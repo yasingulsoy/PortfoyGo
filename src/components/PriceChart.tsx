@@ -27,8 +27,8 @@ export default function PriceChart({ type, symbol, id, days = 30 }: PriceChartPr
   );
 
   useEffect(() => {
-    let chart: unknown;
-    let series: unknown;
+    let chart: any;
+    let series: any;
     let dispose = () => {};
 
     (async () => {
@@ -54,10 +54,10 @@ export default function PriceChart({ type, symbol, id, days = 30 }: PriceChartPr
         topColor: 'rgba(79,70,229,0.3)',
         bottomColor: 'rgba(79,70,229,0.0)'
       });
-      (series as any).setData(data.series);
+      series.setData(data.series);
 
       const onResize = () => {
-        if (containerRef.current) (chart as any).applyOptions({ width: containerRef.current.clientWidth });
+        if (containerRef.current) chart.applyOptions({ width: containerRef.current.clientWidth });
       };
       window.addEventListener('resize', onResize);
       dispose = () => window.removeEventListener('resize', onResize);
@@ -65,7 +65,7 @@ export default function PriceChart({ type, symbol, id, days = 30 }: PriceChartPr
 
     return () => {
       try { dispose(); } catch {}
-      try { (chart as any)?.remove(); } catch {}
+      try { chart?.remove(); } catch {}
     };
   }, [data]);
 
