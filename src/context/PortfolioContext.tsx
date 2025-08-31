@@ -29,11 +29,11 @@ const portfolioReducer = (state: PortfolioState, action: PortfolioAction): Portf
   switch (action.type) {
     case 'BUY_STOCK': {
       const { stock, quantity, price } = action.payload;
-      const totalCost = quantity * price;
-      const commission = totalCost * 0.001; // %0.1 komisyon
-      const totalAmount = totalCost + commission;
+      const totalAmount = quantity * price;
+      const commission = totalAmount * 0.001; // %0.1 komisyon
+      const totalCost = totalAmount + commission;
 
-      if (totalAmount > state.balance) {
+      if (totalCost > state.balance) {
         return state; // Yetersiz bakiye
       }
 
@@ -43,8 +43,9 @@ const portfolioReducer = (state: PortfolioState, action: PortfolioAction): Portf
       if (existingItem) {
         // Mevcut pozisyonu güncelle
         const newQuantity = existingItem.quantity + quantity;
-        const newAveragePrice = ((existingItem.averagePrice * existingItem.quantity) + totalCost) / newQuantity;
-        
+        const newTotalCost = (existingItem.quantity * existingItem.averagePrice) + totalAmount;
+        const newAveragePrice = newTotalCost / newQuantity;
+
         newPortfolioItems = state.portfolioItems.map(item =>
           item.symbol === stock.symbol
             ? {
@@ -58,19 +59,21 @@ const portfolioReducer = (state: PortfolioState, action: PortfolioAction): Portf
             : item
         );
       } else {
-        // Yeni pozisyon ekle
-        const newItem: PortfolioItem = {
-          id: Date.now().toString(),
-          symbol: stock.symbol,
-          name: stock.name,
-          quantity,
-          averagePrice: price,
-          currentPrice: stock.price,
-          totalValue: quantity * stock.price,
-          profitLoss: 0,
-          profitLossPercent: 0
-        };
-        newPortfolioItems = [...state.portfolioItems, newItem];
+        // Yeni pozisyon oluştur
+        newPortfolioItems = [
+          ...state.portfolioItems,
+          {
+            id: Date.now().toString(),
+            symbol: stock.symbol,
+            name: stock.name,
+            quantity,
+            averagePrice: price,
+            currentPrice: stock.price,
+            totalValue: quantity * stock.price,
+            profitLoss: 0,
+            profitLossPercent: 0
+          }
+        ];
       }
 
       const newTransaction: Transaction = {
@@ -85,7 +88,7 @@ const portfolioReducer = (state: PortfolioState, action: PortfolioAction): Portf
         timestamp: new Date()
       };
 
-      const newBalance = state.balance - totalAmount;
+      const newBalance = state.balance - totalCost;
       const newTotalValue = newPortfolioItems.reduce((sum, item) => sum + item.totalValue, 0);
       const newTotalProfitLoss = newPortfolioItems.reduce((sum, item) => sum + item.profitLoss, 0);
 

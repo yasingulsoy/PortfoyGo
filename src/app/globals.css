@@ -1,26 +1,71 @@
-@import "tailwindcss";
+@import "tailwindcss/preflight";
+@import "tailwindcss/utilities";
 
 :root {
   --background: #ffffff;
   --foreground: #171717;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+.dark {
+  --background: #0a0a0a;
+  --foreground: #ededed;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+@layer base {
+  body {
+    background: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-geist-sans), system-ui, sans-serif;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@layer components {
+  .card {
+    background-color: white;
+    border-radius: 0.75rem;
+    box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+    border: 1px solid rgb(229 231 235);
+  }
+  
+  .dark .card {
+    background-color: rgb(17 24 39);
+    border-color: rgb(31 41 55);
+  }
+  
+  .btn-primary {
+    background-color: rgb(79 70 229);
+    color: white;
+    padding: 0.75rem 1rem;
+    border-radius: 0.5rem;
+    transition-property: background-color;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    transition-duration: 150ms;
+  }
+  
+  .btn-primary:hover {
+    background-color: rgb(67 56 202);
+  }
+  
+  .btn-secondary {
+    background-color: rgb(243 244 246);
+    color: rgb(55 65 81);
+    padding: 0.75rem 1rem;
+    border-radius: 0.5rem;
+    transition-property: background-color;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    transition-duration: 150ms;
+  }
+  
+  .dark .btn-secondary {
+    background-color: rgb(31 41 55);
+    color: rgb(229 231 235);
+  }
+  
+  .btn-secondary:hover {
+    background-color: rgb(229 231 235);
+  }
+  
+  .dark .btn-secondary:hover {
+    background-color: rgb(55 65 81);
+  }
 }

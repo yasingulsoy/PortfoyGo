@@ -20,9 +20,16 @@ export default function TradeModal({ isOpen, onClose, stock, type }: TradeModalP
   
   const { state, buyStock, sellStock } = usePortfolio();
 
+  // USD-TRY dönüşüm oranı (gerçek uygulamada API'den alınır)
+  const USD_TO_TRY = 32.5; // Yaklaşık kur
+
   useEffect(() => {
     if (stock) {
-      const amount = quantity * stock.price;
+      // Kripto için USD-TRY dönüşümü yap
+      const isCrypto = stock.symbol.length <= 4; // Kripto sembolleri genelde kısa
+      const priceInTRY = isCrypto ? stock.price * USD_TO_TRY : stock.price;
+      
+      const amount = quantity * priceInTRY;
       const comm = amount * 0.001; // %0.1 komisyon
       setTotalAmount(amount);
       setCommission(comm);
@@ -64,6 +71,10 @@ export default function TradeModal({ isOpen, onClose, stock, type }: TradeModalP
 
   if (!isOpen || !stock) return null;
 
+  // Kripto için USD-TRY dönüşümü
+  const isCrypto = stock.symbol.length <= 4;
+  const priceInTRY = isCrypto ? stock.price * USD_TO_TRY : stock.price;
+
   return (
     <div className="fixed inset-0 bg-black/50 dark:bg-black/60 flex items-center justify-center z-50">
       <div className="bg-white dark:bg-gray-900 rounded-xl shadow-xl max-w-md w-full mx-4 border border-gray-200 dark:border-gray-800">
@@ -95,9 +106,16 @@ export default function TradeModal({ isOpen, onClose, stock, type }: TradeModalP
             </div>
             <div className="mt-3 flex justify-between items-center">
               <span className="text-sm text-gray-500 dark:text-gray-400">Güncel Fiyat</span>
-              <span className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                ₺{stock.price.toLocaleString()}
-              </span>
+              <div className="text-right">
+                <span className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                  ₺{priceInTRY.toLocaleString()}
+                </span>
+                {isCrypto && (
+                  <div className="text-xs text-gray-500 dark:text-gray-400">
+                    ${stock.price.toLocaleString()}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
