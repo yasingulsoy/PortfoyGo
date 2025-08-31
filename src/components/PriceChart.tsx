@@ -39,7 +39,7 @@ export default function PriceChart({ type, symbol, id, days = 30 }: PriceChartPr
       const gridColor = '#F3F4F6';
       chart = lc.createChart(containerRef.current, {
         layout: { 
-          background: { type: 'solid' as any, color: bgColor }, 
+          background: { color: bgColor }, 
           textColor: textColor 
         },
         grid: { 

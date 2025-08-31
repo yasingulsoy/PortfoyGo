@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useReducer, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useReducer, useEffect, ReactNode, useCallback } from 'react';
 import { PortfolioItem, Transaction, Stock } from '@/types';
 
 interface PortfolioState {
@@ -235,13 +235,13 @@ export const PortfolioProvider: React.FC<{ children: ReactNode }> = ({ children 
   }, [state]);
 
   // Local storage'dan yükle
-  useEffect(() => {
+  const loadFromStorage = useCallback(() => {
     const savedPortfolio = localStorage.getItem('portfolio');
     if (savedPortfolio) {
       try {
         const parsed = JSON.parse(savedPortfolio);
         // Timestamp'leri Date objelerine çevir
-        parsed.transactions = parsed.transactions.map((t: any) => ({
+        parsed.transactions = parsed.transactions.map((t: { timestamp: string | number; [key: string]: unknown }) => ({
           ...t,
           timestamp: new Date(t.timestamp)
         }));
@@ -252,6 +252,10 @@ export const PortfolioProvider: React.FC<{ children: ReactNode }> = ({ children 
       }
     }
   }, [state]);
+
+  useEffect(() => {
+    loadFromStorage();
+  }, [loadFromStorage]);
 
   return (
     <PortfolioContext.Provider value={{
