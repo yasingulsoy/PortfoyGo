@@ -1,36 +1,36 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Sanal Yatırım Oyunu
 
-## Getting Started
+Modern Next.js (App Router, TS, Tailwind) ile geliştirilen, gerçek kripto verileri ve mock hisse verileriyle çalışan sanal borsa oyunu.
 
-First, run the development server:
+## Özellikler
+- Hisseler (mock) ve kripto (CoinGecko canlı) piyasa listesi
+- Portföy yönetimi, kâr/zarar ve nakit bakiye takibi
+- Al/Sat modalı, işlem geçmişi ve CSV dışa aktarım
+- Liderlik tablosu (statik örnek, genişletilebilir)
+- Responsive, modern UI (Navbar, Footer, MarketTabs)
 
+## Kurulum
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Ortam Değişkenleri
+`.env.local` içinde aşağıdakileri tanımlayabilirsiniz (opsiyonel):
+```
+# Hisse API anahtarları (ileride entegrasyon için)
+ALPHA_VANTAGE_API_KEY=your_key
+FINNHUB_API_KEY=your_key
+```
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- Kripto verileri CoinGecko ile sağlanır; ücretsiz kullanım için anahtar gerektirmez.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Geliştirme Notları
+- Kripto görselleri için `next.config.ts` içinde `assets.coingecko.com` domaini izinlidir.
+- Hisse verileri şimdilik mock. Gerçek veriye geçişte `src/services/api.ts` içinde ilgili çağrıları açıp API anahtarlarını `.env.local`'dan okuyacak şekilde uyarlayın.
 
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Komutlar
+- `npm run dev`: Geliştirme sunucusu
+- `npm run build`: Üretim build'i
+- `npm run start`: Build sonrası çalıştırma
+- `npm run lint`: Lint
