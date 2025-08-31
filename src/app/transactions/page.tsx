@@ -7,7 +7,6 @@ import {
   ArrowDownTrayIcon
 } from '@heroicons/react/24/outline';
 import { usePortfolio } from '@/context/PortfolioContext';
-import { Transaction } from '@/types';
 
 export default function TransactionsPage() {
   const { state } = usePortfolio();

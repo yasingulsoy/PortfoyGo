@@ -7,7 +7,6 @@ import {
   TrophyIcon, 
   UserIcon,
   ArrowUpIcon,
-  ArrowDownIcon,
 } from '@heroicons/react/24/outline';
 import { Stock } from '@/types';
 import { usePortfolio } from '@/context/PortfolioContext';
@@ -18,8 +17,8 @@ import { CryptoCoin } from '@/services/crypto';
 
 export default function Home() {
   const { state } = usePortfolio();
-  const { stocks, isLoading: stocksLoading } = useStocks();
-  const { cryptos, isLoading: cryptosLoading } = useCryptos();
+  const { stocks } = useStocks();
+  const { cryptos } = useCryptos();
 
   const [selectedStock, setSelectedStock] = useState<Stock | null>(null);
   const [tradeType, setTradeType] = useState<'buy' | 'sell'>('buy');

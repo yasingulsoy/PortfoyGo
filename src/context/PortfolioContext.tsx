@@ -251,7 +251,7 @@ export const PortfolioProvider: React.FC<{ children: ReactNode }> = ({ children 
         console.error('Portfolio load error:', error);
       }
     }
-  }, []);
+  }, [state]);
 
   return (
     <PortfolioContext.Provider value={{

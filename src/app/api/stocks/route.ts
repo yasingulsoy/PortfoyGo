@@ -54,7 +54,7 @@ export async function GET() {
     const data: MarketData = { stocks: results, lastUpdated: new Date() };
     lastCache = { data, ts: now };
     return NextResponse.json(data, { headers: { 'Cache-Control': 'no-store' } });
-  } catch (e) {
+  } catch {
     // Fallback: hafif simülasyonlu mock
     const mock = symbolList.map((s, i) => ({
       id: s,

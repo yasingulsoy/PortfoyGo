@@ -39,7 +39,7 @@ export async function GET(request: Request) {
     }
 
     return NextResponse.json({ series: [] });
-  } catch (e) {
+  } catch {
     // Basit random walk fallback
     const now = Math.floor(Date.now() / 1000);
     const series = Array.from({ length: days }, (_, i) => {
