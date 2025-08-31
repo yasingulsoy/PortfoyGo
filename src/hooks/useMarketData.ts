@@ -1,5 +1,5 @@
 import useSWR from 'swr';
-import { MarketData, Stock } from '@/types';
+import { MarketData } from '@/types';
 import { fetchTopCryptos, CryptoCoin } from '@/services/crypto';
 
 const jsonFetcher = async <T>(url: string): Promise<T> => {

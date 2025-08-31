@@ -1,9 +1,4 @@
-import axios from 'axios';
 import { Stock, MarketData } from '@/types';
-
-// Ücretsiz finansal API'ler
-const ALPHA_VANTAGE_API_KEY = 'demo'; // Ücretsiz demo key
-const FINNHUB_API_KEY = 'demo'; // Ücretsiz demo key
 
 // Mock data - gerçek API'ler için kullanılacak
 const mockStocks: Stock[] = [

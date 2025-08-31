@@ -40,7 +40,7 @@ export async function fetchCryptoById(id: string, vsCurrency: string = 'usd'): P
       }
     });
     return (Array.isArray(data) && data.length > 0) ? data[0] as CryptoCoin : null;
-  } catch (e) {
+  } catch {
     return null;
   }
 }
