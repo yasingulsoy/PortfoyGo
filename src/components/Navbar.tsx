@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import { Bars3Icon, XMarkIcon, ChartBarIcon, HomeIcon, BriefcaseIcon, ClockIcon, TrophyIcon } from '@heroicons/react/24/outline';
+import ThemeToggle from './ThemeToggle';
 
 export default function Navbar() {
   const [open, setOpen] = useState(false);
@@ -15,26 +16,30 @@ export default function Navbar() {
   ];
 
   return (
-    <header className="bg-white/80 backdrop-blur border-b sticky top-0 z-40">
+    <header className="bg-white/80 dark:bg-gray-900/60 backdrop-blur border-b border-gray-200 dark:border-gray-800 sticky top-0 z-40">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           <Link href="/" className="flex items-center space-x-3">
             <ChartBarIcon className="h-8 w-8 text-indigo-600" />
-            <span className="text-xl font-bold text-gray-900">Sanal Yatırım</span>
+            <span className="text-xl font-bold text-gray-900 dark:text-gray-100">Sanal Yatırım</span>
           </Link>
 
           <nav className="hidden md:flex items-center space-x-6">
             {navItems.map(({ href, label, icon: Icon }) => (
-              <Link key={href} href={href} className="inline-flex items-center space-x-2 text-gray-700 hover:text-indigo-600 transition-colors">
+              <Link key={href} href={href} className="inline-flex items-center space-x-2 text-gray-700 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">
                 <Icon className="h-5 w-5" />
                 <span className="text-sm font-medium">{label}</span>
               </Link>
             ))}
           </nav>
 
+          <div className="hidden md:flex items-center gap-3">
+            <ThemeToggle />
+          </div>
+
           <button
             onClick={() => setOpen(!open)}
-            className="md:hidden inline-flex items-center justify-center p-2 rounded-md text-gray-700 hover:bg-gray-100 focus:outline-none"
+            className="md:hidden inline-flex items-center justify-center p-2 rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 focus:outline-none"
             aria-label="Toggle navigation"
           >
             {open ? <XMarkIcon className="h-6 w-6" /> : <Bars3Icon className="h-6 w-6" />}
@@ -44,19 +49,22 @@ export default function Navbar() {
 
       {/* Mobile menu */}
       {open && (
-        <div className="md:hidden border-t bg-white">
+        <div className="md:hidden border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
           <div className="px-4 py-3 space-y-1">
             {navItems.map(({ href, label, icon: Icon }) => (
               <Link
                 key={href}
                 href={href}
                 onClick={() => setOpen(false)}
-                className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-100"
+                className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
               >
                 <Icon className="h-5 w-5" />
                 <span className="text-sm font-medium">{label}</span>
               </Link>
             ))}
+            <div className="px-3 pt-2">
+              <ThemeToggle />
+            </div>
           </div>
         </div>
       )}

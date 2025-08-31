@@ -9,14 +9,21 @@ import { Stock } from '@/types';
 
 const fetcher = (url: string) => fetch(url, { cache: 'no-store' }).then(r => r.json());
 
-export default function AssetDetailPage({ params }: { params: { symbol: string } }) {
+export default function AssetDetailPage({ params }: { params: Promise<{ symbol: string }> }) {
+  const [symbol, setSymbol] = useState<string>('');
+  
+  // params'ı async olarak çöz
+  useState(() => {
+    params.then(p => setSymbol(p.symbol.toUpperCase()));
+  });
+
   const sp = useSearchParams();
   const type = (sp.get('type') as 'stock' | 'crypto') || 'stock';
   const id = sp.get('id') || undefined;
-  const symbol = params.symbol.toUpperCase();
+  const symbolUpper = symbol.toUpperCase();
 
   const { data } = useSWR(() => type === 'stock'
-    ? `/api/asset/history?type=stock&symbol=${symbol}&days=30`
+    ? `/api/asset/history?type=stock&symbol=${symbolUpper}&days=30`
     : `/api/asset/history?type=crypto&id=${id}&days=30`, fetcher, { refreshInterval: 60000 });
 
   const lastPrice = useMemo(() => {
@@ -28,9 +35,9 @@ export default function AssetDetailPage({ params }: { params: { symbol: string }
   const [mode, setMode] = useState<'buy' | 'sell'>('buy');
 
   const stockLike: Stock = {
-    id: id || symbol,
-    symbol,
-    name: symbol,
+    id: id || symbolUpper,
+    symbol: symbolUpper,
+    name: symbolUpper,
     price: lastPrice,
     change: 0,
     changePercent: 0,
@@ -42,16 +49,18 @@ export default function AssetDetailPage({ params }: { params: { symbol: string }
     low: lastPrice,
   };
 
+  if (!symbol) return <div>Loading...</div>;
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-950 dark:to-gray-900">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-6">
-          <h1 className="text-2xl font-bold text-gray-900">{symbol} Detay</h1>
-          <p className="text-sm text-gray-500">Son fiyat: {lastPrice ? `₺${lastPrice.toLocaleString()}` : '—'}</p>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">{symbolUpper} Detay</h1>
+          <p className="text-sm text-gray-500 dark:text-gray-400">Son fiyat: {lastPrice ? `₺${lastPrice.toLocaleString()}` : '—'}</p>
         </div>
 
-        <div className="bg-white rounded-xl shadow-sm border p-4">
-          <PriceChart type={type} symbol={symbol} id={id} days={30} />
+        <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-4">
+          <PriceChart type={type} symbol={symbolUpper} id={id} days={30} />
         </div>
 
         <div className="mt-6 flex gap-3">
