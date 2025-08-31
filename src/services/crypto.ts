@@ -39,7 +39,7 @@ export async function fetchCryptoById(id: string, vsCurrency: string = 'usd'): P
         price_change_percentage: '24h'
       }
     });
-    return (data && data.length > 0) ? data[0] as CryptoCoin : null;
+    return (Array.isArray(data) && data.length > 0) ? data[0] as CryptoCoin : null;
   } catch (e) {
     return null;
   }

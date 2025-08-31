@@ -34,9 +34,18 @@ export default function PriceChart({ type, symbol, id, days = 30 }: PriceChartPr
     (async () => {
       if (!containerRef.current || !data?.series) return;
       const lc = await import('lightweight-charts');
+      const bgColor = '#F3F4F6';
+      const textColor = '#111827';
+      const gridColor = '#F3F4F6';
       chart = lc.createChart(containerRef.current, {
-        layout: { background: { type: 'solid', color: 'white' }, textColor: '#111827' },
-        grid: { vertLines: { color: '#F3F4F6' }, horzLines: { color: '#F3F4F6' } },
+        layout: { 
+          background: { type: 'solid' as any, color: bgColor }, 
+          textColor: textColor 
+        },
+        grid: { 
+          vertLines: { color: gridColor }, 
+          horzLines: { color: gridColor } 
+        },
         width: containerRef.current.clientWidth,
         height: 320,
       });
