@@ -4,6 +4,7 @@ import "./globals.css";
 import { PortfolioProvider } from "@/context/PortfolioContext";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import { ThemeProvider } from "next-themes";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -26,15 +27,17 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="tr">
+    <html lang="tr" suppressHydrationWarning>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-white text-gray-900 dark:bg-gray-950 dark:text-gray-100`}
       >
-        <PortfolioProvider>
-          <Navbar />
-          <main>{children}</main>
-          <Footer />
-        </PortfolioProvider>
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+          <PortfolioProvider>
+            <Navbar />
+            <main>{children}</main>
+            <Footer />
+          </PortfolioProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

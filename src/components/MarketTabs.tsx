@@ -1,6 +1,7 @@
 'use client';
 
 import Image from 'next/image';
+import Link from 'next/link';
 import { ArrowUpIcon, ArrowDownIcon } from '@heroicons/react/24/outline';
 import { Stock } from '@/types';
 import { CryptoCoin } from '@/services/crypto';
@@ -18,7 +19,7 @@ export default function MarketTabs({ stocks, cryptos, onBuy, onSell }: MarketTab
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between px-4 sm:px-6 py-4 border-b gap-3">
         <h2 className="text-lg font-semibold text-gray-900">Piyasa</h2>
         <div className="flex items-center gap-2 text-xs sm:text-sm text-gray-500">
-          <span>Gerçek hisse verileri mock, kripto verileri canlı.</span>
+          <span>Hisse: mock, Kripto: canlı</span>
         </div>
       </div>
 
@@ -29,7 +30,36 @@ export default function MarketTabs({ stocks, cryptos, onBuy, onSell }: MarketTab
             <h3 className="text-sm font-semibold text-gray-700">Hisseler</h3>
             <span className="text-xs text-gray-500">Toplam {stocks.length}</span>
           </div>
-          <div className="overflow-x-auto -mx-4 sm:mx-0">
+
+          {/* Mobile cards */}
+          <div className="grid gap-3 sm:hidden">
+            {stocks.map((s) => (
+              <div key={s.id} className="border rounded-lg p-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Link href={`/asset/${s.symbol}?type=stock`} className="text-sm font-semibold text-gray-900 hover:text-indigo-600">
+                      {s.name}
+                    </Link>
+                    <div className="text-xs text-gray-500">{s.symbol}</div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-sm font-semibold text-gray-900">₺{s.price.toLocaleString()}</div>
+                    <div className={`text-xs inline-flex items-center ${s.change >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      {s.change >= 0 ? <ArrowUpIcon className="h-3 w-3 mr-1" /> : <ArrowDownIcon className="h-3 w-3 mr-1" />}
+                      {s.change >= 0 ? '+' : ''}{s.change.toLocaleString()} ({s.changePercent >= 0 ? '+' : ''}{s.changePercent}%)
+                    </div>
+                  </div>
+                </div>
+                <div className="mt-3 flex gap-2">
+                  <button onClick={() => onBuy(s.symbol, 'stock')} className="flex-1 bg-green-600 text-white px-3 py-2 rounded text-sm">Al</button>
+                  <button onClick={() => onSell(s.symbol, 'stock')} className="flex-1 bg-red-600 text-white px-3 py-2 rounded text-sm">Sat</button>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Table (>=sm) */}
+          <div className="overflow-x-auto -mx-4 sm:mx-0 hidden sm:block">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
@@ -48,12 +78,12 @@ export default function MarketTabs({ stocks, cryptos, onBuy, onSell }: MarketTab
                           <span className="text-sm font-medium text-indigo-600">{s.symbol.slice(0,1)}</span>
                         </div>
                         <div>
-                          <div className="text-sm font-medium text-gray-900">{s.name}</div>
+                          <Link href={`/asset/${s.symbol}?type=stock`} className="text-sm font-medium text-gray-900 hover:text-indigo-600">{s.name}</Link>
                           <div className="text-xs text-gray-500">{s.symbol}</div>
                         </div>
                       </div>
                     </td>
-                    <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-right text-sm text-gray-900">${s.price.toLocaleString()}</td>
+                    <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-right text-sm text-gray-900">₺{s.price.toLocaleString()}</td>
                     <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-right">
                       <div className={`inline-flex items-center ${s.change >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                         {s.change >= 0 ? <ArrowUpIcon className="h-4 w-4 mr-1" /> : <ArrowDownIcon className="h-4 w-4 mr-1" />}
@@ -81,7 +111,39 @@ export default function MarketTabs({ stocks, cryptos, onBuy, onSell }: MarketTab
             <h3 className="text-sm font-semibold text-gray-700">Kripto</h3>
             <span className="text-xs text-gray-500">Toplam {cryptos.length}</span>
           </div>
-          <div className="overflow-x-auto -mx-4 sm:mx-0">
+
+          {/* Mobile cards */}
+          <div className="grid gap-3 sm:hidden">
+            {cryptos.map((c) => (
+              <div key={c.id} className="border rounded-lg p-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <Image src={c.image} alt={c.name} width={24} height={24} className="rounded-full" />
+                    <div>
+                      <Link href={`/asset/${c.symbol.toUpperCase()}?type=crypto&id=${c.id}`} className="text-sm font-semibold text-gray-900 hover:text-indigo-600">
+                        {c.name}
+                      </Link>
+                      <div className="text-xs text-gray-500 uppercase">{c.symbol}</div>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-sm font-semibold text-gray-900">${c.current_price.toLocaleString()}</div>
+                    <div className={`text-xs inline-flex items-center ${c.price_change_percentage_24h >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      {c.price_change_percentage_24h >= 0 ? <ArrowUpIcon className="h-3 w-3 mr-1" /> : <ArrowDownIcon className="h-3 w-3 mr-1" />}
+                      {c.price_change_percentage_24h.toFixed(2)}%
+                    </div>
+                  </div>
+                </div>
+                <div className="mt-3 flex gap-2">
+                  <button onClick={() => onBuy(c.symbol.toUpperCase(), 'crypto')} className="flex-1 bg-green-600 text-white px-3 py-2 rounded text-sm">Al</button>
+                  <button onClick={() => onSell(c.symbol.toUpperCase(), 'crypto')} className="flex-1 bg-red-600 text-white px-3 py-2 rounded text-sm">Sat</button>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Table (>=sm) */}
+          <div className="overflow-x-auto -mx-4 sm:mx-0 hidden sm:block">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
@@ -98,7 +160,7 @@ export default function MarketTabs({ stocks, cryptos, onBuy, onSell }: MarketTab
                       <div className="flex items-center gap-3">
                         <Image src={c.image} alt={c.name} width={24} height={24} className="rounded-full" />
                         <div>
-                          <div className="text-sm font-medium text-gray-900">{c.name}</div>
+                          <Link href={`/asset/${c.symbol.toUpperCase()}?type=crypto&id=${c.id}`} className="text-sm font-medium text-gray-900 hover:text-indigo-600">{c.name}</Link>
                           <div className="text-xs text-gray-500 uppercase">{c.symbol}</div>
                         </div>
                       </div>
