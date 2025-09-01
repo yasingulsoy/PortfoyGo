@@ -34,9 +34,15 @@ export default function PriceChart({ type, symbol, id, days = 30 }: PriceChartPr
     (async () => {
       if (!containerRef.current || !data?.series) return;
       const lc = await import('lightweight-charts');
-      const bgColor = '#F3F4F6';
-      const textColor = '#111827';
-      const gridColor = '#F3F4F6';
+      
+      // Dark mode desteği
+      const isDark = document.documentElement.classList.contains('dark');
+      const bgColor = isDark ? '#1F2937' : '#FFFFFF';
+      const textColor = isDark ? '#F9FAFB' : '#111827';
+      const gridColor = isDark ? '#374151' : '#F3F4F6';
+      const lineColor = isDark ? '#60A5FA' : '#4F46E5';
+      const topColor = isDark ? 'rgba(96,165,250,0.3)' : 'rgba(79,70,229,0.3)';
+      
       chart = lc.createChart(containerRef.current, {
         layout: { 
           background: { color: bgColor }, 
@@ -46,12 +52,19 @@ export default function PriceChart({ type, symbol, id, days = 30 }: PriceChartPr
           vertLines: { color: gridColor }, 
           horzLines: { color: gridColor } 
         },
+        timeScale: {
+          borderColor: gridColor,
+        },
+        rightPriceScale: {
+          borderColor: gridColor,
+        },
         width: containerRef.current.clientWidth,
         height: 320,
       });
+      
       series = chart.addAreaSeries({
-        lineColor: '#4F46E5',
-        topColor: 'rgba(79,70,229,0.3)',
+        lineColor: lineColor,
+        topColor: topColor,
         bottomColor: 'rgba(79,70,229,0.0)'
       });
       series.setData(data.series);

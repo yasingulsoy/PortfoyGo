@@ -18,7 +18,7 @@ type PortfolioAction =
   | { type: 'RESET_PORTFOLIO' };
 
 const initialState: PortfolioState = {
-  balance: 10000, // Başlangıç bakiyesi
+  balance: 10000000, // Başlangıç bakiyesi
   portfolioItems: [],
   transactions: [],
   totalValue: 0,
@@ -30,7 +30,7 @@ const portfolioReducer = (state: PortfolioState, action: PortfolioAction): Portf
     case 'BUY_STOCK': {
       const { stock, quantity, price } = action.payload;
       const totalAmount = quantity * price;
-      const commission = totalAmount * 0.001; // %0.1 komisyon
+      const commission = totalAmount * 0.0025; // %0.25 komisyon
       const totalCost = totalAmount + commission;
 
       if (totalCost > state.balance) {
@@ -111,7 +111,7 @@ const portfolioReducer = (state: PortfolioState, action: PortfolioAction): Portf
       }
 
       const totalRevenue = quantity * price;
-      const commission = totalRevenue * 0.001; // %0.1 komisyon
+      const commission = totalRevenue * 0.0025; // %0.25 komisyon
       const netRevenue = totalRevenue - commission;
 
       let newPortfolioItems: PortfolioItem[];

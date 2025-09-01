@@ -142,9 +142,10 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Market Tabs */}
-        <div className="mb-8">
-          <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800">
+        {/* Market Overview & Actions */}
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 mb-8">
+          {/* Market Tabs - Takes 2/3 width on XL screens */}
+          <div className="xl:col-span-2">
             <MarketTabs
               stocks={stocks}
               cryptos={cryptos}
@@ -152,48 +153,104 @@ export default function Home() {
               onSell={onSell}
             />
           </div>
-        </div>
 
-        {/* Quick Actions */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-6">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Hızlı İşlemler</h3>
-            <div className="space-y-3">
-              <Link href="/portfolio" className="block w-full bg-indigo-600 text-white py-3 px-4 rounded-lg hover:bg-indigo-700 transition-colors text-center">
-                Portföyümü Görüntüle
-              </Link>
-              <Link href="/transactions" className="block w-full bg-gray-100 dark:bg-gray-800 dark:text-gray-200 text-gray-700 py-3 px-4 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors text-center">
-                Geçmiş İşlemler
-              </Link>
-              <button className="w-full bg-gray-100 dark:bg-gray-800 dark:text-gray-200 text-gray-700 py-3 px-4 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
-                Piyasa Analizi
-              </button>
+          {/* Quick Actions Panel */}
+          <div className="space-y-6">
+            <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-6">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Hızlı İşlemler</h3>
+              <div className="space-y-3">
+                <Link href="/portfolio" className="block w-full bg-indigo-600 text-white py-3 px-4 rounded-lg hover:bg-indigo-700 transition-colors text-center font-medium">
+                  Portföyümü Görüntüle
+                </Link>
+                <Link href="/transactions" className="block w-full bg-gray-100 dark:bg-gray-800 dark:text-gray-200 text-gray-700 py-3 px-4 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors text-center font-medium">
+                  Geçmiş İşlemler
+                </Link>
+                <Link href="/leaderboard" className="block w-full bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 py-3 px-4 rounded-lg hover:bg-purple-200 dark:hover:bg-purple-900/50 transition-colors text-center font-medium">
+                  Liderlik Tablosu
+                </Link>
+              </div>
+            </div>
+
+            {/* Market Summary */}
+            <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-6">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Piyasa Özeti</h3>
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-gray-600 dark:text-gray-400">Toplam Hisse</span>
+                  <span className="font-medium text-gray-900 dark:text-gray-100">{stocks.length}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-gray-600 dark:text-gray-400">Toplam Kripto</span>
+                  <span className="font-medium text-gray-900 dark:text-gray-100">{cryptos.length}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-gray-600 dark:text-gray-400">Komisyon Oranı</span>
+                  <span className="font-medium text-green-600">%0.25</span>
+                </div>
+                <div className="pt-3 border-t border-gray-200 dark:border-gray-700">
+                  <div className="text-xs text-gray-500 dark:text-gray-400 text-center">
+                    Son güncelleme: {new Date().toLocaleTimeString('tr-TR')}
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
+        </div>
 
-          <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-6">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Liderlik Tablosu</h3>
-            <div className="space-y-3">
-              <div className="flex items-center justify-between p-3 bg-yellow-50 dark:bg-yellow-900/30 rounded-lg">
-                <div className="flex items-center space-x-3">
-                  <span className="text-yellow-600">🥇</span>
-                  <span className="font-medium">Ahmet Yılmaz</span>
+        {/* Mini Leaderboard */}
+        <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-6">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100">En İyi Performans</h3>
+            <Link href="/leaderboard" className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 text-sm font-medium">
+              Tümünü Gör →
+            </Link>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="flex items-center justify-between p-4 bg-gradient-to-r from-yellow-50 to-yellow-100 dark:from-yellow-900/20 dark:to-yellow-800/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
+              <div className="flex items-center space-x-3">
+                <div className="h-10 w-10 bg-yellow-500 rounded-full flex items-center justify-center">
+                  <span className="text-white font-bold">🥇</span>
                 </div>
-                <span className="text-green-600 font-semibold">+₺2,450</span>
+                <div>
+                  <div className="font-semibold text-gray-900 dark:text-gray-100">Ahmet Yılmaz</div>
+                  <div className="text-sm text-gray-600 dark:text-gray-400">1. Sıra</div>
+                </div>
               </div>
-              <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                <div className="flex items-center space-x-3">
-                  <span className="text-gray-600 dark:text-gray-300">🥈</span>
-                  <span className="font-medium">Ayşe Demir</span>
-                </div>
-                <span className="text-green-600 font-semibold">+₺1,890</span>
+              <div className="text-right">
+                <div className="text-lg font-bold text-green-600">+₺2,450</div>
+                <div className="text-sm text-gray-600 dark:text-gray-400">+24.5%</div>
               </div>
-              <div className="flex items-center justify-between p-3 bg-orange-50 dark:bg-orange-900/30 rounded-lg">
-                <div className="flex items-center space-x-3">
-                  <span className="text-orange-600">🥉</span>
-                  <span className="font-medium">Mehmet Kaya</span>
+            </div>
+            
+            <div className="flex items-center justify-between p-4 bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800/50 dark:to-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-700">
+              <div className="flex items-center space-x-3">
+                <div className="h-10 w-10 bg-gray-400 rounded-full flex items-center justify-center">
+                  <span className="text-white font-bold">🥈</span>
                 </div>
-                <span className="text-green-600 font-semibold">+₺1,230</span>
+                <div>
+                  <div className="font-semibold text-gray-900 dark:text-gray-100">Ayşe Demir</div>
+                  <div className="text-sm text-gray-600 dark:text-gray-400">2. Sıra</div>
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="text-lg font-bold text-green-600">+₺1,890</div>
+                <div className="text-sm text-gray-600 dark:text-gray-400">+18.9%</div>
+              </div>
+            </div>
+            
+            <div className="flex items-center justify-between p-4 bg-gradient-to-r from-orange-50 to-orange-100 dark:from-orange-900/20 dark:to-orange-800/20 rounded-lg border border-orange-200 dark:border-orange-800">
+              <div className="flex items-center space-x-3">
+                <div className="h-10 w-10 bg-orange-500 rounded-full flex items-center justify-center">
+                  <span className="text-white font-bold">🥉</span>
+                </div>
+                <div>
+                  <div className="font-semibold text-gray-900 dark:text-gray-100">Mehmet Kaya</div>
+                  <div className="text-sm text-gray-600 dark:text-gray-400">3. Sıra</div>
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="text-lg font-bold text-green-600">+₺1,230</div>
+                <div className="text-sm text-gray-600 dark:text-gray-400">+12.3%</div>
               </div>
             </div>
           </div>

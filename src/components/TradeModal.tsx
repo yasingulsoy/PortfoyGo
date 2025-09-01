@@ -30,7 +30,7 @@ export default function TradeModal({ isOpen, onClose, stock, type }: TradeModalP
       const priceInTRY = isCrypto ? stock.price * USD_TO_TRY : stock.price;
       
       const amount = quantity * priceInTRY;
-      const comm = amount * 0.001; // %0.1 komisyon
+      const comm = amount * 0.0025; // %0.25 komisyon (gerçekçi komisyon oranı)
       setTotalAmount(amount);
       setCommission(comm);
     }
@@ -142,7 +142,7 @@ export default function TradeModal({ isOpen, onClose, stock, type }: TradeModalP
               <span className="font-medium text-gray-900 dark:text-gray-100">₺{totalAmount.toLocaleString()}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-sm text-gray-500 dark:text-gray-400">Komisyon (%0.1)</span>
+              <span className="text-sm text-gray-500 dark:text-gray-400">Komisyon (%0.25)</span>
               <span className="font-medium text-gray-900 dark:text-gray-100">₺{commission.toLocaleString()}</span>
             </div>
             <div className="border-t border-gray-200 dark:border-gray-700 pt-3">

@@ -1,6 +1,11 @@
 import { Stock, MarketData } from '@/types';
 
-// Mock data - gerçek API'ler için kullanılacak
+// API Configuration
+const ALPHA_VANTAGE_API_KEY = process.env.NEXT_PUBLIC_ALPHA_VANTAGE_API_KEY;
+const FINNHUB_API_KEY = process.env.NEXT_PUBLIC_FINNHUB_API_KEY;
+const IEX_CLOUD_API_KEY = process.env.NEXT_PUBLIC_IEX_CLOUD_API_KEY;
+
+// Mock data - API key yoksa kullanılacak
 const mockStocks: Stock[] = [
   {
     id: '1',
@@ -116,15 +121,125 @@ const mockStocks: Stock[] = [
   }
 ];
 
+// Alpha Vantage API'den popüler hisse senetlerini getir
+const fetchFromAlphaVantage = async (): Promise<Stock[]> => {
+  if (!ALPHA_VANTAGE_API_KEY) return mockStocks;
+  
+  const symbols = ['AAPL', 'MSFT', 'GOOGL', 'TSLA', 'AMZN', 'NVDA', 'META', 'NFLX'];
+  const stocks: Stock[] = [];
+  
+  try {
+    for (const symbol of symbols) {
+      const response = await fetch(
+        `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${symbol}&apikey=${ALPHA_VANTAGE_API_KEY}`
+      );
+      const data = await response.json();
+      
+      if (data['Global Quote']) {
+        const quote = data['Global Quote'];
+        const price = parseFloat(quote['05. price']);
+        const change = parseFloat(quote['09. change']);
+        const changePercent = parseFloat(quote['10. change percent'].replace('%', ''));
+        
+        stocks.push({
+          id: symbol,
+          symbol,
+          name: getCompanyName(symbol),
+          price,
+          change,
+          changePercent,
+          volume: parseInt(quote['06. volume']),
+          marketCap: price * 1000000000, // Yaklaşık
+          previousClose: parseFloat(quote['08. previous close']),
+          open: parseFloat(quote['02. open']),
+          high: parseFloat(quote['03. high']),
+          low: parseFloat(quote['04. low'])
+        });
+      }
+      
+      // Rate limiting için bekle
+      await new Promise(resolve => setTimeout(resolve, 200));
+    }
+    
+    return stocks.length > 0 ? stocks : mockStocks;
+  } catch (error) {
+    console.error('Alpha Vantage API error:', error);
+    return mockStocks;
+  }
+};
+
+// Finnhub API'den hisse senetlerini getir
+const fetchFromFinnhub = async (): Promise<Stock[]> => {
+  if (!FINNHUB_API_KEY) return mockStocks;
+  
+  const symbols = ['AAPL', 'MSFT', 'GOOGL', 'TSLA', 'AMZN', 'NVDA', 'META', 'NFLX'];
+  const stocks: Stock[] = [];
+  
+  try {
+    for (const symbol of symbols) {
+      const [quoteResponse, profileResponse] = await Promise.all([
+        fetch(`https://finnhub.io/api/v1/quote?symbol=${symbol}&token=${FINNHUB_API_KEY}`),
+        fetch(`https://finnhub.io/api/v1/stock/profile2?symbol=${symbol}&token=${FINNHUB_API_KEY}`)
+      ]);
+      
+      const quote = await quoteResponse.json();
+      const profile = await profileResponse.json();
+      
+      if (quote.c && profile.name) {
+        const price = quote.c;
+        const change = quote.d;
+        const changePercent = quote.dp;
+        
+        stocks.push({
+          id: symbol,
+          symbol,
+          name: profile.name,
+          price,
+          change,
+          changePercent,
+          volume: 0, // Finnhub'da ayrı endpoint
+          marketCap: profile.marketCapitalization || 0,
+          previousClose: quote.pc,
+          open: quote.o,
+          high: quote.h,
+          low: quote.l
+        });
+      }
+    }
+    
+    return stocks.length > 0 ? stocks : mockStocks;
+  } catch (error) {
+    console.error('Finnhub API error:', error);
+    return mockStocks;
+  }
+};
+
+// Şirket isimlerini getir
+const getCompanyName = (symbol: string): string => {
+  const names: { [key: string]: string } = {
+    'AAPL': 'Apple Inc.',
+    'MSFT': 'Microsoft Corporation',
+    'GOOGL': 'Alphabet Inc.',
+    'TSLA': 'Tesla Inc.',
+    'AMZN': 'Amazon.com Inc.',
+    'NVDA': 'NVIDIA Corporation',
+    'META': 'Meta Platforms Inc.',
+    'NFLX': 'Netflix Inc.'
+  };
+  return names[symbol] || symbol;
+};
+
 // Gerçek API çağrıları için fonksiyonlar
 export const getMarketData = async (): Promise<MarketData> => {
   try {
-    // Gerçek API kullanımı için:
-    // const response = await axios.get(`https://www.alphavantage.co/query?function=TOP_GAINERS_LOSERS&apikey=${ALPHA_VANTAGE_API_KEY}`);
+    // Önce Finnhub'ı dene, sonra Alpha Vantage
+    let stocks = await fetchFromFinnhub();
+    if (stocks === mockStocks && ALPHA_VANTAGE_API_KEY) {
+      stocks = await fetchFromAlphaVantage();
+    }
     
-    // Şimdilik mock data kullanıyoruz
     return {
-      stocks: mockStocks,
+      stocks,
       lastUpdated: new Date()
     };
   } catch (error) {
