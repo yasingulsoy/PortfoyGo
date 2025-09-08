@@ -1,6 +1,6 @@
 import useSWR from 'swr';
 import { MarketData } from '@/types';
-import { fetchTopCryptos, CryptoCoin } from '@/services/crypto';
+import type { CryptoCoin } from '@/services/crypto';
 
 const jsonFetcher = async <T>(url: string): Promise<T> => {
   const res = await fetch(url, { cache: 'no-store' });
@@ -30,7 +30,7 @@ export function useStocks() {
 export function useCryptos() {
   const { data, error, isLoading, mutate } = useSWR<CryptoCoin[], Error, [string, string]>(
     ['cryptos', 'usd'],
-    ([, vsCurrency]) => fetchTopCryptos(vsCurrency),
+    async ([, vsCurrency]) => jsonFetcher<CryptoCoin[]>(`/api/cryptos?vs=${encodeURIComponent(vsCurrency)}&limit=25`),
     {
       refreshInterval: 30000,
       revalidateOnFocus: true,
