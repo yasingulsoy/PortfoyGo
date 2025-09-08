@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { 
   CurrencyDollarIcon, 
@@ -98,7 +98,7 @@ export default function Home() {
               </div>
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Portföy Değeri</p>
-                <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">₺{state.totalValue.toLocaleString()}</p>
+                <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">₺{state.totalValue.toLocaleString('tr-TR')}</p>
               </div>
             </div>
           </div>
@@ -111,7 +111,7 @@ export default function Home() {
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Toplam Kâr/Zarar</p>
                 <p className={`text-2xl font-bold ${state.totalProfitLoss >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                  {state.totalProfitLoss >= 0 ? '+' : ''}₺{state.totalProfitLoss.toLocaleString()}
+                  {state.totalProfitLoss >= 0 ? '+' : ''}₺{state.totalProfitLoss.toLocaleString('tr-TR')}
                 </p>
               </div>
             </div>
@@ -188,9 +188,7 @@ export default function Home() {
                   <span className="font-medium text-green-600">%0.25</span>
                 </div>
                 <div className="pt-3 border-t border-gray-200 dark:border-gray-700">
-                  <div className="text-xs text-gray-500 dark:text-gray-400 text-center">
-                    Son güncelleme: {new Date().toLocaleTimeString('tr-TR')}
-                  </div>
+                  <ClientOnlyTime />
                 </div>
               </div>
             </div>
@@ -264,6 +262,23 @@ export default function Home() {
         stock={selectedStock}
         type={tradeType}
       />
+    </div>
+  );
+}
+
+function ClientOnlyTime() {
+  const [timeText, setTimeText] = useState<string | null>(null);
+
+  useEffect(() => {
+    const update = () => setTimeText(new Date().toLocaleTimeString('tr-TR'));
+    update();
+    const intervalId = setInterval(update, 60000);
+    return () => clearInterval(intervalId);
+  }, []);
+
+  return (
+    <div className="text-xs text-gray-500 dark:text-gray-400 text-center">
+      Son güncelleme: {timeText ?? '—'}
     </div>
   );
 }
