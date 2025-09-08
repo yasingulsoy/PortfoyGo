@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { useTheme } from 'next-themes';
 import useSWR from 'swr';
 
 interface PriceChartProps {
@@ -18,6 +19,9 @@ const fetcher = async (url: string) => {
 
 export default function PriceChart({ type, symbol, id, days = 30 }: PriceChartProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const { theme, systemTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
   const { data } = useSWR(() =>
     type === 'stock'
       ? `/api/asset/history?type=stock&symbol=${symbol}&days=${days}`
@@ -32,11 +36,12 @@ export default function PriceChart({ type, symbol, id, days = 30 }: PriceChartPr
     let dispose = () => {};
 
     (async () => {
-      if (!containerRef.current || !data?.series) return;
+      if (!containerRef.current || !data?.series || !mounted) return;
       const lc = await import('lightweight-charts');
       
-      // Dark mode desteği
-      const isDark = document.documentElement.classList.contains('dark');
+      // Dark mode desteği (next-themes)
+      const currentTheme = theme === 'system' ? systemTheme : theme;
+      const isDark = currentTheme === 'dark';
       const bgColor = isDark ? '#1F2937' : '#FFFFFF';
       const textColor = isDark ? '#F9FAFB' : '#111827';
       const gridColor = isDark ? '#374151' : '#F3F4F6';
@@ -80,7 +85,7 @@ export default function PriceChart({ type, symbol, id, days = 30 }: PriceChartPr
       try { dispose(); } catch {}
       try { chart?.remove(); } catch {}
     };
-  }, [data]);
+  }, [data, theme, systemTheme, mounted]);
 
   return (
     <div className="w-full">
