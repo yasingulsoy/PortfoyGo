@@ -41,7 +41,7 @@ export default function PortfolioPage() {
               </div>
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Toplam Değer</p>
-                <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">₺{state.totalValue.toLocaleString()}</p>
+                <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">₺{state.totalValue.toLocaleString('tr-TR')}</p>
               </div>
             </div>
           </div>
@@ -54,7 +54,7 @@ export default function PortfolioPage() {
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Toplam Kâr/Zarar</p>
                 <p className={`text-2xl font-bold ${state.totalProfitLoss >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                  {state.totalProfitLoss >= 0 ? '+' : ''}₺{state.totalProfitLoss.toLocaleString()}
+                  {state.totalProfitLoss >= 0 ? '+' : ''}₺{state.totalProfitLoss.toLocaleString('tr-TR')}
                 </p>
               </div>
             </div>
@@ -67,7 +67,7 @@ export default function PortfolioPage() {
               </div>
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Toplam Yatırım</p>
-                <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">₺{getTotalInvestment().toLocaleString()}</p>
+                <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">₺{getTotalInvestment().toLocaleString('tr-TR')}</p>
               </div>
             </div>
           </div>
@@ -79,7 +79,7 @@ export default function PortfolioPage() {
               </div>
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Nakit Bakiye</p>
-                <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">₺{state.balance.toLocaleString()}</p>
+                <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">₺{state.balance.toLocaleString('tr-TR')}</p>
               </div>
             </div>
           </div>
@@ -171,16 +171,16 @@ function PortfolioOverview({ portfolioItems }: { portfolioItems: PortfolioItem[]
                 </div>
               </td>
               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
-                {item.quantity.toLocaleString()}
+                {item.quantity.toLocaleString('tr-TR')}
               </td>
               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
-                ₺{item.averagePrice.toLocaleString()}
+                ₺{item.averagePrice.toLocaleString('tr-TR')}
               </td>
               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
-                ₺{item.currentPrice.toLocaleString()}
+                ₺{item.currentPrice.toLocaleString('tr-TR')}
               </td>
               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
-                ₺{(item.quantity * item.currentPrice).toLocaleString()}
+                ₺{(item.quantity * item.currentPrice).toLocaleString('tr-TR')}
               </td>
               <td className="px-6 py-4 whitespace-nowrap">
                 <div className="flex items-center">
@@ -190,7 +190,7 @@ function PortfolioOverview({ portfolioItems }: { portfolioItems: PortfolioItem[]
                     <ArrowDownIcon className="h-4 w-4 mr-1 text-red-500" />
                   )}
                   <span className="text-sm font-medium">
-                    {item.profitLoss >= 0 ? '+' : ''}₺{item.profitLoss.toLocaleString()}
+                    {item.profitLoss >= 0 ? '+' : ''}₺{item.profitLoss.toLocaleString('tr-TR')}
                   </span>
                 </div>
                 <div className={`text-xs ${item.profitLossPercent >= 0 ? 'text-green-500' : 'text-red-500'}`}>

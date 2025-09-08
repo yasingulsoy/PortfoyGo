@@ -123,21 +123,21 @@ export default function TransactionsPage() {
           <div className="bg-white rounded-xl shadow-sm p-6 border">
             <div className="text-center">
               <p className="text-sm font-medium text-gray-500">Toplam Alım</p>
-              <p className="text-2xl font-bold text-green-600">₺{getTotalBuyAmount().toLocaleString()}</p>
+              <p className="text-2xl font-bold text-green-600">₺{getTotalBuyAmount().toLocaleString('tr-TR')}</p>
             </div>
           </div>
 
           <div className="bg-white rounded-xl shadow-sm p-6 border">
             <div className="text-center">
               <p className="text-sm font-medium text-gray-500">Toplam Satım</p>
-              <p className="text-2xl font-bold text-red-600">₺{getTotalSellAmount().toLocaleString()}</p>
+              <p className="text-2xl font-bold text-red-600">₺{getTotalSellAmount().toLocaleString('tr-TR')}</p>
             </div>
           </div>
 
           <div className="bg-white rounded-xl shadow-sm p-6 border">
             <div className="text-center">
               <p className="text-sm font-medium text-gray-500">Toplam Komisyon</p>
-              <p className="text-2xl font-bold text-gray-900">₺{getTotalCommission().toLocaleString()}</p>
+              <p className="text-2xl font-bold text-gray-900">₺{getTotalCommission().toLocaleString('tr-TR')}</p>
             </div>
           </div>
         </div>

@@ -62,10 +62,10 @@ export default function MarketTabs({ stocks, cryptos, onBuy, onSell }: MarketTab
                       <div className="text-xs text-gray-500 dark:text-gray-400">{s.symbol}</div>
                     </div>
                     <div className="text-right">
-                      <div className="text-sm font-semibold text-gray-900 dark:text-gray-100">₺{s.price.toLocaleString()}</div>
+                      <div className="text-sm font-semibold text-gray-900 dark:text-gray-100">₺{s.price.toLocaleString('tr-TR')}</div>
                       <div className={`text-xs inline-flex items-center ${s.change >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                         {s.change >= 0 ? <ArrowUpIcon className="h-3 w-3 mr-1" /> : <ArrowDownIcon className="h-3 w-3 mr-1" />}
-                        {s.change >= 0 ? '+' : ''}{s.change.toLocaleString()} ({s.changePercent >= 0 ? '+' : ''}{s.changePercent}%)
+                        {s.change >= 0 ? '+' : ''}{s.change.toLocaleString('tr-TR')} ({s.changePercent >= 0 ? '+' : ''}{s.changePercent}%)
                       </div>
                     </div>
                   </div>
@@ -106,12 +106,12 @@ export default function MarketTabs({ stocks, cryptos, onBuy, onSell }: MarketTab
                           </div>
                         </div>
                       </td>
-                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-right text-sm text-gray-900 dark:text-gray-100">₺{s.price.toLocaleString()}</td>
+                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-right text-sm text-gray-900 dark:text-gray-100">₺{s.price.toLocaleString('tr-TR')}</td>
                       <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-right">
                         <div className={`inline-flex items-center ${s.change >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                           {s.change >= 0 ? <ArrowUpIcon className="h-4 w-4 mr-1" /> : <ArrowDownIcon className="h-4 w-4 mr-1" />}
                           <span className="text-sm font-medium">
-                            {s.change >= 0 ? '+' : ''}{s.change.toLocaleString()} ({s.changePercent >= 0 ? '+' : ''}{s.changePercent}%)
+                            {s.change >= 0 ? '+' : ''}{s.change.toLocaleString('tr-TR')} ({s.changePercent >= 0 ? '+' : ''}{s.changePercent}%)
                           </span>
                         </div>
                       </td>
@@ -154,12 +154,17 @@ export default function MarketTabs({ stocks, cryptos, onBuy, onSell }: MarketTab
                     </div>
                     <div className="text-right">
                       <div className="text-sm font-semibold text-gray-900 dark:text-gray-100">₺{c.current_price * USD_TO_TRY}</div>
-                      <div className={`text-xs inline-flex items-center ${c.price_change_percentage_24h >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                        {c.price_change_percentage_24h >= 0 ? <ArrowUpIcon className="h-3 w-3 mr-1" /> : <ArrowDownIcon className="h-3 w-3 mr-1" />}
-                        {c.price_change_percentage_24h.toFixed(2)}%
+                      {(() => {
+                        const changePct = c.price_change_percentage_24h ?? 0;
+                        return (
+                          <div className={`text-xs inline-flex items-center ${changePct >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                            {changePct >= 0 ? <ArrowUpIcon className="h-3 w-3 mr-1" /> : <ArrowDownIcon className="h-3 w-3 mr-1" />}
+                            {changePct.toFixed(2)}%
+                          </div>
+                        );
+                      })()}
                       </div>
                     </div>
-                  </div>
                   <div className="mt-3 flex gap-2">
                     <button onClick={() => onBuy(c.symbol.toUpperCase(), 'crypto')} className="flex-1 bg-green-600 text-white px-3 py-2 rounded text-sm">Al</button>
                     <button onClick={() => onSell(c.symbol.toUpperCase(), 'crypto')} className="flex-1 bg-red-600 text-white px-3 py-2 rounded text-sm">Sat</button>
@@ -197,10 +202,15 @@ export default function MarketTabs({ stocks, cryptos, onBuy, onSell }: MarketTab
                       </td>
                       <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-right text-sm text-gray-900 dark:text-gray-100">₺{c.current_price * USD_TO_TRY}</td>
                       <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-right">
-                        <div className={`inline-flex items-center ${c.price_change_percentage_24h >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                          {c.price_change_percentage_24h >= 0 ? <ArrowUpIcon className="h-4 w-4 mr-1" /> : <ArrowDownIcon className="h-4 w-4 mr-1" />}
-                          <span className="text-sm font-medium">{c.price_change_percentage_24h.toFixed(2)}%</span>
-                        </div>
+                        {(() => {
+                          const changePct = c.price_change_percentage_24h ?? 0;
+                          return (
+                            <div className={`inline-flex items-center ${changePct >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                              {changePct >= 0 ? <ArrowUpIcon className="h-4 w-4 mr-1" /> : <ArrowDownIcon className="h-4 w-4 mr-1" />}
+                              <span className="text-sm font-medium">{changePct.toFixed(2)}%</span>
+                            </div>
+                          );
+                        })()}
                       </td>
                       <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-center">
                         <div className="flex justify-center gap-2">

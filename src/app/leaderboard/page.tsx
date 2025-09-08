@@ -91,7 +91,7 @@ export default function LeaderboardPage() {
                         {row.profitPercent.toFixed(2)}%
                       </span>
                     </td>
-                    <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-gray-900">₺{row.portfolioValue.toLocaleString()}</td>
+                    <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-gray-900">₺{row.portfolioValue.toLocaleString('tr-TR')}</td>
                   </tr>
                 ))}
               </tbody>

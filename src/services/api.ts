@@ -3,7 +3,6 @@ import { Stock, MarketData } from '@/types';
 // API Configuration
 const ALPHA_VANTAGE_API_KEY = process.env.NEXT_PUBLIC_ALPHA_VANTAGE_API_KEY;
 const FINNHUB_API_KEY = process.env.NEXT_PUBLIC_FINNHUB_API_KEY;
-const IEX_CLOUD_API_KEY = process.env.NEXT_PUBLIC_IEX_CLOUD_API_KEY;
 
 // Mock data - API key yoksa kullanılacak
 const mockStocks: Stock[] = [

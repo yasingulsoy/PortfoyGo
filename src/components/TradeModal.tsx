@@ -108,11 +108,11 @@ export default function TradeModal({ isOpen, onClose, stock, type }: TradeModalP
               <span className="text-sm text-gray-500 dark:text-gray-400">Güncel Fiyat</span>
               <div className="text-right">
                 <span className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                  ₺{priceInTRY.toLocaleString()}
+                  ₺{priceInTRY.toLocaleString('tr-TR')}
                 </span>
                 {isCrypto && (
                   <div className="text-xs text-gray-500 dark:text-gray-400">
-                    ${stock.price.toLocaleString()}
+                    ${stock.price.toLocaleString('tr-TR')}
                   </div>
                 )}
               </div>
@@ -139,11 +139,11 @@ export default function TradeModal({ isOpen, onClose, stock, type }: TradeModalP
           <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 space-y-3">
             <div className="flex justify-between">
               <span className="text-sm text-gray-500 dark:text-gray-400">Toplam Tutar</span>
-              <span className="font-medium text-gray-900 dark:text-gray-100">₺{totalAmount.toLocaleString()}</span>
+              <span className="font-medium text-gray-900 dark:text-gray-100">₺{totalAmount.toLocaleString('tr-TR')}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-sm text-gray-500 dark:text-gray-400">Komisyon (%0.25)</span>
-              <span className="font-medium text-gray-900 dark:text-gray-100">₺{commission.toLocaleString()}</span>
+              <span className="font-medium text-gray-900 dark:text-gray-100">₺{commission.toLocaleString('tr-TR')}</span>
             </div>
             <div className="border-t border-gray-200 dark:border-gray-700 pt-3">
               <div className="flex justify-between">
@@ -151,7 +151,7 @@ export default function TradeModal({ isOpen, onClose, stock, type }: TradeModalP
                   {type === 'buy' ? 'Toplam Maliyet' : 'Net Gelir'}
                 </span>
                 <span className={`font-semibold ${type === 'buy' ? 'text-red-600' : 'text-green-600'}`}>
-                  ₺{(type === 'buy' ? totalAmount + commission : totalAmount - commission).toLocaleString()}
+                  ₺{(type === 'buy' ? totalAmount + commission : totalAmount - commission).toLocaleString('tr-TR')}
                 </span>
               </div>
             </div>
@@ -162,12 +162,12 @@ export default function TradeModal({ isOpen, onClose, stock, type }: TradeModalP
             <div className="bg-blue-50 dark:bg-blue-900/30 rounded-lg p-4">
               <div className="flex justify-between items-center">
                 <span className="text-sm text-blue-700 dark:text-blue-300">Mevcut Bakiye</span>
-                <span className="font-medium text-blue-700 dark:text-blue-300">₺{state.balance.toLocaleString()}</span>
+                <span className="font-medium text-blue-700 dark:text-blue-300">₺{state.balance.toLocaleString('tr-TR')}</span>
               </div>
               <div className="flex justify-between items-center mt-1">
                 <span className="text-sm text-blue-700 dark:text-blue-300">İşlem Sonrası Bakiye</span>
                 <span className="font-medium text-blue-700 dark:text-blue-300">
-                  ₺{(state.balance - totalAmount - commission).toLocaleString()}
+                  ₺{(state.balance - totalAmount - commission).toLocaleString('tr-TR')}
                 </span>
               </div>
             </div>
