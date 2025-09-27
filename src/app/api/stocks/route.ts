@@ -24,37 +24,46 @@ export async function GET() {
     return NextResponse.json(lastCache.data, { headers: { 'Cache-Control': 'no-store' } });
   }
 
-  const token = process.env.FINNHUB_API_KEY;
   try {
-    if (!token) throw new Error('Missing FINNHUB_API_KEY');
+    // Backend API'sinden veri al
+    const backendUrl = process.env.BACKEND_URL || 'http://localhost:5000';
+    const res = await fetch(`${backendUrl}/api/stocks`, { 
+      cache: 'no-store',
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    if (!res.ok) throw new Error('Backend API error');
+    
+    const backendData = await res.json();
+    
+    if (!backendData.success) {
+      throw new Error(backendData.message || 'Backend API error');
+    }
 
-    const results = await Promise.all(
-      symbolList.map(async (symbol) => {
-        const res = await fetch(`https://finnhub.io/api/v1/quote?symbol=${symbol}&token=${token}`, { cache: 'no-store' });
-        if (!res.ok) throw new Error('Finnhub error');
-        const q = await res.json();
-        const stock: Stock = {
-          id: symbol,
-          symbol,
-          name: SYMBOLS[symbol] || symbol,
-          price: q.c ?? 0,
-          change: q.d ?? 0,
-          changePercent: q.dp ?? 0,
-          volume: 0,
-          marketCap: 0,
-          previousClose: q.pc ?? 0,
-          open: q.o ?? 0,
-          high: q.h ?? 0,
-          low: q.l ?? 0,
-        };
-        return stock;
-      })
-    );
+    // Backend'den gelen veriyi frontend formatına çevir
+    const results: Stock[] = backendData.data.map((stock: any) => ({
+      id: stock.symbol,
+      symbol: stock.symbol,
+      name: stock.name,
+      price: stock.price,
+      change: stock.change,
+      changePercent: stock.changePercent,
+      volume: 0, // Backend'de volume yok
+      marketCap: stock.marketCap,
+      previousClose: stock.previousClose,
+      open: stock.open,
+      high: stock.high,
+      low: stock.low,
+    }));
 
     const data: MarketData = { stocks: results, lastUpdated: new Date() };
     lastCache = { data, ts: now };
     return NextResponse.json(data, { headers: { 'Cache-Control': 'no-store' } });
-  } catch {
+  } catch (error) {
+    console.error('Backend API error, falling back to mock data:', error);
+    
     // Fallback: hafif simülasyonlu mock
     const mock = symbolList.map((s, i) => ({
       id: s,

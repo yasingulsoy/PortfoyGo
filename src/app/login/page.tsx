@@ -5,7 +5,6 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { EyeIcon, EyeSlashIcon, ChartBarIcon, ShieldCheckIcon, SunIcon, MoonIcon, ComputerDesktopIcon } from '@heroicons/react/24/outline';
 import { useAuth } from '@/context/AuthContext';
-import { useTheme } from 'next-themes';
 
 export default function LoginPage() {
   const [formData, setFormData] = useState({
@@ -22,13 +21,17 @@ export default function LoginPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user, login } = useAuth();
-  const { theme, setTheme } = useTheme();
+
 
   // Zaten giriş yapmış kullanıcıyı yönlendir
   useEffect(() => {
     if (user) {
-      const redirectTo = searchParams.get('redirect') || '/';
-      router.push(redirectTo);
+      // Kısa bir gecikme ile yönlendir (başarı mesajının görünmesi için)
+      setTimeout(() => {
+        const redirectTo = searchParams.get('redirect') || '/';
+        console.log('Redirecting to:', redirectTo);
+        router.push(redirectTo);
+      }, 1500);
     }
   }, [user, router, searchParams]);
 
@@ -132,40 +135,24 @@ export default function LoginPage() {
     };
 
     try {
-      const response = await fetch('http://localhost:5000/api/auth/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Requested-With': 'XMLHttpRequest', // CSRF koruması için
-        },
-        body: JSON.stringify(sanitizedData),
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
+      // Sadece AuthContext'in login fonksiyonunu kullan
+      const loginSuccess = await login(sanitizedData.email, sanitizedData.password);
+      
+      if (loginSuccess) {
         // Başarılı giriş - deneme sayısını sıfırla
         setAttempts(0);
         setSuccessMessage('Giriş başarılı! Yönlendiriliyorsunuz...');
         
-        // AuthContext ile giriş yap
-        const loginSuccess = await login(sanitizedData.email, sanitizedData.password);
-        
-        if (loginSuccess) {
-          // 1 saniye sonra yönlendir
-          setTimeout(() => {
-            const redirectTo = searchParams.get('redirect') || '/';
-            router.push(redirectTo);
-          }, 1000);
-        }
+        // user state'i güncellendiğinde useEffect ile yönlendirme yapılacak
+        // Burada ekstra yönlendirme yapmaya gerek yok
       } else {
         // Başarısız giriş - deneme sayısını artır
         setAttempts(prev => prev + 1);
-        setError(data.message || 'Giriş başarısız');
+        setError('Giriş başarısız. Email veya şifre hatalı.');
         
         // 3 denemeden sonra uyarı ver
         if (attempts >= 2) {
-          setError(`${data.message || 'Giriş başarısız'} (${attempts + 1}/5 deneme)`);
+          setError(`Giriş başarısız. Email veya şifre hatalı. (${attempts + 1}/5 deneme)`);
         }
       }
     } catch (error) {
@@ -177,45 +164,7 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-cyan-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 relative">
-      {/* Tema Değiştirme Butonu */}
-      <div className="absolute top-4 right-4">
-        <div className="flex items-center space-x-1 bg-white dark:bg-gray-800 rounded-lg p-1 shadow-lg border border-gray-200 dark:border-gray-700">
-          <button
-            onClick={() => setTheme('light')}
-            className={`p-2 rounded-md transition-colors ${
-              theme === 'light' 
-                ? 'bg-indigo-100 text-indigo-600 dark:bg-indigo-900 dark:text-indigo-400' 
-                : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
-            }`}
-            title="Açık Tema"
-          >
-            <SunIcon className="h-4 w-4" />
-          </button>
-          <button
-            onClick={() => setTheme('dark')}
-            className={`p-2 rounded-md transition-colors ${
-              theme === 'dark' 
-                ? 'bg-indigo-100 text-indigo-600 dark:bg-indigo-900 dark:text-indigo-400' 
-                : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
-            }`}
-            title="Koyu Tema"
-          >
-            <MoonIcon className="h-4 w-4" />
-          </button>
-          <button
-            onClick={() => setTheme('system')}
-            className={`p-2 rounded-md transition-colors ${
-              theme === 'system' 
-                ? 'bg-indigo-100 text-indigo-600 dark:bg-indigo-900 dark:text-indigo-400' 
-                : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
-            }`}
-            title="Sistem Teması"
-          >
-            <ComputerDesktopIcon className="h-4 w-4" />
-          </button>
-        </div>
-      </div>
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 relative">
 
       <div className="max-w-md w-full">
         {/* Logo ve Başlık */}
@@ -223,10 +172,10 @@ export default function LoginPage() {
           <div className="mx-auto h-16 w-16 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-full flex items-center justify-center mb-4">
             <ChartBarIcon className="h-8 w-8 text-white" />
           </div>
-          <h2 className="text-3xl font-bold text-gray-900 dark:text-white">
+          <h2 className="text-3xl font-bold text-white">
             Hoş Geldiniz
           </h2>
-          <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+          <p className="mt-2 text-sm text-gray-400">
             Hesabınıza giriş yapın ve yatırım yolculuğunuza başlayın
           </p>
         </div>
@@ -249,10 +198,10 @@ export default function LoginPage() {
         )}
 
         {/* Giriş Formu */}
-        <div className="bg-white dark:bg-gray-800 py-8 px-6 shadow-xl rounded-2xl border border-gray-100 dark:border-gray-700">
+        <div className="bg-gray-800 py-8 px-6 shadow-xl rounded-2xl border border-gray-700">
           <form className="space-y-6" onSubmit={handleSubmit}>
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              <label htmlFor="email" className="block text-sm font-medium text-gray-300 mb-2">
                 Email Adresi
               </label>
               <input
@@ -261,7 +210,7 @@ export default function LoginPage() {
                 type="email"
                 autoComplete="email"
                 required
-                className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:text-white transition-colors"
+                className="w-full px-4 py-3 border border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-gray-700 dark:text-white transition-colors"
                 placeholder="ornek@email.com"
                 value={formData.email}
                 onChange={handleChange}
@@ -269,7 +218,7 @@ export default function LoginPage() {
             </div>
 
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              <label htmlFor="password" className="block text-sm font-medium text-gray-300 mb-2">
                 Şifre
               </label>
               <div className="relative">
@@ -279,7 +228,7 @@ export default function LoginPage() {
                   type={showPassword ? 'text' : 'password'}
                   autoComplete="current-password"
                   required
-                  className="w-full px-4 py-3 pr-12 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:text-white transition-colors"
+                  className="w-full px-4 py-3 pr-12 border border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-gray-700 dark:text-white transition-colors"
                   placeholder="Şifrenizi girin"
                   value={formData.password}
                   onChange={handleChange}
@@ -326,10 +275,10 @@ export default function LoginPage() {
           <div className="mt-6">
             <div className="relative">
               <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-300 dark:border-gray-600" />
+                <div className="w-full border-t border-gray-600" />
               </div>
               <div className="relative flex justify-center text-sm">
-                <span className="px-2 bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400">
+                <span className="px-2 bg-gray-800 text-gray-500 dark:text-gray-400">
                   Hesabınız yok mu?
                 </span>
               </div>
@@ -338,7 +287,7 @@ export default function LoginPage() {
             <div className="mt-6">
               <Link
                 href="/register"
-                className="w-full flex justify-center py-3 px-4 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all duration-200"
+                className="w-full flex justify-center py-3 px-4 border border-gray-600 rounded-lg shadow-sm text-sm font-medium text-gray-300 bg-white bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all duration-200"
               >
                 Yeni Hesap Oluştur
               </Link>

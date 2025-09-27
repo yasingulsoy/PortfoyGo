@@ -3,6 +3,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import authRoutes from './routes/auth';
 import emailRoutes from './routes/email';
+import stocksRoutes from './routes/stocks';
 
 // Environment variables
 dotenv.config();
@@ -24,6 +25,7 @@ app.use(express.urlencoded({ extended: true }));
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/email', emailRoutes);
+app.use('/api/stocks', stocksRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

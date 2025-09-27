@@ -38,6 +38,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     if (savedToken && savedUser) {
       setToken(savedToken);
       setUser(JSON.parse(savedUser));
+      
+      // Cookie'ye de token'ı kaydet (middleware için)
+      document.cookie = `token=${savedToken}; path=/; max-age=86400; SameSite=Lax`;
     }
     setLoading(false);
   }, []);
@@ -48,6 +51,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest', // CSRF koruması için
         },
         body: JSON.stringify({ email, password }),
       });
@@ -59,9 +63,16 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setUser(data.user);
         localStorage.setItem('token', data.token);
         localStorage.setItem('user', JSON.stringify(data.user));
+        
+        // Cookie'ye de token'ı kaydet (middleware için)
+        document.cookie = `token=${data.token}; path=/; max-age=86400; SameSite=Lax`;
+        
+        console.log('Login successful:', data.user);
         return true;
+      } else {
+        console.error('Login failed:', data.message);
+        return false;
       }
-      return false;
     } catch (error) {
       console.error('Login error:', error);
       return false;
@@ -91,6 +102,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setToken(null);
     localStorage.removeItem('token');
     localStorage.removeItem('user');
+    
+    // Cookie'yi de temizle
+    document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
   };
 
   const value = {

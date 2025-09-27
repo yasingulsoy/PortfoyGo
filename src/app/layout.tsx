@@ -5,7 +5,6 @@ import { PortfolioProvider } from "@/context/PortfolioContext";
 import { AuthProvider } from "@/context/AuthContext";
 import ConditionalNavbar from "@/components/ConditionalNavbar";
 import Footer from "@/components/Footer";
-import { ThemeProvider } from "next-themes";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -30,17 +29,15 @@ export default function RootLayout({
   return (
     <html lang="tr" suppressHydrationWarning>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-white text-gray-900 dark:bg-gray-950 dark:text-gray-100`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-gray-950 text-gray-100`}
       >
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange storageKey="theme">
-          <AuthProvider>
-            <PortfolioProvider>
-              <ConditionalNavbar />
-              <main>{children}</main>
-              <Footer />
-            </PortfolioProvider>
-          </AuthProvider>
-        </ThemeProvider>
+        <AuthProvider>
+          <PortfolioProvider>
+            <ConditionalNavbar />
+            <main>{children}</main>
+            <Footer />
+          </PortfolioProvider>
+        </AuthProvider>
       </body>
     </html>
   );
