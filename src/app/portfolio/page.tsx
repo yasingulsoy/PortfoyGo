@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { 
   CurrencyDollarIcon, 
   ArrowUpIcon, 
@@ -9,11 +10,21 @@ import {
   ClockIcon
 } from '@heroicons/react/24/outline';
 import { usePortfolio } from '@/context/PortfolioContext';
+import { useAuth } from '@/context/AuthContext';
 import { PortfolioItem, Transaction } from '@/types';
 
 export default function PortfolioPage() {
   const { state } = usePortfolio();
+  const { user, loading } = useAuth();
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<'overview' | 'transactions'>('overview');
+
+  // Kullanıcı giriş yapmamışsa login sayfasına yönlendir
+  useEffect(() => {
+    if (!loading && !user) {
+      router.push('/login');
+    }
+  }, [user, loading, router]);
 
   const getTotalInvestment = () => {
     return state.portfolioItems.reduce((sum, item) => sum + (item.quantity * item.averagePrice), 0);

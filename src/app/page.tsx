@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { 
   CurrencyDollarIcon, 
@@ -10,6 +11,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { Stock } from '@/types';
 import { usePortfolio } from '@/context/PortfolioContext';
+import { useAuth } from '@/context/AuthContext';
 import TradeModal from '@/components/TradeModal';
 import MarketTabs from '@/components/MarketTabs';
 import { useStocks, useCryptos } from '@/hooks/useMarketData';
@@ -19,10 +21,19 @@ export default function Home() {
   const { state } = usePortfolio();
   const { stocks } = useStocks();
   const { cryptos } = useCryptos();
+  const { user, loading } = useAuth();
+  const router = useRouter();
 
   const [selectedStock, setSelectedStock] = useState<Stock | null>(null);
   const [tradeType, setTradeType] = useState<'buy' | 'sell'>('buy');
   const [isTradeModalOpen, setIsTradeModalOpen] = useState(false);
+
+  // Kullanıcı giriş yapmamışsa login sayfasına yönlendir
+  useEffect(() => {
+    if (!loading && !user) {
+      router.push('/login');
+    }
+  }, [user, loading, router]);
 
   const toStockFromCrypto = (c: CryptoCoin): Stock => {
     const price = c.current_price;
@@ -85,6 +96,30 @@ export default function Home() {
     setIsTradeModalOpen(false);
     setSelectedStock(null);
   };
+
+  // Loading durumunda loading ekranı göster
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-950 dark:to-gray-900 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
+          <p className="text-gray-600 dark:text-gray-400">Yükleniyor...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Kullanıcı giriş yapmamışsa loading ekranı göster (yönlendirme sırasında)
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-950 dark:to-gray-900 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
+          <p className="text-gray-600 dark:text-gray-400">Giriş sayfasına yönlendiriliyorsunuz...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-950 dark:to-gray-900">

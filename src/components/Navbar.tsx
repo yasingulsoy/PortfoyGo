@@ -94,6 +94,38 @@ export default function Navbar() {
             ))}
             <div className="px-3 pt-2">
               <ThemeToggle />
+              {user ? (
+                <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-gray-700 dark:text-gray-300">
+                      Hoş geldin, {user.username}
+                    </span>
+                    <button
+                      onClick={logout}
+                      className="px-3 py-1 text-sm bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors"
+                    >
+                      Çıkış
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700 flex gap-2">
+                  <Link
+                    href="/login"
+                    onClick={() => setOpen(false)}
+                    className="flex-1 px-3 py-2 text-sm text-center text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md transition-colors"
+                  >
+                    Giriş
+                  </Link>
+                  <Link
+                    href="/register"
+                    onClick={() => setOpen(false)}
+                    className="flex-1 px-3 py-2 text-sm text-center bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors"
+                  >
+                    Kayıt
+                  </Link>
+                </div>
+              )}
             </div>
           </div>
         </div>
