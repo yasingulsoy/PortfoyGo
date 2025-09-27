@@ -2,11 +2,13 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
-import { Bars3Icon, XMarkIcon, ChartBarIcon, HomeIcon, BriefcaseIcon, ClockIcon, TrophyIcon } from '@heroicons/react/24/outline';
+import { Bars3Icon, XMarkIcon, ChartBarIcon, HomeIcon, BriefcaseIcon, ClockIcon, TrophyIcon, UserIcon } from '@heroicons/react/24/outline';
 import ThemeToggle from './ThemeToggle';
+import { useAuth } from '@/context/AuthContext';
 
 export default function Navbar() {
   const [open, setOpen] = useState(false);
+  const { user, logout } = useAuth();
 
   const navItems = [
     { href: '/', label: 'Ana Sayfa', icon: HomeIcon },
@@ -35,6 +37,34 @@ export default function Navbar() {
 
           <div className="hidden md:flex items-center gap-3">
             <ThemeToggle />
+            {user ? (
+              <div className="flex items-center gap-3">
+                <span className="text-sm text-gray-700 dark:text-gray-300">
+                  Hoş geldin, {user.username}
+                </span>
+                <button
+                  onClick={logout}
+                  className="px-3 py-1 text-sm bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors"
+                >
+                  Çıkış
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <Link
+                  href="/login"
+                  className="px-3 py-1 text-sm text-gray-700 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
+                >
+                  Giriş
+                </Link>
+                <Link
+                  href="/register"
+                  className="px-3 py-1 text-sm bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors"
+                >
+                  Kayıt
+                </Link>
+              </div>
+            )}
           </div>
 
           <button
