@@ -1,8 +1,10 @@
 // Finnhub API Test Script
 const https = require('https');
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, 'backend', '.env') });
 
-// API key'inizi buraya yazın
-const API_KEY = 'd3br09pr01qqg7bvqai0d3br09pr01qqg7bvqaig';
+// API key'i .env dosyasından al
+const API_KEY = process.env.FINNHUB_API_KEY || 'd3br09pr01qqg7bvqai0d3br09pr01qqg7bvqaig';
 
 // Test fonksiyonu
 async function testFinnhubAPI() {
