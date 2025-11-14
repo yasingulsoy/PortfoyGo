@@ -43,28 +43,30 @@ export default function LeaderboardPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
-      <div className="bg-white border-b">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-indigo-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
+      <div className="bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border-b border-gray-200 dark:border-gray-700">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center h-16">
-            <TrophyIcon className="h-8 w-8 text-purple-600 mr-3" />
-            <h1 className="text-2xl font-bold text-gray-900">Liderlik Tablosu</h1>
+            <div className="h-10 w-10 bg-gradient-to-br from-yellow-400 to-amber-500 rounded-xl flex items-center justify-center shadow-sm mr-3">
+              <TrophyIcon className="h-6 w-6 text-white" />
+            </div>
+            <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">Liderlik Tablosu</h1>
           </div>
         </div>
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="bg-white rounded-xl shadow-sm border">
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700">
           {/* Header */}
-          <div className="border-b px-4 sm:px-6 py-4">
+          <div className="border-b border-gray-200 dark:border-gray-700 px-4 sm:px-6 py-4 bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-900/20 dark:to-purple-900/20">
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-gray-900">Genel Liderlik Tablosu</h2>
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Genel Liderlik Tablosu</h2>
               <button
                 onClick={loadLeaderboard}
                 disabled={loading}
-                className="text-sm text-indigo-600 hover:text-indigo-700 disabled:text-gray-400"
+                className="text-sm text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 disabled:text-gray-400 dark:disabled:text-gray-600 px-3 py-1 rounded-lg hover:bg-indigo-100 dark:hover:bg-indigo-900/30 transition-colors"
               >
-                {loading ? 'Yenileniyor...' : 'Yenile'}
+                {loading ? 'Yenileniyor...' : '🔄 Yenile'}
               </button>
             </div>
           </div>
@@ -91,34 +93,34 @@ export default function LeaderboardPage() {
                 <p className="text-gray-500">Henüz lider yok</p>
               </div>
             ) : (
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
+              <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                <thead className="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-700">
                   <tr>
-                    <th className="px-4 sm:px-6 py-3 text-left text-[10px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider">Sıra</th>
-                    <th className="px-4 sm:px-6 py-3 text-left text-[10px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider">Kullanıcı</th>
-                    <th className="px-4 sm:px-6 py-3 text-right text-[10px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider">Kâr/Zarar</th>
-                    <th className="px-4 sm:px-6 py-3 text-right text-[10px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider">Portföy Değeri</th>
-                    <th className="px-4 sm:px-6 py-3 text-right text-[10px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider">Toplam Varlık</th>
+                    <th className="px-4 sm:px-6 py-3 text-left text-[10px] sm:text-xs font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">Sıra</th>
+                    <th className="px-4 sm:px-6 py-3 text-left text-[10px] sm:text-xs font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">Kullanıcı</th>
+                    <th className="px-4 sm:px-6 py-3 text-right text-[10px] sm:text-xs font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">Kâr/Zarar</th>
+                    <th className="px-4 sm:px-6 py-3 text-right text-[10px] sm:text-xs font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">Portföy Değeri</th>
+                    <th className="px-4 sm:px-6 py-3 text-right text-[10px] sm:text-xs font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">Toplam Varlık</th>
                   </tr>
                 </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
+                <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                   {leaders.map((leader) => {
                     const totalAssets = leader.balance + leader.portfolio_value;
                     const isProfit = leader.profit_loss_percent >= 0;
                     return (
-                      <tr key={leader.rank} className="hover:bg-gray-50">
-                        <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                      <tr key={leader.rank} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+                        <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
                           {leader.rank <= 3 ? (
                             <span className="text-2xl">
                               {leader.rank === 1 ? '🥇' : leader.rank === 2 ? '🥈' : '🥉'}
                             </span>
                           ) : (
-                            `#${leader.rank}`
+                            <span className="px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded text-gray-700 dark:text-gray-300">#{leader.rank}</span>
                           )}
                         </td>
-                        <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">{leader.username}</td>
+                        <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">{leader.username}</td>
                         <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-right">
-                          <span className={`inline-flex items-center font-medium ${isProfit ? 'text-green-600' : 'text-red-600'}`}>
+                          <span className={`inline-flex items-center font-medium ${isProfit ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
                             {isProfit ? (
                               <ArrowUpIcon className="h-4 w-4 mr-1" />
                             ) : (
@@ -126,14 +128,14 @@ export default function LeaderboardPage() {
                             )}
                             {leader.profit_loss_percent.toFixed(2)}%
                           </span>
-                          <div className="text-xs text-gray-500">
+                          <div className="text-xs text-gray-500 dark:text-gray-400">
                             {isProfit ? '+' : ''}₺{leader.total_profit_loss.toLocaleString('tr-TR')}
                           </div>
                         </td>
-                        <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-gray-900">
+                        <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-gray-900 dark:text-white">
                           ₺{leader.portfolio_value.toLocaleString('tr-TR')}
                         </td>
-                        <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-right text-sm font-bold text-indigo-600">
+                        <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-right text-sm font-bold text-indigo-600 dark:text-indigo-400">
                           ₺{totalAssets.toLocaleString('tr-TR')}
                         </td>
                       </tr>

@@ -9,6 +9,7 @@
     "dev": "nodemon src/index.ts",
     "create-tables": "ts-node src/scripts/createTables.ts",
     "create-users": "ts-node src/scripts/createTestUsers.ts",
+    "create-user": "ts-node src/scripts/createUser.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": ["trading", "crypto", "stocks", "api"],

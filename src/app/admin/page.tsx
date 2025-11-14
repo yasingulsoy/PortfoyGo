@@ -36,12 +36,13 @@ export default function AdminPage() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    if (!authLoading && !user) {
-      router.push('/login');
-    } else if (user) {
-      loadStats();
+    if (!authLoading) {
+      if (user) {
+        loadStats();
+      }
+      // Giriş kontrolü kaldırıldı - herkes içeri bakabilir
     }
-  }, [user, authLoading, router]);
+  }, [user, authLoading]);
 
   const loadStats = async () => {
     try {

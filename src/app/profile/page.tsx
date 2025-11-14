@@ -28,12 +28,13 @@ export default function ProfilePage() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    if (!authLoading && !user) {
-      router.push('/login');
-    } else if (user) {
-      loadBadges();
+    if (!authLoading) {
+      if (user) {
+        loadBadges();
+      }
+      // Giriş kontrolü kaldırıldı - herkes içeri bakabilir
     }
-  }, [user, authLoading, router]);
+  }, [user, authLoading]);
 
   const loadBadges = async () => {
     try {

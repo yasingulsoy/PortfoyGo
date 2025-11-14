@@ -5,6 +5,7 @@ import { PortfolioProvider } from "@/context/PortfolioContext";
 import { AuthProvider } from "@/context/AuthContext";
 import ConditionalNavbar from "@/components/ConditionalNavbar";
 import Footer from "@/components/Footer";
+import PageTransition from "@/components/PageTransition";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -34,7 +35,9 @@ export default function RootLayout({
         <AuthProvider>
           <PortfolioProvider>
             <ConditionalNavbar />
-            <main>{children}</main>
+            <PageTransition>
+              <main>{children}</main>
+            </PageTransition>
             <Footer />
           </PortfolioProvider>
         </AuthProvider>

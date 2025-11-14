@@ -17,30 +17,7 @@ const publicRoutes = [
 ];
 
 export function middleware(request: NextRequest) {
-  const { pathname } = request.nextUrl;
-  
-  // API route'ları için middleware çalıştırma
-  if (pathname.startsWith('/api/')) {
-    return NextResponse.next();
-  }
-
-  // Public route'lar için kontrol yapma
-  if (publicRoutes.includes(pathname)) {
-    return NextResponse.next();
-  }
-
-  // Protected route'lar için token kontrolü
-  if (protectedRoutes.includes(pathname)) {
-    const token = request.cookies.get('token')?.value;
-    
-    if (!token) {
-      // Token yoksa login sayfasına yönlendir
-      const loginUrl = new URL('/login', request.url);
-      loginUrl.searchParams.set('redirect', pathname);
-      return NextResponse.redirect(loginUrl);
-    }
-  }
-
+  // Şimdilik tüm kontrolleri kaldırdık - herkes içeri bakabilir
   return NextResponse.next();
 }
 

@@ -3,22 +3,13 @@
 -- pgAdmin'de çalıştırılacak
 -- ============================================
 
--- 1. Veritabanını oluştur (eğer yoksa)
--- Not: pgAdmin'de sağ tık -> Create -> Database ile de oluşturabilirsiniz
-CREATE DATABASE trading_platform
-    WITH 
-    OWNER = postgres
-    ENCODING = 'UTF8'
-    LC_COLLATE = 'Turkish_Turkey.1254'
-    LC_CTYPE = 'Turkish_Turkey.1254'
-    TABLESPACE = pg_default
-    CONNECTION LIMIT = -1;
+-- ⚠️ ÖNEMLİ: Bu scripti çalıştırmadan önce trading_platform veritabanını oluşturun!
+-- pgAdmin'de: Sağ tık -> Create -> Database -> Name: trading_platform
 
--- Veritabanına bağlan (pgAdmin'de Query Tool'da çalıştırırken otomatik bağlanır)
--- \c trading_platform
+-- Veritabanına bağlanın (pgAdmin'de Query Tool'da trading_platform veritabanını seçin)
 
 -- ============================================
--- 2. TABLOLARI OLUŞTUR
+-- TABLOLARI OLUŞTUR
 -- ============================================
 
 -- Users Tablosu
