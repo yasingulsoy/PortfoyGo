@@ -41,6 +41,8 @@ interface User {
   rank: number;
   created_at: string;
   last_login?: string;
+  is_banned?: boolean;
+  is_admin?: boolean;
 }
 
 export default function AdminPage() {
@@ -95,6 +97,25 @@ export default function AdminPage() {
     }
   };
 
+  const handleToggleBan = async (userId: string, currentBanStatus: boolean) => {
+    try {
+      const result = await adminApi.toggleUserBan(userId, !currentBanStatus);
+      if (result.success) {
+        // Kullanıcı listesini güncelle
+        setAllUsers(prevUsers =>
+          prevUsers.map(u =>
+            u.id === userId ? { ...u, is_banned: !currentBanStatus } : u
+          )
+        );
+        setError('');
+      } else {
+        setError(result.message || 'İşlem başarısız');
+      }
+    } catch (err: any) {
+      setError(err.message || 'Bir hata oluştu');
+    }
+  };
+
   const filteredUsers = allUsers.filter(u => 
     u.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
     u.email.toLowerCase().includes(searchTerm.toLowerCase())
@@ -115,6 +136,18 @@ export default function AdminPage() {
 
   if (!user) {
     return null;
+  }
+
+  // Admin kontrolü
+  if (!user.is_admin) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-indigo-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-red-600 dark:text-red-400 mb-4">Erişim Reddedildi</h1>
+          <p className="text-gray-600 dark:text-gray-400">Bu sayfaya erişmek için admin yetkisi gereklidir.</p>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -287,20 +320,23 @@ export default function AdminPage() {
                           <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Kâr/Zarar</th>
                           <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Kayıt Tarihi</th>
                           <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Son Giriş</th>
+                          <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">İşlemler</th>
                         </tr>
                       </thead>
                       <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                         {filteredUsers.length === 0 ? (
                           <tr>
-                            <td colSpan={9} className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
+                            <td colSpan={10} className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
                               Kullanıcı bulunamadı
                             </td>
                           </tr>
                         ) : (
                           filteredUsers.map((user) => {
                             const isProfit = user.total_profit_loss >= 0;
+                            const isBanned = user.is_banned || false;
+                            const isAdminUser = user.is_admin || false;
                             return (
-                              <tr key={user.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                              <tr key={user.id} className={`hover:bg-gray-50 dark:hover:bg-gray-700/50 ${isBanned ? 'opacity-60' : ''}`}>
                                 <td className="px-6 py-4 whitespace-nowrap">
                                   <div className="flex items-center">
                                     <div className="h-10 w-10 bg-gradient-to-br from-indigo-100 to-purple-100 dark:from-indigo-900/40 dark:to-purple-900/40 rounded-full flex items-center justify-center mr-3">
@@ -308,20 +344,32 @@ export default function AdminPage() {
                                         {user.username.charAt(0).toUpperCase()}
                                       </span>
                                     </div>
-                                    <div className="text-sm font-medium text-gray-900 dark:text-white">{user.username}</div>
+                                    <div>
+                                      <div className="text-sm font-medium text-gray-900 dark:text-white">{user.username}</div>
+                                      {isAdminUser && (
+                                        <span className="text-xs text-purple-600 dark:text-purple-400 font-semibold">Admin</span>
+                                      )}
+                                    </div>
                                   </div>
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{user.email}</td>
                                 <td className="px-6 py-4 whitespace-nowrap">
-                                  {user.email_verified ? (
-                                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-400">
-                                      Doğrulanmış
-                                    </span>
-                                  ) : (
-                                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-400">
-                                      Beklemede
-                                    </span>
-                                  )}
+                                  <div className="flex flex-col gap-1">
+                                    {user.email_verified ? (
+                                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-400">
+                                        Doğrulanmış
+                                      </span>
+                                    ) : (
+                                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-400">
+                                        Beklemede
+                                      </span>
+                                    )}
+                                    {isBanned && (
+                                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-400">
+                                        Yasaklı
+                                      </span>
+                                    )}
+                                  </div>
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-gray-900 dark:text-white">
                                   #{user.rank || '-'}
@@ -347,6 +395,20 @@ export default function AdminPage() {
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                                   {user.last_login ? new Date(user.last_login).toLocaleDateString('tr-TR') : '-'}
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-center">
+                                  {!isAdminUser && (
+                                    <button
+                                      onClick={() => handleToggleBan(user.id, isBanned)}
+                                      className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+                                        isBanned
+                                          ? 'bg-green-100 text-green-800 hover:bg-green-200 dark:bg-green-900/40 dark:text-green-400 dark:hover:bg-green-900/60'
+                                          : 'bg-red-100 text-red-800 hover:bg-red-200 dark:bg-red-900/40 dark:text-red-400 dark:hover:bg-red-900/60'
+                                      }`}
+                                    >
+                                      {isBanned ? 'Yasağı Kaldır' : 'Yasakla'}
+                                    </button>
+                                  )}
                                 </td>
                               </tr>
                             );

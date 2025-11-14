@@ -14,6 +14,10 @@ const portfolio_1 = __importDefault(require("./routes/portfolio"));
 const leaderboard_1 = __importDefault(require("./routes/leaderboard"));
 const admin_1 = __importDefault(require("./routes/admin"));
 const badges_1 = __importDefault(require("./routes/badges"));
+const activityLogs_1 = __importDefault(require("./routes/activityLogs"));
+const cryptos_1 = __importDefault(require("./routes/cryptos"));
+const marketCache_1 = require("./services/marketCache");
+const node_cron_1 = __importDefault(require("node-cron"));
 // Environment variables
 dotenv_1.default.config();
 const app = (0, express_1.default)();
@@ -36,6 +40,8 @@ app.use('/api/portfolio', portfolio_1.default);
 app.use('/api/leaderboard', leaderboard_1.default);
 app.use('/api/admin', admin_1.default);
 app.use('/api/badges', badges_1.default);
+app.use('/api/activity-logs', activityLogs_1.default);
+app.use('/api/cryptos', cryptos_1.default);
 // Health check
 app.get('/api/health', (req, res) => {
     res.json({
@@ -59,9 +65,35 @@ app.use((err, req, res, next) => {
         message: 'Sunucu hatası'
     });
 });
+// Cache'i başlangıçta doldur
+marketCache_1.MarketCacheService.refreshCache().catch(err => {
+    console.error('Initial cache refresh error:', err);
+});
+// Her 2 saatte bir cache'i güncelle (cron: 0 */2 * * *)
+node_cron_1.default.schedule('0 */2 * * *', async () => {
+    console.log('⏰ Scheduled cache refresh başlatılıyor...');
+    try {
+        await marketCache_1.MarketCacheService.refreshCache();
+        console.log('✅ Scheduled cache refresh tamamlandı');
+    }
+    catch (error) {
+        console.error('❌ Scheduled cache refresh hatası:', error);
+    }
+});
+// Cache durumunu göster
+setInterval(async () => {
+    const status = await marketCache_1.MarketCacheService.getCacheStatus();
+    console.log('📊 Cache Durumu:', {
+        stocks: status.stocks,
+        cryptos: status.cryptos,
+        oldest: status.oldestCache,
+        newest: status.newestCache
+    });
+}, 3600000); // Her saatte bir
 app.listen(PORT, () => {
     console.log(`🚀 Server running on port ${PORT}`);
     console.log(`📊 Trading Platform API ready!`);
     console.log(`🌐 Health check: http://localhost:${PORT}/api/health`);
+    console.log(`🔄 Cache otomatik güncelleme: Her 2 saatte bir`);
 });
 //# sourceMappingURL=index.js.map

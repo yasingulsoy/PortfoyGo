@@ -4,16 +4,16 @@ $processes = Get-NetTCPConnection -LocalPort $port -ErrorAction SilentlyContinue
 
 if ($processes) {
     Write-Host "Found processes using port 5000: $($processes -join ', ')" -ForegroundColor Yellow
-    foreach ($pid in $processes) {
+    foreach ($processId in $processes) {
         try {
-            $process = Get-Process -Id $pid -ErrorAction SilentlyContinue
+            $process = Get-Process -Id $processId -ErrorAction SilentlyContinue
             if ($process) {
-                Write-Host "Killing process: $($process.ProcessName) (PID: $pid)" -ForegroundColor Red
-                Stop-Process -Id $pid -Force -ErrorAction SilentlyContinue
-                Write-Host "Process killed: PID $pid" -ForegroundColor Green
+                Write-Host "Killing process: $($process.ProcessName) (PID: $processId)" -ForegroundColor Red
+                Stop-Process -Id $processId -Force -ErrorAction SilentlyContinue
+                Write-Host "Process killed: PID $processId" -ForegroundColor Green
             }
         } catch {
-            Write-Host "Could not kill process: PID $pid - $($_.Exception.Message)" -ForegroundColor Yellow
+            Write-Host "Could not kill process: PID $processId - $($_.Exception.Message)" -ForegroundColor Yellow
         }
     }
     Start-Sleep -Seconds 1

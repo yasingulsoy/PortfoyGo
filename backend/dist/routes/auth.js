@@ -1,4 +1,37 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -53,6 +86,28 @@ router.post('/login', async (req, res) => {
         }
         const result = await auth_1.AuthService.login({ email, password });
         if (result.success) {
+            // Activity log kaydı (asenkron)
+            setImmediate(async () => {
+                try {
+                    const { ActivityLogService } = await Promise.resolve().then(() => __importStar(require('../services/activityLog')));
+                    const ipAddress = req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+                    const userAgent = req.headers['user-agent'];
+                    await ActivityLogService.createLog({
+                        user_id: result.user.id,
+                        activity_type: 'login',
+                        description: 'Kullanıcı giriş yaptı',
+                        metadata: {
+                            email: result.user.email,
+                            username: result.user.username
+                        },
+                        ip_address: Array.isArray(ipAddress) ? ipAddress[0] : ipAddress,
+                        user_agent: userAgent
+                    });
+                }
+                catch (error) {
+                    console.error('Activity log error:', error);
+                }
+            });
             res.json(result);
         }
         else {

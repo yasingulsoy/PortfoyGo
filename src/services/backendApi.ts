@@ -1,4 +1,4 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/api';
 
 // Token'ı localStorage'dan al
 const getToken = (): string | null => {
@@ -89,6 +89,13 @@ export const adminApi = {
 
   getUsers: async (limit: number = 50, offset: number = 0) => {
     return apiCall(`/admin/users?limit=${limit}&offset=${offset}`);
+  },
+
+  toggleUserBan: async (userId: string, ban: boolean) => {
+    return apiCall(`/admin/users/${userId}/ban`, {
+      method: 'POST',
+      body: JSON.stringify({ ban }),
+    });
   },
 };
 

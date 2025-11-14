@@ -12,7 +12,8 @@ async function fetchTopCryptos(limit: number = 25): Promise<any[]> {
     const url = `${COINGECKO_BASE}/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=${limit}&page=1&sparkline=false&price_change_percentage=24h`;
 
     const response = await axios.get(url, { headers, timeout: 10000 });
-    return response.data || [];
+    const data = response.data;
+    return Array.isArray(data) ? data : [];
   } catch (error) {
     console.error('CoinGecko API error:', error);
     return [];
@@ -119,8 +120,8 @@ export class MarketCacheService {
             item.price,
             item.change,
             item.change_percent,
-            item.volume,
-            item.market_cap,
+            Math.floor(item.volume || 0), // BIGINT için tam sayıya çevir
+            Math.floor(item.market_cap || 0), // BIGINT için tam sayıya çevir
             item.previous_close || null,
             item.open_price || null,
             item.high_price || null,
@@ -157,14 +158,14 @@ export class MarketCacheService {
           price: stock.price,
           change: stock.change,
           change_percent: stock.changePercent,
-          volume: stock.volume || 0,
+          volume: 0, // StockData'da volume yok, default 0
           market_cap: stock.marketCap || 0,
           previous_close: stock.previousClose,
           open_price: stock.open,
           high_price: stock.high,
           low_price: stock.low,
           metadata: {
-            id: stock.id
+            symbol: stock.symbol // id yerine symbol kullan
           }
         }));
         await this.saveToCache(stockCacheData);

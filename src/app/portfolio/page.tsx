@@ -11,7 +11,7 @@ import {
   ClockIcon,
   ArrowTrendingUpIcon,
   ArrowTrendingDownIcon,
-  RefreshIcon
+  ArrowPathIcon
 } from '@heroicons/react/24/outline';
 import { usePortfolio } from '@/context/PortfolioContext';
 import { useAuth } from '@/context/AuthContext';
@@ -122,7 +122,7 @@ export default function PortfolioPage() {
               disabled={isRefreshing}
               className="flex items-center space-x-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors"
             >
-              <RefreshIcon className={`h-5 w-5 ${isRefreshing ? 'animate-spin' : ''}`} />
+              <ArrowPathIcon className={`h-5 w-5 ${isRefreshing ? 'animate-spin' : ''}`} />
               <span>Yenile</span>
             </button>
           </div>

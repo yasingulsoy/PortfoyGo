@@ -26,7 +26,7 @@ export async function GET() {
 
   try {
     // Backend API'sinden veri al
-    const backendUrl = process.env.BACKEND_URL || 'http://localhost:5000';
+    const backendUrl = process.env.BACKEND_URL || 'http://localhost:5001';
     const res = await fetch(`${backendUrl}/api/stocks`, { 
       cache: 'no-store',
       headers: {

@@ -1,15 +1,9 @@
 import express from 'express';
 import { AdminService } from '../services/admin';
 import { authenticateToken } from '../middleware/auth';
+import { isAdmin } from '../middleware/admin';
 
 const router = express.Router();
-
-// Basit admin kontrolü (gerçek uygulamada daha güvenli olmalı)
-const isAdmin = (req: any, res: express.Response, next: express.NextFunction) => {
-  // Şimdilik tüm authenticated kullanıcılara izin ver
-  // Gerçek uygulamada admin rolü kontrolü yapılmalı
-  next();
-};
 
 // Admin istatistikleri
 router.get('/stats', authenticateToken, isAdmin, async (req, res) => {
@@ -51,6 +45,38 @@ router.get('/users', authenticateToken, isAdmin, async (req, res) => {
     }
   } catch (error) {
     console.error('Admin users route error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Sunucu hatası'
+    });
+  }
+});
+
+// Kullanıcıyı banla/unban yap
+router.post('/users/:userId/ban', authenticateToken, isAdmin, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { ban } = req.body; // true = ban, false = unban
+
+    if (typeof ban !== 'boolean') {
+      return res.status(400).json({
+        success: false,
+        message: 'Ban değeri boolean olmalı'
+      });
+    }
+
+    const result = await AdminService.toggleUserBan(userId, ban);
+    
+    if (result.success) {
+      res.json(result);
+    } else {
+      res.status(500).json({
+        success: false,
+        message: result.message || 'İşlem başarısız'
+      });
+    }
+  } catch (error) {
+    console.error('Admin ban route error:', error);
     res.status(500).json({
       success: false,
       message: 'Sunucu hatası'

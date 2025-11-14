@@ -78,7 +78,7 @@ export class AdminService {
   static async getAllUsers(limit: number = 50, offset: number = 0): Promise<{ success: boolean; users?: User[]; total?: number }> {
     try {
       const usersResult = await pool.query(
-        `SELECT id, username, email, email_verified, balance, portfolio_value, total_profit_loss, rank, created_at, last_login
+        `SELECT id, username, email, email_verified, balance, portfolio_value, total_profit_loss, rank, created_at, last_login, is_banned, is_admin
          FROM users
          ORDER BY created_at DESC
          LIMIT $1 OFFSET $2`,
@@ -97,7 +97,9 @@ export class AdminService {
         portfolio_value: parseFloat(row.portfolio_value || 0),
         total_profit_loss: parseFloat(row.total_profit_loss || 0),
         rank: row.rank,
-        created_at: row.created_at
+        created_at: row.created_at,
+        is_banned: row.is_banned || false,
+        is_admin: row.is_admin || false
       }));
 
       return {
@@ -108,6 +110,27 @@ export class AdminService {
     } catch (error) {
       console.error('Get all users error:', error);
       return { success: false };
+    }
+  }
+
+  // Kullanıcıyı banla/unban yap
+  static async toggleUserBan(userId: string, ban: boolean): Promise<{ success: boolean; message?: string }> {
+    try {
+      await pool.query(
+        'UPDATE users SET is_banned = $1 WHERE id = $2',
+        [ban, userId]
+      );
+
+      return {
+        success: true,
+        message: ban ? 'Kullanıcı yasaklandı' : 'Kullanıcı yasağı kaldırıldı'
+      };
+    } catch (error) {
+      console.error('Toggle user ban error:', error);
+      return {
+        success: false,
+        message: 'İşlem başarısız'
+      };
     }
   }
 }

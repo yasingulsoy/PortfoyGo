@@ -34,6 +34,7 @@ router.get('/:symbol', async (req, res) => {
       return res.json({ 
         success: true, 
         data: {
+          id: cached.id || cached.symbol,
           symbol: cached.symbol,
           name: cached.name,
           price: cached.price,
@@ -51,7 +52,23 @@ router.get('/:symbol', async (req, res) => {
 
     // Cache'de yoksa API'den çek
     const stockData = await getStockData(symbol.toUpperCase());
-    res.json({ success: true, data: stockData });
+    res.json({ 
+      success: true, 
+      data: {
+        id: stockData.symbol,
+        symbol: stockData.symbol,
+        name: stockData.name,
+        price: stockData.price,
+        change: stockData.change,
+        changePercent: stockData.changePercent,
+        volume: 0,
+        marketCap: stockData.marketCap,
+        previousClose: stockData.previousClose,
+        open: stockData.open,
+        high: stockData.high,
+        low: stockData.low
+      }
+    });
   } catch (error) {
     res.status(500).json({ 
       success: false, 
@@ -76,13 +93,30 @@ router.get('/', async (req, res) => {
         console.error('Cache refresh error, falling back to API:', error);
         // Fallback: API'den direkt çek
         const apiStocks = await getPopularStocks();
-        return res.json({ success: true, data: apiStocks });
+        return res.json({ 
+          success: true, 
+          data: apiStocks.map(s => ({
+            id: s.symbol, // Symbol'ü id olarak kullan
+            symbol: s.symbol,
+            name: s.name,
+            price: s.price,
+            change: s.change,
+            changePercent: s.changePercent,
+            volume: 0,
+            marketCap: s.marketCap,
+            previousClose: s.previousClose,
+            open: s.open,
+            high: s.high,
+            low: s.low
+          }))
+        });
       }
     }
 
     res.json({ 
       success: true, 
       data: stocks.map(s => ({
+        id: s.id || s.symbol, // Cache'den gelen id veya symbol'ü id olarak kullan
         symbol: s.symbol,
         name: s.name,
         price: s.price,

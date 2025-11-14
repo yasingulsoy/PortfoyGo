@@ -75,6 +75,14 @@ export class AuthService {
 
       const user = result.rows[0];
 
+      // Banned kontrolü
+      if (user.is_banned) {
+        return {
+          success: false,
+          message: 'Hesabınız yasaklanmış. Lütfen yönetici ile iletişime geçin.'
+        };
+      }
+
       // Şifreyi kontrol et
       const isValidPassword = await bcrypt.compare(data.password, user.password_hash);
 
@@ -109,7 +117,8 @@ export class AuthService {
           portfolio_value: parseFloat(user.portfolio_value),
           total_profit_loss: parseFloat(user.total_profit_loss),
           rank: user.rank,
-          created_at: user.created_at
+          created_at: user.created_at,
+          is_admin: user.is_admin || false
         },
         token
       };
@@ -155,6 +164,12 @@ export class AuthService {
       }
 
       const user = result.rows[0];
+      
+      // Banned kontrolü
+      if (user.is_banned) {
+        return null;
+      }
+
       return {
         id: user.id,
         username: user.username,
@@ -164,7 +179,8 @@ export class AuthService {
         portfolio_value: parseFloat(user.portfolio_value),
         total_profit_loss: parseFloat(user.total_profit_loss),
         rank: user.rank,
-        created_at: user.created_at
+        created_at: user.created_at,
+        is_admin: user.is_admin || false
       };
     } catch (error) {
       console.error('Token verification error:', error);
