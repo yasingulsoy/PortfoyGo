@@ -83,6 +83,22 @@ async function createAllTables() {
     `);
     console.log('✅ Transactions tablosu oluşturuldu!\n');
 
+    // 5. Activity logs tablosu
+    console.log('📋 Activity logs tablosu oluşturuluyor...');
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS activity_logs (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        activity_type VARCHAR(50) NOT NULL,
+        description TEXT NOT NULL,
+        metadata JSONB,
+        ip_address VARCHAR(45),
+        user_agent TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    console.log('✅ Activity logs tablosu oluşturuldu!\n');
+
     // Index'ler oluştur
     console.log('📊 Index\'ler oluşturuluyor...');
     
@@ -112,6 +128,22 @@ async function createAllTables() {
     
     await pool.query(`
       CREATE INDEX IF NOT EXISTS idx_transactions_created_at ON transactions(created_at DESC);
+    `);
+    
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_activity_logs_user_id ON activity_logs(user_id);
+    `);
+    
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_activity_logs_activity_type ON activity_logs(activity_type);
+    `);
+    
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_activity_logs_created_at ON activity_logs(created_at DESC);
+    `);
+    
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_activity_logs_user_created ON activity_logs(user_id, created_at DESC);
     `);
     
     console.log('✅ Index\'ler oluşturuldu!\n');

@@ -1,0 +1,122 @@
+"use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+const bcryptjs_1 = __importDefault(require("bcryptjs"));
+const database_1 = __importDefault(require("../config/database"));
+async function createUser(userData) {
+    try {
+        console.log('🔧 Kullanıcı oluşturuluyor...\n');
+        // Kullanıcı zaten var mı kontrol et
+        const existingUser = await database_1.default.query('SELECT id, username, email FROM users WHERE username = $1 OR email = $2', [userData.username, userData.email]);
+        if (existingUser.rows.length > 0) {
+            const user = existingUser.rows[0];
+            console.log(`⚠️  Kullanıcı zaten mevcut:`);
+            console.log(`   Username: ${user.username}`);
+            console.log(`   Email: ${user.email}`);
+            console.log(`   ID: ${user.id}\n`);
+            const readline = require('readline').createInterface({
+                input: process.stdin,
+                output: process.stdout
+            });
+            return new Promise((resolve) => {
+                readline.question('❓ Mevcut kullanıcıyı silip yeniden oluşturmak ister misiniz? (e/h): ', async (answer) => {
+                    readline.close();
+                    if (answer.toLowerCase() === 'e' || answer.toLowerCase() === 'evet') {
+                        await database_1.default.query('DELETE FROM users WHERE id = $1', [user.id]);
+                        console.log('🗑️  Mevcut kullanıcı silindi.\n');
+                        await createNewUser(userData);
+                    }
+                    else {
+                        console.log('❌ İşlem iptal edildi.');
+                    }
+                    resolve();
+                });
+            });
+        }
+        else {
+            await createNewUser(userData);
+        }
+    }
+    catch (error) {
+        console.error('❌ Hata:', error);
+    }
+    finally {
+        await database_1.default.end();
+    }
+}
+async function createNewUser(userData) {
+    try {
+        // Şifreyi hashle
+        const saltRounds = 10;
+        const passwordHash = await bcryptjs_1.default.hash(userData.password, saltRounds);
+        // Kullanıcıyı oluştur
+        const result = await database_1.default.query(`INSERT INTO users (
+        username, 
+        email, 
+        password_hash, 
+        email_verified, 
+        balance,
+        portfolio_value,
+        total_profit_loss,
+        rank
+      ) 
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8) 
+      RETURNING id, username, email, email_verified, balance, created_at`, [
+            userData.username,
+            userData.email,
+            passwordHash,
+            userData.email_verified ?? true,
+            userData.balance ?? 100000.00,
+            0.00,
+            0.00,
+            0
+        ]);
+        const newUser = result.rows[0];
+        console.log('✅ Kullanıcı başarıyla oluşturuldu!\n');
+        console.log('📋 Kullanıcı Bilgileri:');
+        console.log(`   ID: ${newUser.id}`);
+        console.log(`   Username: ${newUser.username}`);
+        console.log(`   Email: ${newUser.email}`);
+        console.log(`   Email Verified: ${newUser.email_verified}`);
+        console.log(`   Balance: ₺${parseFloat(newUser.balance).toLocaleString('tr-TR')}`);
+        console.log(`   Created At: ${newUser.created_at}\n`);
+        console.log('🔑 Giriş Bilgileri:');
+        console.log(`   Email: ${userData.email}`);
+        console.log(`   Şifre: ${userData.password}\n`);
+        console.log('💡 SQL Hash (eğer SQL ile eklemek isterseniz):');
+        console.log(`   password_hash: ${passwordHash}\n`);
+    }
+    catch (error) {
+        console.error('❌ Kullanıcı oluşturma hatası:', error);
+        throw error;
+    }
+}
+// Varsayılan kullanıcı bilgileri
+const defaultUser = {
+    username: 'trading_platform',
+    email: 'trading@platform.com',
+    password: 'trading123',
+    email_verified: true,
+    balance: 100000.00
+};
+// Komut satırından argümanları al
+const args = process.argv.slice(2);
+if (args.length >= 3) {
+    // Özel kullanıcı bilgileri
+    createUser({
+        username: args[0],
+        email: args[1],
+        password: args[2],
+        email_verified: args[3] === 'true' || args[3] === undefined,
+        balance: args[4] ? parseFloat(args[4]) : 100000.00
+    });
+}
+else {
+    // Varsayılan kullanıcı
+    console.log('📝 Varsayılan kullanıcı oluşturuluyor...\n');
+    console.log('💡 Özel kullanıcı için: npm run create-user <username> <email> <password> [verified] [balance]\n');
+    createUser(defaultUser);
+}
+//# sourceMappingURL=createUser.js.map

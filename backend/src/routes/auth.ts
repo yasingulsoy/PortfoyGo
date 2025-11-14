@@ -56,6 +56,29 @@ router.post('/login', async (req, res) => {
     const result = await AuthService.login({ email, password });
     
     if (result.success) {
+      // Activity log kaydı (asenkron)
+      setImmediate(async () => {
+        try {
+          const { ActivityLogService } = await import('../services/activityLog');
+          const ipAddress = req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+          const userAgent = req.headers['user-agent'];
+          
+          await ActivityLogService.createLog({
+            user_id: result.user!.id,
+            activity_type: 'login',
+            description: 'Kullanıcı giriş yaptı',
+            metadata: {
+              email: result.user!.email,
+              username: result.user!.username
+            },
+            ip_address: Array.isArray(ipAddress) ? ipAddress[0] : ipAddress,
+            user_agent: userAgent
+          });
+        } catch (error) {
+          console.error('Activity log error:', error);
+        }
+      });
+      
       res.json(result);
     } else {
       res.status(401).json(result);

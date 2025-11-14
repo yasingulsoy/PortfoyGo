@@ -9,6 +9,7 @@ import portfolioRoutes from './routes/portfolio';
 import leaderboardRoutes from './routes/leaderboard';
 import adminRoutes from './routes/admin';
 import badgesRoutes from './routes/badges';
+import activityLogsRoutes from './routes/activityLogs';
 
 // Environment variables
 dotenv.config();
@@ -36,6 +37,7 @@ app.use('/api/portfolio', portfolioRoutes);
 app.use('/api/leaderboard', leaderboardRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/badges', badgesRoutes);
+app.use('/api/activity-logs', activityLogsRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

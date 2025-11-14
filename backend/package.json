@@ -7,6 +7,8 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "dev": "nodemon src/index.ts",
+    "kill-port": "powershell -ExecutionPolicy Bypass -File ./kill-port.ps1",
+    "dev:clean": "npm run kill-port && npm run dev",
     "create-tables": "ts-node src/scripts/createTables.ts",
     "create-users": "ts-node src/scripts/createTestUsers.ts",
     "create-user": "ts-node src/scripts/createUser.ts",
@@ -27,6 +29,7 @@
   "devDependencies": {
     "@types/express": "^4.17.21",
     "@types/cors": "^2.8.17",
+    "@types/node": "^20.11.0",
     "@types/pg": "^8.10.9",
     "@types/bcryptjs": "^2.4.6",
     "@types/jsonwebtoken": "^9.0.5",

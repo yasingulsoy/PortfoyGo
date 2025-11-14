@@ -8,9 +8,19 @@ const router = express.Router();
 router.post('/buy', authenticateToken, async (req: any, res) => {
   try {
     const { symbol, name, asset_type, quantity, price } = req.body;
+    
+    console.log('🛒 Alış isteği alındı:', {
+      userId: req.user.id,
+      symbol,
+      name,
+      asset_type,
+      quantity,
+      price
+    });
 
     // Validasyon
     if (!symbol || !name || !asset_type || !quantity || !price) {
+      console.log('❌ Validasyon hatası: Tüm alanlar gerekli');
       return res.status(400).json({
         success: false,
         message: 'Tüm alanlar gerekli'
@@ -47,15 +57,18 @@ router.post('/buy', authenticateToken, async (req: any, res) => {
     });
 
     if (result.success) {
+      console.log('✅ Alış işlemi başarılı:', result.transaction?.id);
       res.json(result);
     } else {
+      console.log('❌ Alış işlemi başarısız:', result.message);
       res.status(400).json(result);
     }
-  } catch (error) {
-    console.error('Buy route error:', error);
+  } catch (error: any) {
+    console.error('❌ Buy route error:', error);
+    console.error('Error stack:', error.stack);
     res.status(500).json({
       success: false,
-      message: 'Sunucu hatası'
+      message: error.message || 'Sunucu hatası'
     });
   }
 });
@@ -64,9 +77,16 @@ router.post('/buy', authenticateToken, async (req: any, res) => {
 router.post('/sell', authenticateToken, async (req: any, res) => {
   try {
     const { symbol, quantity } = req.body;
+    
+    console.log('💰 Satış isteği alındı:', {
+      userId: req.user.id,
+      symbol,
+      quantity
+    });
 
     // Validasyon
     if (!symbol || !quantity) {
+      console.log('❌ Validasyon hatası: Sembol ve miktar gerekli');
       return res.status(400).json({
         success: false,
         message: 'Sembol ve miktar gerekli'
@@ -86,15 +106,18 @@ router.post('/sell', authenticateToken, async (req: any, res) => {
     });
 
     if (result.success) {
+      console.log('✅ Satış işlemi başarılı:', result.transaction?.id);
       res.json(result);
     } else {
+      console.log('❌ Satış işlemi başarısız:', result.message);
       res.status(400).json(result);
     }
-  } catch (error) {
-    console.error('Sell route error:', error);
+  } catch (error: any) {
+    console.error('❌ Sell route error:', error);
+    console.error('Error stack:', error.stack);
     res.status(500).json({
       success: false,
-      message: 'Sunucu hatası'
+      message: error.message || 'Sunucu hatası'
     });
   }
 });

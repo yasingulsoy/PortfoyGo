@@ -211,10 +211,11 @@ export default function Home() {
                           </div>
                         </div>
                         <div className="text-right">
-                          <div className="text-lg font-bold text-gray-900 dark:text-white">₺{stock.price.toLocaleString('tr-TR')}</div>
-                          <div className={`text-sm inline-flex items-center font-medium ${stock.change >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                          <div className="text-lg font-bold text-gray-900 dark:text-white">${stock.price.toLocaleString('en-US', { maximumFractionDigits: 2 })}</div>
+                          <div className="text-xs text-gray-500 dark:text-gray-400">₺{(stock.price * 32.5).toLocaleString('tr-TR', { maximumFractionDigits: 2 })}</div>
+                          <div className={`text-sm inline-flex items-center font-medium mt-1 ${stock.change >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
                             {stock.change >= 0 ? <ArrowUpIcon className="h-4 w-4 mr-1" /> : <ArrowDownIcon className="h-4 w-4 mr-1" />}
-                            {stock.change >= 0 ? '+' : ''}{stock.change.toLocaleString('tr-TR')} ({stock.changePercent >= 0 ? '+' : ''}{stock.changePercent}%)
+                            {stock.change >= 0 ? '+' : ''}${stock.change.toFixed(2)} ({stock.changePercent >= 0 ? '+' : ''}{stock.changePercent.toFixed(2)}%)
                           </div>
                         </div>
                       </div>
@@ -269,8 +270,9 @@ export default function Home() {
                             </div>
                           </div>
                           <div className="text-right">
-                            <div className="text-lg font-bold text-gray-900 dark:text-white">₺{(crypto.current_price * USD_TO_TRY).toLocaleString('tr-TR', { maximumFractionDigits: 2 })}</div>
-                            <div className={`text-sm inline-flex items-center font-medium ${changePct >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                            <div className="text-lg font-bold text-gray-900 dark:text-white">${crypto.current_price.toLocaleString('en-US', { maximumFractionDigits: 2 })}</div>
+                            <div className="text-xs text-gray-500 dark:text-gray-400">₺{(crypto.current_price * USD_TO_TRY).toLocaleString('tr-TR', { maximumFractionDigits: 2 })}</div>
+                            <div className={`text-sm inline-flex items-center font-medium mt-1 ${changePct >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
                               {changePct >= 0 ? <ArrowUpIcon className="h-4 w-4 mr-1" /> : <ArrowDownIcon className="h-4 w-4 mr-1" />}
                               {changePct.toFixed(2)}%
                             </div>

@@ -47,6 +47,18 @@ export class TransactionService {
       }
 
       // İşlemi kaydet
+      console.log('📝 Transaction kaydediliyor:', {
+        userId,
+        symbol: data.symbol,
+        name: data.name,
+        asset_type: data.asset_type,
+        quantity: data.quantity,
+        price: data.price,
+        totalAmount,
+        commission,
+        netAmount
+      });
+
       const transactionResult = await client.query(
         `INSERT INTO transactions (user_id, type, symbol, name, asset_type, quantity, price, total_amount, commission, net_amount)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
@@ -66,6 +78,7 @@ export class TransactionService {
       );
 
       const transaction = transactionResult.rows[0];
+      console.log('✅ Transaction başarıyla kaydedildi:', transaction.id);
 
       // Bakiyeyi güncelle
       await client.query(
@@ -104,7 +117,34 @@ export class TransactionService {
       // Portföy değerlerini güncelle
       await this.updatePortfolioValue(userId, client);
 
+      console.log('💾 Alış transaction commit ediliyor...');
       await client.query('COMMIT');
+      console.log('✅ Alış transaction başarıyla commit edildi');
+
+      // Activity log kaydı (asenkron, hata olsa bile devam et)
+      setImmediate(async () => {
+        try {
+          const { ActivityLogService } = await import('./activityLog');
+          await ActivityLogService.createLog({
+            user_id: userId,
+            activity_type: 'buy',
+            description: `${data.quantity} adet ${data.name} (${data.symbol}) alındı`,
+            metadata: {
+              symbol: data.symbol,
+              name: data.name,
+              asset_type: data.asset_type,
+              quantity: data.quantity,
+              price: data.price,
+              total_amount: totalAmount,
+              commission,
+              net_amount: netAmount,
+              transaction_id: transaction.id
+            }
+          });
+        } catch (error) {
+          console.error('Activity log error:', error);
+        }
+      });
 
       // Rozet kontrolü (asenkron, hata olsa bile devam et)
       setImmediate(async () => {
@@ -154,10 +194,19 @@ export class TransactionService {
           updated_at: updatedPortfolioResult.rows[0].updated_at
         } : undefined
       };
-    } catch (error) {
+    } catch (error: any) {
       await client.query('ROLLBACK');
-      console.error('Buy transaction error:', error);
-      return { success: false, message: 'İşlem sırasında bir hata oluştu' };
+      console.error('❌ Buy transaction error:', error);
+      console.error('Error details:', {
+        code: error.code,
+        message: error.message,
+        detail: error.detail,
+        stack: error.stack
+      });
+      return { 
+        success: false, 
+        message: error.message || 'İşlem sırasında bir hata oluştu' 
+      };
     } finally {
       client.release();
     }
@@ -196,6 +245,18 @@ export class TransactionService {
       const netAmount = totalAmount - commission;
 
       // İşlemi kaydet
+      console.log('📝 Satış transaction kaydediliyor:', {
+        userId,
+        symbol: portfolioItem.symbol,
+        name: portfolioItem.name,
+        asset_type: portfolioItem.asset_type,
+        quantity: data.quantity,
+        price: currentPrice,
+        totalAmount,
+        commission,
+        netAmount
+      });
+
       const transactionResult = await client.query(
         `INSERT INTO transactions (user_id, type, symbol, name, asset_type, quantity, price, total_amount, commission, net_amount)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
@@ -215,6 +276,7 @@ export class TransactionService {
       );
 
       const transaction = transactionResult.rows[0];
+      console.log('✅ Satış transaction başarıyla kaydedildi:', transaction.id);
 
       // Bakiyeyi güncelle
       await client.query(
@@ -244,7 +306,34 @@ export class TransactionService {
       // Portföy değerlerini güncelle
       await this.updatePortfolioValue(userId, client);
 
+      console.log('💾 Satış transaction commit ediliyor...');
       await client.query('COMMIT');
+      console.log('✅ Satış transaction başarıyla commit edildi');
+
+      // Activity log kaydı (asenkron, hata olsa bile devam et)
+      setImmediate(async () => {
+        try {
+          const { ActivityLogService } = await import('./activityLog');
+          await ActivityLogService.createLog({
+            user_id: userId,
+            activity_type: 'sell',
+            description: `${data.quantity} adet ${portfolioItem.name} (${portfolioItem.symbol}) satıldı`,
+            metadata: {
+              symbol: portfolioItem.symbol,
+              name: portfolioItem.name,
+              asset_type: portfolioItem.asset_type,
+              quantity: data.quantity,
+              price: currentPrice,
+              total_amount: totalAmount,
+              commission,
+              net_amount: netAmount,
+              transaction_id: transaction.id
+            }
+          });
+        } catch (error) {
+          console.error('Activity log error:', error);
+        }
+      });
 
       // Rozet kontrolü (asenkron, hata olsa bile devam et)
       setImmediate(async () => {
@@ -273,10 +362,19 @@ export class TransactionService {
           created_at: transaction.created_at
         }
       };
-    } catch (error) {
+    } catch (error: any) {
       await client.query('ROLLBACK');
-      console.error('Sell transaction error:', error);
-      return { success: false, message: 'İşlem sırasında bir hata oluştu' };
+      console.error('❌ Sell transaction error:', error);
+      console.error('Error details:', {
+        code: error.code,
+        message: error.message,
+        detail: error.detail,
+        stack: error.stack
+      });
+      return { 
+        success: false, 
+        message: error.message || 'İşlem sırasında bir hata oluştu' 
+      };
     } finally {
       client.release();
     }

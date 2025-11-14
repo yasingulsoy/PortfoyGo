@@ -6,7 +6,9 @@ const protectedRoutes = [
   '/',
   '/portfolio',
   '/transactions',
-  '/leaderboard'
+  '/leaderboard',
+  '/profile',
+  '/admin'
 ];
 
 // Genel sayfalar (giriş gerektirmeyen)
@@ -17,7 +19,35 @@ const publicRoutes = [
 ];
 
 export function middleware(request: NextRequest) {
-  // Şimdilik tüm kontrolleri kaldırdık - herkes içeri bakabilir
+  const { pathname } = request.nextUrl;
+  
+  // API route'ları için kontrol yapma
+  if (pathname.startsWith('/api/')) {
+    return NextResponse.next();
+  }
+  
+  // Public route'lar için kontrol yapma
+  if (publicRoutes.includes(pathname)) {
+    // Eğer zaten giriş yapmışsa ana sayfaya yönlendir
+    const token = request.cookies.get('token')?.value;
+    if (token) {
+      return NextResponse.redirect(new URL('/', request.url));
+    }
+    return NextResponse.next();
+  }
+  
+  // Korumalı route'lar için token kontrolü
+  if (protectedRoutes.includes(pathname)) {
+    const token = request.cookies.get('token')?.value;
+    
+    if (!token) {
+      // Token yoksa login sayfasına yönlendir
+      const loginUrl = new URL('/login', request.url);
+      loginUrl.searchParams.set('redirect', pathname);
+      return NextResponse.redirect(loginUrl);
+    }
+  }
+  
   return NextResponse.next();
 }
 

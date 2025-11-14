@@ -1,12 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { EyeIcon, EyeSlashIcon, ChartBarIcon, ShieldCheckIcon, SunIcon, MoonIcon, ComputerDesktopIcon } from '@heroicons/react/24/outline';
+import { EyeIcon, EyeSlashIcon, ChartBarIcon, ShieldCheckIcon } from '@heroicons/react/24/outline';
 import { useAuth } from '@/context/AuthContext';
 
-export default function LoginPage() {
+function LoginForm() {
   const [formData, setFormData] = useState({
     email: '',
     password: ''
@@ -155,7 +155,7 @@ export default function LoginPage() {
           setError(`Giriş başarısız. Email veya şifre hatalı. (${attempts + 1}/5 deneme)`);
         }
       }
-    } catch (error) {
+    } catch {
       setAttempts(prev => prev + 1);
       setError('Sunucuya bağlanılamadı. Lütfen tekrar deneyin.');
     } finally {
@@ -306,10 +306,22 @@ export default function LoginPage() {
             <Link href="/privacy" className="text-indigo-600 dark:text-indigo-400 hover:underline">
               Gizlilik Politikası
             </Link>{' '}
-            'nı kabul etmiş olursunuz.
+            &apos;nı kabul etmiş olursunuz.
           </p>
         </div>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white"></div>
+      </div>
+    }>
+      <LoginForm />
+    </Suspense>
   );
 }

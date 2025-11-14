@@ -11,9 +11,9 @@ const getToken = (): string | null => {
 // API çağrısı yap
 const apiCall = async (endpoint: string, options: RequestInit = {}) => {
   const token = getToken();
-  const headers: HeadersInit = {
+  const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    ...options.headers,
+    ...(options.headers as Record<string, string>),
   };
 
   if (token) {
@@ -100,5 +100,23 @@ export const badgesApi = {
 
   getAllBadges: async () => {
     return apiCall('/badges');
+  },
+};
+
+// Activity Logs API
+export const activityLogsApi = {
+  getLogs: async (limit: number = 50, offset: number = 0, type?: string) => {
+    const params = new URLSearchParams({
+      limit: limit.toString(),
+      offset: offset.toString(),
+    });
+    if (type) {
+      params.append('type', type);
+    }
+    return apiCall(`/activity-logs?${params.toString()}`);
+  },
+
+  getTypes: async () => {
+    return apiCall('/activity-logs/types');
   },
 };

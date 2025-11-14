@@ -56,6 +56,21 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         body: JSON.stringify({ email, password }),
       });
 
+      // Response'un başarılı olup olmadığını kontrol et
+      if (!response.ok) {
+        // Hata durumunda response'u parse et
+        let errorMessage = 'Giriş başarısız';
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.message || errorMessage;
+        } catch (parseError) {
+          // JSON parse edilemezse status text'i kullan
+          errorMessage = response.statusText || 'Sunucu hatası';
+        }
+        console.error('Login failed:', errorMessage, 'Status:', response.status);
+        return false;
+      }
+
       const data = await response.json();
 
       if (data.success) {
@@ -70,11 +85,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         console.log('Login successful:', data.user);
         return true;
       } else {
-        console.error('Login failed:', data.message);
+        console.error('Login failed:', data.message || 'Bilinmeyen hata');
         return false;
       }
     } catch (error) {
       console.error('Login error:', error);
+      // Network hatası veya diğer hatalar
+      if (error instanceof TypeError && error.message.includes('fetch')) {
+        console.error('Network error: Backend sunucusuna bağlanılamadı');
+      }
       return false;
     }
   };

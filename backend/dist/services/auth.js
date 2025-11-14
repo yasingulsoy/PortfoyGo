@@ -92,9 +92,24 @@ class AuthService {
         }
         catch (error) {
             console.error('Login error:', error);
+            // Veritabanı bağlantı hatası kontrolü
+            if (error.code === '28P01') {
+                console.error('PostgreSQL kimlik doğrulama hatası. Lütfen .env dosyasındaki DB_PASSWORD değerini kontrol edin.');
+                return {
+                    success: false,
+                    message: 'Veritabanı bağlantı hatası: Kimlik doğrulama başarısız. Lütfen veritabanı şifresini kontrol edin.'
+                };
+            }
+            if (error.code === 'ECONNREFUSED' || error.code === 'ENOTFOUND') {
+                console.error('PostgreSQL sunucusuna bağlanılamadı.');
+                return {
+                    success: false,
+                    message: 'Veritabanı sunucusuna bağlanılamadı. PostgreSQL servisinin çalıştığından emin olun.'
+                };
+            }
             return {
                 success: false,
-                message: 'Giriş sırasında bir hata oluştu'
+                message: error.message || 'Giriş sırasında bir hata oluştu'
             };
         }
     }
