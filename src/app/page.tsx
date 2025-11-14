@@ -18,6 +18,7 @@ import TradeModal from '@/components/TradeModal';
 import MarketTabs from '@/components/MarketTabs';
 import { useStocks, useCryptos } from '@/hooks/useMarketData';
 import { CryptoCoin } from '@/services/crypto';
+import { leaderboardApi } from '@/services/backendApi';
 
 export default function Home() {
   const { state } = usePortfolio();
@@ -29,7 +30,36 @@ export default function Home() {
   const [selectedStock, setSelectedStock] = useState<Stock | null>(null);
   const [tradeType, setTradeType] = useState<'buy' | 'sell'>('buy');
   const [isTradeModalOpen, setIsTradeModalOpen] = useState(false);
+  const [topLeaders, setTopLeaders] = useState<Array<{
+    rank: number;
+    username: string;
+    profit_loss_percent: number;
+    total_profit_loss: number;
+    portfolio_value: number;
+    balance: number;
+  }>>([]);
 
+  // Liderlik verilerini yükle
+  useEffect(() => {
+    const loadTopLeaders = async () => {
+      try {
+        const result = await leaderboardApi.getLeaderboard(3);
+        console.log('Top leaders result:', result); // Debug için
+        if (result.success && result.leaderboard && result.leaderboard.length > 0) {
+          setTopLeaders(result.leaderboard);
+        } else {
+          console.log('No leaders found or empty leaderboard');
+          setTopLeaders([]);
+        }
+      } catch (error) {
+        console.error('Top leaders load error:', error);
+        setTopLeaders([]);
+      }
+    };
+    if (user) {
+      loadTopLeaders();
+    }
+  }, [user]);
 
   // Giriş kontrolü kaldırıldı - herkes içeri bakabilir
 
@@ -383,53 +413,93 @@ export default function Home() {
             </Link>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-            <div className="flex items-center justify-between p-3 sm:p-4 bg-gradient-to-r from-yellow-50 to-amber-50 dark:from-yellow-900/20 dark:to-amber-900/20 rounded-lg border border-yellow-200 dark:border-yellow-800 hover:shadow-md transition-shadow">
-              <div className="flex items-center space-x-2 sm:space-x-3">
-                <div className="h-10 w-10 sm:h-12 sm:w-12 bg-gradient-to-br from-yellow-400 to-yellow-500 rounded-full flex items-center justify-center shadow-sm">
-                  <span className="text-white font-bold text-base sm:text-lg">🥇</span>
+            {topLeaders.length > 0 ? (
+              topLeaders.map((leader, index) => {
+                const isProfit = leader.profit_loss_percent >= 0;
+                const medalEmoji = leader.rank === 1 ? '🥇' : leader.rank === 2 ? '🥈' : '🥉';
+                const bgColors = leader.rank === 1 
+                  ? 'from-yellow-50 to-amber-50 dark:from-yellow-900/20 dark:to-amber-900/20 border-yellow-200 dark:border-yellow-800'
+                  : leader.rank === 2
+                  ? 'from-gray-50 to-slate-50 dark:from-gray-700/50 dark:to-gray-800/50 border-gray-200 dark:border-gray-700'
+                  : 'from-orange-50 to-amber-50 dark:from-orange-900/20 dark:to-amber-900/20 border-orange-200 dark:border-orange-800';
+                const iconColors = leader.rank === 1
+                  ? 'from-yellow-400 to-yellow-500'
+                  : leader.rank === 2
+                  ? 'from-gray-400 to-gray-500'
+                  : 'from-orange-400 to-orange-500';
+                
+                return (
+                  <div key={leader.rank} className={`flex items-center justify-between p-3 sm:p-4 bg-gradient-to-r ${bgColors} rounded-lg border hover:shadow-md transition-shadow`}>
+                    <div className="flex items-center space-x-2 sm:space-x-3">
+                      <div className={`h-10 w-10 sm:h-12 sm:w-12 bg-gradient-to-br ${iconColors} rounded-full flex items-center justify-center shadow-sm`}>
+                        <span className="text-white font-bold text-base sm:text-lg">{medalEmoji}</span>
+                      </div>
+                      <div>
+                        <div className="font-semibold text-gray-900 dark:text-white text-sm sm:text-base">{leader.username}</div>
+                        <div className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">{leader.rank}. Sıra</div>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className={`text-sm sm:text-lg font-bold ${isProfit ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                        {isProfit ? '+' : ''}₺{leader.total_profit_loss.toLocaleString('tr-TR')}
+                      </div>
+                      <div className={`text-xs sm:text-sm ${isProfit ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                        {isProfit ? '+' : ''}{leader.profit_loss_percent.toFixed(2)}%
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            ) : (
+              // Fallback: Eğer veri yoksa placeholder göster
+              <>
+                <div className="flex items-center justify-between p-3 sm:p-4 bg-gradient-to-r from-yellow-50 to-amber-50 dark:from-yellow-900/20 dark:to-amber-900/20 rounded-lg border border-yellow-200 dark:border-yellow-800 hover:shadow-md transition-shadow">
+                  <div className="flex items-center space-x-2 sm:space-x-3">
+                    <div className="h-10 w-10 sm:h-12 sm:w-12 bg-gradient-to-br from-yellow-400 to-yellow-500 rounded-full flex items-center justify-center shadow-sm">
+                      <span className="text-white font-bold text-base sm:text-lg">🥇</span>
+                    </div>
+                    <div>
+                      <div className="font-semibold text-gray-900 dark:text-white text-sm sm:text-base">-</div>
+                      <div className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">1. Sıra</div>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-sm sm:text-lg font-bold text-gray-400">-</div>
+                    <div className="text-xs sm:text-sm text-gray-400">-</div>
+                  </div>
                 </div>
-                <div>
-                  <div className="font-semibold text-gray-900 dark:text-white text-sm sm:text-base">Ahmet Yılmaz</div>
-                  <div className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">1. Sıra</div>
+                <div className="flex items-center justify-between p-3 sm:p-4 bg-gradient-to-r from-gray-50 to-slate-50 dark:from-gray-700/50 dark:to-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700 hover:shadow-md transition-shadow">
+                  <div className="flex items-center space-x-2 sm:space-x-3">
+                    <div className="h-10 w-10 sm:h-12 sm:w-12 bg-gradient-to-br from-gray-400 to-gray-500 rounded-full flex items-center justify-center shadow-sm">
+                      <span className="text-white font-bold text-base sm:text-lg">🥈</span>
+                    </div>
+                    <div>
+                      <div className="font-semibold text-gray-900 dark:text-white text-sm sm:text-base">-</div>
+                      <div className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">2. Sıra</div>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-sm sm:text-lg font-bold text-gray-400">-</div>
+                    <div className="text-xs sm:text-sm text-gray-400">-</div>
+                  </div>
                 </div>
-              </div>
-              <div className="text-right">
-                <div className="text-sm sm:text-lg font-bold text-green-600 dark:text-green-400">+₺2,450</div>
-                <div className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">+24.5%</div>
-              </div>
-            </div>
-            
-            <div className="flex items-center justify-between p-3 sm:p-4 bg-gradient-to-r from-gray-50 to-slate-50 dark:from-gray-700/50 dark:to-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700 hover:shadow-md transition-shadow">
-              <div className="flex items-center space-x-2 sm:space-x-3">
-                <div className="h-10 w-10 sm:h-12 sm:w-12 bg-gradient-to-br from-gray-400 to-gray-500 rounded-full flex items-center justify-center shadow-sm">
-                  <span className="text-white font-bold text-base sm:text-lg">🥈</span>
+                <div className="flex items-center justify-between p-3 sm:p-4 bg-gradient-to-r from-orange-50 to-amber-50 dark:from-orange-900/20 dark:to-amber-900/20 rounded-lg border border-orange-200 dark:border-orange-800 sm:col-span-2 lg:col-span-1 hover:shadow-md transition-shadow">
+                  <div className="flex items-center space-x-2 sm:space-x-3">
+                    <div className="h-10 w-10 sm:h-12 sm:w-12 bg-gradient-to-br from-orange-400 to-orange-500 rounded-full flex items-center justify-center shadow-sm">
+                      <span className="text-white font-bold text-base sm:text-lg">🥉</span>
+                    </div>
+                    <div>
+                      <div className="font-semibold text-gray-900 dark:text-white text-sm sm:text-base">-</div>
+                      <div className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">3. Sıra</div>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-sm sm:text-lg font-bold text-gray-400">-</div>
+                    <div className="text-xs sm:text-sm text-gray-400">-</div>
+                  </div>
                 </div>
-                <div>
-                  <div className="font-semibold text-gray-900 dark:text-white text-sm sm:text-base">Ayşe Demir</div>
-                  <div className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">2. Sıra</div>
-                </div>
-              </div>
-              <div className="text-right">
-                <div className="text-sm sm:text-lg font-bold text-green-600 dark:text-green-400">+₺1,890</div>
-                <div className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">+18.9%</div>
-              </div>
-            </div>
-            
-            <div className="flex items-center justify-between p-3 sm:p-4 bg-gradient-to-r from-orange-50 to-amber-50 dark:from-orange-900/20 dark:to-amber-900/20 rounded-lg border border-orange-200 dark:border-orange-800 sm:col-span-2 lg:col-span-1 hover:shadow-md transition-shadow">
-              <div className="flex items-center space-x-2 sm:space-x-3">
-                <div className="h-10 w-10 sm:h-12 sm:w-12 bg-gradient-to-br from-orange-400 to-orange-500 rounded-full flex items-center justify-center shadow-sm">
-                  <span className="text-white font-bold text-base sm:text-lg">🥉</span>
-                </div>
-                <div>
-                  <div className="font-semibold text-gray-900 dark:text-white text-sm sm:text-base">Mehmet Kaya</div>
-                  <div className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">3. Sıra</div>
-                </div>
-              </div>
-              <div className="text-right">
-                <div className="text-sm sm:text-lg font-bold text-green-600 dark:text-green-400">+₺1,230</div>
-                <div className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">+12.3%</div>
-              </div>
-            </div>
+              </>
+            )}
           </div>
         </div>
       </main>

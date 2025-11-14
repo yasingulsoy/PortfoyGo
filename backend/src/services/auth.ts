@@ -2,6 +2,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import pool from '../config/database';
 import { User, LoginRequest, RegisterRequest, AuthResponse } from '../types';
+import { LeaderboardService } from './leaderboard';
 
 export class AuthService {
   // Kullanıcı kayıt
@@ -106,6 +107,16 @@ export class AuthService {
         [user.id]
       );
 
+      // Rank'leri güncelle
+      await LeaderboardService.updateRanks();
+
+      // Güncel rank'i al
+      const rankResult = await pool.query(
+        `SELECT rank FROM users WHERE id = $1`,
+        [user.id]
+      );
+      const currentRank = rankResult.rows[0]?.rank || null;
+
       return {
         success: true,
         user: {
@@ -116,7 +127,7 @@ export class AuthService {
           balance: parseFloat(user.balance),
           portfolio_value: parseFloat(user.portfolio_value),
           total_profit_loss: parseFloat(user.total_profit_loss),
-          rank: user.rank,
+          rank: currentRank,
           created_at: user.created_at,
           is_admin: user.is_admin || false
         },
@@ -170,6 +181,18 @@ export class AuthService {
         return null;
       }
 
+      // Rank'i güncelle (sadece rank NULL ise)
+      if (!user.rank) {
+        await LeaderboardService.updateRanks();
+      }
+
+      // Güncel rank'i al
+      const rankResult = await pool.query(
+        `SELECT rank FROM users WHERE id = $1`,
+        [user.id]
+      );
+      const currentRank = rankResult.rows[0]?.rank || null;
+
       return {
         id: user.id,
         username: user.username,
@@ -178,7 +201,7 @@ export class AuthService {
         balance: parseFloat(user.balance),
         portfolio_value: parseFloat(user.portfolio_value),
         total_profit_loss: parseFloat(user.total_profit_loss),
-        rank: user.rank,
+        rank: currentRank,
         created_at: user.created_at,
         is_admin: user.is_admin || false
       };

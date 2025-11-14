@@ -15,7 +15,7 @@ interface TradeModalProps {
 }
 
 export default function TradeModal({ isOpen, onClose, stock, type }: TradeModalProps) {
-  const [quantity, setQuantity] = useState(1);
+  const [quantity, setQuantity] = useState<number>(1);
   const [totalAmount, setTotalAmount] = useState(0);
   const [commission, setCommission] = useState(0);
   const [error, setError] = useState('');
@@ -28,7 +28,7 @@ export default function TradeModal({ isOpen, onClose, stock, type }: TradeModalP
   const USD_TO_TRY = 32.5; // Yaklaşık kur
 
   useEffect(() => {
-    if (stock) {
+    if (stock && quantity > 0) {
       // Kripto için USD-TRY dönüşümü yap
       const isCrypto = stock.symbol.length <= 4; // Kripto sembolleri genelde kısa
       const priceInTRY = isCrypto ? stock.price * USD_TO_TRY : stock.price;
@@ -37,13 +37,19 @@ export default function TradeModal({ isOpen, onClose, stock, type }: TradeModalP
       const comm = amount * 0.0025; // %0.25 komisyon (gerçekçi komisyon oranı)
       setTotalAmount(amount);
       setCommission(comm);
+    } else {
+      setTotalAmount(0);
+      setCommission(0);
     }
   }, [quantity, stock]);
 
   const handleQuantityChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = parseInt(e.target.value);
-    if (value > 0) {
+    const value = parseFloat(e.target.value);
+    if (!isNaN(value) && value > 0) {
       setQuantity(value);
+    } else if (e.target.value === '' || e.target.value === '.') {
+      // Kullanıcı yazarken geçici olarak boş veya sadece nokta olabilir
+      setQuantity(0);
     }
   };
 
@@ -51,6 +57,12 @@ export default function TradeModal({ isOpen, onClose, stock, type }: TradeModalP
     e.preventDefault();
     
     if (!stock || !user) return;
+
+    // Miktar validasyonu
+    if (!quantity || quantity <= 0) {
+      setError('Miktar 0\'dan büyük olmalıdır!');
+      return;
+    }
 
     setLoading(true);
     setError('');
@@ -89,8 +101,13 @@ export default function TradeModal({ isOpen, onClose, stock, type }: TradeModalP
         }
       } else {
         const portfolioItem = state.portfolioItems.find(item => item.symbol === stock.symbol);
-        if (!portfolioItem || portfolioItem.quantity < quantity) {
-          setError('Yetersiz hisse miktarı!');
+        if (!portfolioItem) {
+          setError('Portföyde bu varlık bulunamadı!');
+          setLoading(false);
+          return;
+        }
+        if (portfolioItem.quantity < quantity) {
+          setError(`Yetersiz miktar! Mevcut: ${portfolioItem.quantity.toFixed(8)}`);
           setLoading(false);
           return;
         }
@@ -176,11 +193,12 @@ export default function TradeModal({ isOpen, onClose, stock, type }: TradeModalP
             <input
               type="number"
               id="quantity"
-              min="1"
-              value={quantity}
+              min="0.01"
+              step="0.01"
+              value={quantity || ''}
               onChange={handleQuantityChange}
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-              placeholder="Miktar girin"
+              placeholder="Miktar girin (örn: 1.2)"
             />
           </div>
 
@@ -227,7 +245,7 @@ export default function TradeModal({ isOpen, onClose, stock, type }: TradeModalP
               <div className="flex justify-between items-center">
                 <span className="text-sm text-green-700 dark:text-green-300">Mevcut Miktar</span>
                 <span className="font-medium text-green-700 dark:text-green-300">
-                  {state.portfolioItems.find(item => item.symbol === stock.symbol)?.quantity || 0}
+                  {(state.portfolioItems.find(item => item.symbol === stock.symbol)?.quantity || 0).toFixed(8)}
                 </span>
               </div>
             </div>

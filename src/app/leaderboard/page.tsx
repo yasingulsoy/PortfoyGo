@@ -29,13 +29,16 @@ export default function LeaderboardPage() {
     try {
       setLoading(true);
       const result = await leaderboardApi.getLeaderboard(10);
+      console.log('Leaderboard result:', result); // Debug için
       if (result.success && result.leaderboard) {
         setLeaders(result.leaderboard);
         setError('');
       } else {
-        setError('Liderlik tablosu yüklenemedi');
+        console.error('Leaderboard error:', result);
+        setError(result.message || 'Liderlik tablosu yüklenemedi');
       }
     } catch (err: any) {
+      console.error('Leaderboard fetch error:', err);
       setError(err.message || 'Bir hata oluştu');
     } finally {
       setLoading(false);
