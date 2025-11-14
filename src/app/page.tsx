@@ -39,6 +39,13 @@ export default function Home() {
     balance: number;
   }>>([]);
 
+  // Giriş kontrolü - giriş yapılmamışsa login sayfasına yönlendir
+  useEffect(() => {
+    if (!loading && !user) {
+      router.push('/login');
+    }
+  }, [user, loading, router]);
+
   // Liderlik verilerini yükle
   useEffect(() => {
     const loadTopLeaders = async () => {
@@ -60,8 +67,6 @@ export default function Home() {
       loadTopLeaders();
     }
   }, [user]);
-
-  // Giriş kontrolü kaldırıldı - herkes içeri bakabilir
 
   const toStockFromCrypto = (c: CryptoCoin): Stock => {
     const price = c.current_price;
@@ -125,6 +130,17 @@ export default function Home() {
     setSelectedStock(null);
   };
 
+  // Loading durumunda veya kullanıcı yoksa loading göster
+  if (loading || !user) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-indigo-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 flex items-center justify-center">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+          <p className="mt-4 text-gray-600 dark:text-gray-300">Yükleniyor...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-indigo-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">

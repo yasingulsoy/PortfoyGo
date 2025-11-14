@@ -58,7 +58,7 @@ export default function AdminPage() {
   const limit = 20;
 
   useEffect(() => {
-    if (!authLoading && user) {
+    if (!authLoading && user && user.is_admin) {
       loadStats();
       loadAllUsers();
     }
@@ -67,15 +67,21 @@ export default function AdminPage() {
   const loadStats = async () => {
     try {
       setLoading(true);
+      setError('');
       const result = await adminApi.getStats();
       if (result.success && result.stats) {
         setStats(result.stats);
-        setError('');
       } else {
         setError('İstatistikler yüklenemedi');
       }
     } catch (err: any) {
-      setError(err.message || 'Bir hata oluştu');
+      const errorMessage = err.message || 'Bir hata oluştu';
+      setError(errorMessage);
+      console.error('Stats load error:', err);
+      // Eğer admin yetkisi yoksa, sayfayı yeniden yükle
+      if (errorMessage.includes('admin yetkisi')) {
+        window.location.href = '/';
+      }
     } finally {
       setLoading(false);
     }
@@ -84,14 +90,23 @@ export default function AdminPage() {
   const loadAllUsers = async () => {
     try {
       setUsersLoading(true);
+      setError('');
       const offset = (page - 1) * limit;
       const result = await adminApi.getUsers(limit, offset);
       if (result.success && result.users) {
         setAllUsers(result.users);
         setTotalUsers(result.total || 0);
+      } else {
+        setError('Kullanıcılar yüklenemedi');
       }
     } catch (err: any) {
+      const errorMessage = err.message || 'Bir hata oluştu';
+      setError(errorMessage);
       console.error('Users load error:', err);
+      // Eğer admin yetkisi yoksa, sayfayı yeniden yükle
+      if (errorMessage.includes('admin yetkisi')) {
+        window.location.href = '/';
+      }
     } finally {
       setUsersLoading(false);
     }

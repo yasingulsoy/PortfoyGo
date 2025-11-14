@@ -3,9 +3,10 @@
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { EyeIcon, EyeSlashIcon, ChartBarIcon, ShieldCheckIcon } from '@heroicons/react/24/outline';
+import { EyeIcon, EyeSlashIcon, ShieldCheckIcon } from '@heroicons/react/24/outline';
 import { useAuth } from '@/context/AuthContext';
 import DotGrid from '@/components/DotGrid';
+import Image from 'next/image';
 
 function LoginForm() {
   const [formData, setFormData] = useState({
@@ -183,40 +184,47 @@ function LoginForm() {
 
       <div className="max-w-md w-full relative z-10">
         {/* Logo ve Başlık */}
-        <div className="text-center mb-8">
-          <div className="mx-auto h-16 w-16 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-full flex items-center justify-center mb-4">
-            <ChartBarIcon className="h-8 w-8 text-white" />
+        <div className="text-center mb-10">
+          <div className="mx-auto mb-6 flex justify-center">
+            <Image
+              src="/PortfoyGo.png"
+              alt="PortfoyGo Logo"
+              width={180}
+              height={80}
+              className="object-contain"
+              priority
+            />
           </div>
-          <h2 className="text-3xl font-bold text-white">
+          <h2 className="text-4xl font-bold text-white mb-2">
             Hoş Geldiniz
           </h2>
-          <p className="mt-2 text-sm text-gray-400">
+          <p className="text-gray-300 text-base">
             Hesabınıza giriş yapın ve yatırım yolculuğunuza başlayın
           </p>
         </div>
 
         {/* Başarı Mesajı */}
         {successMessage && (
-          <div className="mb-6 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-green-600 dark:text-green-400 px-4 py-3 rounded-lg text-sm text-center">
+          <div className="mb-6 bg-green-500/20 backdrop-blur-sm border border-green-400/30 text-green-300 px-5 py-4 rounded-xl text-sm text-center shadow-lg">
             {successMessage}
           </div>
         )}
 
         {/* Güvenlik Uyarısı */}
         {attempts > 0 && attempts < 5 && (
-          <div className="mb-6 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 text-yellow-600 dark:text-yellow-400 px-4 py-3 rounded-lg text-sm text-center">
+          <div className="mb-6 bg-yellow-500/20 backdrop-blur-sm border border-yellow-400/30 text-yellow-300 px-5 py-4 rounded-xl text-sm text-center shadow-lg">
             <div className="flex items-center justify-center">
-              <ShieldCheckIcon className="h-4 w-4 mr-2" />
+              <ShieldCheckIcon className="h-5 w-5 mr-2" />
               Güvenlik: {attempts}/5 deneme hakkınız kaldı
             </div>
           </div>
         )}
 
         {/* Giriş Formu */}
-        <div className="bg-gray-800 py-8 px-6 shadow-xl rounded-2xl border border-gray-700">
+        <div className="bg-white/10 dark:bg-gray-800/90 backdrop-blur-xl py-10 px-8 shadow-2xl rounded-3xl border border-white/20 dark:border-gray-700">
           <form className="space-y-6" onSubmit={handleSubmit}>
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-300 mb-2">
+              <label htmlFor="email" className="block text-sm font-semibold text-white mb-3">
                 Email Adresi
               </label>
               <input
@@ -225,7 +233,7 @@ function LoginForm() {
                 type="email"
                 autoComplete="email"
                 required
-                className="w-full px-4 py-3 border border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-gray-700 dark:text-white transition-colors"
+                className="w-full px-5 py-4 border border-white/20 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-white/10 dark:bg-gray-700/50 backdrop-blur-sm text-white placeholder-gray-400 transition-all duration-200"
                 placeholder="ornek@email.com"
                 value={formData.email}
                 onChange={handleChange}
@@ -233,7 +241,7 @@ function LoginForm() {
             </div>
 
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-300 mb-2">
+              <label htmlFor="password" className="block text-sm font-semibold text-white mb-3">
                 Şifre
               </label>
               <div className="relative">
@@ -243,27 +251,27 @@ function LoginForm() {
                   type={showPassword ? 'text' : 'password'}
                   autoComplete="current-password"
                   required
-                  className="w-full px-4 py-3 pr-12 border border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-gray-700 dark:text-white transition-colors"
+                  className="w-full px-5 py-4 pr-14 border border-white/20 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-white/10 dark:bg-gray-700/50 backdrop-blur-sm text-white placeholder-gray-400 transition-all duration-200"
                   placeholder="Şifrenizi girin"
                   value={formData.password}
                   onChange={handleChange}
                 />
                 <button
                   type="button"
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                  className="absolute inset-y-0 right-0 pr-4 flex items-center"
                   onClick={() => setShowPassword(!showPassword)}
                 >
                   {showPassword ? (
-                    <EyeSlashIcon className="h-5 w-5 text-gray-400 hover:text-gray-600" />
+                    <EyeSlashIcon className="h-6 w-6 text-gray-400 hover:text-white transition-colors" />
                   ) : (
-                    <EyeIcon className="h-5 w-5 text-gray-400 hover:text-gray-600" />
+                    <EyeIcon className="h-6 w-6 text-gray-400 hover:text-white transition-colors" />
                   )}
                 </button>
               </div>
             </div>
 
             {error && (
-              <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 px-4 py-3 rounded-lg text-sm">
+              <div className="bg-red-500/20 backdrop-blur-sm border border-red-400/30 text-red-300 px-5 py-4 rounded-xl text-sm shadow-lg">
                 {error}
               </div>
             )}
@@ -271,11 +279,11 @@ function LoginForm() {
             <button
               type="submit"
               disabled={loading || isBlocked}
-              className="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+              className="w-full flex justify-center py-4 px-4 border border-transparent rounded-xl shadow-lg text-base font-semibold text-white bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-600 hover:from-purple-700 hover:via-indigo-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 transform hover:scale-[1.02] active:scale-[0.98]"
             >
               {loading ? (
                 <div className="flex items-center">
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-3"></div>
                   Giriş yapılıyor...
                 </div>
               ) : isBlocked ? (
@@ -287,13 +295,13 @@ function LoginForm() {
           </form>
 
           {/* Kayıt Ol Butonu */}
-          <div className="mt-6">
+          <div className="mt-8">
             <div className="relative">
               <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-600" />
+                <div className="w-full border-t border-white/20 dark:border-gray-600" />
               </div>
               <div className="relative flex justify-center text-sm">
-                <span className="px-2 bg-gray-800 text-gray-500 dark:text-gray-400">
+                <span className="px-3 bg-white/10 dark:bg-gray-800 text-gray-300 dark:text-gray-400">
                   Hesabınız yok mu?
                 </span>
               </div>
@@ -302,7 +310,7 @@ function LoginForm() {
             <div className="mt-6">
               <Link
                 href="/register"
-                className="w-full flex justify-center py-3 px-4 border border-gray-600 rounded-lg shadow-sm text-sm font-medium text-gray-300 bg-white bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all duration-200"
+                className="w-full flex justify-center py-4 px-4 border border-white/30 dark:border-gray-600 rounded-xl shadow-md text-base font-semibold text-white bg-white/5 dark:bg-gray-700/30 backdrop-blur-sm hover:bg-white/10 dark:hover:bg-gray-600/50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 transition-all duration-200 transform hover:scale-[1.02] active:scale-[0.98]"
               >
                 Yeni Hesap Oluştur
               </Link>
@@ -312,13 +320,13 @@ function LoginForm() {
 
         {/* Alt Bilgi */}
         <div className="mt-8 text-center">
-          <p className="text-xs text-gray-500 dark:text-gray-400">
+          <p className="text-xs text-gray-400 dark:text-gray-500">
             Giriş yaparak{' '}
-            <Link href="/terms" className="text-indigo-600 dark:text-indigo-400 hover:underline">
+            <Link href="/terms" className="text-purple-400 hover:text-purple-300 hover:underline transition-colors">
               Kullanım Şartları
             </Link>{' '}
             ve{' '}
-            <Link href="/privacy" className="text-indigo-600 dark:text-indigo-400 hover:underline">
+            <Link href="/privacy" className="text-purple-400 hover:text-purple-300 hover:underline transition-colors">
               Gizlilik Politikası
             </Link>{' '}
             &apos;nı kabul etmiş olursunuz.

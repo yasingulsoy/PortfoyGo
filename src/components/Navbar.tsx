@@ -1,8 +1,9 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { useState } from 'react';
-import { Bars3Icon, XMarkIcon, ChartBarIcon, HomeIcon, BriefcaseIcon, ClockIcon, TrophyIcon, BellIcon, Cog6ToothIcon, UserIcon } from '@heroicons/react/24/outline';
+import { Bars3Icon, XMarkIcon, HomeIcon, BriefcaseIcon, ClockIcon, TrophyIcon, BellIcon, Cog6ToothIcon, UserIcon } from '@heroicons/react/24/outline';
 import { useAuth } from '@/context/AuthContext';
 
 export default function Navbar() {
@@ -14,6 +15,7 @@ export default function Navbar() {
     { href: '/portfolio', label: 'Portföyüm', icon: BriefcaseIcon },
     { href: '/transactions', label: 'İşlemler', icon: ClockIcon },
     { href: '/leaderboard', label: 'Liderlik', icon: TrophyIcon },
+    ...(user?.is_admin ? [{ href: '/admin', label: 'Admin', icon: Cog6ToothIcon }] : []),
   ];
 
   return (
@@ -21,11 +23,15 @@ export default function Navbar() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
-          <Link href="/" className="flex items-center space-x-2 sm:space-x-3">
-            <div className="h-8 w-8 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-lg flex items-center justify-center shadow-sm">
-              <ChartBarIcon className="h-5 w-5 text-white" />
-            </div>
-            <span className="text-lg sm:text-xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">Sanal Yatırım</span>
+          <Link href="/" className="flex items-center space-x-2 sm:space-x-3 hover:opacity-80 transition-opacity">
+            <Image
+              src="/PortfoyGo.png"
+              alt="PortfoyGo Logo"
+              width={140}
+              height={50}
+              className="object-contain h-8 sm:h-10"
+              priority
+            />
           </Link>
 
           {/* Desktop Navigation */}
