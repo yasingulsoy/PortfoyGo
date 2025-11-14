@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
-import { Bars3Icon, XMarkIcon, ChartBarIcon, HomeIcon, BriefcaseIcon, ClockIcon, TrophyIcon, BellIcon, Cog6ToothIcon } from '@heroicons/react/24/outline';
+import { Bars3Icon, XMarkIcon, ChartBarIcon, HomeIcon, BriefcaseIcon, ClockIcon, TrophyIcon, BellIcon, Cog6ToothIcon, UserIcon } from '@heroicons/react/24/outline';
 import { useAuth } from '@/context/AuthContext';
 
 export default function Navbar() {
@@ -49,9 +49,13 @@ export default function Navbar() {
                 <button className="p-2 text-gray-400 hover:text-gray-300 dark:text-gray-400 dark:hover:text-gray-200 transition-colors">
                   <BellIcon className="h-5 w-5" />
                 </button>
-                <button className="p-2 text-gray-400 hover:text-gray-300 dark:text-gray-400 dark:hover:text-gray-200 transition-colors">
-                  <Cog6ToothIcon className="h-5 w-5" />
-                </button>
+                <Link
+                  href="/profile"
+                  className="p-2 text-gray-400 hover:text-gray-300 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
+                  title="Profilim"
+                >
+                  <UserIcon className="h-5 w-5" />
+                </Link>
                 <div className="flex items-center gap-3 pl-3 border-l border-gray-200 dark:border-gray-700">
                   <span className="text-sm text-gray-300 dark:text-gray-300">
                     Hoş geldin, <span className="font-medium">{user.username}</span>

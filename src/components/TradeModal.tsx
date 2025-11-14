@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import { Stock } from '@/types';
 import { usePortfolio } from '@/context/PortfolioContext';
+import { transactionApi } from '@/services/backendApi';
+import { useAuth } from '@/context/AuthContext';
 
 interface TradeModalProps {
   isOpen: boolean;
@@ -17,8 +19,10 @@ export default function TradeModal({ isOpen, onClose, stock, type }: TradeModalP
   const [totalAmount, setTotalAmount] = useState(0);
   const [commission, setCommission] = useState(0);
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
   
-  const { state, buyStock, sellStock } = usePortfolio();
+  const { state, buyStock, sellStock, refreshPortfolio } = usePortfolio();
+  const { user } = useAuth();
 
   // USD-TRY dönüşüm oranı (gerçek uygulamada API'den alınır)
   const USD_TO_TRY = 32.5; // Yaklaşık kur
@@ -43,30 +47,75 @@ export default function TradeModal({ isOpen, onClose, stock, type }: TradeModalP
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!stock) return;
+    if (!stock || !user) return;
 
-    if (type === 'buy') {
-      const totalCost = totalAmount + commission;
-      if (totalCost > state.balance) {
-        setError('Yetersiz bakiye!');
-        return;
-      }
-      buyStock(stock, quantity, stock.price);
-    } else {
-      const portfolioItem = state.portfolioItems.find(item => item.symbol === stock.symbol);
-      if (!portfolioItem || portfolioItem.quantity < quantity) {
-        setError('Yetersiz hisse miktarı!');
-        return;
-      }
-      sellStock(stock, quantity, stock.price);
-    }
-
-    onClose();
-    setQuantity(1);
+    setLoading(true);
     setError('');
+
+    try {
+      // Kripto için asset_type belirleme
+      const assetType = stock.symbol.length <= 4 ? 'crypto' : 'stock';
+      const isCrypto = stock.symbol.length <= 4;
+      const priceInTRY = isCrypto ? stock.price * USD_TO_TRY : stock.price;
+      
+      if (type === 'buy') {
+        const totalCost = totalAmount + commission;
+        if (totalCost > state.balance) {
+          setError('Yetersiz bakiye!');
+          setLoading(false);
+          return;
+        }
+
+        // Backend'e alış isteği gönder
+        const result = await transactionApi.buy({
+          symbol: stock.symbol,
+          name: stock.name,
+          asset_type: assetType,
+          quantity: quantity,
+          price: priceInTRY
+        });
+
+        if (result.success) {
+          // Portföyü yenile
+          await refreshPortfolio();
+          onClose();
+          setQuantity(1);
+          setError('');
+        } else {
+          setError(result.message || 'İşlem başarısız!');
+        }
+      } else {
+        const portfolioItem = state.portfolioItems.find(item => item.symbol === stock.symbol);
+        if (!portfolioItem || portfolioItem.quantity < quantity) {
+          setError('Yetersiz hisse miktarı!');
+          setLoading(false);
+          return;
+        }
+
+        // Backend'e satış isteği gönder
+        const result = await transactionApi.sell({
+          symbol: stock.symbol,
+          quantity: quantity
+        });
+
+        if (result.success) {
+          // Portföyü yenile
+          await refreshPortfolio();
+          onClose();
+          setQuantity(1);
+          setError('');
+        } else {
+          setError(result.message || 'İşlem başarısız!');
+        }
+      }
+    } catch (err: any) {
+      setError(err.message || 'Bir hata oluştu!');
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (!isOpen || !stock) return null;
@@ -202,13 +251,14 @@ export default function TradeModal({ isOpen, onClose, stock, type }: TradeModalP
             </button>
             <button
               type="submit"
+              disabled={loading}
               className={`flex-1 px-4 py-2 rounded-lg text-white font-medium transition-colors ${
                 type === 'buy' 
-                  ? 'bg-green-600 hover:bg-green-700' 
-                  : 'bg-red-600 hover:bg-red-700'
+                  ? 'bg-green-600 hover:bg-green-700 disabled:bg-green-400' 
+                  : 'bg-red-600 hover:bg-red-700 disabled:bg-red-400'
               }`}
             >
-              {type === 'buy' ? 'Satın Al' : 'Sat'}
+              {loading ? 'İşleniyor...' : (type === 'buy' ? 'Satın Al' : 'Sat')}
             </button>
           </div>
         </form>

@@ -1,0 +1,81 @@
+-- PostgreSQL Veritabanı Tabloları Oluşturma Scripti
+-- PortfoyGo Projesi için tüm tabloları oluşturur
+
+-- 1. Users Tablosu
+CREATE TABLE IF NOT EXISTS users (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  username VARCHAR(50) UNIQUE NOT NULL,
+  email VARCHAR(255) UNIQUE NOT NULL,
+  password_hash VARCHAR(255) NOT NULL,
+  email_verified BOOLEAN DEFAULT FALSE,
+  verification_code VARCHAR(6),
+  verification_code_expires_at TIMESTAMP,
+  balance DECIMAL(15,2) DEFAULT 100000.00,
+  portfolio_value DECIMAL(15,2) DEFAULT 0.00,
+  total_profit_loss DECIMAL(15,2) DEFAULT 0.00,
+  rank INTEGER DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  last_login TIMESTAMP
+);
+
+-- 2. Email Verifications Tablosu
+CREATE TABLE IF NOT EXISTS email_verifications (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  email VARCHAR(255) NOT NULL,
+  verification_code VARCHAR(6) NOT NULL,
+  expires_at TIMESTAMP NOT NULL,
+  used BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 3. Portfolio Items Tablosu
+CREATE TABLE IF NOT EXISTS portfolio_items (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  symbol VARCHAR(20) NOT NULL,
+  name VARCHAR(255) NOT NULL,
+  asset_type VARCHAR(10) NOT NULL CHECK (asset_type IN ('crypto', 'stock')),
+  quantity DECIMAL(20,8) NOT NULL DEFAULT 0,
+  average_price DECIMAL(15,2) NOT NULL DEFAULT 0,
+  current_price DECIMAL(15,2) NOT NULL DEFAULT 0,
+  total_value DECIMAL(15,2) NOT NULL DEFAULT 0,
+  profit_loss DECIMAL(15,2) NOT NULL DEFAULT 0,
+  profit_loss_percent DECIMAL(10,4) NOT NULL DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(user_id, symbol, asset_type)
+);
+
+-- 4. Transactions Tablosu
+CREATE TABLE IF NOT EXISTS transactions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  type VARCHAR(4) NOT NULL CHECK (type IN ('buy', 'sell')),
+  symbol VARCHAR(20) NOT NULL,
+  name VARCHAR(255) NOT NULL,
+  asset_type VARCHAR(10) NOT NULL CHECK (asset_type IN ('crypto', 'stock')),
+  quantity DECIMAL(20,8) NOT NULL,
+  price DECIMAL(15,2) NOT NULL,
+  total_amount DECIMAL(15,2) NOT NULL,
+  commission DECIMAL(15,2) NOT NULL DEFAULT 0,
+  net_amount DECIMAL(15,2) NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Index'ler
+CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
+CREATE INDEX IF NOT EXISTS idx_email_verifications_user_id ON email_verifications(user_id);
+CREATE INDEX IF NOT EXISTS idx_email_verifications_email ON email_verifications(email);
+CREATE INDEX IF NOT EXISTS idx_portfolio_items_user_id ON portfolio_items(user_id);
+CREATE INDEX IF NOT EXISTS idx_transactions_user_id ON transactions(user_id);
+CREATE INDEX IF NOT EXISTS idx_transactions_created_at ON transactions(created_at DESC);
+
+-- Başarı mesajı için
+DO $$
+BEGIN
+  RAISE NOTICE '✅ Tüm tablolar başarıyla oluşturuldu!';
+END $$;
+

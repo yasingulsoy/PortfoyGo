@@ -4,6 +4,11 @@ import dotenv from 'dotenv';
 import authRoutes from './routes/auth';
 import emailRoutes from './routes/email';
 import stocksRoutes from './routes/stocks';
+import transactionsRoutes from './routes/transactions';
+import portfolioRoutes from './routes/portfolio';
+import leaderboardRoutes from './routes/leaderboard';
+import adminRoutes from './routes/admin';
+import badgesRoutes from './routes/badges';
 
 // Environment variables
 dotenv.config();
@@ -26,6 +31,11 @@ app.use(express.urlencoded({ extended: true }));
 app.use('/api/auth', authRoutes);
 app.use('/api/email', emailRoutes);
 app.use('/api/stocks', stocksRoutes);
+app.use('/api/transactions', transactionsRoutes);
+app.use('/api/portfolio', portfolioRoutes);
+app.use('/api/leaderboard', leaderboardRoutes);
+app.use('/api/admin', adminRoutes);
+app.use('/api/badges', badgesRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

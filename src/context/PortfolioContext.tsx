@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useReducer, useEffect, ReactNode, useCallback } from 'react';
 import { PortfolioItem, Transaction, Stock } from '@/types';
+import { portfolioApi } from '@/services/backendApi';
 
 interface PortfolioState {
   balance: number;
@@ -15,7 +16,8 @@ type PortfolioAction =
   | { type: 'BUY_STOCK'; payload: { stock: Stock; quantity: number; price: number } }
   | { type: 'SELL_STOCK'; payload: { stock: Stock; quantity: number; price: number } }
   | { type: 'UPDATE_PRICES'; payload: Stock[] }
-  | { type: 'RESET_PORTFOLIO' };
+  | { type: 'RESET_PORTFOLIO' }
+  | { type: 'SET_PORTFOLIO'; payload: { balance: number; portfolioItems: PortfolioItem[]; transactions: Transaction[]; totalValue: number; totalProfitLoss: number } };
 
 const initialState: PortfolioState = {
   balance: 10000000, // Başlangıç bakiyesi
@@ -195,6 +197,16 @@ const portfolioReducer = (state: PortfolioState, action: PortfolioAction): Portf
     case 'RESET_PORTFOLIO':
       return initialState;
 
+    case 'SET_PORTFOLIO':
+      return {
+        ...state,
+        balance: action.payload.balance,
+        portfolioItems: action.payload.portfolioItems,
+        transactions: action.payload.transactions,
+        totalValue: action.payload.totalValue,
+        totalProfitLoss: action.payload.totalProfitLoss
+      };
+
     default:
       return state;
   }
@@ -206,6 +218,7 @@ interface PortfolioContextType {
   sellStock: (stock: Stock, quantity: number, price: number) => void;
   updatePrices: (stocks: Stock[]) => void;
   resetPortfolio: () => void;
+  refreshPortfolio: () => Promise<void>;
 }
 
 const PortfolioContext = createContext<PortfolioContextType | undefined>(undefined);
@@ -228,6 +241,56 @@ export const PortfolioProvider: React.FC<{ children: ReactNode }> = ({ children 
   const resetPortfolio = () => {
     dispatch({ type: 'RESET_PORTFOLIO' });
   };
+
+  const refreshPortfolio = useCallback(async () => {
+    try {
+      const result = await portfolioApi.getPortfolio();
+      if (result.success && result.portfolio) {
+        // Portföy verilerini state'e aktar
+        const portfolioItems: PortfolioItem[] = result.portfolio.map((item: any) => ({
+          id: item.id,
+          symbol: item.symbol,
+          name: item.name,
+          quantity: item.quantity,
+          averagePrice: item.average_price,
+          currentPrice: item.current_price,
+          totalValue: item.total_value,
+          profitLoss: item.profit_loss,
+          profitLossPercent: item.profit_loss_percent
+        }));
+
+        // Transactions'ı da al
+        const transactionsResult = await portfolioApi.getTransactions();
+        const transactions: Transaction[] = transactionsResult.success && transactionsResult.transactions
+          ? transactionsResult.transactions.map((t: any) => ({
+              id: t.id,
+              type: t.type,
+              symbol: t.symbol,
+              name: t.name,
+              quantity: t.quantity,
+              price: t.price,
+              totalAmount: t.total_amount,
+              commission: t.commission,
+              timestamp: new Date(t.created_at)
+            }))
+          : [];
+
+        // State'i güncelle
+        dispatch({
+          type: 'SET_PORTFOLIO',
+          payload: {
+            balance: result.balance || 0,
+            portfolioItems,
+            transactions,
+            totalValue: result.portfolioValue || 0,
+            totalProfitLoss: result.totalProfitLoss || 0
+          }
+        } as any);
+      }
+    } catch (error) {
+      console.error('Refresh portfolio error:', error);
+    }
+  }, []);
 
   // Local storage'a kaydet
   useEffect(() => {
@@ -263,7 +326,8 @@ export const PortfolioProvider: React.FC<{ children: ReactNode }> = ({ children 
       buyStock,
       sellStock,
       updatePrices,
-      resetPortfolio
+      resetPortfolio,
+      refreshPortfolio
     }}>
       {children}
     </PortfolioContext.Provider>

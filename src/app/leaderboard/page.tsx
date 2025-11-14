@@ -1,34 +1,46 @@
 'use client';
 
-import { useState } from 'react';
-import { TrophyIcon, ArrowUpIcon } from '@heroicons/react/24/outline';
+import { useState, useEffect } from 'react';
+import { TrophyIcon, ArrowUpIcon, ArrowDownIcon } from '@heroicons/react/24/outline';
+import { leaderboardApi } from '@/services/backendApi';
 
 interface Leader {
   rank: number;
   username: string;
-  profitPercent: number;
-  portfolioValue: number;
+  profit_loss_percent: number;
+  portfolio_value: number;
+  total_profit_loss: number;
+  balance: number;
 }
 
-const weeklyLeaders: Leader[] = [
-  { rank: 1, username: 'Ahmet Yılmaz', profitPercent: 12.4, portfolioValue: 11240 },
-  { rank: 2, username: 'Ayşe Demir', profitPercent: 9.8, portfolioValue: 10980 },
-  { rank: 3, username: 'Mehmet Kaya', profitPercent: 7.1, portfolioValue: 10710 },
-  { rank: 4, username: 'Zeynep Koç', profitPercent: 5.2, portfolioValue: 10520 },
-  { rank: 5, username: 'Can Aydın', profitPercent: 4.7, portfolioValue: 10470 },
-];
-
-const monthlyLeaders: Leader[] = [
-  { rank: 1, username: 'Elif Şimşek', profitPercent: 28.9, portfolioValue: 12890 },
-  { rank: 2, username: 'Kemal Aras', profitPercent: 22.3, portfolioValue: 12230 },
-  { rank: 3, username: 'Deniz Uçar', profitPercent: 18.6, portfolioValue: 11860 },
-  { rank: 4, username: 'Bora Çetin', profitPercent: 16.1, portfolioValue: 11610 },
-  { rank: 5, username: 'Ece Kaplan', profitPercent: 15.4, portfolioValue: 11540 },
-];
-
 export default function LeaderboardPage() {
-  const [activeTab, setActiveTab] = useState<'weekly' | 'monthly'>('weekly');
-  const data = activeTab === 'weekly' ? weeklyLeaders : monthlyLeaders;
+  const [leaders, setLeaders] = useState<Leader[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    loadLeaderboard();
+    // Her 30 saniyede bir güncelle
+    const interval = setInterval(loadLeaderboard, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const loadLeaderboard = async () => {
+    try {
+      setLoading(true);
+      const result = await leaderboardApi.getLeaderboard(10);
+      if (result.success && result.leaderboard) {
+        setLeaders(result.leaderboard);
+        setError('');
+      } else {
+        setError('Liderlik tablosu yüklenemedi');
+      }
+    } catch (err: any) {
+      setError(err.message || 'Bir hata oluştu');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
@@ -43,59 +55,93 @@ export default function LeaderboardPage() {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="bg-white rounded-xl shadow-sm border">
-          {/* Tabs */}
-          <div className="border-b px-4 sm:px-6">
-            <nav className="flex space-x-6">
+          {/* Header */}
+          <div className="border-b px-4 sm:px-6 py-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-gray-900">Genel Liderlik Tablosu</h2>
               <button
-                onClick={() => setActiveTab('weekly')}
-                className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                  activeTab === 'weekly'
-                    ? 'border-indigo-500 text-indigo-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
+                onClick={loadLeaderboard}
+                disabled={loading}
+                className="text-sm text-indigo-600 hover:text-indigo-700 disabled:text-gray-400"
               >
-                Haftalık
+                {loading ? 'Yenileniyor...' : 'Yenile'}
               </button>
-              <button
-                onClick={() => setActiveTab('monthly')}
-                className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                  activeTab === 'monthly'
-                    ? 'border-indigo-500 text-indigo-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                Aylık
-              </button>
-            </nav>
+            </div>
           </div>
 
           {/* Table */}
           <div className="p-4 sm:p-6 overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-4 sm:px-6 py-3 text-left text-[10px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider">Sıra</th>
-                  <th className="px-4 sm:px-6 py-3 text-left text-[10px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider">Kullanıcı</th>
-                  <th className="px-4 sm:px-6 py-3 text-right text-[10px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider">Kâr Oranı</th>
-                  <th className="px-4 sm:px-6 py-3 text-right text-[10px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider">Portföy Değeri</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {data.map((row) => (
-                  <tr key={row.rank} className="hover:bg-gray-50">
-                    <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">#{row.rank}</td>
-                    <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">{row.username}</td>
-                    <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-right">
-                      <span className="inline-flex items-center text-green-600 font-medium">
-                        <ArrowUpIcon className="h-4 w-4 mr-1" />
-                        {row.profitPercent.toFixed(2)}%
-                      </span>
-                    </td>
-                    <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-gray-900">₺{row.portfolioValue.toLocaleString('tr-TR')}</td>
+            {loading ? (
+              <div className="text-center py-12">
+                <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+                <p className="mt-4 text-sm text-gray-500">Yükleniyor...</p>
+              </div>
+            ) : error ? (
+              <div className="text-center py-12">
+                <p className="text-red-600">{error}</p>
+                <button
+                  onClick={loadLeaderboard}
+                  className="mt-4 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+                >
+                  Tekrar Dene
+                </button>
+              </div>
+            ) : leaders.length === 0 ? (
+              <div className="text-center py-12">
+                <p className="text-gray-500">Henüz lider yok</p>
+              </div>
+            ) : (
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 sm:px-6 py-3 text-left text-[10px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider">Sıra</th>
+                    <th className="px-4 sm:px-6 py-3 text-left text-[10px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider">Kullanıcı</th>
+                    <th className="px-4 sm:px-6 py-3 text-right text-[10px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider">Kâr/Zarar</th>
+                    <th className="px-4 sm:px-6 py-3 text-right text-[10px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider">Portföy Değeri</th>
+                    <th className="px-4 sm:px-6 py-3 text-right text-[10px] sm:text-xs font-medium text-gray-500 uppercase tracking-wider">Toplam Varlık</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {leaders.map((leader) => {
+                    const totalAssets = leader.balance + leader.portfolio_value;
+                    const isProfit = leader.profit_loss_percent >= 0;
+                    return (
+                      <tr key={leader.rank} className="hover:bg-gray-50">
+                        <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                          {leader.rank <= 3 ? (
+                            <span className="text-2xl">
+                              {leader.rank === 1 ? '🥇' : leader.rank === 2 ? '🥈' : '🥉'}
+                            </span>
+                          ) : (
+                            `#${leader.rank}`
+                          )}
+                        </td>
+                        <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">{leader.username}</td>
+                        <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-right">
+                          <span className={`inline-flex items-center font-medium ${isProfit ? 'text-green-600' : 'text-red-600'}`}>
+                            {isProfit ? (
+                              <ArrowUpIcon className="h-4 w-4 mr-1" />
+                            ) : (
+                              <ArrowDownIcon className="h-4 w-4 mr-1" />
+                            )}
+                            {leader.profit_loss_percent.toFixed(2)}%
+                          </span>
+                          <div className="text-xs text-gray-500">
+                            {isProfit ? '+' : ''}₺{leader.total_profit_loss.toLocaleString('tr-TR')}
+                          </div>
+                        </td>
+                        <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-gray-900">
+                          ₺{leader.portfolio_value.toLocaleString('tr-TR')}
+                        </td>
+                        <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-right text-sm font-bold text-indigo-600">
+                          ₺{totalAssets.toLocaleString('tr-TR')}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
           </div>
         </div>
       </div>
