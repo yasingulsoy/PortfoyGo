@@ -10,6 +10,9 @@ import leaderboardRoutes from './routes/leaderboard';
 import adminRoutes from './routes/admin';
 import badgesRoutes from './routes/badges';
 import activityLogsRoutes from './routes/activityLogs';
+import cryptosRoutes from './routes/cryptos';
+import { MarketCacheService } from './services/marketCache';
+import cron from 'node-cron';
 
 // Environment variables
 dotenv.config();
@@ -38,6 +41,7 @@ app.use('/api/leaderboard', leaderboardRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/badges', badgesRoutes);
 app.use('/api/activity-logs', activityLogsRoutes);
+app.use('/api/cryptos', cryptosRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
@@ -65,8 +69,36 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
   });
 });
 
+// Cache'i başlangıçta doldur
+MarketCacheService.refreshCache().catch(err => {
+  console.error('Initial cache refresh error:', err);
+});
+
+// Her 2 saatte bir cache'i güncelle (cron: 0 */2 * * *)
+cron.schedule('0 */2 * * *', async () => {
+  console.log('⏰ Scheduled cache refresh başlatılıyor...');
+  try {
+    await MarketCacheService.refreshCache();
+    console.log('✅ Scheduled cache refresh tamamlandı');
+  } catch (error) {
+    console.error('❌ Scheduled cache refresh hatası:', error);
+  }
+});
+
+// Cache durumunu göster
+setInterval(async () => {
+  const status = await MarketCacheService.getCacheStatus();
+  console.log('📊 Cache Durumu:', {
+    stocks: status.stocks,
+    cryptos: status.cryptos,
+    oldest: status.oldestCache,
+    newest: status.newestCache
+  });
+}, 3600000); // Her saatte bir
+
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`📊 Trading Platform API ready!`);
   console.log(`🌐 Health check: http://localhost:${PORT}/api/health`);
+  console.log(`🔄 Cache otomatik güncelleme: Her 2 saatte bir`);
 });

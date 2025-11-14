@@ -2,37 +2,129 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { 
   CurrencyDollarIcon, 
   ArrowUpIcon, 
   ArrowDownIcon,
   ChartBarIcon,
-  ClockIcon
+  ClockIcon,
+  ArrowTrendingUpIcon,
+  ArrowTrendingDownIcon,
+  RefreshIcon
 } from '@heroicons/react/24/outline';
 import { usePortfolio } from '@/context/PortfolioContext';
 import { useAuth } from '@/context/AuthContext';
 import { PortfolioItem, Transaction } from '@/types';
+import { useStocks, useCryptos } from '@/hooks/useMarketData';
+
+const USD_TO_TRY = 32.5;
 
 export default function PortfolioPage() {
-  const { state } = usePortfolio();
+  const { state, refreshPortfolio } = usePortfolio();
   const { user, loading } = useAuth();
   const router = useRouter();
+  const { stocks } = useStocks();
+  const { cryptos } = useCryptos();
   const [activeTab, setActiveTab] = useState<'overview' | 'transactions'>('overview');
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [portfolioWithPrices, setPortfolioWithPrices] = useState<PortfolioItem[]>([]);
 
-  // Giriş kontrolü kaldırıldı - herkes içeri bakabilir
+  useEffect(() => {
+    if (user) {
+      refreshPortfolio();
+    }
+  }, [user]);
+
+  // Portföy öğelerini güncel fiyatlarla güncelle
+  useEffect(() => {
+    if (state.portfolioItems.length > 0 && (stocks.length > 0 || cryptos.length > 0)) {
+      const updated = state.portfolioItems.map(item => {
+        // Hisse senedi mi kripto mu kontrol et
+        const isCrypto = item.symbol.length <= 4;
+        
+        if (isCrypto) {
+          const crypto = cryptos.find(c => c.symbol.toUpperCase() === item.symbol.toUpperCase());
+          if (crypto) {
+            const currentPriceUSD = crypto.current_price;
+            const currentPriceTRY = currentPriceUSD * USD_TO_TRY;
+            const averagePriceTRY = item.averagePrice;
+            const profitLoss = (currentPriceTRY - averagePriceTRY) * item.quantity;
+            const profitLossPercent = averagePriceTRY > 0 ? ((currentPriceTRY - averagePriceTRY) / averagePriceTRY) * 100 : 0;
+            
+            return {
+              ...item,
+              currentPrice: currentPriceTRY,
+              currentPriceUSD: currentPriceUSD,
+              totalValue: item.quantity * currentPriceTRY,
+              profitLoss,
+              profitLossPercent
+            };
+          }
+        } else {
+          const stock = stocks.find(s => s.symbol === item.symbol);
+          if (stock) {
+            const currentPriceUSD = stock.price;
+            const currentPriceTRY = currentPriceUSD * USD_TO_TRY;
+            const averagePriceTRY = item.averagePrice;
+            const profitLoss = (currentPriceTRY - averagePriceTRY) * item.quantity;
+            const profitLossPercent = averagePriceTRY > 0 ? ((currentPriceTRY - averagePriceTRY) / averagePriceTRY) * 100 : 0;
+            
+            return {
+              ...item,
+              currentPrice: currentPriceTRY,
+              currentPriceUSD: currentPriceUSD,
+              totalValue: item.quantity * currentPriceTRY,
+              profitLoss,
+              profitLossPercent
+            };
+          }
+        }
+        return item;
+      });
+      
+      setPortfolioWithPrices(updated);
+    } else {
+      setPortfolioWithPrices(state.portfolioItems);
+    }
+  }, [state.portfolioItems, stocks, cryptos]);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    await refreshPortfolio();
+    setTimeout(() => setIsRefreshing(false), 1000);
+  };
 
   const getTotalInvestment = () => {
-    return state.portfolioItems.reduce((sum, item) => sum + (item.quantity * item.averagePrice), 0);
+    return portfolioWithPrices.reduce((sum, item) => sum + (item.quantity * item.averagePrice), 0);
+  };
+
+  const getTotalCurrentValue = () => {
+    return portfolioWithPrices.reduce((sum, item) => sum + item.totalValue, 0);
+  };
+
+  const getTotalProfitLoss = () => {
+    return portfolioWithPrices.reduce((sum, item) => sum + item.profitLoss, 0);
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-950 dark:to-gray-900">
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-indigo-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
       {/* Header */}
-      <div className="bg-white dark:bg-gray-900 shadow-sm border-b border-gray-200 dark:border-gray-800">
+      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center h-16">
-            <ChartBarIcon className="h-8 w-8 text-indigo-600 mr-3" />
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Portföyüm</h1>
+          <div className="flex items-center justify-between h-16">
+            <div className="flex items-center">
+              <ChartBarIcon className="h-8 w-8 text-indigo-600 dark:text-indigo-400 mr-3" />
+              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Portföyüm</h1>
+            </div>
+            <button
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+              className="flex items-center space-x-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+            >
+              <RefreshIcon className={`h-5 w-5 ${isRefreshing ? 'animate-spin' : ''}`} />
+              <span>Yenile</span>
+            </button>
           </div>
         </div>
       </div>
@@ -48,15 +140,16 @@ export default function PortfolioPage() {
                 </div>
                 <div className="ml-4">
                   <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Toplam Değer</p>
-                  <p className="text-2xl font-bold text-gray-900 dark:text-white">₺{state.totalValue.toLocaleString('tr-TR')}</p>
+                  <p className="text-2xl font-bold text-gray-900 dark:text-white">₺{getTotalCurrentValue().toLocaleString('tr-TR', { maximumFractionDigits: 2 })}</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">${(getTotalCurrentValue() / USD_TO_TRY).toLocaleString('en-US', { maximumFractionDigits: 2 })}</p>
                 </div>
               </div>
             </div>
 
             <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 border border-gray-200 dark:border-gray-700 hover:shadow-xl transition-shadow">
               <div className="flex items-center">
-                <div className={`p-3 rounded-xl ${state.totalProfitLoss >= 0 ? 'bg-gradient-to-br from-green-100 to-emerald-100 dark:from-green-900/40 dark:to-emerald-900/40' : 'bg-gradient-to-br from-red-100 to-pink-100 dark:from-red-900/40 dark:to-pink-900/40'}`}>
-                  {state.totalProfitLoss >= 0 ? (
+                <div className={`p-3 rounded-xl ${getTotalProfitLoss() >= 0 ? 'bg-gradient-to-br from-green-100 to-emerald-100 dark:from-green-900/40 dark:to-emerald-900/40' : 'bg-gradient-to-br from-red-100 to-pink-100 dark:from-red-900/40 dark:to-pink-900/40'}`}>
+                  {getTotalProfitLoss() >= 0 ? (
                     <ArrowUpIcon className="h-6 w-6 text-green-600 dark:text-green-400" />
                   ) : (
                     <ArrowDownIcon className="h-6 w-6 text-red-600 dark:text-red-400" />
@@ -64,8 +157,11 @@ export default function PortfolioPage() {
                 </div>
                 <div className="ml-4">
                   <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Toplam Kâr/Zarar</p>
-                  <p className={`text-2xl font-bold ${state.totalProfitLoss >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                    {state.totalProfitLoss >= 0 ? '+' : ''}₺{state.totalProfitLoss.toLocaleString('tr-TR')}
+                  <p className={`text-2xl font-bold ${getTotalProfitLoss() >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                    {getTotalProfitLoss() >= 0 ? '+' : ''}₺{getTotalProfitLoss().toLocaleString('tr-TR', { maximumFractionDigits: 2 })}
+                  </p>
+                  <p className={`text-xs ${getTotalProfitLoss() >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                    {getTotalInvestment() > 0 ? `${((getTotalProfitLoss() / getTotalInvestment()) * 100).toFixed(2)}%` : '0%'}
                   </p>
                 </div>
               </div>
@@ -78,7 +174,8 @@ export default function PortfolioPage() {
                 </div>
                 <div className="ml-4">
                   <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Toplam Yatırım</p>
-                  <p className="text-2xl font-bold text-gray-900 dark:text-white">₺{getTotalInvestment().toLocaleString('tr-TR')}</p>
+                  <p className="text-2xl font-bold text-gray-900 dark:text-white">₺{getTotalInvestment().toLocaleString('tr-TR', { maximumFractionDigits: 2 })}</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">${(getTotalInvestment() / USD_TO_TRY).toLocaleString('en-US', { maximumFractionDigits: 2 })}</p>
                 </div>
               </div>
             </div>
@@ -90,7 +187,8 @@ export default function PortfolioPage() {
                 </div>
                 <div className="ml-4">
                   <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Nakit Bakiye</p>
-                  <p className="text-2xl font-bold text-gray-900 dark:text-white">₺{state.balance.toLocaleString('tr-TR')}</p>
+                  <p className="text-2xl font-bold text-gray-900 dark:text-white">₺{state.balance.toLocaleString('tr-TR', { maximumFractionDigits: 2 })}</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">${(state.balance / USD_TO_TRY).toLocaleString('en-US', { maximumFractionDigits: 2 })}</p>
                 </div>
               </div>
             </div>
@@ -126,7 +224,7 @@ export default function PortfolioPage() {
 
           <div className="p-6">
             {activeTab === 'overview' ? (
-              <PortfolioOverview portfolioItems={state.portfolioItems} />
+              <PortfolioOverview portfolioItems={portfolioWithPrices} />
             ) : (
               <TransactionHistory transactions={state.transactions} />
             )}
@@ -137,7 +235,11 @@ export default function PortfolioPage() {
   );
 }
 
-function PortfolioOverview({ portfolioItems }: { portfolioItems: PortfolioItem[] }) {
+interface ExtendedPortfolioItem extends PortfolioItem {
+  currentPriceUSD?: number;
+}
+
+function PortfolioOverview({ portfolioItems }: { portfolioItems: ExtendedPortfolioItem[] }) {
   if (portfolioItems.length === 0) {
     return (
       <div className="text-center py-12">
@@ -150,72 +252,100 @@ function PortfolioOverview({ portfolioItems }: { portfolioItems: PortfolioItem[]
 
   return (
     <div className="overflow-x-auto">
-      <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-800">
+      <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
         <thead className="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-700">
           <tr>
             <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">
-              Hisse
+              Varlık
             </th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">
+            <th className="px-6 py-3 text-right text-xs font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">
               Miktar
             </th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">
-              Ortalama Fiyat
+            <th className="px-6 py-3 text-right text-xs font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">
+              Alış Fiyatı
             </th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">
+            <th className="px-6 py-3 text-right text-xs font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">
               Güncel Fiyat
             </th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">
+            <th className="px-6 py-3 text-right text-xs font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">
               Toplam Değer
             </th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">
+            <th className="px-6 py-3 text-right text-xs font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">
               Kâr/Zarar
+            </th>
+            <th className="px-6 py-3 text-right text-xs font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">
+              Değişim %
             </th>
           </tr>
         </thead>
         <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-          {portfolioItems.map((item) => (
-            <tr key={item.symbol} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
-              <td className="px-6 py-4 whitespace-nowrap">
-                <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 bg-gradient-to-br from-indigo-100 to-purple-100 dark:from-indigo-900/40 dark:to-purple-900/40 rounded-lg flex items-center justify-center">
-                    <span className="text-sm font-bold text-indigo-600 dark:text-indigo-400">{item.symbol.slice(0,1)}</span>
+          {portfolioItems.map((item) => {
+            const isProfit = item.profitLoss >= 0;
+            const priceChange = item.averagePrice > 0 ? ((item.currentPrice - item.averagePrice) / item.averagePrice) * 100 : 0;
+            
+            return (
+              <tr key={item.symbol} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 bg-gradient-to-br from-indigo-100 to-purple-100 dark:from-indigo-900/40 dark:to-purple-900/40 rounded-lg flex items-center justify-center">
+                      <span className="text-sm font-bold text-indigo-600 dark:text-indigo-400">{item.symbol.slice(0,1)}</span>
+                    </div>
+                    <div>
+                      <Link 
+                        href={`/asset/${item.symbol}?type=${item.symbol.length <= 4 ? 'crypto' : 'stock'}`}
+                        className="text-sm font-medium text-gray-900 dark:text-white hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
+                      >
+                        {item.name}
+                      </Link>
+                      <div className="text-xs text-gray-500 dark:text-gray-400">{item.symbol}</div>
+                    </div>
                   </div>
-                  <div>
-                    <div className="text-sm font-medium text-gray-900 dark:text-white">{item.name}</div>
-                    <div className="text-sm text-gray-500 dark:text-gray-400">{item.symbol}</div>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-gray-900 dark:text-white">
+                  {item.quantity.toLocaleString('tr-TR', { maximumFractionDigits: 8 })}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-900 dark:text-white">
+                  <div>₺{item.averagePrice.toLocaleString('tr-TR', { maximumFractionDigits: 2 })}</div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400">${(item.averagePrice / USD_TO_TRY).toLocaleString('en-US', { maximumFractionDigits: 2 })}</div>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-900 dark:text-white">
+                  <div className="font-semibold">₺{item.currentPrice.toLocaleString('tr-TR', { maximumFractionDigits: 2 })}</div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400">
+                    ${item.currentPriceUSD ? item.currentPriceUSD.toLocaleString('en-US', { maximumFractionDigits: 2 }) : (item.currentPrice / USD_TO_TRY).toLocaleString('en-US', { maximumFractionDigits: 2 })}
                   </div>
-                </div>
-              </td>
-              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
-                {item.quantity.toLocaleString('tr-TR')}
-              </td>
-              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                ₺{item.averagePrice.toLocaleString('tr-TR')}
-              </td>
-              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                ₺{item.currentPrice.toLocaleString('tr-TR')}
-              </td>
-              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
-                ₺{(item.quantity * item.currentPrice).toLocaleString('tr-TR')}
-              </td>
-              <td className="px-6 py-4 whitespace-nowrap">
-                <div className="flex items-center">
-                  {item.profitLoss >= 0 ? (
-                    <ArrowUpIcon className="h-4 w-4 mr-1 text-green-600 dark:text-green-400" />
-                  ) : (
-                    <ArrowDownIcon className="h-4 w-4 mr-1 text-red-600 dark:text-red-400" />
-                  )}
-                  <span className={`text-sm font-medium ${item.profitLoss >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                    {item.profitLoss >= 0 ? '+' : ''}₺{item.profitLoss.toLocaleString('tr-TR')}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-gray-900 dark:text-white">
+                  <div>₺{item.totalValue.toLocaleString('tr-TR', { maximumFractionDigits: 2 })}</div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400">${(item.totalValue / USD_TO_TRY).toLocaleString('en-US', { maximumFractionDigits: 2 })}</div>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-right">
+                  <div className={`flex items-center justify-end ${isProfit ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                    {isProfit ? (
+                      <ArrowTrendingUpIcon className="h-4 w-4 mr-1" />
+                    ) : (
+                      <ArrowTrendingDownIcon className="h-4 w-4 mr-1" />
+                    )}
+                    <span className="text-sm font-medium">
+                      {isProfit ? '+' : ''}₺{item.profitLoss.toLocaleString('tr-TR', { maximumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                  <div className={`text-xs ${isProfit ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                    {isProfit ? '+' : ''}${(item.profitLoss / USD_TO_TRY).toLocaleString('en-US', { maximumFractionDigits: 2 })}
+                  </div>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-right">
+                  <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${
+                    isProfit 
+                      ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-400' 
+                      : 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-400'
+                  }`}>
+                    {isProfit ? <ArrowUpIcon className="h-3 w-3 mr-1" /> : <ArrowDownIcon className="h-3 w-3 mr-1" />}
+                    {isProfit ? '+' : ''}{priceChange.toFixed(2)}%
                   </span>
-                </div>
-                <div className={`text-xs font-medium ${item.profitLossPercent >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                  {item.profitLossPercent >= 0 ? '+' : ''}{item.profitLossPercent.toFixed(2)}%
-                </div>
-              </td>
-            </tr>
-          ))}
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>
@@ -245,36 +375,36 @@ function TransactionHistory({ transactions }: { transactions: Transaction[] }) {
 
   return (
     <div className="overflow-x-auto">
-      <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-800">
-        <thead className="bg-gray-50 dark:bg-gray-800/60">
+      <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+        <thead className="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-700">
           <tr>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">
               Tarih
             </th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">
               İşlem
             </th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-              Hisse
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">
+              Varlık
             </th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+            <th className="px-6 py-3 text-right text-xs font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">
               Miktar
             </th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+            <th className="px-6 py-3 text-right text-xs font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">
               Fiyat
             </th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+            <th className="px-6 py-3 text-right text-xs font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">
               Toplam
             </th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+            <th className="px-6 py-3 text-right text-xs font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">
               Komisyon
             </th>
           </tr>
         </thead>
-        <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-800">
+        <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
           {transactions.map((transaction) => (
-            <tr key={transaction.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/60">
-              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
+            <tr key={transaction.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
                 {formatDate(transaction.timestamp)}
               </td>
               <td className="px-6 py-4 whitespace-nowrap">
@@ -288,21 +418,23 @@ function TransactionHistory({ transactions }: { transactions: Transaction[] }) {
               </td>
               <td className="px-6 py-4 whitespace-nowrap">
                 <div>
-                  <div className="text-sm font-medium text-gray-900 dark:text-gray-100">{transaction.name}</div>
+                  <div className="text-sm font-medium text-gray-900 dark:text-white">{transaction.name}</div>
                   <div className="text-sm text-gray-500 dark:text-gray-400">{transaction.symbol}</div>
                 </div>
               </td>
-              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
-                {transaction.quantity.toLocaleString()}
+              <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-gray-900 dark:text-white">
+                {transaction.quantity.toLocaleString('tr-TR', { maximumFractionDigits: 8 })}
               </td>
-              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
-                ₺{transaction.price.toLocaleString()}
+              <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-900 dark:text-white">
+                <div>₺{transaction.price.toLocaleString('tr-TR', { maximumFractionDigits: 2 })}</div>
+                <div className="text-xs text-gray-500 dark:text-gray-400">${(transaction.price / USD_TO_TRY).toLocaleString('en-US', { maximumFractionDigits: 2 })}</div>
               </td>
-              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100">
-                ₺{transaction.totalAmount.toLocaleString()}
+              <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-gray-900 dark:text-white">
+                <div>₺{transaction.totalAmount.toLocaleString('tr-TR', { maximumFractionDigits: 2 })}</div>
+                <div className="text-xs text-gray-500 dark:text-gray-400">${(transaction.totalAmount / USD_TO_TRY).toLocaleString('en-US', { maximumFractionDigits: 2 })}</div>
               </td>
-              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                ₺{transaction.commission.toLocaleString()}
+              <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-500 dark:text-gray-400">
+                ₺{transaction.commission.toLocaleString('tr-TR', { maximumFractionDigits: 2 })}
               </td>
             </tr>
           ))}
