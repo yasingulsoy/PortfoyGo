@@ -8,6 +8,8 @@ export interface User {
   total_profit_loss: number;
   rank: number;
   created_at: Date;
+  is_admin?: boolean;
+  is_banned?: boolean;
 }
 
 export interface LoginRequest {
