@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { EyeIcon, EyeSlashIcon, ChartBarIcon, ShieldCheckIcon } from '@heroicons/react/24/outline';
 import { useAuth } from '@/context/AuthContext';
+import DotGrid from '@/components/DotGrid';
 
 function LoginForm() {
   const [formData, setFormData] = useState({
@@ -165,8 +166,22 @@ function LoginForm() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 relative">
+      {/* DotGrid Arka Plan */}
+      <div style={{ width: '100%', height: '100%', position: 'absolute', top: 0, left: 0 }}>
+        <DotGrid
+          dotSize={2}
+          gap={15}
+          baseColor="#5227FF"
+          activeColor="#5227FF"
+          proximity={120}
+          shockRadius={250}
+          shockStrength={5}
+          resistance={750}
+          returnDuration={1.5}
+        />
+      </div>
 
-      <div className="max-w-md w-full">
+      <div className="max-w-md w-full relative z-10">
         {/* Logo ve Başlık */}
         <div className="text-center mb-8">
           <div className="mx-auto h-16 w-16 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-full flex items-center justify-center mb-4">
