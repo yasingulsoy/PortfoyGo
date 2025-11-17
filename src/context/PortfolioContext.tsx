@@ -166,11 +166,16 @@ const portfolioReducer = (state: PortfolioState, action: PortfolioAction): Portf
     case 'UPDATE_PRICES': {
       const updatedStocks = action.payload;
       const newPortfolioItems = state.portfolioItems.map(item => {
-        const updatedStock = updatedStocks.find(stock => stock.symbol === item.symbol);
+        // Case-insensitive symbol eşleştirmesi
+        const updatedStock = updatedStocks.find(stock => 
+          stock.symbol.toUpperCase() === item.symbol.toUpperCase()
+        );
         if (updatedStock) {
           const newTotalValue = item.quantity * updatedStock.price;
           const newProfitLoss = (updatedStock.price - item.averagePrice) * item.quantity;
-          const newProfitLossPercent = ((updatedStock.price - item.averagePrice) / item.averagePrice) * 100;
+          const newProfitLossPercent = item.averagePrice > 0 
+            ? ((updatedStock.price - item.averagePrice) / item.averagePrice) * 100 
+            : 0;
 
           return {
             ...item,

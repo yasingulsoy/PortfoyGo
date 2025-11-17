@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -21,7 +21,7 @@ import { CryptoCoin } from '@/services/crypto';
 import { leaderboardApi } from '@/services/backendApi';
 
 export default function Home() {
-  const { state, refreshPortfolio } = usePortfolio();
+  const { state, refreshPortfolio, updatePrices } = usePortfolio();
   const { stocks } = useStocks();
   const { cryptos } = useCryptos();
   const { user, loading } = useAuth();
@@ -180,12 +180,55 @@ export default function Home() {
     }
   }, [cryptos]);
 
+  // Crypto'yu Stock formatına çevir
+  const toStockFromCrypto = useCallback((c: CryptoCoin): Stock => {
+    const price = c.current_price;
+    const changePercent = c.price_change_percentage_24h ?? 0;
+    const change = price * (changePercent / 100);
+    return {
+      id: c.id,
+      symbol: c.symbol.toUpperCase(),
+      name: c.name,
+      price,
+      change,
+      changePercent,
+      volume: c.total_volume ?? 0,
+      marketCap: c.market_cap ?? 0,
+      previousClose: price - change,
+      open: price,
+      high: price,
+      low: price,
+    };
+  }, []);
+
   // Kullanıcı yüklendiğinde portföyü yenile
   useEffect(() => {
     if (user && !loading) {
       refreshPortfolio();
     }
   }, [user, loading, refreshPortfolio]);
+
+  // Stocks ve cryptos verileri değiştiğinde portföy fiyatlarını güncelle
+  useEffect(() => {
+    if (state.portfolioItems.length > 0 && (stocks.length > 0 || cryptos.length > 0)) {
+      // Stocks ve cryptos'u birleştirip Stock formatına çevir
+      const allAssets: Stock[] = [
+        ...stocks,
+        ...cryptos.map(c => toStockFromCrypto(c))
+      ];
+      
+      // Sadece portföyde olan varlıkları güncelle
+      const portfolioAssets = allAssets.filter(asset => 
+        state.portfolioItems.some(item => 
+          item.symbol.toUpperCase() === asset.symbol.toUpperCase()
+        )
+      );
+      
+      if (portfolioAssets.length > 0) {
+        updatePrices(portfolioAssets);
+      }
+    }
+  }, [stocks, cryptos, state.portfolioItems, updatePrices, toStockFromCrypto]);
 
   // Liderlik verilerini yükle
   useEffect(() => {
@@ -208,26 +251,6 @@ export default function Home() {
       loadTopLeaders();
     }
   }, [user]);
-
-  const toStockFromCrypto = (c: CryptoCoin): Stock => {
-    const price = c.current_price;
-    const changePercent = c.price_change_percentage_24h ?? 0;
-    const change = price * (changePercent / 100);
-    return {
-      id: c.id,
-      symbol: c.symbol.toUpperCase(),
-      name: c.name,
-      price,
-      change,
-      changePercent,
-      volume: c.total_volume ?? 0,
-      marketCap: c.market_cap ?? 0,
-      previousClose: price - change,
-      open: price,
-      high: price,
-      low: price,
-    };
-  };
 
   const openTrade = (asset: Stock) => {
     setSelectedStock(asset);
