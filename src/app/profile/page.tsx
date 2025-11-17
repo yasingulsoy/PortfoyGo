@@ -103,30 +103,15 @@ export default function ProfilePage() {
   const getActivityIcon = (type: string) => {
     switch (type) {
       case 'buy':
-        return <ArrowTrendingUpIcon className="h-5 w-5 text-green-500" />;
+        return <ArrowTrendingUpIcon className="h-5 w-5 text-[#0ecb81]" />;
       case 'sell':
-        return <ArrowTrendingDownIcon className="h-5 w-5 text-red-500" />;
+        return <ArrowTrendingDownIcon className="h-5 w-5 text-[#f6465d]" />;
       case 'login':
-        return <UserIcon className="h-5 w-5 text-blue-500" />;
+        return <UserIcon className="h-5 w-5 text-[#0ecb81]" />;
       case 'logout':
-        return <UserIcon className="h-5 w-5 text-gray-500" />;
+        return <UserIcon className="h-5 w-5 text-[#848e9c]" />;
       default:
-        return <ClockIcon className="h-5 w-5 text-gray-400" />;
-    }
-  };
-
-  const getActivityColor = (type: string) => {
-    switch (type) {
-      case 'buy':
-        return 'bg-green-50 border-green-200 text-green-800';
-      case 'sell':
-        return 'bg-red-50 border-red-200 text-red-800';
-      case 'login':
-        return 'bg-blue-50 border-blue-200 text-blue-800';
-      case 'logout':
-        return 'bg-gray-50 border-gray-200 text-gray-800';
-      default:
-        return 'bg-gray-50 border-gray-200 text-gray-800';
+        return <ClockIcon className="h-5 w-5 text-[#848e9c]" />;
     }
   };
 
@@ -153,10 +138,10 @@ export default function ProfilePage() {
 
   if (authLoading || loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-indigo-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 flex items-center justify-center">
+      <div className="min-h-screen bg-[#181a20] flex items-center justify-center">
         <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
-          <p className="mt-4 text-gray-600 dark:text-gray-400">Yükleniyor...</p>
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-[#0ecb81]"></div>
+          <p className="mt-4 text-[#848e9c]">Yükleniyor...</p>
         </div>
       </div>
     );
@@ -177,32 +162,32 @@ export default function ProfilePage() {
   const totalPages = Math.ceil(totalLogs / limit);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-indigo-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
+    <div className="min-h-screen bg-[#181a20]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Kullanıcı Bilgileri Kartı */}
-        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-100 dark:border-gray-700 mb-8 overflow-hidden">
-          <div className="bg-gradient-to-r from-indigo-600 to-purple-600 px-6 py-8">
+        <div className="bg-[#1e2329] rounded-xl border border-[#2b3139] mb-8 overflow-hidden">
+          <div className="bg-[#0ecb81]/10 px-6 py-8 border-b border-[#2b3139]">
             <div className="flex items-center space-x-6">
-              <div className="h-24 w-24 bg-white dark:bg-gray-800 rounded-full flex items-center justify-center shadow-lg">
-                <span className="text-4xl font-bold text-indigo-600 dark:text-indigo-400">
+              <div className="h-24 w-24 bg-[#0ecb81]/20 rounded-full flex items-center justify-center border-2 border-[#0ecb81]">
+                <span className="text-4xl font-bold text-[#0ecb81]">
                   {user.username.charAt(0).toUpperCase()}
                 </span>
               </div>
               <div className="flex-1 text-white">
                 <h1 className="text-3xl font-bold mb-2">{user.username}</h1>
-                <p className="text-indigo-100 mb-4">{user.email}</p>
+                <p className="text-[#848e9c] mb-4">{user.email}</p>
                 <div className="flex flex-wrap items-center gap-4">
-                  <div className="flex items-center bg-white/20 backdrop-blur-sm rounded-lg px-4 py-2">
-                    <TrophyIcon className="h-5 w-5 mr-2" />
-                    <span className="font-semibold">Sıra: #{user.rank || '-'}</span>
+                  <div className="flex items-center bg-[#2b3139] rounded-lg px-4 py-2">
+                    <TrophyIcon className="h-5 w-5 mr-2 text-[#f0b90b]" />
+                    <span className="font-semibold text-white">Sıra: #{user.rank || '-'}</span>
                   </div>
-                  <div className="flex items-center bg-white/20 backdrop-blur-sm rounded-lg px-4 py-2">
-                    <CurrencyDollarIcon className="h-5 w-5 mr-2" />
-                    <span className="font-semibold">₺{user.balance?.toLocaleString('tr-TR') || '0'}</span>
+                  <div className="flex items-center bg-[#2b3139] rounded-lg px-4 py-2">
+                    <CurrencyDollarIcon className="h-5 w-5 mr-2 text-[#0ecb81]" />
+                    <span className="font-semibold text-white">₺{user.balance?.toLocaleString('tr-TR') || '0'}</span>
                   </div>
-                  <div className="flex items-center bg-white/20 backdrop-blur-sm rounded-lg px-4 py-2">
-                    <CalendarIcon className="h-5 w-5 mr-2" />
-                    <span>{new Date(user.created_at).toLocaleDateString('tr-TR')}</span>
+                  <div className="flex items-center bg-[#2b3139] rounded-lg px-4 py-2">
+                    <CalendarIcon className="h-5 w-5 mr-2 text-[#848e9c]" />
+                    <span className="text-white">{new Date(user.created_at).toLocaleDateString('tr-TR')}</span>
                   </div>
                 </div>
               </div>
@@ -210,32 +195,32 @@ export default function ProfilePage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Sol Kolon - Rozetler */}
           <div className="lg:col-span-1">
-            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-100 dark:border-gray-700">
-              <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-                <h2 className="text-xl font-bold text-gray-900 dark:text-white flex items-center">
-                  <TrophyIcon className="h-6 w-6 mr-2 text-yellow-500" />
+            <div className="bg-[#1e2329] rounded-xl border border-[#2b3139]">
+              <div className="px-6 py-4 border-b border-[#2b3139] bg-[#161a1e]">
+                <h2 className="text-xl font-bold text-white flex items-center">
+                  <TrophyIcon className="h-6 w-6 mr-2 text-[#f0b90b]" />
                   Rozetlerim ({badges.length})
                 </h2>
               </div>
 
               {error ? (
                 <div className="p-6 text-center">
-                  <p className="text-red-600 dark:text-red-400">{error}</p>
+                  <p className="text-[#f6465d]">{error}</p>
                   <button
                     onClick={loadBadges}
-                    className="mt-4 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+                    className="mt-4 px-4 py-2 bg-[#0ecb81] hover:bg-[#0bb975] text-white rounded-lg transition-colors font-semibold"
                   >
                     Tekrar Dene
                   </button>
                 </div>
               ) : badges.length === 0 ? (
                 <div className="p-12 text-center">
-                  <TrophyIcon className="mx-auto h-12 w-12 text-gray-400" />
-                  <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-white">Henüz rozet yok</h3>
-                  <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                  <TrophyIcon className="mx-auto h-12 w-12 text-[#848e9c]" />
+                  <h3 className="mt-2 text-sm font-semibold text-white">Henüz rozet yok</h3>
+                  <p className="mt-1 text-sm text-[#848e9c]">
                     İşlem yaparak rozetler kazanmaya başlayın!
                   </p>
                 </div>
@@ -243,7 +228,7 @@ export default function ProfilePage() {
                 <div className="p-6">
                   {Object.entries(groupedBadges).map(([category, categoryBadges]) => (
                     <div key={category} className="mb-6">
-                      <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase mb-3">
+                      <h3 className="text-xs font-semibold text-[#848e9c] uppercase mb-3">
                         {category === 'transaction' ? 'İşlem Rozetleri' :
                          category === 'profit' ? 'Kâr Rozetleri' :
                          category === 'portfolio' ? 'Portföy Rozetleri' :
@@ -257,13 +242,13 @@ export default function ProfilePage() {
                         {categoryBadges.map((badge) => (
                           <div
                             key={badge.id}
-                            className="bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-gray-700 dark:to-gray-600 rounded-lg p-4 border border-indigo-200 dark:border-gray-600 hover:shadow-md transition-shadow"
+                            className="bg-[#161a1e] rounded-lg p-4 border border-[#2b3139] hover:border-[#0ecb81]/30 transition-all"
                           >
                             <div className="text-3xl text-center mb-2">{badge.icon}</div>
-                            <div className="text-xs font-semibold text-gray-900 dark:text-white text-center mb-1">
+                            <div className="text-xs font-semibold text-white text-center mb-1">
                               {badge.name}
                             </div>
-                            <div className="text-xs text-gray-600 dark:text-gray-400 text-center">
+                            <div className="text-xs text-[#848e9c] text-center">
                               {badge.earned_at.toLocaleDateString('tr-TR')}
                             </div>
                           </div>
@@ -278,22 +263,22 @@ export default function ProfilePage() {
 
           {/* Sağ Kolon - Aktivite Logları */}
           <div className="lg:col-span-2">
-            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-100 dark:border-gray-700">
-              <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
-                <h2 className="text-xl font-bold text-gray-900 dark:text-white flex items-center">
-                  <ClockIcon className="h-6 w-6 mr-2 text-indigo-500" />
+            <div className="bg-[#1e2329] rounded-xl border border-[#2b3139]">
+              <div className="px-6 py-4 border-b border-[#2b3139] bg-[#161a1e] flex items-center justify-between">
+                <h2 className="text-xl font-bold text-white flex items-center">
+                  <ClockIcon className="h-6 w-6 mr-2 text-[#0ecb81]" />
                   Aktivite Logları ({totalLogs})
                 </h2>
                 {activityTypes.length > 0 && (
                   <div className="flex items-center space-x-2">
-                    <FunnelIcon className="h-5 w-5 text-gray-400" />
+                    <FunnelIcon className="h-5 w-5 text-[#848e9c]" />
                     <select
                       value={selectedType}
                       onChange={(e) => {
                         setSelectedType(e.target.value);
                         setPage(1);
                       }}
-                      className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      className="px-3 py-1.5 text-sm border border-[#2b3139] rounded-lg bg-[#1e2329] text-white focus:outline-none focus:ring-2 focus:ring-[#0ecb81] focus:border-[#0ecb81] transition-colors"
                     >
                       <option value="">Tümü</option>
                       {activityTypes.map((type) => (
@@ -313,47 +298,55 @@ export default function ProfilePage() {
               <div className="p-6">
                 {logsLoading ? (
                   <div className="text-center py-12">
-                    <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
-                    <p className="mt-4 text-gray-600 dark:text-gray-400">Yükleniyor...</p>
+                    <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-[#0ecb81]"></div>
+                    <p className="mt-4 text-[#848e9c]">Yükleniyor...</p>
                   </div>
                 ) : activityLogs.length === 0 ? (
                   <div className="text-center py-12">
-                    <ClockIcon className="mx-auto h-12 w-12 text-gray-400" />
-                    <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-white">Henüz aktivite yok</h3>
-                    <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                    <ClockIcon className="mx-auto h-12 w-12 text-[#848e9c]" />
+                    <h3 className="mt-2 text-sm font-semibold text-white">Henüz aktivite yok</h3>
+                    <p className="mt-1 text-sm text-[#848e9c]">
                       İşlem yaptıkça aktivite logları burada görünecek.
                     </p>
                   </div>
                 ) : (
                   <>
                     <div className="space-y-3">
-                      {activityLogs.map((log) => (
-                        <div
-                          key={log.id}
-                          className={`flex items-start space-x-4 p-4 rounded-lg border ${getActivityColor(log.activity_type)} transition-all hover:shadow-md`}
-                        >
-                          <div className="flex-shrink-0 mt-0.5">
-                            {getActivityIcon(log.activity_type)}
+                      {activityLogs.map((log) => {
+                        const activityColors = {
+                          buy: 'bg-[#0ecb81]/10 border-[#0ecb81]/30 text-[#0ecb81]',
+                          sell: 'bg-[#f6465d]/10 border-[#f6465d]/30 text-[#f6465d]',
+                          login: 'bg-[#0ecb81]/10 border-[#0ecb81]/30 text-[#0ecb81]',
+                          logout: 'bg-[#2b3139] border-[#2b3139] text-[#848e9c]'
+                        };
+                        return (
+                          <div
+                            key={log.id}
+                            className={`flex items-start space-x-4 p-4 rounded-lg border ${activityColors[log.activity_type as keyof typeof activityColors] || 'bg-[#2b3139] border-[#2b3139] text-[#848e9c]'} transition-all hover:bg-[#161a1e]`}
+                          >
+                            <div className="flex-shrink-0 mt-0.5">
+                              {getActivityIcon(log.activity_type)}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-semibold text-white">{log.description}</p>
+                              {log.metadata && (
+                                <div className="mt-1 text-xs text-[#848e9c]">
+                                  {log.metadata.symbol && (
+                                    <span className="mr-2">Sembol: {log.metadata.symbol}</span>
+                                  )}
+                                  {log.metadata.quantity && (
+                                    <span className="mr-2">Miktar: {log.metadata.quantity}</span>
+                                  )}
+                                  {log.metadata.price && (
+                                    <span>Fiyat: ₺{log.metadata.price.toLocaleString('tr-TR')}</span>
+                                  )}
+                                </div>
+                              )}
+                              <p className="text-xs mt-1 text-[#848e9c]">{formatDate(log.created_at)}</p>
+                            </div>
                           </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium">{log.description}</p>
-                            {log.metadata && (
-                              <div className="mt-1 text-xs opacity-75">
-                                {log.metadata.symbol && (
-                                  <span className="mr-2">Sembol: {log.metadata.symbol}</span>
-                                )}
-                                {log.metadata.quantity && (
-                                  <span className="mr-2">Miktar: {log.metadata.quantity}</span>
-                                )}
-                                {log.metadata.price && (
-                                  <span>Fiyat: ₺{log.metadata.price.toLocaleString('tr-TR')}</span>
-                                )}
-                              </div>
-                            )}
-                            <p className="text-xs mt-1 opacity-60">{formatDate(log.created_at)}</p>
-                          </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
 
                     {/* Pagination */}
@@ -362,17 +355,17 @@ export default function ProfilePage() {
                         <button
                           onClick={() => setPage(p => Math.max(1, p - 1))}
                           disabled={page === 1}
-                          className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="px-4 py-2 text-sm font-semibold text-white bg-[#2b3139] border border-[#2b3139] rounded-lg hover:bg-[#3a4149] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                         >
                           Önceki
                         </button>
-                        <span className="text-sm text-gray-700 dark:text-gray-300">
+                        <span className="text-sm text-[#848e9c]">
                           Sayfa {page} / {totalPages}
                         </span>
                         <button
                           onClick={() => setPage(p => Math.min(totalPages, p + 1))}
                           disabled={page === totalPages}
-                          className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="px-4 py-2 text-sm font-semibold text-white bg-[#2b3139] border border-[#2b3139] rounded-lg hover:bg-[#3a4149] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                         >
                           Sonraki
                         </button>

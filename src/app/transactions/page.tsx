@@ -99,65 +99,65 @@ export default function TransactionsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-indigo-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
+    <div className="min-h-screen bg-[#181a20]">
       {/* Header */}
-      <div className="bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm shadow-sm border-b border-gray-200 dark:border-gray-800">
+      <div className="bg-[#1e2329] border-b border-[#2b3139]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center h-16">
-            <div className="h-10 w-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center shadow-sm mr-3">
-              <ClockIcon className="h-6 w-6 text-white" />
+            <div className="p-2 bg-[#0ecb81]/10 rounded-lg mr-3">
+              <ClockIcon className="h-6 w-6 text-[#0ecb81]" />
             </div>
-            <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">İşlem Geçmişi</h1>
+            <h1 className="text-2xl sm:text-3xl font-bold text-white">İşlem Geçmişi</h1>
           </div>
         </div>
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 border border-gray-200 dark:border-gray-700 hover:shadow-xl transition-shadow">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+          <div className="bg-[#1e2329] rounded-xl p-5 border border-[#2b3139] hover:border-[#0ecb81]/30 transition-all">
             <div className="text-center">
-              <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Toplam İşlem</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">{state.transactions.length}</p>
+              <p className="text-xs text-[#848e9c] mb-1">Toplam İşlem</p>
+              <p className="text-2xl font-bold text-white">{state.transactions.length}</p>
             </div>
           </div>
 
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 border border-gray-200 dark:border-gray-700 hover:shadow-xl transition-shadow">
+          <div className="bg-[#1e2329] rounded-xl p-5 border border-[#2b3139] hover:border-[#0ecb81]/30 transition-all">
             <div className="text-center">
-              <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Toplam Alım</p>
-              <p className="text-2xl font-bold text-green-600 dark:text-green-400 mt-1">₺{getTotalBuyAmount().toLocaleString('tr-TR')}</p>
+              <p className="text-xs text-[#848e9c] mb-1">Toplam Alım</p>
+              <p className="text-2xl font-bold text-[#0ecb81]">₺{getTotalBuyAmount().toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
             </div>
           </div>
 
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 border border-gray-200 dark:border-gray-700 hover:shadow-xl transition-shadow">
+          <div className="bg-[#1e2329] rounded-xl p-5 border border-[#2b3139] hover:border-[#0ecb81]/30 transition-all">
             <div className="text-center">
-              <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Toplam Satım</p>
-              <p className="text-2xl font-bold text-red-600 dark:text-red-400 mt-1">₺{getTotalSellAmount().toLocaleString('tr-TR')}</p>
+              <p className="text-xs text-[#848e9c] mb-1">Toplam Satım</p>
+              <p className="text-2xl font-bold text-[#f6465d]">₺{getTotalSellAmount().toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
             </div>
           </div>
 
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 border border-gray-200 dark:border-gray-700 hover:shadow-xl transition-shadow">
+          <div className="bg-[#1e2329] rounded-xl p-5 border border-[#2b3139] hover:border-[#0ecb81]/30 transition-all">
             <div className="text-center">
-              <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Toplam Komisyon</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">₺{getTotalCommission().toLocaleString('tr-TR')}</p>
+              <p className="text-xs text-[#848e9c] mb-1">Toplam Komisyon</p>
+              <p className="text-2xl font-bold text-white">₺{getTotalCommission().toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
             </div>
           </div>
         </div>
 
         {/* Filters and Controls */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 mb-8">
-          <div className="p-6 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-900/20 dark:to-purple-900/20">
+        <div className="bg-[#1e2329] rounded-xl border border-[#2b3139] mb-8">
+          <div className="p-6 border-b border-[#2b3139] bg-[#161a1e]">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">İşlem Detayları</h2>
+              <h2 className="text-lg font-bold text-white">İşlem Detayları</h2>
               
               <div className="flex flex-wrap items-center gap-3">
                 {/* Filter */}
                 <div className="flex items-center space-x-2">
-                  <FunnelIcon className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+                  <FunnelIcon className="h-5 w-5 text-[#848e9c]" />
                   <select
                     value={filterType}
                     onChange={(e) => setFilterType(e.target.value as 'all' | 'buy' | 'sell')}
-                    className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-colors"
+                    className="border border-[#2b3139] bg-[#1e2329] text-white rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#0ecb81] focus:border-[#0ecb81] transition-colors"
                   >
                     <option value="all">Tüm İşlemler</option>
                     <option value="buy">Sadece Alımlar</option>
@@ -170,7 +170,7 @@ export default function TransactionsPage() {
                   <select
                     value={sortBy}
                     onChange={(e) => setSortBy(e.target.value as 'date' | 'amount' | 'symbol')}
-                    className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-colors"
+                    className="border border-[#2b3139] bg-[#1e2329] text-white rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#0ecb81] focus:border-[#0ecb81] transition-colors"
                   >
                     <option value="date">Tarihe Göre</option>
                     <option value="amount">Tutara Göre</option>
@@ -179,7 +179,7 @@ export default function TransactionsPage() {
                   
                   <button
                     onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-                    className="p-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
+                    className="p-2 border border-[#2b3139] bg-[#1e2329] text-white rounded-lg hover:bg-[#2b3139] transition-colors"
                     title={sortOrder === 'asc' ? 'Artan' : 'Azalan'}
                   >
                     {sortOrder === 'asc' ? '↑' : '↓'}
@@ -189,10 +189,10 @@ export default function TransactionsPage() {
                 {/* Export */}
                 <button
                   onClick={exportTransactions}
-                  className="flex items-center space-x-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-4 py-2 rounded-lg hover:from-indigo-700 hover:to-purple-700 transition-all shadow-sm hover:shadow-md"
+                  className="flex items-center space-x-2 bg-[#0ecb81] hover:bg-[#0bb975] text-white px-4 py-2 rounded-lg transition-all font-semibold"
                 >
                   <ArrowDownTrayIcon className="h-4 w-4" />
-                  <span className="text-sm font-medium">Dışa Aktar</span>
+                  <span className="text-sm">Dışa Aktar</span>
                 </button>
               </div>
             </div>
@@ -201,11 +201,11 @@ export default function TransactionsPage() {
           <div className="p-6">
             {filteredTransactions.length === 0 ? (
               <div className="text-center py-16">
-                <div className="mx-auto h-16 w-16 bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800 rounded-full flex items-center justify-center mb-4">
-                  <ClockIcon className="h-8 w-8 text-gray-400 dark:text-gray-500" />
+                <div className="mx-auto h-16 w-16 bg-[#2b3139] rounded-full flex items-center justify-center mb-4">
+                  <ClockIcon className="h-8 w-8 text-[#848e9c]" />
                 </div>
-                <h3 className="mt-2 text-base font-semibold text-gray-900 dark:text-white">İşlem bulunamadı</h3>
-                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                <h3 className="mt-2 text-base font-semibold text-white">İşlem bulunamadı</h3>
+                <p className="mt-1 text-sm text-[#848e9c]">
                   {filterType === 'all' 
                     ? 'Henüz hiç işlem yapılmamış.' 
                     : `Bu filtrede işlem bulunamadı.`
@@ -214,41 +214,41 @@ export default function TransactionsPage() {
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                  <thead className="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-700">
+                <table className="min-w-full divide-y divide-[#2b3139]">
+                  <thead className="bg-[#161a1e]">
                     <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">
+                      <th className="px-6 py-3 text-left text-xs font-semibold text-[#848e9c] uppercase tracking-wider">
                         Tarih
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">
+                      <th className="px-6 py-3 text-left text-xs font-semibold text-[#848e9c] uppercase tracking-wider">
                         İşlem
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">
+                      <th className="px-6 py-3 text-left text-xs font-semibold text-[#848e9c] uppercase tracking-wider">
                         Hisse
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">
+                      <th className="px-6 py-3 text-left text-xs font-semibold text-[#848e9c] uppercase tracking-wider">
                         Miktar
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">
+                      <th className="px-6 py-3 text-left text-xs font-semibold text-[#848e9c] uppercase tracking-wider">
                         Fiyat
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">
+                      <th className="px-6 py-3 text-left text-xs font-semibold text-[#848e9c] uppercase tracking-wider">
                         Toplam
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">
+                      <th className="px-6 py-3 text-left text-xs font-semibold text-[#848e9c] uppercase tracking-wider">
                         Komisyon
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                  <tbody className="bg-[#1e2329] divide-y divide-[#2b3139]">
                     {filteredTransactions.map((transaction) => (
-                      <tr key={transaction.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+                      <tr key={transaction.id} className="hover:bg-[#161a1e] transition-colors">
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div>
-                            <div className="text-sm font-medium text-gray-900 dark:text-white">
+                            <div className="text-sm font-semibold text-white">
                               {formatShortDate(transaction.timestamp)}
                             </div>
-                            <div className="text-xs text-gray-500 dark:text-gray-400">
+                            <div className="text-xs text-[#848e9c]">
                               {formatDate(transaction.timestamp)}
                             </div>
                           </div>
@@ -256,34 +256,34 @@ export default function TransactionsPage() {
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span className={`inline-flex px-3 py-1 text-xs font-semibold rounded-full ${
                             transaction.type === 'buy' 
-                              ? 'bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-200' 
-                              : 'bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-200'
+                              ? 'bg-[#0ecb81]/10 text-[#0ecb81]' 
+                              : 'bg-[#f6465d]/10 text-[#f6465d]'
                           }`}>
                             {transaction.type === 'buy' ? 'Alım' : 'Satım'}
                           </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="flex items-center gap-2">
-                            <div className="h-8 w-8 bg-gradient-to-br from-indigo-100 to-purple-100 dark:from-indigo-900/40 dark:to-purple-900/40 rounded-lg flex items-center justify-center">
-                              <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400">{transaction.symbol.slice(0,1)}</span>
+                            <div className="h-8 w-8 bg-[#0ecb81]/10 rounded-lg flex items-center justify-center">
+                              <span className="text-xs font-bold text-[#0ecb81]">{transaction.symbol.slice(0,1)}</span>
                             </div>
                             <div>
-                              <div className="text-sm font-medium text-gray-900 dark:text-white">{transaction.name}</div>
-                              <div className="text-xs text-gray-500 dark:text-gray-400">{transaction.symbol}</div>
+                              <div className="text-sm font-semibold text-white">{transaction.name}</div>
+                              <div className="text-xs text-[#848e9c]">{transaction.symbol}</div>
                             </div>
                           </div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
-                          {transaction.quantity.toLocaleString()}
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-white">
+                          {transaction.quantity.toLocaleString('tr-TR', { maximumFractionDigits: 8 })}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                          ₺{transaction.price.toLocaleString()}
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-white">
+                          ₺{transaction.price.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
-                          ₺{transaction.totalAmount.toLocaleString()}
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-white">
+                          ₺{transaction.totalAmount.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                          ₺{transaction.commission.toLocaleString()}
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-[#848e9c]">
+                          ₺{transaction.commission.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </td>
                       </tr>
                     ))}

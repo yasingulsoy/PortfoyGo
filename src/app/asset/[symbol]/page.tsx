@@ -80,10 +80,10 @@ export default function AssetDetailPage({ params }: { params: Promise<{ symbol: 
 
   if (!symbol) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-indigo-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 flex items-center justify-center">
+      <div className="min-h-screen bg-[#181a20] flex items-center justify-center">
         <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
-          <p className="mt-4 text-gray-600 dark:text-gray-400">Yükleniyor...</p>
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-[#0ecb81]"></div>
+          <p className="mt-4 text-[#848e9c]">Yükleniyor...</p>
         </div>
       </div>
     );
@@ -92,18 +92,20 @@ export default function AssetDetailPage({ params }: { params: Promise<{ symbol: 
   const isProfit = changePercent >= 0;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-indigo-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
+    <div className="min-h-screen bg-[#181a20]">
       {/* Header */}
-      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+      <div className="bg-[#1e2329] border-b border-[#2b3139]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center h-16">
-            <Link href="/" className="mr-4 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
+            <Link href="/" className="mr-4 text-[#848e9c] hover:text-white transition-colors">
               ← Geri
             </Link>
-            <ChartBarIcon className="h-8 w-8 text-indigo-600 dark:text-indigo-400 mr-3" />
+            <div className="p-2 bg-[#0ecb81]/10 rounded-lg mr-3">
+              <ChartBarIcon className="h-6 w-6 text-[#0ecb81]" />
+            </div>
             <div>
-              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{currentAsset?.name || symbolUpper}</h1>
-              <p className="text-sm text-gray-500 dark:text-gray-400">{symbolUpper} • {type === 'crypto' ? 'Kripto Para' : 'Hisse Senedi'}</p>
+              <h1 className="text-2xl font-bold text-white">{currentAsset?.name || symbolUpper}</h1>
+              <p className="text-sm text-[#848e9c]">{symbolUpper} • {type === 'crypto' ? 'Kripto Para' : 'Hisse Senedi'}</p>
             </div>
           </div>
         </div>
@@ -111,24 +113,24 @@ export default function AssetDetailPage({ params }: { params: Promise<{ symbol: 
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Price Card */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6 mb-6">
+        <div className="bg-[#1e2329] rounded-xl border border-[#2b3139] p-6 mb-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">Güncel Fiyat</p>
+              <p className="text-sm font-medium text-[#848e9c] mb-2">Güncel Fiyat</p>
               <div className="flex items-baseline space-x-3">
-                <div className="text-4xl font-bold text-gray-900 dark:text-white">
-                  ${priceUSD.toLocaleString('en-US', { maximumFractionDigits: 2 })}
+                <div className="text-4xl font-bold text-white">
+                  ${priceUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </div>
-                <div className="text-xl text-gray-500 dark:text-gray-400">
-                  ₺{priceTRY.toLocaleString('tr-TR', { maximumFractionDigits: 2 })}
+                <div className="text-xl text-[#848e9c]">
+                  ₺{priceTRY.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </div>
               </div>
             </div>
             <div className="text-right">
               <div className={`inline-flex items-center px-4 py-2 rounded-lg ${
                 isProfit 
-                  ? 'bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-400' 
-                  : 'bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-400'
+                  ? 'bg-[#0ecb81]/10 text-[#0ecb81] border border-[#0ecb81]/30' 
+                  : 'bg-[#f6465d]/10 text-[#f6465d] border border-[#f6465d]/30'
               }`}>
                 {isProfit ? (
                   <ArrowUpIcon className="h-5 w-5 mr-2" />
@@ -144,8 +146,8 @@ export default function AssetDetailPage({ params }: { params: Promise<{ symbol: 
         </div>
 
         {/* Chart */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6 mb-6">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Fiyat Grafiği (30 Gün)</h2>
+        <div className="bg-[#1e2329] rounded-xl border border-[#2b3139] p-6 mb-6">
+          <h2 className="text-lg font-bold text-white mb-4">Fiyat Grafiği (30 Gün)</h2>
           <PriceChart type={type} symbol={symbolUpper} id={id} days={30} />
         </div>
 
@@ -153,14 +155,14 @@ export default function AssetDetailPage({ params }: { params: Promise<{ symbol: 
         <div className="flex gap-4">
           <button 
             onClick={() => { setMode('buy'); setOpen(true); }} 
-            className="flex-1 bg-gradient-to-r from-green-500 to-emerald-600 text-white px-6 py-3 rounded-lg font-semibold hover:from-green-600 hover:to-emerald-700 transition-all shadow-lg hover:shadow-xl flex items-center justify-center"
+            className="flex-1 bg-[#0ecb81] hover:bg-[#0bb975] text-white px-6 py-3 rounded-lg font-bold transition-all shadow-lg hover:shadow-xl flex items-center justify-center"
           >
             <CurrencyDollarIcon className="h-5 w-5 mr-2" />
             Al
           </button>
           <button 
             onClick={() => { setMode('sell'); setOpen(true); }} 
-            className="flex-1 bg-gradient-to-r from-red-500 to-pink-600 text-white px-6 py-3 rounded-lg font-semibold hover:from-red-600 hover:to-pink-700 transition-all shadow-lg hover:shadow-xl flex items-center justify-center"
+            className="flex-1 bg-[#f6465d] hover:bg-[#e03e54] text-white px-6 py-3 rounded-lg font-bold transition-all shadow-lg hover:shadow-xl flex items-center justify-center"
           >
             <CurrencyDollarIcon className="h-5 w-5 mr-2" />
             Sat

@@ -368,75 +368,75 @@ function TransactionHistory({ transactions }: { transactions: Transaction[] }) {
   if (transactions.length === 0) {
     return (
       <div className="text-center py-12">
-        <ClockIcon className="mx-auto h-12 w-12 text-gray-400 dark:text-gray-500" />
-        <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-gray-100">Henüz işlem yok</h3>
-        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">İlk alım veya satım işleminizi yaptığınızda burada görünecek.</p>
+        <ClockIcon className="mx-auto h-12 w-12 text-[#848e9c]" />
+        <h3 className="mt-2 text-sm font-semibold text-white">Henüz işlem yok</h3>
+        <p className="mt-1 text-sm text-[#848e9c]">İlk alım veya satım işleminizi yaptığınızda burada görünecek.</p>
       </div>
     );
   }
 
   return (
     <div className="overflow-x-auto">
-      <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-        <thead className="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-700">
+      <table className="min-w-full divide-y divide-[#2b3139]">
+        <thead className="bg-[#161a1e]">
           <tr>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">
+            <th className="px-6 py-3 text-left text-xs font-semibold text-[#848e9c] uppercase tracking-wider">
               Tarih
             </th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">
+            <th className="px-6 py-3 text-left text-xs font-semibold text-[#848e9c] uppercase tracking-wider">
               İşlem
             </th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">
+            <th className="px-6 py-3 text-left text-xs font-semibold text-[#848e9c] uppercase tracking-wider">
               Varlık
             </th>
-            <th className="px-6 py-3 text-right text-xs font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">
+            <th className="px-6 py-3 text-right text-xs font-semibold text-[#848e9c] uppercase tracking-wider">
               Miktar
             </th>
-            <th className="px-6 py-3 text-right text-xs font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">
+            <th className="px-6 py-3 text-right text-xs font-semibold text-[#848e9c] uppercase tracking-wider">
               Fiyat
             </th>
-            <th className="px-6 py-3 text-right text-xs font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">
+            <th className="px-6 py-3 text-right text-xs font-semibold text-[#848e9c] uppercase tracking-wider">
               Toplam
             </th>
-            <th className="px-6 py-3 text-right text-xs font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">
+            <th className="px-6 py-3 text-right text-xs font-semibold text-[#848e9c] uppercase tracking-wider">
               Komisyon
             </th>
           </tr>
         </thead>
-        <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+        <tbody className="bg-[#1e2329] divide-y divide-[#2b3139]">
           {transactions.map((transaction) => (
-            <tr key={transaction.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
-              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+            <tr key={transaction.id} className="hover:bg-[#161a1e] transition-colors">
+              <td className="px-6 py-4 whitespace-nowrap text-sm text-white">
                 {formatDate(transaction.timestamp)}
               </td>
               <td className="px-6 py-4 whitespace-nowrap">
-                <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                <span className={`inline-flex px-3 py-1 text-xs font-semibold rounded-full ${
                   transaction.type === 'buy' 
-                    ? 'bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-200' 
-                    : 'bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-200'
+                    ? 'bg-[#0ecb81]/10 text-[#0ecb81]' 
+                    : 'bg-[#f6465d]/10 text-[#f6465d]'
                 }`}>
                   {transaction.type === 'buy' ? 'Alım' : 'Satım'}
                 </span>
               </td>
               <td className="px-6 py-4 whitespace-nowrap">
                 <div>
-                  <div className="text-sm font-medium text-gray-900 dark:text-white">{transaction.name}</div>
-                  <div className="text-sm text-gray-500 dark:text-gray-400">{transaction.symbol}</div>
+                  <div className="text-sm font-semibold text-white">{transaction.name}</div>
+                  <div className="text-sm text-[#848e9c]">{transaction.symbol}</div>
                 </div>
               </td>
-              <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-gray-900 dark:text-white">
+              <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-semibold text-white">
                 {transaction.quantity.toLocaleString('tr-TR', { maximumFractionDigits: 8 })}
               </td>
-              <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-900 dark:text-white">
-                <div>₺{transaction.price.toLocaleString('tr-TR', { maximumFractionDigits: 2 })}</div>
-                <div className="text-xs text-gray-500 dark:text-gray-400">${(transaction.price / USD_TO_TRY).toLocaleString('en-US', { maximumFractionDigits: 2 })}</div>
+              <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-white">
+                <div>₺{transaction.price.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                <div className="text-xs text-[#848e9c]">${(transaction.price / USD_TO_TRY).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
               </td>
-              <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-gray-900 dark:text-white">
-                <div>₺{transaction.totalAmount.toLocaleString('tr-TR', { maximumFractionDigits: 2 })}</div>
-                <div className="text-xs text-gray-500 dark:text-gray-400">${(transaction.totalAmount / USD_TO_TRY).toLocaleString('en-US', { maximumFractionDigits: 2 })}</div>
+              <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-semibold text-white">
+                <div>₺{transaction.totalAmount.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                <div className="text-xs text-[#848e9c]">${(transaction.totalAmount / USD_TO_TRY).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
               </td>
-              <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-500 dark:text-gray-400">
-                ₺{transaction.commission.toLocaleString('tr-TR', { maximumFractionDigits: 2 })}
+              <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-[#848e9c]">
+                ₺{transaction.commission.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </td>
             </tr>
           ))}

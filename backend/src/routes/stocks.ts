@@ -240,8 +240,8 @@ router.get('/', async (req, res) => {
     // Önce cache'den kontrol et (her zaman cache'den başla - hızlı yanıt için)
     let stocks = await MarketCacheService.getFromCache('stock');
     
-    // Cache'de yeterli veri varsa (50'den fazla) hemen cache'den döndür
-    if (stocks.length >= 50 && !forceRefresh) {
+    // Cache'de yeterli veri varsa (10'dan fazla) hemen cache'den döndür
+    if (stocks.length >= 10 && !forceRefresh) {
       // Arka planda cache'i güncelle (kullanıcıyı bekletmeden)
       if (!useActive) {
         MarketCacheService.refreshCache(false).catch(err => {
@@ -269,11 +269,11 @@ router.get('/', async (req, res) => {
     }
     
     // Cache'de az veri varsa veya zorla yenileme isteniyorsa
-    if (stocks.length < 50 || forceRefresh || useActive) {
+    if (stocks.length < 10 || forceRefresh || useActive) {
       // Kullanıcıya cache'den döndür (eğer varsa)
       if (stocks.length > 0 && !forceRefresh) {
         // Arka planda cache'i güncelle
-        const hasEnoughCache = stocks.length >= 50;
+        const hasEnoughCache = stocks.length >= 10;
         MarketCacheService.refreshCache(!hasEnoughCache).catch(err => {
           console.error('Background cache refresh error:', err);
         });

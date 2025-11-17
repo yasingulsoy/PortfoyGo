@@ -144,18 +144,17 @@ export class MarketCacheService {
   }
 
   // Cache'i güncelle (API'den çekip kaydet)
-  // İlk yüklemede daha fazla hisse çeker (200-300), sonraki güncellemelerde daha az (100)
+  // Şu anlık sadece 10 hisseye odaklanıyoruz
   static async refreshCache(forceFullRefresh: boolean = false): Promise<void> {
     try {
       console.log('🔄 Market data cache güncelleniyor...');
       
       // Cache durumunu kontrol et
       const cacheStatus = await this.getCacheStatus();
-      const hasEnoughCache = cacheStatus.stocks >= 50;
+      const hasEnoughCache = cacheStatus.stocks >= 10;
       
-      // İki API key ile daha hızlı çekebildiğimiz için limitleri artırıyoruz
-      // İlk yükleme veya zorla yenileme ise daha fazla çek
-      const maxStocks = (forceFullRefresh || !hasEnoughCache) ? 300 : 150; // 2 key ile daha fazla çekebiliriz
+      // Şu anlık sadece 10 hisseye odaklanıyoruz
+      const maxStocks = 10;
       const minMarketCap = 100000000; // 100 milyon $ üzeri (daha kaliteli hisse senetleri)
 
       // Hisse senetlerini çek ve cache'e kaydet

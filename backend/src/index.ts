@@ -74,13 +74,12 @@ MarketCacheService.refreshCache(true).catch(err => {
   console.error('Initial cache refresh error:', err);
 });
 
-// Her 10 dakikada bir cache'i güncelle (küçük güncelleme - 100 hisse)
-// Rate limit: 60 çağrı/dakika, 100 hisse = 200 çağrı = ~3.3 dakika
-// 10 dakikada bir güncelleme güvenli
+// Her 10 dakikada bir cache'i güncelle (10 hisse)
+// Şu anlık sadece 10 hisseye odaklanıyoruz
 cron.schedule('*/10 * * * *', async () => {
   console.log('⏰ Scheduled cache refresh başlatılıyor (10 dakika)...');
   try {
-    // Küçük güncelleme (100 hisse)
+    // Güncelleme (10 hisse)
     await MarketCacheService.refreshCache(false);
     console.log('✅ Scheduled cache refresh tamamlandı');
   } catch (error) {
@@ -88,11 +87,11 @@ cron.schedule('*/10 * * * *', async () => {
   }
 });
 
-// Her 2 saatte bir tam cache refresh (200 hisse)
+// Her 2 saatte bir tam cache refresh (10 hisse)
 cron.schedule('0 */2 * * *', async () => {
   console.log('⏰ Full cache refresh başlatılıyor (2 saat)...');
   try {
-    // Tam güncelleme (200 hisse)
+    // Tam güncelleme (10 hisse)
     await MarketCacheService.refreshCache(true);
     console.log('✅ Full cache refresh tamamlandı');
   } catch (error) {
