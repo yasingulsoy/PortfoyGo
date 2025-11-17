@@ -34,49 +34,57 @@ export default function PageTransition({ children }: { children: React.ReactNode
   return (
     <>
       {loading && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-white/90 dark:bg-gray-900/90 backdrop-blur-md transition-opacity duration-300">
-          <div className="flex flex-col items-center gap-6">
-            {/* Animated Logo/Icon */}
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-gradient-to-br from-white/95 via-gray-50/95 to-white/95 dark:from-gray-900/95 dark:via-gray-800/95 dark:to-gray-900/95 backdrop-blur-xl transition-all duration-500 ease-out">
+          <div className="flex flex-col items-center gap-8 animate-fade-in">
+            {/* Modern Animated Logo/Icon */}
             <div className="relative">
-              <div className="h-20 w-20 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-2xl">
-                <svg className="w-10 h-10 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              {/* Outer glow rings */}
+              <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-indigo-500/30 via-purple-500/30 to-pink-500/30 blur-2xl animate-pulse"></div>
+              <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-indigo-500/20 via-purple-500/20 to-pink-500/20 blur-xl animate-ping"></div>
+              
+              {/* Main icon container */}
+              <div className="relative h-24 w-24 rounded-2xl bg-gradient-to-br from-indigo-500 via-purple-600 to-pink-500 flex items-center justify-center shadow-2xl transform transition-all duration-300 hover:scale-105">
+                <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-white/20 to-transparent"></div>
+                <svg className="w-12 h-12 text-white relative z-10 animate-bounce-slow" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                 </svg>
               </div>
-              {/* Pulsing ring */}
-              <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 animate-ping opacity-20"></div>
             </div>
             
-            {/* Spinner */}
-            <div className="relative">
-              <div className="h-12 w-12 border-4 border-indigo-200 dark:border-indigo-800 rounded-full"></div>
-              <div className="absolute top-0 left-0 h-12 w-12 border-4 border-transparent border-t-indigo-600 dark:border-t-indigo-400 rounded-full animate-spin"></div>
+            {/* Modern Spinner - Three dots */}
+            <div className="flex items-center gap-2">
+              <div className="h-3 w-3 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 animate-bounce" style={{ animationDelay: '0ms' }}></div>
+              <div className="h-3 w-3 rounded-full bg-gradient-to-br from-purple-500 to-pink-600 animate-bounce" style={{ animationDelay: '150ms' }}></div>
+              <div className="h-3 w-3 rounded-full bg-gradient-to-br from-pink-500 to-indigo-600 animate-bounce" style={{ animationDelay: '300ms' }}></div>
             </div>
             
-            {/* Loading text */}
-            <div className="flex flex-col items-center gap-2">
-              <p className="text-base font-semibold text-gray-700 dark:text-gray-300">
+            {/* Loading text with modern typography */}
+            <div className="flex flex-col items-center gap-3">
+              <p className="text-lg font-bold bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-clip-text text-transparent dark:from-indigo-400 dark:via-purple-400 dark:to-pink-400 animate-pulse">
                 Sayfa yükleniyor...
               </p>
-              <p className="text-xs text-gray-500 dark:text-gray-400">
+              <p className="text-sm text-gray-500 dark:text-gray-400 font-medium">
                 Lütfen bekleyin
               </p>
             </div>
             
-            {/* Progress bar */}
-            <div className="w-64 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+            {/* Modern Progress bar */}
+            <div className="w-72 h-2 bg-gray-200/50 dark:bg-gray-700/50 rounded-full overflow-hidden backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50">
               <div 
-                className="h-full bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 rounded-full"
+                className="h-full bg-gradient-to-r from-indigo-500 via-purple-500 via-pink-500 to-indigo-500 rounded-full shadow-lg relative overflow-hidden"
                 style={{
-                  animation: 'loading-progress 1.5s ease-in-out infinite',
+                  backgroundSize: '200% 100%',
+                  animation: 'loading-progress 1.5s ease-in-out infinite, gradient-shift 2s ease infinite',
                 }}
-              ></div>
+              >
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent animate-shimmer"></div>
+              </div>
             </div>
           </div>
         </div>
       )}
       
-      <div className={`transition-opacity duration-300 ${loading ? 'opacity-0' : 'opacity-100'}`}>
+      <div className={`transition-all duration-500 ease-out ${loading ? 'opacity-0 scale-[0.98] blur-sm' : 'opacity-100 scale-100 blur-0'}`}>
         {displayChildren}
       </div>
       
@@ -94,6 +102,56 @@ export default function PageTransition({ children }: { children: React.ReactNode
             transform: translateX(100%);
             width: 100%;
           }
+        }
+        
+        @keyframes gradient-shift {
+          0%, 100% {
+            background-position: 0% 50%;
+          }
+          50% {
+            background-position: 100% 50%;
+          }
+        }
+        
+        @keyframes shimmer {
+          0% {
+            transform: translateX(-100%);
+          }
+          100% {
+            transform: translateX(100%);
+          }
+        }
+        
+        @keyframes fade-in {
+          from {
+            opacity: 0;
+            transform: translateY(-10px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        
+        @keyframes bounce-slow {
+          0%, 100% {
+            transform: translateY(0);
+          }
+          50% {
+            transform: translateY(-5px);
+          }
+        }
+        
+        .animate-fade-in {
+          animation: fade-in 0.5s ease-out;
+        }
+        
+        .animate-bounce-slow {
+          animation: bounce-slow 2s ease-in-out infinite;
+        }
+        
+        .animate-shimmer {
+          animation: shimmer 1.5s ease-in-out infinite;
         }
       `}</style>
     </>

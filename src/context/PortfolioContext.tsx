@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useReducer, useEffect, ReactNode, useCallback } from 'react';
+import React, { createContext, useContext, useReducer, useEffect, useState, ReactNode, useCallback } from 'react';
 import { PortfolioItem, Transaction, Stock } from '@/types';
 import { portfolioApi } from '@/services/backendApi';
 
@@ -224,7 +224,36 @@ interface PortfolioContextType {
 const PortfolioContext = createContext<PortfolioContextType | undefined>(undefined);
 
 export const PortfolioProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [state, dispatch] = useReducer(portfolioReducer, initialState);
+  // Initial state'i localStorage'dan yükle
+  const getInitialState = (): PortfolioState => {
+    if (typeof window === 'undefined') return initialState;
+    
+    const savedPortfolio = localStorage.getItem('portfolio');
+    if (savedPortfolio) {
+      try {
+        const parsed = JSON.parse(savedPortfolio);
+        // Timestamp'leri Date objelerine çevir
+        if (parsed.transactions && Array.isArray(parsed.transactions)) {
+          parsed.transactions = parsed.transactions.map((t: { timestamp: string | number; [key: string]: unknown }) => ({
+            ...t,
+            timestamp: new Date(t.timestamp)
+          }));
+        }
+        return {
+          ...initialState,
+          ...parsed,
+          transactions: parsed.transactions || []
+        };
+      } catch (error) {
+        console.error('Portfolio load error:', error);
+        return initialState;
+      }
+    }
+    return initialState;
+  };
+
+  const [state, dispatch] = useReducer(portfolioReducer, getInitialState());
+  const [isInitialized, setIsInitialized] = useState(false);
 
   const buyStock = (stock: Stock, quantity: number, price: number) => {
     dispatch({ type: 'BUY_STOCK', payload: { stock, quantity, price } });
@@ -240,6 +269,7 @@ export const PortfolioProvider: React.FC<{ children: ReactNode }> = ({ children 
 
   const resetPortfolio = () => {
     dispatch({ type: 'RESET_PORTFOLIO' });
+    localStorage.removeItem('portfolio');
   };
 
   const refreshPortfolio = useCallback(async () => {
@@ -292,33 +322,27 @@ export const PortfolioProvider: React.FC<{ children: ReactNode }> = ({ children 
     }
   }, []);
 
-  // Local storage'a kaydet
+  // Local storage'a kaydet (sadece state değiştiğinde)
   useEffect(() => {
-    localStorage.setItem('portfolio', JSON.stringify(state));
-  }, [state]);
-
-  // Local storage'dan yükle
-  const loadFromStorage = useCallback(() => {
-    const savedPortfolio = localStorage.getItem('portfolio');
-    if (savedPortfolio) {
-      try {
-        const parsed = JSON.parse(savedPortfolio);
-        // Timestamp'leri Date objelerine çevir
-        parsed.transactions = parsed.transactions.map((t: { timestamp: string | number; [key: string]: unknown }) => ({
-          ...t,
-          timestamp: new Date(t.timestamp)
-        }));
-        // State'i güncelle
-        Object.assign(state, parsed);
-      } catch (error) {
-        console.error('Portfolio load error:', error);
-      }
+    if (isInitialized) {
+      localStorage.setItem('portfolio', JSON.stringify(state));
     }
-  }, [state]);
+  }, [state, isInitialized]);
 
+  // Sayfa yüklendiğinde kullanıcı varsa API'den veri çek
   useEffect(() => {
-    loadFromStorage();
-  }, [loadFromStorage]);
+    const checkAndRefresh = async () => {
+      const token = localStorage.getItem('token');
+      if (token && !isInitialized) {
+        await refreshPortfolio();
+        setIsInitialized(true);
+      } else if (!token) {
+        setIsInitialized(true);
+      }
+    };
+    
+    checkAndRefresh();
+  }, [refreshPortfolio, isInitialized]);
 
   return (
     <PortfolioContext.Provider value={{

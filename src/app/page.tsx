@@ -21,7 +21,7 @@ import { CryptoCoin } from '@/services/crypto';
 import { leaderboardApi } from '@/services/backendApi';
 
 export default function Home() {
-  const { state } = usePortfolio();
+  const { state, refreshPortfolio } = usePortfolio();
   const { stocks } = useStocks();
   const { cryptos } = useCryptos();
   const { user, loading } = useAuth();
@@ -31,6 +31,65 @@ export default function Home() {
   const prevStockPricesRef = useRef<Map<string, number>>(new Map());
   const prevCryptoPricesRef = useRef<Map<string, number>>(new Map());
   const [priceAnimations, setPriceAnimations] = useState<Map<string, 'up' | 'down' | null>>(new Map());
+
+  // USD-TRY dönüşüm oranı
+  const USD_TO_TRY = 32.5;
+
+  // Portföy öğelerini güncel fiyatlarla güncelle ve toplam değerleri hesapla
+  const [calculatedTotals, setCalculatedTotals] = useState({
+    totalValue: 0,
+    totalProfitLoss: 0
+  });
+
+  useEffect(() => {
+    if (state.portfolioItems.length > 0 && (stocks.length > 0 || cryptos.length > 0)) {
+      let totalValue = 0;
+      let totalProfitLoss = 0;
+
+      state.portfolioItems.forEach(item => {
+        // Kripto mu hisse senedi mi kontrol et
+        const crypto = cryptos.find(c => c.symbol.toUpperCase() === item.symbol.toUpperCase());
+        const stock = stocks.find(s => s.symbol === item.symbol);
+
+        if (crypto) {
+          // Kripto için
+          const currentPriceUSD = crypto.current_price;
+          const currentPriceTRY = currentPriceUSD * USD_TO_TRY;
+          const averagePriceTRY = item.averagePrice;
+          const itemTotalValue = item.quantity * currentPriceTRY;
+          const itemProfitLoss = (currentPriceTRY - averagePriceTRY) * item.quantity;
+
+          totalValue += itemTotalValue;
+          totalProfitLoss += itemProfitLoss;
+        } else if (stock) {
+          // Hisse senedi için
+          const currentPriceUSD = stock.price;
+          const currentPriceTRY = currentPriceUSD * USD_TO_TRY;
+          const averagePriceTRY = item.averagePrice;
+          const itemTotalValue = item.quantity * currentPriceTRY;
+          const itemProfitLoss = (currentPriceTRY - averagePriceTRY) * item.quantity;
+
+          totalValue += itemTotalValue;
+          totalProfitLoss += itemProfitLoss;
+        } else {
+          // Fiyat bulunamadıysa eski değerleri kullan
+          totalValue += item.totalValue;
+          totalProfitLoss += item.profitLoss;
+        }
+      });
+
+      setCalculatedTotals({
+        totalValue,
+        totalProfitLoss
+      });
+    } else {
+      // Portföy boşsa state'teki değerleri kullan
+      setCalculatedTotals({
+        totalValue: state.totalValue,
+        totalProfitLoss: state.totalProfitLoss
+      });
+    }
+  }, [state.portfolioItems, stocks, cryptos, state.totalValue, state.totalProfitLoss]);
 
   const [selectedStock, setSelectedStock] = useState<Stock | null>(null);
   const [tradeType, setTradeType] = useState<'buy' | 'sell'>('buy');
@@ -120,6 +179,13 @@ export default function Home() {
       });
     }
   }, [cryptos]);
+
+  // Kullanıcı yüklendiğinde portföyü yenile
+  useEffect(() => {
+    if (user && !loading) {
+      refreshPortfolio();
+    }
+  }, [user, loading, refreshPortfolio]);
 
   // Liderlik verilerini yükle
   useEffect(() => {
@@ -235,7 +301,7 @@ export default function Home() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs text-[#848e9c] mb-1">Portföy Değeri</p>
-                  <p className="text-2xl font-bold text-white">₺{state.totalValue.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                  <p className="text-2xl font-bold text-white">₺{calculatedTotals.totalValue.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                 </div>
                 <div className="p-3 bg-[#0ecb81]/10 rounded-lg">
                   <CurrencyDollarIcon className="h-6 w-6 text-[#0ecb81]" />
@@ -247,12 +313,12 @@ export default function Home() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs text-[#848e9c] mb-1">Toplam Kâr/Zarar</p>
-                  <p className={`text-2xl font-bold ${state.totalProfitLoss >= 0 ? 'text-[#0ecb81]' : 'text-[#f6465d]'}`}>
-                    {state.totalProfitLoss >= 0 ? '+' : ''}₺{state.totalProfitLoss.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  <p className={`text-2xl font-bold ${calculatedTotals.totalProfitLoss >= 0 ? 'text-[#0ecb81]' : 'text-[#f6465d]'}`}>
+                    {calculatedTotals.totalProfitLoss >= 0 ? '+' : ''}₺{calculatedTotals.totalProfitLoss.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </p>
                 </div>
-                <div className={`p-3 rounded-lg ${state.totalProfitLoss >= 0 ? 'bg-[#0ecb81]/10' : 'bg-[#f6465d]/10'}`}>
-                  {state.totalProfitLoss >= 0 ? (
+                <div className={`p-3 rounded-lg ${calculatedTotals.totalProfitLoss >= 0 ? 'bg-[#0ecb81]/10' : 'bg-[#f6465d]/10'}`}>
+                  {calculatedTotals.totalProfitLoss >= 0 ? (
                     <ArrowUpIcon className={`h-6 w-6 text-[#0ecb81]`} />
                   ) : (
                     <ArrowDownIcon className={`h-6 w-6 text-[#f6465d]`} />
