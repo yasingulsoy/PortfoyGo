@@ -153,8 +153,9 @@ export class MarketCacheService {
       const cacheStatus = await this.getCacheStatus();
       const hasEnoughCache = cacheStatus.stocks >= 50;
       
+      // İki API key ile daha hızlı çekebildiğimiz için limitleri artırıyoruz
       // İlk yükleme veya zorla yenileme ise daha fazla çek
-      const maxStocks = (forceFullRefresh || !hasEnoughCache) ? 200 : 100;
+      const maxStocks = (forceFullRefresh || !hasEnoughCache) ? 300 : 150; // 2 key ile daha fazla çekebiliriz
       const minMarketCap = 100000000; // 100 milyon $ üzeri (daha kaliteli hisse senetleri)
 
       // Hisse senetlerini çek ve cache'e kaydet

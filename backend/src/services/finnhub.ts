@@ -53,17 +53,67 @@ export interface StockSymbol {
 }
 
 const FINNHUB_BASE = 'https://finnhub.io/api/v1';
-const FINNHUB_API_KEY = process.env.FINNHUB_API_KEY || 'd3br09pr01qqg7bvqai0d3br09pr01qqg7bvqaig';
+
+// Çoklu API key desteği
+// FINNHUB_API_KEY veya FINNHUB_API_KEYS (virgülle ayrılmış) kullanılabilir
+function getApiKeys(): string[] {
+  const keysEnv = process.env.FINNHUB_API_KEYS;
+  const singleKey = process.env.FINNHUB_API_KEY || 'd3br09pr01qqg7bvqai0d3br09pr01qqg7bvqaig';
+  
+  if (keysEnv) {
+    // Virgülle ayrılmış key'leri al ve temizle
+    return keysEnv.split(',').map(k => k.trim()).filter(k => k.length > 0);
+  }
+  
+  return [singleKey];
+}
 
 export class FinnhubService {
+  private static apiKeys: string[] = getApiKeys();
+  private static currentKeyIndex = 0;
+  
+  /**
+   * Kullanılabilir bir API key seç (round-robin, rate limit'e göre)
+   */
+  private static getAvailableApiKey(): string {
+    // Önce kullanılabilir key'leri bul
+    const availableKeys = this.apiKeys.filter(key => {
+      const status = RateLimiter.getStatus(key);
+      return status.isAvailable && status.remaining > 0;
+    });
+    
+    if (availableKeys.length === 0) {
+      // Hiç kullanılabilir key yoksa, en az kullanılan key'i seç
+      let minUsed = Infinity;
+      let bestKey = this.apiKeys[0];
+      
+      for (const key of this.apiKeys) {
+        const status = RateLimiter.getStatus(key);
+        if (status.remaining > minUsed) {
+          minUsed = status.remaining;
+          bestKey = key;
+        }
+      }
+      return bestKey;
+    }
+    
+    // Round-robin ile sıradaki key'i seç
+    const selectedKey = availableKeys[this.currentKeyIndex % availableKeys.length];
+    this.currentKeyIndex = (this.currentKeyIndex + 1) % availableKeys.length;
+    
+    return selectedKey;
+  }
+
   private static async makeRequest<T>(endpoint: string, params: Record<string, any> = {}): Promise<T> {
+    const apiKey = this.getAvailableApiKey();
+    
     try {
       // Rate limit kontrolü - gerekirse beklet
-      await RateLimiter.waitIfNeeded();
+      await RateLimiter.waitIfNeeded(apiKey);
       
       const url = `${FINNHUB_BASE}${endpoint}`;
       const queryParams = new URLSearchParams({
-        token: FINNHUB_API_KEY,
+        token: apiKey,
         ...params
       });
       
@@ -75,7 +125,7 @@ export class FinnhubService {
       });
       
       // API çağrısını kaydet
-      RateLimiter.recordCall(1);
+      RateLimiter.recordCall(apiKey, 1);
       
       if ((data as any).error) {
         throw new Error((data as any).error);
@@ -85,13 +135,13 @@ export class FinnhubService {
     } catch (error: any) {
       // 429 hatası geldiğinde özel işlem yap
       if (error.response?.status === 429 || error.status === 429) {
-        RateLimiter.record429Error();
+        RateLimiter.record429Error(apiKey);
         // 429 hatasında çağrıyı kaydetme (zaten limit aşıldı)
       } else {
         // Diğer hatalarda çağrıyı kaydet
-        RateLimiter.recordCall(1);
+        RateLimiter.recordCall(apiKey, 1);
       }
-      console.error('Finnhub API error:', error);
+      console.error(`Finnhub API error (key: ${apiKey.substring(0, 8)}...):`, error);
       throw error;
     }
   }
@@ -154,55 +204,94 @@ export class FinnhubService {
     });
   }
 
-  // Aktif hisse senetlerini batch'ler halinde çek
+  // Concurrency limit ile paralel işlem yap (rate limit'i aşmamak için)
+  private static async processWithConcurrencyLimit<T, R>(
+    items: T[],
+    concurrency: number,
+    processor: (item: T) => Promise<R>
+  ): Promise<R[]> {
+    const results: R[] = [];
+    let index = 0;
+    
+    const processNext = async (): Promise<void> => {
+      while (index < items.length) {
+        const currentIndex = index++;
+        try {
+          const result = await processor(items[currentIndex]);
+          results[currentIndex] = result;
+        } catch (error) {
+          results[currentIndex] = null as any;
+        }
+      }
+    };
+    
+    // Concurrency kadar paralel işlem başlat
+    const workers = Array(Math.min(concurrency, items.length))
+      .fill(null)
+      .map(() => processNext());
+    
+    await Promise.all(workers);
+    return results.filter(r => r !== null);
+  }
+
+  // Aktif hisse senetlerini batch'ler halinde çek (rate limit'e uygun)
   private static async fetchStocksInBatches(
     symbols: StockSymbol[], 
-    batchSize: number = 30, // Rate limit için batch size'ı azalttık
+    batchSize: number = 30,
     maxStocks: number = 500
   ): Promise<StockData[]> {
     const limitedSymbols = symbols.slice(0, maxStocks);
     const stocks: StockData[] = [];
+    const numKeys = this.apiKeys.length;
     
-    console.log(`📊 ${limitedSymbols.length} adet hisse senedi çekiliyor...`);
+    console.log(`📊 ${limitedSymbols.length} adet hisse senedi çekiliyor (${numKeys} API key ile)...`);
     RateLimiter.logStatus();
     
     // Her hisse senedi için 2 API çağrısı yapılıyor (quote + profile)
-    // Bu yüzden batch size'ı daha küçük tutuyoruz
-    const actualBatchSize = Math.min(batchSize, 30); // Maksimum 30 (60 çağrı/dakika / 2 = 30 hisse/dakika)
+    // 2 key = 120 çağrı/dakika = 60 hisse/dakika potansiyel
+    // Güvenli olması için: her key için aynı anda max 5 hisse (10 çağrı)
+    // 2 key = aynı anda max 10 hisse (20 çağrı) - güvenli
+    const concurrencyPerKey = 5; // Her key için aynı anda max 5 hisse
+    const totalConcurrency = numKeys > 1 ? concurrencyPerKey * numKeys : concurrencyPerKey;
+    const actualBatchSize = Math.min(batchSize, 30); // Batch size'ı küçük tut
     
     for (let i = 0; i < limitedSymbols.length; i += actualBatchSize) {
       const batch = limitedSymbols.slice(i, i + actualBatchSize);
-      
-      // Her hisse senedi için sırayla çek (paralel çekmek rate limit'i aşabilir)
-      for (const symbol of batch) {
-        try {
-          const stockData = await this.getStockData(symbol.symbol);
-          if (stockData && stockData.price > 0) {
-            stocks.push(stockData);
-          }
-        } catch (error) {
-          console.error(`Error fetching ${symbol.symbol}:`, (error as Error).message);
-        }
-        
-        // Her çağrıdan sonra rate limit durumunu kontrol et
-        const status = RateLimiter.getStatus();
-        if (status.remaining < 5) {
-          console.log(`⚠️  Rate limit yaklaşıyor (${status.remaining} kaldı), bekleniyor...`);
-          await new Promise(resolve => setTimeout(resolve, 2000)); // 2 saniye bekle
-        }
-      }
-      
       const batchNum = Math.floor(i / actualBatchSize) + 1;
       const totalBatches = Math.ceil(limitedSymbols.length / actualBatchSize);
-      console.log(`✅ Batch ${batchNum}/${totalBatches}: ${stocks.length} başarılı`);
+      
+      // Batch içinde concurrency limit ile işle
+      const batchStocks = await this.processWithConcurrencyLimit(
+        batch,
+        totalConcurrency,
+        async (symbol) => {
+          try {
+            const stockData = await this.getStockData(symbol.symbol);
+            if (stockData && stockData.price > 0) {
+              return stockData;
+            }
+            return null;
+          } catch (error) {
+            console.error(`Error fetching ${symbol.symbol}:`, (error as Error).message);
+            return null;
+          }
+        }
+      );
+      
+      stocks.push(...batchStocks.filter((s): s is StockData => s !== null));
+      
+      console.log(`✅ Batch ${batchNum}/${totalBatches}: ${batchStocks.filter(s => s !== null).length}/${batch.length} başarılı`);
       RateLimiter.logStatus();
       
-      // Son batch değilse, rate limit için bekle
+      // Batch'ler arası bekleme - rate limit için
       if (i + actualBatchSize < limitedSymbols.length) {
-        // Her hisse senedi 2 çağrı yapıyor, bu yüzden daha uzun bekle
-        // 60 çağrı/dakika = 1 çağrı/saniye, 2 çağrı/hisse = 0.5 hisse/saniye
-        // Güvenli olması için 1.5 saniye bekleyelim
-        await new Promise(resolve => setTimeout(resolve, 1500));
+        // Her batch'te ~30 hisse * 2 çağrı = 60 çağrı
+        // Rate limiter her key için ayrı takip yapıyor, bu yüzden daha kısa bekleme yeterli
+        // 2 key ile: her key için 30 çağrı = 30/60 = 0.5 dakika = 30 saniye
+        // Güvenli olması için biraz daha fazla bekleyelim
+        const waitTime = numKeys > 1 ? 20000 : 40000; // 2 key: 20s, 1 key: 40s
+        console.log(`⏳ Rate limit için ${waitTime / 1000} saniye bekleniyor...`);
+        await new Promise(resolve => setTimeout(resolve, waitTime));
       }
     }
     
@@ -252,8 +341,8 @@ export class FinnhubService {
   static async getPopularStocks(): Promise<StockData[]> {
     // Önce aktif hisse senetlerini çekmeyi dene
     try {
-      // Daha düşük market cap threshold ile daha fazla hisse çekmeyi dene
-      const activeStocks = await this.getActiveStocks('US', 150, 500000000); // 500 milyon $ üzeri, 150 hisse
+      // İki key ile daha hızlı çekebildiğimiz için daha fazla hisse çekmeyi dene
+      const activeStocks = await this.getActiveStocks('US', 200, 500000000); // 500 milyon $ üzeri, 200 hisse
       if (activeStocks.length > 0) {
         // En popüler 50 tanesini döndür
         return activeStocks.slice(0, 50);
