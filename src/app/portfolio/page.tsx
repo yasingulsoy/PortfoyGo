@@ -108,19 +108,21 @@ export default function PortfolioPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-indigo-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
+    <div className="min-h-screen bg-[#181a20]">
       {/* Header */}
-      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+      <div className="bg-[#1e2329] border-b border-[#2b3139]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center">
-              <ChartBarIcon className="h-8 w-8 text-indigo-600 dark:text-indigo-400 mr-3" />
-              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Portföyüm</h1>
+              <div className="p-2 bg-[#0ecb81]/10 rounded-lg mr-3">
+                <ChartBarIcon className="h-6 w-6 text-[#0ecb81]" />
+              </div>
+              <h1 className="text-2xl font-bold text-white">Portföyüm</h1>
             </div>
             <button
               onClick={handleRefresh}
               disabled={isRefreshing}
-              className="flex items-center space-x-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+              className="flex items-center space-x-2 px-4 py-2 bg-[#0ecb81] hover:bg-[#0bb975] text-white rounded-lg disabled:opacity-50 transition-colors font-semibold"
             >
               <ArrowPathIcon className={`h-5 w-5 ${isRefreshing ? 'animate-spin' : ''}`} />
               <span>Yenile</span>
@@ -132,63 +134,63 @@ export default function PortfolioPage() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Portfolio Summary */}
         {user && (
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 border border-gray-200 dark:border-gray-700 hover:shadow-xl transition-shadow">
-              <div className="flex items-center">
-                <div className="p-3 bg-gradient-to-br from-blue-100 to-cyan-100 dark:from-blue-900/40 dark:to-cyan-900/40 rounded-xl">
-                  <CurrencyDollarIcon className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+            <div className="bg-[#1e2329] rounded-xl p-5 border border-[#2b3139] hover:border-[#0ecb81]/30 transition-all">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-[#848e9c] mb-1">Toplam Değer</p>
+                  <p className="text-2xl font-bold text-white">₺{getTotalCurrentValue().toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                  <p className="text-xs text-[#848e9c]">${(getTotalCurrentValue() / USD_TO_TRY).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                 </div>
-                <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Toplam Değer</p>
-                  <p className="text-2xl font-bold text-gray-900 dark:text-white">₺{getTotalCurrentValue().toLocaleString('tr-TR', { maximumFractionDigits: 2 })}</p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">${(getTotalCurrentValue() / USD_TO_TRY).toLocaleString('en-US', { maximumFractionDigits: 2 })}</p>
+                <div className="p-3 bg-[#0ecb81]/10 rounded-lg">
+                  <CurrencyDollarIcon className="h-6 w-6 text-[#0ecb81]" />
                 </div>
               </div>
             </div>
 
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 border border-gray-200 dark:border-gray-700 hover:shadow-xl transition-shadow">
-              <div className="flex items-center">
-                <div className={`p-3 rounded-xl ${getTotalProfitLoss() >= 0 ? 'bg-gradient-to-br from-green-100 to-emerald-100 dark:from-green-900/40 dark:to-emerald-900/40' : 'bg-gradient-to-br from-red-100 to-pink-100 dark:from-red-900/40 dark:to-pink-900/40'}`}>
-                  {getTotalProfitLoss() >= 0 ? (
-                    <ArrowUpIcon className="h-6 w-6 text-green-600 dark:text-green-400" />
-                  ) : (
-                    <ArrowDownIcon className="h-6 w-6 text-red-600 dark:text-red-400" />
-                  )}
-                </div>
-                <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Toplam Kâr/Zarar</p>
-                  <p className={`text-2xl font-bold ${getTotalProfitLoss() >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                    {getTotalProfitLoss() >= 0 ? '+' : ''}₺{getTotalProfitLoss().toLocaleString('tr-TR', { maximumFractionDigits: 2 })}
+            <div className="bg-[#1e2329] rounded-xl p-5 border border-[#2b3139] hover:border-[#0ecb81]/30 transition-all">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-[#848e9c] mb-1">Toplam Kâr/Zarar</p>
+                  <p className={`text-2xl font-bold ${getTotalProfitLoss() >= 0 ? 'text-[#0ecb81]' : 'text-[#f6465d]'}`}>
+                    {getTotalProfitLoss() >= 0 ? '+' : ''}₺{getTotalProfitLoss().toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </p>
-                  <p className={`text-xs ${getTotalProfitLoss() >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                  <p className={`text-xs ${getTotalProfitLoss() >= 0 ? 'text-[#0ecb81]' : 'text-[#f6465d]'}`}>
                     {getTotalInvestment() > 0 ? `${((getTotalProfitLoss() / getTotalInvestment()) * 100).toFixed(2)}%` : '0%'}
                   </p>
                 </div>
-              </div>
-            </div>
-
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 border border-gray-200 dark:border-gray-700 hover:shadow-xl transition-shadow">
-              <div className="flex items-center">
-                <div className="p-3 bg-gradient-to-br from-purple-100 to-pink-100 dark:from-purple-900/40 dark:to-pink-900/40 rounded-xl">
-                  <CurrencyDollarIcon className="h-6 w-6 text-purple-600 dark:text-purple-400" />
-                </div>
-                <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Toplam Yatırım</p>
-                  <p className="text-2xl font-bold text-gray-900 dark:text-white">₺{getTotalInvestment().toLocaleString('tr-TR', { maximumFractionDigits: 2 })}</p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">${(getTotalInvestment() / USD_TO_TRY).toLocaleString('en-US', { maximumFractionDigits: 2 })}</p>
+                <div className={`p-3 rounded-lg ${getTotalProfitLoss() >= 0 ? 'bg-[#0ecb81]/10' : 'bg-[#f6465d]/10'}`}>
+                  {getTotalProfitLoss() >= 0 ? (
+                    <ArrowUpIcon className={`h-6 w-6 text-[#0ecb81]`} />
+                  ) : (
+                    <ArrowDownIcon className={`h-6 w-6 text-[#f6465d]`} />
+                  )}
                 </div>
               </div>
             </div>
 
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 border border-gray-200 dark:border-gray-700 hover:shadow-xl transition-shadow">
-              <div className="flex items-center">
-                <div className="p-3 bg-gradient-to-br from-indigo-100 to-blue-100 dark:from-indigo-900/40 dark:to-blue-900/40 rounded-xl">
-                  <CurrencyDollarIcon className="h-6 w-6 text-indigo-600 dark:text-indigo-400" />
+            <div className="bg-[#1e2329] rounded-xl p-5 border border-[#2b3139] hover:border-[#0ecb81]/30 transition-all">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-[#848e9c] mb-1">Toplam Yatırım</p>
+                  <p className="text-2xl font-bold text-white">₺{getTotalInvestment().toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                  <p className="text-xs text-[#848e9c]">${(getTotalInvestment() / USD_TO_TRY).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                 </div>
-                <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Nakit Bakiye</p>
-                  <p className="text-2xl font-bold text-gray-900 dark:text-white">₺{state.balance.toLocaleString('tr-TR', { maximumFractionDigits: 2 })}</p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">${(state.balance / USD_TO_TRY).toLocaleString('en-US', { maximumFractionDigits: 2 })}</p>
+                <div className="p-3 bg-[#0ecb81]/10 rounded-lg">
+                  <CurrencyDollarIcon className="h-6 w-6 text-[#0ecb81]" />
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-[#1e2329] rounded-xl p-5 border border-[#2b3139] hover:border-[#0ecb81]/30 transition-all">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-[#848e9c] mb-1">Nakit Bakiye</p>
+                  <p className="text-2xl font-bold text-white">₺{state.balance.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                  <p className="text-xs text-[#848e9c]">${(state.balance / USD_TO_TRY).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                </div>
+                <div className="p-3 bg-[#0ecb81]/10 rounded-lg">
+                  <CurrencyDollarIcon className="h-6 w-6 text-[#0ecb81]" />
                 </div>
               </div>
             </div>
@@ -196,25 +198,25 @@ export default function PortfolioPage() {
         )}
 
         {/* Tabs */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 mb-8">
-          <div className="border-b border-gray-200 dark:border-gray-700">
+        <div className="bg-[#1e2329] rounded-xl border border-[#2b3139] mb-8">
+          <div className="border-b border-[#2b3139]">
             <nav className="flex space-x-8 px-6">
               <button
                 onClick={() => setActiveTab('overview')}
-                className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                className={`py-4 px-1 border-b-2 font-semibold text-sm transition-colors ${
                   activeTab === 'overview'
-                    ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400'
-                    : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
+                    ? 'border-[#0ecb81] text-[#0ecb81]'
+                    : 'border-transparent text-[#848e9c] hover:text-white'
                 }`}
               >
                 Portföy Genel Bakış
               </button>
               <button
                 onClick={() => setActiveTab('transactions')}
-                className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                className={`py-4 px-1 border-b-2 font-semibold text-sm transition-colors ${
                   activeTab === 'transactions'
-                    ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400'
-                    : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
+                    ? 'border-[#0ecb81] text-[#0ecb81]'
+                    : 'border-transparent text-[#848e9c] hover:text-white'
                 }`}
               >
                 İşlem Geçmişi
@@ -243,101 +245,101 @@ function PortfolioOverview({ portfolioItems }: { portfolioItems: ExtendedPortfol
   if (portfolioItems.length === 0) {
     return (
       <div className="text-center py-12">
-        <ChartBarIcon className="mx-auto h-12 w-12 text-gray-400 dark:text-gray-500" />
-        <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-gray-100">Henüz portföy yok</h3>
-        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">İlk hisse alımınızı yaptığınızda burada görünecek.</p>
+        <ChartBarIcon className="mx-auto h-12 w-12 text-[#848e9c]" />
+        <h3 className="mt-2 text-sm font-semibold text-white">Henüz portföy yok</h3>
+        <p className="mt-1 text-sm text-[#848e9c]">İlk hisse alımınızı yaptığınızda burada görünecek.</p>
       </div>
     );
   }
 
   return (
     <div className="overflow-x-auto">
-      <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-        <thead className="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-700">
+      <table className="min-w-full divide-y divide-[#2b3139]">
+        <thead className="bg-[#161a1e]">
           <tr>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">
+            <th className="px-6 py-3 text-left text-xs font-semibold text-[#848e9c] uppercase tracking-wider">
               Varlık
             </th>
-            <th className="px-6 py-3 text-right text-xs font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">
+            <th className="px-6 py-3 text-right text-xs font-semibold text-[#848e9c] uppercase tracking-wider">
               Miktar
             </th>
-            <th className="px-6 py-3 text-right text-xs font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">
+            <th className="px-6 py-3 text-right text-xs font-semibold text-[#848e9c] uppercase tracking-wider">
               Alış Fiyatı
             </th>
-            <th className="px-6 py-3 text-right text-xs font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">
+            <th className="px-6 py-3 text-right text-xs font-semibold text-[#848e9c] uppercase tracking-wider">
               Güncel Fiyat
             </th>
-            <th className="px-6 py-3 text-right text-xs font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">
+            <th className="px-6 py-3 text-right text-xs font-semibold text-[#848e9c] uppercase tracking-wider">
               Toplam Değer
             </th>
-            <th className="px-6 py-3 text-right text-xs font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">
+            <th className="px-6 py-3 text-right text-xs font-semibold text-[#848e9c] uppercase tracking-wider">
               Kâr/Zarar
             </th>
-            <th className="px-6 py-3 text-right text-xs font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">
+            <th className="px-6 py-3 text-right text-xs font-semibold text-[#848e9c] uppercase tracking-wider">
               Değişim %
             </th>
           </tr>
         </thead>
-        <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+        <tbody className="bg-[#1e2329] divide-y divide-[#2b3139]">
           {portfolioItems.map((item) => {
             const isProfit = item.profitLoss >= 0;
             const priceChange = item.averagePrice > 0 ? ((item.currentPrice - item.averagePrice) / item.averagePrice) * 100 : 0;
             
             return (
-              <tr key={item.symbol} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+              <tr key={item.symbol} className="hover:bg-[#161a1e] transition-colors">
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 bg-gradient-to-br from-indigo-100 to-purple-100 dark:from-indigo-900/40 dark:to-purple-900/40 rounded-lg flex items-center justify-center">
-                      <span className="text-sm font-bold text-indigo-600 dark:text-indigo-400">{item.symbol.slice(0,1)}</span>
+                    <div className="h-10 w-10 bg-[#0ecb81]/10 rounded-lg flex items-center justify-center">
+                      <span className="text-sm font-bold text-[#0ecb81]">{item.symbol.slice(0,1)}</span>
                     </div>
                     <div>
                       <Link 
                         href={`/asset/${item.symbol}?type=${item.symbol.length <= 4 ? 'crypto' : 'stock'}`}
-                        className="text-sm font-medium text-gray-900 dark:text-white hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
+                        className="text-sm font-semibold text-white hover:text-[#0ecb81] transition-colors"
                       >
                         {item.name}
                       </Link>
-                      <div className="text-xs text-gray-500 dark:text-gray-400">{item.symbol}</div>
+                      <div className="text-xs text-[#848e9c]">{item.symbol}</div>
                     </div>
                   </div>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-gray-900 dark:text-white">
+                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-semibold text-white">
                   {item.quantity.toLocaleString('tr-TR', { maximumFractionDigits: 8 })}
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-900 dark:text-white">
-                  <div>₺{item.averagePrice.toLocaleString('tr-TR', { maximumFractionDigits: 2 })}</div>
-                  <div className="text-xs text-gray-500 dark:text-gray-400">${(item.averagePrice / USD_TO_TRY).toLocaleString('en-US', { maximumFractionDigits: 2 })}</div>
+                <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-white">
+                  <div>₺{item.averagePrice.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                  <div className="text-xs text-[#848e9c]">${(item.averagePrice / USD_TO_TRY).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-900 dark:text-white">
-                  <div className="font-semibold">₺{item.currentPrice.toLocaleString('tr-TR', { maximumFractionDigits: 2 })}</div>
-                  <div className="text-xs text-gray-500 dark:text-gray-400">
-                    ${item.currentPriceUSD ? item.currentPriceUSD.toLocaleString('en-US', { maximumFractionDigits: 2 }) : (item.currentPrice / USD_TO_TRY).toLocaleString('en-US', { maximumFractionDigits: 2 })}
+                <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-white">
+                  <div className="font-semibold">₺{item.currentPrice.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                  <div className="text-xs text-[#848e9c]">
+                    ${item.currentPriceUSD ? item.currentPriceUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : (item.currentPrice / USD_TO_TRY).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </div>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-gray-900 dark:text-white">
-                  <div>₺{item.totalValue.toLocaleString('tr-TR', { maximumFractionDigits: 2 })}</div>
-                  <div className="text-xs text-gray-500 dark:text-gray-400">${(item.totalValue / USD_TO_TRY).toLocaleString('en-US', { maximumFractionDigits: 2 })}</div>
+                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-semibold text-white">
+                  <div>₺{item.totalValue.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                  <div className="text-xs text-[#848e9c]">${(item.totalValue / USD_TO_TRY).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-right">
-                  <div className={`flex items-center justify-end ${isProfit ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                  <div className={`flex items-center justify-end ${isProfit ? 'text-[#0ecb81]' : 'text-[#f6465d]'}`}>
                     {isProfit ? (
                       <ArrowTrendingUpIcon className="h-4 w-4 mr-1" />
                     ) : (
                       <ArrowTrendingDownIcon className="h-4 w-4 mr-1" />
                     )}
-                    <span className="text-sm font-medium">
-                      {isProfit ? '+' : ''}₺{item.profitLoss.toLocaleString('tr-TR', { maximumFractionDigits: 2 })}
+                    <span className="text-sm font-semibold">
+                      {isProfit ? '+' : ''}₺{item.profitLoss.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </span>
                   </div>
-                  <div className={`text-xs ${isProfit ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                    {isProfit ? '+' : ''}${(item.profitLoss / USD_TO_TRY).toLocaleString('en-US', { maximumFractionDigits: 2 })}
+                  <div className={`text-xs ${isProfit ? 'text-[#0ecb81]' : 'text-[#f6465d]'}`}>
+                    {isProfit ? '+' : ''}${(item.profitLoss / USD_TO_TRY).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-right">
-                  <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${
+                  <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${
                     isProfit 
-                      ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-400' 
-                      : 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-400'
+                      ? 'bg-[#0ecb81]/10 text-[#0ecb81]' 
+                      : 'bg-[#f6465d]/10 text-[#f6465d]'
                   }`}>
                     {isProfit ? <ArrowUpIcon className="h-3 w-3 mr-1" /> : <ArrowDownIcon className="h-3 w-3 mr-1" />}
                     {isProfit ? '+' : ''}{priceChange.toFixed(2)}%
