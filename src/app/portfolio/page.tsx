@@ -37,52 +37,61 @@ export default function PortfolioPage() {
   }, [user]);
 
   // Portföy öğelerini güncel fiyatlarla güncelle
+  // Not: Sembol uzunluğuna göre tahmin yapmak yerine gerçekten kriptolarda mı, hisselerde mi olduğuna bakıyoruz.
   useEffect(() => {
     if (state.portfolioItems.length > 0 && (stocks.length > 0 || cryptos.length > 0)) {
       const updated = state.portfolioItems.map(item => {
-        // Hisse senedi mi kripto mu kontrol et
-        const isCrypto = item.symbol.length <= 4;
-        
-        if (isCrypto) {
-          const crypto = cryptos.find(c => c.symbol.toUpperCase() === item.symbol.toUpperCase());
-          if (crypto) {
-            const currentPriceUSD = crypto.current_price;
-            const currentPriceTRY = currentPriceUSD * USD_TO_TRY;
-            const averagePriceTRY = item.averagePrice;
-            const profitLoss = (currentPriceTRY - averagePriceTRY) * item.quantity;
-            const profitLossPercent = averagePriceTRY > 0 ? ((currentPriceTRY - averagePriceTRY) / averagePriceTRY) * 100 : 0;
-            
-            return {
-              ...item,
-              currentPrice: currentPriceTRY,
-              currentPriceUSD: currentPriceUSD,
-              totalValue: item.quantity * currentPriceTRY,
-              profitLoss,
-              profitLossPercent
-            };
-          }
-        } else {
-          const stock = stocks.find(s => s.symbol === item.symbol);
-          if (stock) {
-            const currentPriceUSD = stock.price;
-            const currentPriceTRY = currentPriceUSD * USD_TO_TRY;
-            const averagePriceTRY = item.averagePrice;
-            const profitLoss = (currentPriceTRY - averagePriceTRY) * item.quantity;
-            const profitLossPercent = averagePriceTRY > 0 ? ((currentPriceTRY - averagePriceTRY) / averagePriceTRY) * 100 : 0;
-            
-            return {
-              ...item,
-              currentPrice: currentPriceTRY,
-              currentPriceUSD: currentPriceUSD,
-              totalValue: item.quantity * currentPriceTRY,
-              profitLoss,
-              profitLossPercent
-            };
-          }
+        // Önce kripto listesinde var mı diye bak
+        const crypto = cryptos.find(
+          c => c.symbol.toUpperCase() === item.symbol.toUpperCase()
+        );
+
+        if (crypto) {
+          const currentPriceUSD = crypto.current_price;
+          const currentPriceTRY = currentPriceUSD * USD_TO_TRY;
+          const averagePriceTRY = item.averagePrice;
+          const profitLoss = (currentPriceTRY - averagePriceTRY) * item.quantity;
+          const profitLossPercent =
+            averagePriceTRY > 0
+              ? ((currentPriceTRY - averagePriceTRY) / averagePriceTRY) * 100
+              : 0;
+
+          return {
+            ...item,
+            currentPrice: currentPriceTRY,
+            currentPriceUSD: currentPriceUSD,
+            totalValue: item.quantity * currentPriceTRY,
+            profitLoss,
+            profitLossPercent,
+          };
         }
+
+        // Aksi halde hisse senedi olarak değerlendir
+        const stock = stocks.find(s => s.symbol.toUpperCase() === item.symbol.toUpperCase());
+        if (stock) {
+          const currentPriceUSD = stock.price;
+          const currentPriceTRY = currentPriceUSD * USD_TO_TRY;
+          const averagePriceTRY = item.averagePrice;
+          const profitLoss = (currentPriceTRY - averagePriceTRY) * item.quantity;
+          const profitLossPercent =
+            averagePriceTRY > 0
+              ? ((currentPriceTRY - averagePriceTRY) / averagePriceTRY) * 100
+              : 0;
+
+          return {
+            ...item,
+            currentPrice: currentPriceTRY,
+            currentPriceUSD: currentPriceUSD,
+            totalValue: item.quantity * currentPriceTRY,
+            profitLoss,
+            profitLossPercent,
+          };
+        }
+
+        // İlgili fiyat bulunamazsa mevcut değeri olduğu gibi bırak
         return item;
       });
-      
+
       setPortfolioWithPrices(updated);
     } else {
       setPortfolioWithPrices(state.portfolioItems);

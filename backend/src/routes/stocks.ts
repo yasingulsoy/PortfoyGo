@@ -2,6 +2,11 @@ import express from 'express';
 import { getStockData, getPopularStocks, testFinnhubAPI, getStockCount, getStockSymbols, getExchangeStockCounts, getActiveStocks } from '../services/finnhub';
 import { MarketCacheService } from '../services/marketCache';
 
+// Arka planda cache yenilemenin çok sık tetiklenmesini önlemek için basit throttle
+// Her istekte değil, en az X dakikada bir arka plan yenilemesi yapalım
+const MIN_BACKGROUND_REFRESH_INTERVAL_MS = 5 * 60 * 1000; // 5 dakika
+let lastBackgroundRefresh = 0;
+
 const router = express.Router();
 
 // API key testi
@@ -243,10 +248,16 @@ router.get('/', async (req, res) => {
     // Cache'de yeterli veri varsa (10'dan fazla) hemen cache'den döndür
     if (stocks.length >= 10 && !forceRefresh) {
       // Arka planda cache'i güncelle (kullanıcıyı bekletmeden)
+      // Fakat bunu HER istekte yapmak yerine, en az 5 dakikada bir kez yapalım
       if (!useActive) {
-        MarketCacheService.refreshCache(false).catch(err => {
-          console.error('Background cache refresh error:', err);
-        });
+        const now = Date.now();
+        const backgroundRefreshEnabled = process.env.ENABLE_BACKGROUND_STOCK_REFRESH !== 'false';
+        if (backgroundRefreshEnabled && now - lastBackgroundRefresh > MIN_BACKGROUND_REFRESH_INTERVAL_MS) {
+          lastBackgroundRefresh = now;
+          MarketCacheService.refreshCache(false).catch(err => {
+            console.error('Background cache refresh error:', err);
+          });
+        }
       }
       
       return res.json({ 
@@ -274,9 +285,14 @@ router.get('/', async (req, res) => {
       if (stocks.length > 0 && !forceRefresh) {
         // Arka planda cache'i güncelle
         const hasEnoughCache = stocks.length >= 10;
-        MarketCacheService.refreshCache(!hasEnoughCache).catch(err => {
-          console.error('Background cache refresh error:', err);
-        });
+        const now = Date.now();
+        const backgroundRefreshEnabled = process.env.ENABLE_BACKGROUND_STOCK_REFRESH !== 'false';
+        if (backgroundRefreshEnabled && now - lastBackgroundRefresh > MIN_BACKGROUND_REFRESH_INTERVAL_MS) {
+          lastBackgroundRefresh = now;
+          MarketCacheService.refreshCache(!hasEnoughCache).catch(err => {
+            console.error('Background cache refresh error:', err);
+          });
+        }
         
         return res.json({ 
           success: true, 

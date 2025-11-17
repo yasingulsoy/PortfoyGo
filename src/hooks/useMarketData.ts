@@ -21,7 +21,7 @@ export function useStocks() {
     `${API_BASE_URL}/stocks`,
     (url) => jsonFetcher<Stock[]>(url),
     {
-      refreshInterval: 60000, // 1 dakika (cache'den geldiği için daha uzun)
+      refreshInterval: 15000, // 15 saniye (10 hisse olduğu için daha hızlı güncelleme)
       revalidateOnFocus: true,
     }
   );
@@ -40,7 +40,7 @@ export function useCryptos() {
     `${API_BASE_URL}/cryptos?limit=25`,
     (url) => jsonFetcher<CryptoCoin[]>(url),
     {
-      refreshInterval: 60000, // 1 dakika (cache'den geldiği için daha uzun)
+      refreshInterval: 15000, // 15 saniye (daha hızlı güncelleme)
       revalidateOnFocus: true,
     }
   );

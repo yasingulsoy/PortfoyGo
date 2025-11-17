@@ -74,10 +74,10 @@ MarketCacheService.refreshCache(true).catch(err => {
   console.error('Initial cache refresh error:', err);
 });
 
-// Her 10 dakikada bir cache'i güncelle (10 hisse)
-// Şu anlık sadece 10 hisseye odaklanıyoruz
-cron.schedule('*/10 * * * *', async () => {
-  console.log('⏰ Scheduled cache refresh başlatılıyor (10 dakika)...');
+// Her 2 dakikada bir cache'i güncelle (10 hisse - hızlı güncelleme)
+// Şu anlık sadece 10 hisseye odaklanıyoruz, bu yüzden daha sık güncelleyebiliriz
+cron.schedule('*/2 * * * *', async () => {
+  console.log('⏰ Scheduled cache refresh başlatılıyor (2 dakika)...');
   try {
     // Güncelleme (10 hisse)
     await MarketCacheService.refreshCache(false);
@@ -87,9 +87,9 @@ cron.schedule('*/10 * * * *', async () => {
   }
 });
 
-// Her 2 saatte bir tam cache refresh (10 hisse)
-cron.schedule('0 */2 * * *', async () => {
-  console.log('⏰ Full cache refresh başlatılıyor (2 saat)...');
+// Her 30 dakikada bir tam cache refresh (10 hisse)
+cron.schedule('*/30 * * * *', async () => {
+  console.log('⏰ Full cache refresh başlatılıyor (30 dakika)...');
   try {
     // Tam güncelleme (10 hisse)
     await MarketCacheService.refreshCache(true);
@@ -114,5 +114,5 @@ app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`📊 Trading Platform API ready!`);
   console.log(`🌐 Health check: http://localhost:${PORT}/api/health`);
-  console.log(`🔄 Cache otomatik güncelleme: Her 2 saatte bir`);
+  console.log(`🔄 Cache otomatik güncelleme: Her 2 dakikada bir (10 hisse)`);
 });

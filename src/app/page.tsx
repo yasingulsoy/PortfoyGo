@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -27,6 +27,11 @@ export default function Home() {
   const { user, loading } = useAuth();
   const router = useRouter();
 
+  // Önceki fiyatları takip et (hisse senetleri ve kripto paralar için)
+  const prevStockPricesRef = useRef<Map<string, number>>(new Map());
+  const prevCryptoPricesRef = useRef<Map<string, number>>(new Map());
+  const [priceAnimations, setPriceAnimations] = useState<Map<string, 'up' | 'down' | null>>(new Map());
+
   const [selectedStock, setSelectedStock] = useState<Stock | null>(null);
   const [tradeType, setTradeType] = useState<'buy' | 'sell'>('buy');
   const [isTradeModalOpen, setIsTradeModalOpen] = useState(false);
@@ -45,6 +50,76 @@ export default function Home() {
       router.push('/login');
     }
   }, [user, loading, router]);
+
+  // Fiyat değişikliklerini takip et ve animasyon ekle (hisse senetleri)
+  useEffect(() => {
+    const newAnimations = new Map<string, 'up' | 'down' | null>();
+    
+    stocks.forEach((stock) => {
+      const prevPrice = prevStockPricesRef.current.get(stock.symbol);
+      if (prevPrice !== undefined && prevPrice !== stock.price) {
+        // Fiyat değişti
+        if (stock.price > prevPrice) {
+          newAnimations.set(`stock-${stock.symbol}`, 'up');
+        } else {
+          newAnimations.set(`stock-${stock.symbol}`, 'down');
+        }
+        // Animasyonu 600ms sonra temizle
+        setTimeout(() => {
+          setPriceAnimations((prev) => {
+            const updated = new Map(prev);
+            updated.delete(`stock-${stock.symbol}`);
+            return updated;
+          });
+        }, 600);
+      }
+      // Güncel fiyatı kaydet
+      prevStockPricesRef.current.set(stock.symbol, stock.price);
+    });
+
+    if (newAnimations.size > 0) {
+      setPriceAnimations((prev) => {
+        const merged = new Map(prev);
+        newAnimations.forEach((value, key) => merged.set(key, value));
+        return merged;
+      });
+    }
+  }, [stocks]);
+
+  // Fiyat değişikliklerini takip et ve animasyon ekle (kripto paralar)
+  useEffect(() => {
+    const newAnimations = new Map<string, 'up' | 'down' | null>();
+    
+    cryptos.forEach((crypto) => {
+      const prevPrice = prevCryptoPricesRef.current.get(crypto.id);
+      if (prevPrice !== undefined && prevPrice !== crypto.current_price) {
+        // Fiyat değişti
+        if (crypto.current_price > prevPrice) {
+          newAnimations.set(`crypto-${crypto.id}`, 'up');
+        } else {
+          newAnimations.set(`crypto-${crypto.id}`, 'down');
+        }
+        // Animasyonu 600ms sonra temizle
+        setTimeout(() => {
+          setPriceAnimations((prev) => {
+            const updated = new Map(prev);
+            updated.delete(`crypto-${crypto.id}`);
+            return updated;
+          });
+        }, 600);
+      }
+      // Güncel fiyatı kaydet
+      prevCryptoPricesRef.current.set(crypto.id, crypto.current_price);
+    });
+
+    if (newAnimations.size > 0) {
+      setPriceAnimations((prev) => {
+        const merged = new Map(prev);
+        newAnimations.forEach((value, key) => merged.set(key, value));
+        return merged;
+      });
+    }
+  }, [cryptos]);
 
   // Liderlik verilerini yükle
   useEffect(() => {
@@ -219,12 +294,16 @@ export default function Home() {
             <div className="bg-[#1e2329] rounded-xl border border-[#2b3139] overflow-hidden">
               <div className="flex items-center justify-between px-6 py-4 border-b border-[#2b3139] bg-[#161a1e]">
                 <h2 className="text-xl font-bold text-white">Hisse Senetleri</h2>
-                <span className="text-sm text-[#848e9c] bg-[#2b3139] px-3 py-1 rounded-full">{stocks.length} hisse</span>
+                <span className="text-sm text-[#848e9c] bg-[#2b3139] px-3 py-1 rounded-full">{Math.min(stocks.length, 10)} hisse</span>
               </div>
               
               <div className="p-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2 gap-3">
-                  {stocks.map((stock) => (
+                  {stocks.slice(0, 10).map((stock) => {
+                    const animation = priceAnimations.get(`stock-${stock.symbol}`);
+                    const animationClass = animation === 'up' ? 'price-flash-up' : animation === 'down' ? 'price-flash-down' : '';
+                    
+                    return (
                     <div key={stock.id} className="bg-[#161a1e] rounded-lg p-4 border border-[#2b3139] hover:border-[#0ecb81]/30 transition-all hover:bg-[#1e2329]">
                       <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center gap-3">
@@ -238,7 +317,7 @@ export default function Home() {
                             <div className="text-xs text-[#848e9c]">{stock.symbol}</div>
                           </div>
                         </div>
-                        <div className="text-right">
+                        <div className={`text-right rounded px-2 py-1 ${animationClass}`}>
                           <div className="text-base font-bold text-white">${stock.price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                           <div className="text-xs text-[#848e9c]">₺{(stock.price * 32.5).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                           <div className={`text-xs inline-flex items-center font-medium mt-1 ${stock.change >= 0 ? 'text-[#0ecb81]' : 'text-[#f6465d]'}`}>
@@ -264,7 +343,8 @@ export default function Home() {
                         </div>
                       )}
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             </div>
@@ -283,6 +363,9 @@ export default function Home() {
                   {cryptos.slice(0, 6).map((crypto) => {
                     const USD_TO_TRY = 32.5;
                     const changePct = crypto.price_change_percentage_24h ?? 0;
+                    const animation = priceAnimations.get(`crypto-${crypto.id}`);
+                    const animationClass = animation === 'up' ? 'price-flash-up' : animation === 'down' ? 'price-flash-down' : '';
+                    
                     return (
                       <div key={crypto.id} className="bg-[#161a1e] rounded-lg p-4 border border-[#2b3139] hover:border-[#0ecb81]/30 transition-all hover:bg-[#1e2329]">
                         <div className="flex items-center justify-between mb-3">
@@ -297,7 +380,7 @@ export default function Home() {
                               <div className="text-xs text-[#848e9c] uppercase">{crypto.symbol}</div>
                             </div>
                           </div>
-                          <div className="text-right">
+                          <div className={`text-right rounded px-2 py-1 ${animationClass}`}>
                             <div className="text-base font-bold text-white">${crypto.current_price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                             <div className="text-xs text-[#848e9c]">₺{(crypto.current_price * USD_TO_TRY).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                             <div className={`text-xs inline-flex items-center font-medium mt-1 ${changePct >= 0 ? 'text-[#0ecb81]' : 'text-[#f6465d]'}`}>
@@ -356,30 +439,8 @@ export default function Home() {
               <div className="space-y-3">
                 <div className="flex justify-between items-center py-2 border-b border-[#2b3139]">
                   <span className="text-sm text-[#848e9c]">Toplam Hisse</span>
-                  <span className="font-semibold text-white">{stocks.length}</span>
+                  <span className="font-semibold text-white">{Math.min(stocks.length, 10)}</span>
                 </div>
-                {stocks.length < 50 && (
-                  <div className="bg-[#f0b90b]/10 border border-[#f0b90b]/30 rounded-lg p-3 mb-3">
-                    <p className="text-xs text-[#f0b90b] mb-2">
-                      ⚠️ Az sayıda hisse senedi görüntüleniyor. Cache güncelleniyor...
-                    </p>
-                    <button
-                      onClick={async () => {
-                        try {
-                          const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/api';
-                          await fetch(`${API_BASE_URL}/stocks/refresh-cache`, { method: 'POST' });
-                          // Sayfayı yenile
-                          window.location.reload();
-                        } catch (error) {
-                          console.error('Cache refresh error:', error);
-                        }
-                      }}
-                      className="text-xs bg-[#f0b90b] hover:bg-[#d4a308] text-white px-3 py-1 rounded transition-colors"
-                    >
-                      Cache'i Yenile
-                    </button>
-                  </div>
-                )}
                 <div className="flex justify-between items-center py-2 border-b border-[#2b3139]">
                   <span className="text-sm text-[#848e9c]">Toplam Kripto</span>
                   <span className="font-semibold text-white">{cryptos.length}</span>

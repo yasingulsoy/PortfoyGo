@@ -47,12 +47,12 @@ export default function MarketTabs({ stocks, cryptos, onBuy, onSell }: MarketTab
           <div className="p-4 sm:p-6">
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-sm font-semibold text-gray-300">Hisseler</h3>
-              <span className="text-xs text-gray-400">Toplam {stocks.length}</span>
+              <span className="text-xs text-gray-400">Toplam {Math.min(stocks.length, 10)}</span>
             </div>
 
             {/* Mobile cards */}
             <div className="grid gap-3 xl:hidden">
-              {stocks.map((s) => (
+              {stocks.slice(0, 10).map((s) => (
                 <div key={s.id} className="border border-gray-200 dark:border-gray-700 rounded-lg p-3 bg-white dark:bg-gray-800">
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-3">
@@ -98,7 +98,7 @@ export default function MarketTabs({ stocks, cryptos, onBuy, onSell }: MarketTab
                   </tr>
                 </thead>
                 <tbody className="bg-gray-800 divide-y divide-gray-200 dark:divide-gray-800">
-                  {stocks.map((s) => (
+                  {stocks.slice(0, 10).map((s) => (
                     <tr key={s.id} className="hover:bg-gray-700">
                       <td className="px-4 xl:px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center gap-3">

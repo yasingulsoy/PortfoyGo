@@ -39,7 +39,7 @@ export interface CachedMarketData {
   expires_at: Date;
 }
 
-const CACHE_DURATION_HOURS = 2;
+const CACHE_DURATION_HOURS = 1; // 1 saat (10 hisse olduğu için daha kısa süre yeterli)
 
 export class MarketCacheService {
   // Cache'den veri al

@@ -16,7 +16,7 @@ const SYMBOLS: Record<string, string> = {
 const symbolList = Object.keys(SYMBOLS);
 
 let lastCache: { data: MarketData; ts: number } | null = null;
-const CACHE_MS = 20_000; // 20 saniye
+const CACHE_MS = 10_000; // 10 saniye (10 hisse olduğu için daha hızlı güncelleme)
 
 export async function GET() {
   const now = Date.now();
