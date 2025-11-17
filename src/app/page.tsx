@@ -150,9 +150,6 @@ export default function Home() {
           <h1 className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent mb-2">
             {user ? `Hoş geldin, ${user.username}!` : 'Sanal Yatırım Platformu'}
           </h1>
-          <p className="text-gray-600 dark:text-gray-300 text-lg">
-            {user ? 'Piyasa verilerini takip edin ve yatırım kararlarınızı alın' : 'Gerçek zamanlı piyasa verileri ile sanal yatırım yapın'}
-          </p>
           {!user && (
             <div className="mt-4 flex gap-3">
               <Link
@@ -376,6 +373,28 @@ export default function Home() {
                   <span className="text-sm text-gray-600 dark:text-gray-400">Toplam Hisse</span>
                   <span className="font-medium text-gray-900 dark:text-white">{stocks.length}</span>
                 </div>
+                {stocks.length < 50 && (
+                  <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3 mb-3">
+                    <p className="text-xs text-yellow-800 dark:text-yellow-200 mb-2">
+                      ⚠️ Az sayıda hisse senedi görüntüleniyor. Cache güncelleniyor...
+                    </p>
+                    <button
+                      onClick={async () => {
+                        try {
+                          const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/api';
+                          await fetch(`${API_BASE_URL}/stocks/refresh-cache`, { method: 'POST' });
+                          // Sayfayı yenile
+                          window.location.reload();
+                        } catch (error) {
+                          console.error('Cache refresh error:', error);
+                        }
+                      }}
+                      className="text-xs bg-yellow-600 hover:bg-yellow-700 text-white px-3 py-1 rounded transition-colors"
+                    >
+                      Cache'i Yenile
+                    </button>
+                  </div>
+                )}
                 <div className="flex justify-between items-center py-2 border-b border-gray-200 dark:border-gray-700">
                   <span className="text-sm text-gray-600 dark:text-gray-400">Toplam Kripto</span>
                   <span className="font-medium text-gray-900 dark:text-white">{cryptos.length}</span>

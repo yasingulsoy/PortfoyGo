@@ -69,19 +69,34 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
   });
 });
 
-// Cache'i başlangıçta doldur
-MarketCacheService.refreshCache().catch(err => {
+// Cache'i başlangıçta doldur (ilk yükleme - daha fazla hisse çek)
+MarketCacheService.refreshCache(true).catch(err => {
   console.error('Initial cache refresh error:', err);
 });
 
-// Her 2 saatte bir cache'i güncelle (cron: 0 */2 * * *)
-cron.schedule('0 */2 * * *', async () => {
-  console.log('⏰ Scheduled cache refresh başlatılıyor...');
+// Her 10 dakikada bir cache'i güncelle (küçük güncelleme - 100 hisse)
+// Rate limit: 60 çağrı/dakika, 100 hisse = 200 çağrı = ~3.3 dakika
+// 10 dakikada bir güncelleme güvenli
+cron.schedule('*/10 * * * *', async () => {
+  console.log('⏰ Scheduled cache refresh başlatılıyor (10 dakika)...');
   try {
-    await MarketCacheService.refreshCache();
+    // Küçük güncelleme (100 hisse)
+    await MarketCacheService.refreshCache(false);
     console.log('✅ Scheduled cache refresh tamamlandı');
   } catch (error) {
     console.error('❌ Scheduled cache refresh hatası:', error);
+  }
+});
+
+// Her 2 saatte bir tam cache refresh (200 hisse)
+cron.schedule('0 */2 * * *', async () => {
+  console.log('⏰ Full cache refresh başlatılıyor (2 saat)...');
+  try {
+    // Tam güncelleme (200 hisse)
+    await MarketCacheService.refreshCache(true);
+    console.log('✅ Full cache refresh tamamlandı');
+  } catch (error) {
+    console.error('❌ Full cache refresh hatası:', error);
   }
 });
 

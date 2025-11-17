@@ -11,7 +11,8 @@ import {
   ArrowTrendingDownIcon,
   MagnifyingGlassIcon,
   ChevronLeftIcon,
-  ChevronRightIcon
+  ChevronRightIcon,
+  ArrowPathIcon
 } from '@heroicons/react/24/outline';
 
 interface AdminStats {
@@ -55,14 +56,61 @@ export default function AdminPage() {
   const [error, setError] = useState('');
   const [page, setPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState('');
+  const [cacheRefreshing, setCacheRefreshing] = useState(false);
+  const [cacheStatus, setCacheStatus] = useState<{ stocks: number; cryptos: number } | null>(null);
   const limit = 20;
 
   useEffect(() => {
     if (!authLoading && user && user.is_admin) {
       loadStats();
       loadAllUsers();
+      loadCacheStatus();
     }
   }, [user, authLoading, page]);
+
+  const loadCacheStatus = async () => {
+    try {
+      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/api';
+      const res = await fetch(`${API_BASE_URL}/stocks/cache-status`);
+      const data = await res.json();
+      if (data.success && data.data) {
+        setCacheStatus({
+          stocks: data.data.currentStocks || data.data.stocks || 0,
+          cryptos: data.data.cryptos || 0
+        });
+      }
+    } catch (err) {
+      console.error('Cache status load error:', err);
+    }
+  };
+
+  const handleRefreshCache = async () => {
+    try {
+      setCacheRefreshing(true);
+      setError('');
+      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/api';
+      const res = await fetch(`${API_BASE_URL}/stocks/refresh-cache`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+      const data = await res.json();
+      if (data.success) {
+        setError('');
+        // Cache durumunu güncelle
+        await loadCacheStatus();
+        alert(`✅ ${data.message || 'Cache başarıyla yenilendi!'}`);
+      } else {
+        setError(data.message || 'Cache yenileme başarısız');
+      }
+    } catch (err: any) {
+      setError(err.message || 'Cache yenileme hatası');
+      console.error('Cache refresh error:', err);
+    } finally {
+      setCacheRefreshing(false);
+    }
+  };
 
   const loadStats = async () => {
     try {
@@ -170,9 +218,26 @@ export default function AdminPage() {
       {/* Header */}
       <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center h-16">
-            <ChartBarIcon className="h-8 w-8 text-purple-600 dark:text-purple-400 mr-3" />
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Admin Paneli</h1>
+          <div className="flex items-center justify-between h-16">
+            <div className="flex items-center">
+              <ChartBarIcon className="h-8 w-8 text-purple-600 dark:text-purple-400 mr-3" />
+              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Admin Paneli</h1>
+            </div>
+            <div className="flex items-center gap-4">
+              {cacheStatus && (
+                <div className="text-sm text-gray-600 dark:text-gray-400">
+                  <span className="font-medium">Cache:</span> {cacheStatus.stocks} hisse, {cacheStatus.cryptos} kripto
+                </div>
+              )}
+              <button
+                onClick={handleRefreshCache}
+                disabled={cacheRefreshing}
+                className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-400 text-white rounded-lg transition-colors font-medium"
+              >
+                <ArrowPathIcon className={`h-5 w-5 ${cacheRefreshing ? 'animate-spin' : ''}`} />
+                {cacheRefreshing ? 'Yenileniyor...' : 'Cache Yenile'}
+              </button>
+            </div>
           </div>
         </div>
       </div>
