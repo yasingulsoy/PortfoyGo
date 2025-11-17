@@ -252,7 +252,8 @@ export class FinnhubService {
   static async getPopularStocks(): Promise<StockData[]> {
     // Önce aktif hisse senetlerini çekmeyi dene
     try {
-      const activeStocks = await this.getActiveStocks('US', 100, 1000000000); // 1 milyar $ üzeri
+      // Daha düşük market cap threshold ile daha fazla hisse çekmeyi dene
+      const activeStocks = await this.getActiveStocks('US', 150, 500000000); // 500 milyon $ üzeri, 150 hisse
       if (activeStocks.length > 0) {
         // En popüler 50 tanesini döndür
         return activeStocks.slice(0, 50);
@@ -261,8 +262,15 @@ export class FinnhubService {
       console.warn('Active stocks fetch failed, falling back to hardcoded list:', error);
     }
     
-    // Fallback: Hardcoded liste
-    const popularSymbols = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'META', 'NVDA', 'NFLX', 'AMD', 'INTC'];
+    // Fallback: Genişletilmiş hardcoded liste (50+ popüler hisse senedi)
+    const popularSymbols = [
+      'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'META', 'NVDA', 'NFLX', 'AMD', 'INTC',
+      'JPM', 'V', 'JNJ', 'WMT', 'PG', 'MA', 'UNH', 'HD', 'DIS', 'BAC',
+      'XOM', 'CVX', 'ABBV', 'PFE', 'KO', 'AVGO', 'PEP', 'TMO', 'COST', 'ABT',
+      'MRK', 'ACN', 'CSCO', 'ADBE', 'CRM', 'NKE', 'TXN', 'CMCSA', 'NEE', 'LIN',
+      'PM', 'RTX', 'HON', 'QCOM', 'UPS', 'AMGN', 'LOW', 'IBM', 'SPGI', 'INTU',
+      'AMT', 'DE', 'CAT', 'GE', 'GS', 'AXP', 'BKNG', 'SBUX', 'MDT', 'ISRG'
+    ];
     
     try {
       const stockPromises = popularSymbols.map(symbol => 
