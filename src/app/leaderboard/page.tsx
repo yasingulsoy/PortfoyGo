@@ -29,7 +29,6 @@ export default function LeaderboardPage() {
     try {
       setLoading(true);
       const result = await leaderboardApi.getLeaderboard(10);
-      console.log('Leaderboard result:', result); // Debug için
       if (result.success && result.leaderboard) {
         setLeaders(result.leaderboard);
         setError('');

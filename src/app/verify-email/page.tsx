@@ -50,7 +50,8 @@ function VerifyEmailContent() {
     setError('');
 
     try {
-      const response = await fetch('http://localhost:5001/api/email/verify', {
+      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/api';
+      const response = await fetch(`${API_BASE_URL}/email/verify`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -82,7 +83,8 @@ function VerifyEmailContent() {
     setError('');
 
     try {
-      const response = await fetch('http://localhost:5001/api/email/send-verification', {
+      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/api';
+      const response = await fetch(`${API_BASE_URL}/email/send-verification`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -108,44 +110,44 @@ function VerifyEmailContent() {
 
   if (success) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-emerald-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+      <div className="min-h-screen bg-[#181a20] flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
         <div className="max-w-md w-full text-center">
-          <div className="mx-auto h-16 w-16 bg-green-100 dark:bg-green-900/20 rounded-full flex items-center justify-center mb-4">
-            <CheckCircleIcon className="h-8 w-8 text-green-600 dark:text-green-400" />
+          <div className="mx-auto h-16 w-16 bg-[#0ecb81]/10 rounded-full flex items-center justify-center mb-4 border-2 border-[#0ecb81]">
+            <CheckCircleIcon className="h-8 w-8 text-[#0ecb81]" />
           </div>
-          <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
+          <h2 className="text-3xl font-bold text-white mb-2">
             Email Doğrulandı!
           </h2>
-          <p className="text-gray-600 dark:text-gray-400 mb-6">
+          <p className="text-[#848e9c] mb-6">
             Hesabınız başarıyla aktifleştirildi. Ana sayfaya yönlendiriliyorsunuz...
           </p>
-          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-green-600 mx-auto"></div>
+          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#0ecb81] mx-auto"></div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-cyan-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-[#181a20] flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full">
         {/* Logo ve Başlık */}
         <div className="text-center mb-8">
-          <div className="mx-auto h-16 w-16 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-full flex items-center justify-center mb-4">
-            <EnvelopeIcon className="h-8 w-8 text-white" />
+          <div className="mx-auto h-16 w-16 bg-[#0ecb81]/10 rounded-full flex items-center justify-center mb-4 border-2 border-[#0ecb81]">
+            <EnvelopeIcon className="h-8 w-8 text-[#0ecb81]" />
           </div>
-          <h2 className="text-3xl font-bold text-gray-900 dark:text-white">
+          <h2 className="text-3xl font-bold text-white">
             Email Doğrulama
           </h2>
-          <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-            <strong>{email}</strong> adresine gönderilen 6 haneli kodu girin
+          <p className="mt-2 text-sm text-[#848e9c]">
+            <strong className="text-white">{email}</strong> adresine gönderilen 6 haneli kodu girin
           </p>
         </div>
 
         {/* Doğrulama Formu */}
-        <div className="bg-white dark:bg-gray-800 py-8 px-6 shadow-xl rounded-2xl border border-gray-100 dark:border-gray-700">
+        <div className="bg-[#1e2329] rounded-xl border border-[#2b3139] py-8 px-6">
           <form className="space-y-6" onSubmit={handleVerify}>
             <div>
-              <label htmlFor="code" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              <label htmlFor="code" className="block text-sm font-semibold text-white mb-3">
                 Doğrulama Kodu
               </label>
               <input
@@ -154,18 +156,18 @@ function VerifyEmailContent() {
                 type="text"
                 maxLength={6}
                 required
-                className="w-full px-4 py-3 text-center text-2xl font-mono tracking-widest border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:text-white transition-colors"
+                className="w-full px-4 py-3 text-center text-2xl font-mono tracking-widest border border-[#2b3139] rounded-xl focus:ring-2 focus:ring-[#0ecb81] focus:border-[#0ecb81] bg-[#161a1e] text-white transition-colors"
                 placeholder="123456"
                 value={code}
                 onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
               />
-              <p className="mt-2 text-xs text-gray-500 dark:text-gray-400 text-center">
+              <p className="mt-2 text-xs text-[#848e9c] text-center">
                 6 haneli sayısal kod
               </p>
             </div>
 
             {error && (
-              <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 px-4 py-3 rounded-lg text-sm flex items-center">
+              <div className="bg-[#f6465d]/10 border border-[#f6465d]/30 text-[#f6465d] px-4 py-3 rounded-xl text-sm flex items-center">
                 <XCircleIcon className="h-4 w-4 mr-2 flex-shrink-0" />
                 {error}
               </div>
@@ -174,11 +176,11 @@ function VerifyEmailContent() {
             <button
               type="submit"
               disabled={loading || code.length !== 6}
-              className="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+              className="w-full flex justify-center py-4 px-4 rounded-xl text-base font-semibold text-white bg-[#0ecb81] hover:bg-[#0bb975] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#0ecb81] disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
             >
               {loading ? (
                 <div className="flex items-center">
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
                   Doğrulanıyor...
                 </div>
               ) : (
@@ -188,18 +190,18 @@ function VerifyEmailContent() {
           </form>
 
           {/* Yeniden Gönder */}
-          <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
-            <p className="text-sm text-gray-600 dark:text-gray-400 text-center mb-4">
+          <div className="mt-6 pt-6 border-t border-[#2b3139]">
+            <p className="text-sm text-[#848e9c] text-center mb-4">
               Kodu almadınız mı?
             </p>
             <button
               onClick={handleResend}
               disabled={resendLoading || resendCooldown > 0}
-              className="w-full flex justify-center py-2 px-4 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+              className="w-full flex justify-center py-3 px-4 border border-[#2b3139] rounded-xl text-sm font-semibold text-white bg-[#2b3139] hover:bg-[#3a4149] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#0ecb81] disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
             >
               {resendLoading ? (
                 <div className="flex items-center">
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600 mr-2"></div>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
                   Gönderiliyor...
                 </div>
               ) : resendCooldown > 0 ? (
@@ -213,7 +215,7 @@ function VerifyEmailContent() {
 
         {/* Alt Bilgi */}
         <div className="mt-8 text-center">
-          <p className="text-xs text-gray-500 dark:text-gray-400">
+          <p className="text-xs text-[#848e9c]">
             Doğrulama kodu 15 dakika geçerlidir. Spam klasörünüzü kontrol etmeyi unutmayın.
           </p>
         </div>
@@ -225,8 +227,8 @@ function VerifyEmailContent() {
 export default function VerifyEmailPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-cyan-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+      <div className="min-h-screen bg-[#181a20] flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#0ecb81]"></div>
       </div>
     }>
       <VerifyEmailContent />

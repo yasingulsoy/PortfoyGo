@@ -267,11 +267,9 @@ export default function Home() {
     const loadTopLeaders = async () => {
       try {
         const result = await leaderboardApi.getLeaderboard(3);
-        console.log('Top leaders result:', result); // Debug için
         if (result.success && result.leaderboard && result.leaderboard.length > 0) {
           setTopLeaders(result.leaderboard);
         } else {
-          console.log('No leaders found or empty leaderboard');
           setTopLeaders([]);
         }
       } catch (error) {

@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { useAuth } from '@/context/AuthContext';
 
 export default function RegisterPage() {
   const [formData, setFormData] = useState({
@@ -14,6 +15,7 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const router = useRouter();
+  const { register, loading: authLoading } = useAuth();
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({
@@ -41,52 +43,54 @@ export default function RegisterPage() {
     }
 
     try {
-      const response = await fetch('http://localhost:5001/api/auth/register', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          username: formData.username,
-          email: formData.email,
-          password: formData.password
-        }),
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
+      const success = await register(formData.username, formData.email, formData.password);
+      
+      if (success) {
         // Kayıt başarılı, giriş sayfasına yönlendir
-        router.push('/login?message=Kayıt başarılı! Giriş yapabilirsiniz.');
+        router.push('/login?message=' + encodeURIComponent('Kayıt başarılı! Giriş yapabilirsiniz.'));
       } else {
-        setError(data.message || 'Kayıt başarısız');
+        setError('Kayıt başarısız. Lütfen tekrar deneyin.');
       }
-    } catch (error) {
-      setError('Sunucuya bağlanılamadı');
+    } catch (error: any) {
+      setError(error.message || 'Sunucuya bağlanılamadı');
     } finally {
       setLoading(false);
     }
   };
 
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-900 py-12 px-4 sm:px-6 lg:px-8 relative">
+  // AuthContext yüklenirken loading göster
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-[#181a20] flex items-center justify-center">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-[#0ecb81]"></div>
+          <p className="mt-4 text-[#848e9c]">Yükleniyor...</p>
+        </div>
+      </div>
+    );
+  }
 
-      <div className="max-w-md w-full space-y-8">
-        <div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-white">
+  return (
+    <div className="min-h-screen bg-[#181a20] flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-md w-full">
+        {/* Başlık */}
+        <div className="text-center mb-10">
+          <h2 className="text-4xl font-bold text-white mb-2">
             Yeni Hesap Oluşturun
           </h2>
-          <p className="mt-2 text-center text-sm text-gray-400">
+          <p className="text-[#848e9c] text-base">
             Veya{' '}
-            <Link href="/login" className="font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300">
+            <Link href="/login" className="text-[#0ecb81] hover:text-[#0bb975] hover:underline transition-colors">
               mevcut hesabınızla giriş yapın
             </Link>
           </p>
         </div>
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-          <div className="space-y-4">
+
+        {/* Form */}
+        <div className="bg-[#1e2329] rounded-xl border border-[#2b3139] py-10 px-8">
+          <form className="space-y-6" onSubmit={handleSubmit}>
             <div>
-              <label htmlFor="username" className="block text-sm font-medium text-gray-300">
+              <label htmlFor="username" className="block text-sm font-semibold text-white mb-3">
                 Kullanıcı Adı
               </label>
               <input
@@ -94,14 +98,15 @@ export default function RegisterPage() {
                 name="username"
                 type="text"
                 required
-                className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-600 placeholder-gray-500 dark:placeholder-gray-400 text-white bg-white dark:bg-gray-700 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                className="w-full px-5 py-4 border border-[#2b3139] rounded-xl focus:ring-2 focus:ring-[#0ecb81] focus:border-[#0ecb81] bg-[#161a1e] text-white placeholder-[#848e9c] transition-all duration-200"
                 placeholder="Kullanıcı adınız"
                 value={formData.username}
                 onChange={handleChange}
               />
             </div>
+
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-300">
+              <label htmlFor="email" className="block text-sm font-semibold text-white mb-3">
                 Email Adresi
               </label>
               <input
@@ -110,14 +115,15 @@ export default function RegisterPage() {
                 type="email"
                 autoComplete="email"
                 required
-                className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-600 placeholder-gray-500 dark:placeholder-gray-400 text-white bg-white dark:bg-gray-700 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                placeholder="Email adresiniz"
+                className="w-full px-5 py-4 border border-[#2b3139] rounded-xl focus:ring-2 focus:ring-[#0ecb81] focus:border-[#0ecb81] bg-[#161a1e] text-white placeholder-[#848e9c] transition-all duration-200"
+                placeholder="ornek@email.com"
                 value={formData.email}
                 onChange={handleChange}
               />
             </div>
+
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-300">
+              <label htmlFor="password" className="block text-sm font-semibold text-white mb-3">
                 Şifre
               </label>
               <input
@@ -125,14 +131,15 @@ export default function RegisterPage() {
                 name="password"
                 type="password"
                 required
-                className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-600 placeholder-gray-500 dark:placeholder-gray-400 text-white bg-white dark:bg-gray-700 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                className="w-full px-5 py-4 border border-[#2b3139] rounded-xl focus:ring-2 focus:ring-[#0ecb81] focus:border-[#0ecb81] bg-[#161a1e] text-white placeholder-[#848e9c] transition-all duration-200"
                 placeholder="Şifreniz (en az 6 karakter)"
                 value={formData.password}
                 onChange={handleChange}
               />
             </div>
+
             <div>
-              <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-300">
+              <label htmlFor="confirmPassword" className="block text-sm font-semibold text-white mb-3">
                 Şifre Tekrar
               </label>
               <input
@@ -140,30 +147,73 @@ export default function RegisterPage() {
                 name="confirmPassword"
                 type="password"
                 required
-                className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-600 placeholder-gray-500 dark:placeholder-gray-400 text-white bg-white dark:bg-gray-700 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                className="w-full px-5 py-4 border border-[#2b3139] rounded-xl focus:ring-2 focus:ring-[#0ecb81] focus:border-[#0ecb81] bg-[#161a1e] text-white placeholder-[#848e9c] transition-all duration-200"
                 placeholder="Şifrenizi tekrar girin"
                 value={formData.confirmPassword}
                 onChange={handleChange}
               />
             </div>
-          </div>
 
-          {error && (
-            <div className="text-red-600 text-sm text-center">
-              {error}
-            </div>
-          )}
+            {error && (
+              <div className="bg-[#f6465d]/10 border border-[#f6465d]/30 text-[#f6465d] px-5 py-4 rounded-xl text-sm">
+                {error}
+              </div>
+            )}
 
-          <div>
             <button
               type="submit"
               disabled={loading}
-              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full flex justify-center py-4 px-4 rounded-xl text-base font-semibold text-white bg-[#0ecb81] hover:bg-[#0bb975] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#0ecb81] disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
             >
-              {loading ? 'Hesap oluşturuluyor...' : 'Hesap Oluştur'}
+              {loading ? (
+                <div className="flex items-center">
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-3"></div>
+                  Hesap oluşturuluyor...
+                </div>
+              ) : (
+                'Hesap Oluştur'
+              )}
             </button>
+          </form>
+
+          {/* Giriş Yap Linki */}
+          <div className="mt-8">
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-[#2b3139]" />
+              </div>
+              <div className="relative flex justify-center text-sm">
+                <span className="px-3 bg-[#1e2329] text-[#848e9c]">
+                  Zaten hesabınız var mı?
+                </span>
+              </div>
+            </div>
+
+            <div className="mt-6">
+              <Link
+                href="/login"
+                className="w-full flex justify-center py-4 px-4 border border-[#2b3139] rounded-xl text-base font-semibold text-white bg-[#2b3139] hover:bg-[#3a4149] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#0ecb81] transition-all duration-200"
+              >
+                Giriş Yap
+              </Link>
+            </div>
           </div>
-        </form>
+        </div>
+
+        {/* Alt Bilgi */}
+        <div className="mt-8 text-center">
+          <p className="text-xs text-[#848e9c]">
+            Kayıt olarak{' '}
+            <Link href="/terms" className="text-[#0ecb81] hover:text-[#0bb975] hover:underline transition-colors">
+              Kullanım Şartları
+            </Link>{' '}
+            ve{' '}
+            <Link href="/privacy" className="text-[#0ecb81] hover:text-[#0bb975] hover:underline transition-colors">
+              Gizlilik Politikası
+            </Link>{' '}
+            &apos;nı kabul etmiş olursunuz.
+          </p>
+        </div>
       </div>
     </div>
   );
