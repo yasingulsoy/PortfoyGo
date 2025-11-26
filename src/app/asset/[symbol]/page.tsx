@@ -7,6 +7,7 @@ import PriceChart from '@/components/PriceChart';
 import TradeModal from '@/components/TradeModal';
 import useSWR from 'swr';
 import { Stock } from '@/types';
+import { CryptoCoin } from '@/services/crypto';
 import { useStocks, useCryptos } from '@/hooks/useMarketData';
 import { 
   ArrowUpIcon, 
@@ -46,19 +47,37 @@ export default function AssetDetailPage({ params }: { params: Promise<{ symbol: 
     }
   }, [type, symbolUpper, id, stocks, cryptos]);
 
+  const currentPriceUSD = useMemo(() => {
+    if (!currentAsset) return 0;
+    if (type === 'crypto') {
+      return (currentAsset as CryptoCoin).current_price ?? 0;
+    }
+    return (currentAsset as Stock).price ?? 0;
+  }, [currentAsset, type]);
+
   const lastPrice = useMemo(() => {
     const arr = data?.series as { time: number, value: number }[] | undefined;
-    return arr && arr.length ? arr[arr.length - 1].value : (currentAsset?.price || 0);
-  }, [data, currentAsset]);
+    return arr && arr.length ? arr[arr.length - 1].value : currentPriceUSD;
+  }, [data, currentPriceUSD]);
 
-  const priceUSD = type === 'crypto' 
-    ? (currentAsset as any)?.current_price || (lastPrice / USD_TO_TRY)
-    : (currentAsset as any)?.price || (lastPrice / USD_TO_TRY);
+  const priceUSD = lastPrice || currentPriceUSD;
   
   const priceTRY = priceUSD * USD_TO_TRY;
-  const changePercent = type === 'crypto' 
-    ? (currentAsset as any)?.price_change_percentage_24h || 0
-    : (currentAsset as any)?.changePercent || 0;
+  const changePercent = useMemo(() => {
+    if (!currentAsset) return 0;
+    if (type === 'crypto') {
+      return (currentAsset as CryptoCoin).price_change_percentage_24h ?? 0;
+    }
+    return (currentAsset as Stock).changePercent ?? 0;
+  }, [currentAsset, type]);
+
+  const volumeValue = type === 'crypto'
+    ? (currentAsset as CryptoCoin | undefined)?.total_volume ?? 0
+    : (currentAsset as Stock | undefined)?.volume ?? 0;
+
+  const marketCapValue = type === 'crypto'
+    ? (currentAsset as CryptoCoin | undefined)?.market_cap ?? 0
+    : (currentAsset as Stock | undefined)?.marketCap ?? 0;
 
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<'buy' | 'sell'>('buy');
@@ -70,8 +89,8 @@ export default function AssetDetailPage({ params }: { params: Promise<{ symbol: 
     price: priceUSD,
     change: (changePercent / 100) * priceUSD,
     changePercent,
-    volume: (currentAsset as any)?.volume || 0,
-    marketCap: (currentAsset as any)?.marketCap || 0,
+    volume: volumeValue,
+    marketCap: marketCapValue,
     previousClose: priceUSD,
     open: priceUSD,
     high: priceUSD,

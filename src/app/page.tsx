@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -36,12 +36,7 @@ export default function Home() {
   const USD_TO_TRY = 32.5;
 
   // Portföy öğelerini güncel fiyatlarla güncelle ve toplam değerleri hesapla
-  const [calculatedTotals, setCalculatedTotals] = useState({
-    totalValue: 0,
-    totalProfitLoss: 0
-  });
-
-  useEffect(() => {
+  const calculatedTotals = useMemo(() => {
     if (state.portfolioItems.length > 0 && (stocks.length > 0 || cryptos.length > 0)) {
       let totalValue = 0;
       let totalProfitLoss = 0;
@@ -78,17 +73,17 @@ export default function Home() {
         }
       });
 
-      setCalculatedTotals({
+      return {
         totalValue,
         totalProfitLoss
-      });
-    } else {
-      // Portföy boşsa state'teki değerleri kullan
-      setCalculatedTotals({
-        totalValue: state.totalValue,
-        totalProfitLoss: state.totalProfitLoss
-      });
+      };
     }
+
+    // Portföy boşsa state'teki değerleri kullan
+    return {
+      totalValue: state.totalValue,
+      totalProfitLoss: state.totalProfitLoss
+    };
   }, [state.portfolioItems, stocks, cryptos, state.totalValue, state.totalProfitLoss]);
 
   const [selectedStock, setSelectedStock] = useState<Stock | null>(null);
