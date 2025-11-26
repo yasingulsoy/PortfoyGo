@@ -59,9 +59,6 @@ export default function Navbar() {
     ...(user?.is_admin ? [{ href: '/admin', label: 'Admin', icon: Cog6ToothIcon }] : []),
   ];
 
-  console.log('📊 Navbar Component - navItems oluşturuldu:', navItems);
-  console.log('📊 user bilgisi:', user);
-
   const isActive = (href: string) => {
     if (href === '/') {
       return pathname === '/';
@@ -80,10 +77,6 @@ export default function Navbar() {
 
           {/* Desktop Navigation */}
           <nav className="hidden lg:flex items-center space-x-1 flex-1 justify-center mx-4">
-            {(() => {
-              console.log('🖥️ Desktop Menü - navItems:', navItems);
-              return null;
-            })()}
             {navItems && navItems.length > 0 ? (
               navItems.map(({ href, label, icon: Icon }) => {
                 const active = isActive(href);
@@ -225,16 +218,9 @@ export default function Navbar() {
               <div className="py-3 px-3">
                 {/* Menü Linkleri */}
                 <nav className="space-y-1">
-                  {(() => {
-                    console.log('🔍 Mobil Menü - navItems:', navItems);
-                    console.log('🔍 navItems length:', navItems?.length);
-                    console.log('🔍 user:', user);
-                    return null;
-                  })()}
                   {navItems && navItems.length > 0 ? (
                     navItems.map(({ href, label, icon: Icon }) => {
                       const active = isActive(href);
-                      console.log('🎯 Menü öğesi render ediliyor:', label, href);
                       return (
                         <Link
                           key={href}

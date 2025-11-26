@@ -95,9 +95,13 @@ export class AuthService {
       }
 
       // JWT token oluştur
+      if (!process.env.JWT_SECRET) {
+        throw new Error('JWT_SECRET is not configured');
+      }
+      
       const token = jwt.sign(
         { userId: user.id, email: user.email },
-        process.env.JWT_SECRET || 'fallback_secret',
+        process.env.JWT_SECRET,
         { expiresIn: '7d' }
       );
 
