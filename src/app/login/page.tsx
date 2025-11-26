@@ -29,7 +29,6 @@ function LoginForm() {
       // Kısa bir gecikme ile yönlendir (başarı mesajının görünmesi için)
       setTimeout(() => {
         const redirectTo = searchParams.get('redirect') || '/';
-        console.log('Redirecting to:', redirectTo);
         router.push(redirectTo);
       }, 1500);
     }

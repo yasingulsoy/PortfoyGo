@@ -118,7 +118,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         // Cookie'ye de token'ı kaydet (middleware için)
         document.cookie = `token=${data.token}; path=/; max-age=86400; SameSite=Lax`;
         
-        console.log('Login successful:', data.user);
         return { success: true };
       } else {
         const errorMessage = data.message || 'Bilinmeyen hata';
