@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 
 interface User {
   id: string;
@@ -18,7 +18,7 @@ interface User {
 interface AuthContextType {
   user: User | null;
   token: string | null;
-  login: (email: string, password: string) => Promise<boolean>;
+  login: (email: string, password: string) => Promise<{ success: boolean; message?: string }>;
   register: (username: string, email: string, password: string) => Promise<boolean>;
   logout: () => void;
   loading: boolean;
@@ -30,6 +30,23 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // Logout fonksiyonunu önce tanımla (useEffect'te kullanılacak)
+  const logout = useCallback(() => {
+    setUser(null);
+    setToken(null);
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    localStorage.removeItem('portfolio');
+    
+    // Cookie'yi de temizle
+    document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+    
+    // Logout sonrası login sayfasına yönlendir
+    if (typeof window !== 'undefined') {
+      window.location.href = '/login';
+    }
+  }, []);
 
   // Sayfa yüklendiğinde localStorage'dan kullanıcı bilgilerini yükle
   useEffect(() => {
@@ -46,7 +63,19 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setLoading(false);
   }, []);
 
-  const login = async (email: string, password: string): Promise<boolean> => {
+  // Logout event'ini dinle (backendApi'den gelen)
+  useEffect(() => {
+    const handleLogout = () => {
+      logout();
+    };
+
+    window.addEventListener('auth:logout', handleLogout);
+    return () => {
+      window.removeEventListener('auth:logout', handleLogout);
+    };
+  }, [logout]);
+
+  const login = async (email: string, password: string): Promise<{ success: boolean; message?: string }> => {
     try {
       const response = await fetch('http://localhost:5001/api/auth/login', {
         method: 'POST',
@@ -68,8 +97,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           // JSON parse edilemezse status text'i kullan
           errorMessage = response.statusText || 'Sunucu hatası';
         }
-        console.error('Login failed:', errorMessage, 'Status:', response.status);
-        return false;
+        // 401 hatası normal bir durum (yanlış şifre), console.error yerine info log
+        if (response.status === 401) {
+          console.info('Login failed:', errorMessage);
+        } else {
+          console.error('Login failed:', errorMessage, 'Status:', response.status);
+        }
+        return { success: false, message: errorMessage };
       }
 
       const data = await response.json();
@@ -84,18 +118,20 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         document.cookie = `token=${data.token}; path=/; max-age=86400; SameSite=Lax`;
         
         console.log('Login successful:', data.user);
-        return true;
+        return { success: true };
       } else {
-        console.error('Login failed:', data.message || 'Bilinmeyen hata');
-        return false;
+        const errorMessage = data.message || 'Bilinmeyen hata';
+        console.info('Login failed:', errorMessage);
+        return { success: false, message: errorMessage };
       }
     } catch (error) {
       console.error('Login error:', error);
       // Network hatası veya diğer hatalar
+      let errorMessage = 'Sunucuya bağlanılamadı. Lütfen tekrar deneyin.';
       if (error instanceof TypeError && error.message.includes('fetch')) {
-        console.error('Network error: Backend sunucusuna bağlanılamadı');
+        errorMessage = 'Backend sunucusuna bağlanılamadı. Lütfen sunucunun çalıştığından emin olun.';
       }
-      return false;
+      return { success: false, message: errorMessage };
     }
   };
 
@@ -115,16 +151,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       console.error('Register error:', error);
       return false;
     }
-  };
-
-  const logout = () => {
-    setUser(null);
-    setToken(null);
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    
-    // Cookie'yi de temizle
-    document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
   };
 
   const value = {

@@ -268,9 +268,9 @@ export const PortfolioProvider: React.FC<{ children: ReactNode }> = ({ children 
     dispatch({ type: 'SELL_STOCK', payload: { stock, quantity, price } });
   };
 
-  const updatePrices = (stocks: Stock[]) => {
+  const updatePrices = useCallback((stocks: Stock[]) => {
     dispatch({ type: 'UPDATE_PRICES', payload: stocks });
-  };
+  }, []);
 
   const resetPortfolio = () => {
     dispatch({ type: 'RESET_PORTFOLIO' });
@@ -339,8 +339,17 @@ export const PortfolioProvider: React.FC<{ children: ReactNode }> = ({ children 
     const checkAndRefresh = async () => {
       const token = localStorage.getItem('token');
       if (token && !isInitialized) {
-        await refreshPortfolio();
-        setIsInitialized(true);
+        try {
+          await refreshPortfolio();
+        } catch (error) {
+          // Token geçersizse veya başka bir hata varsa
+          // isInitialized'ı true yap ki tekrar denemesin
+          // (backendApi zaten logout yapacak ve yönlendirecek)
+          console.error('Portfolio refresh failed:', error);
+        } finally {
+          // Her durumda initialized olarak işaretle
+          setIsInitialized(true);
+        }
       } else if (!token) {
         setIsInitialized(true);
       }

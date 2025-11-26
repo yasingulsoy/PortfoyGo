@@ -30,6 +30,7 @@ export default function Home() {
   // Önceki fiyatları takip et (hisse senetleri ve kripto paralar için)
   const prevStockPricesRef = useRef<Map<string, number>>(new Map());
   const prevCryptoPricesRef = useRef<Map<string, number>>(new Map());
+  const prevPortfolioPricesRef = useRef<Map<string, number>>(new Map());
   const [priceAnimations, setPriceAnimations] = useState<Map<string, 'up' | 'down' | null>>(new Map());
 
   // USD-TRY dönüşüm oranı
@@ -101,7 +102,10 @@ export default function Home() {
   // Giriş kontrolü - giriş yapılmamışsa login sayfasına yönlendir
   useEffect(() => {
     if (!loading && !user) {
-      router.push('/login');
+      // Eğer zaten login sayfasındaysak yönlendirme yapma
+      if (window.location.pathname !== '/login' && window.location.pathname !== '/register') {
+        router.push('/login');
+      }
     }
   }, [user, loading, router]);
 
@@ -199,31 +203,64 @@ export default function Home() {
   // Kullanıcı yüklendiğinde portföyü yenile
   useEffect(() => {
     if (user && !loading) {
-      refreshPortfolio();
+      refreshPortfolio().catch((error) => {
+        // Hata durumunda sessizce logla (backendApi zaten logout yapacak)
+        console.error('Portfolio refresh error:', error);
+      });
     }
   }, [user, loading, refreshPortfolio]);
 
+  const portfolioSymbolsKey = useMemo(() => {
+    if (state.portfolioItems.length === 0) return '';
+    return state.portfolioItems
+      .map(item => item.symbol.toUpperCase())
+      .sort()
+      .join('|');
+  }, [state.portfolioItems]);
+
   // Stocks ve cryptos verileri değiştiğinde portföy fiyatlarını güncelle
   useEffect(() => {
-    if (state.portfolioItems.length > 0 && (stocks.length > 0 || cryptos.length > 0)) {
+    if (!portfolioSymbolsKey || (stocks.length === 0 && cryptos.length === 0)) {
+      return;
+    }
+
+    const portfolioSymbolsSet = new Set(
+      portfolioSymbolsKey.split('|').filter(Boolean)
+    );
+
+    if (portfolioSymbolsSet.size === 0) {
+      return;
+    }
+
+    if (stocks.length > 0 || cryptos.length > 0) {
       // Stocks ve cryptos'u birleştirip Stock formatına çevir
       const allAssets: Stock[] = [
         ...stocks,
         ...cryptos.map(c => toStockFromCrypto(c))
       ];
       
-      // Sadece portföyde olan varlıkları güncelle
+      // Sadece portföyde olan varlıkları filtrele
       const portfolioAssets = allAssets.filter(asset => 
-        state.portfolioItems.some(item => 
-          item.symbol.toUpperCase() === asset.symbol.toUpperCase()
-        )
+        portfolioSymbolsSet.has(asset.symbol.toUpperCase())
       );
       
-      if (portfolioAssets.length > 0) {
+      // Fiyatlar gerçekten değişti mi kontrol et
+      const hasPriceChanged = portfolioAssets.some(asset => {
+        const prevPrice = prevPortfolioPricesRef.current.get(asset.symbol.toUpperCase());
+        const currentPrice = asset.price;
+        const changed = prevPrice === undefined || prevPrice !== currentPrice;
+        if (changed) {
+          prevPortfolioPricesRef.current.set(asset.symbol.toUpperCase(), currentPrice);
+        }
+        return changed;
+      });
+      
+      // Sadece fiyat değiştiyse güncelle
+      if (hasPriceChanged && portfolioAssets.length > 0) {
         updatePrices(portfolioAssets);
       }
     }
-  }, [stocks, cryptos, state.portfolioItems, updatePrices, toStockFromCrypto]);
+  }, [stocks, cryptos, portfolioSymbolsKey, updatePrices, toStockFromCrypto]);
 
   // Liderlik verilerini yükle
   useEffect(() => {
@@ -289,8 +326,8 @@ export default function Home() {
     setSelectedStock(null);
   };
 
-  // Loading durumunda veya kullanıcı yoksa loading göster
-  if (loading || !user) {
+  // Loading durumunda loading göster
+  if (loading) {
     return (
       <div className="min-h-screen bg-[#181a20] flex items-center justify-center">
         <div className="text-center">
@@ -299,6 +336,11 @@ export default function Home() {
         </div>
       </div>
     );
+  }
+
+  // Kullanıcı yoksa null döndür (useEffect zaten yönlendirecek)
+  if (!user) {
+    return null;
   }
 
   return (

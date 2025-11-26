@@ -1,7 +1,6 @@
 'use client';
 
 import Link from 'next/link';
-import Image from 'next/image';
 import { useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { Bars3Icon, XMarkIcon, HomeIcon, BriefcaseIcon, ClockIcon, TrophyIcon, BellIcon, Cog6ToothIcon, UserIcon } from '@heroicons/react/24/outline';
@@ -31,17 +30,6 @@ export default function Navbar() {
     <header className="bg-[#181a20] border-b border-[#2b3139] sticky top-0 z-50 backdrop-blur-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
-          {/* Logo */}
-          <Link href="/" className="flex items-center space-x-2 sm:space-x-3 hover:opacity-80 transition-opacity">
-            <Image
-              src="/PortfoyGo.png"
-              alt="PortfoyGo Logo"
-              width={140}
-              height={50}
-              className="object-contain h-8 sm:h-10 brightness-0 invert"
-              priority
-            />
-          </Link>
 
           {/* Desktop Navigation */}
           <nav className="hidden lg:flex items-center space-x-1">

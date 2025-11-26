@@ -61,10 +61,15 @@ export default function AdminPage() {
   const limit = 20;
 
   useEffect(() => {
-    if (!authLoading && user && user.is_admin) {
-      loadStats();
-      loadAllUsers();
-      loadCacheStatus();
+    if (!authLoading) {
+      if (user && user.is_admin) {
+        loadStats();
+        loadAllUsers();
+        loadCacheStatus();
+      } else {
+        // Admin değilse loading'i false yap
+        setLoading(false);
+      }
     }
   }, [user, authLoading, page]);
 
@@ -186,53 +191,73 @@ export default function AdminPage() {
 
   const totalPages = Math.ceil(totalUsers / limit);
 
-  if (authLoading || loading) {
+  // Loading durumu
+  if (authLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-indigo-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 flex items-center justify-center">
+      <div className="min-h-screen bg-[#181a20] flex items-center justify-center">
         <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
-          <p className="mt-4 text-gray-600 dark:text-gray-400">Yükleniyor...</p>
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-[#0ecb81]"></div>
+          <p className="mt-4 text-[#848e9c]">Yükleniyor...</p>
         </div>
       </div>
     );
   }
 
+  // Kullanıcı yoksa null döndür
   if (!user) {
     return null;
   }
 
-  // Admin kontrolü
+  // Admin kontrolü - admin değilse erişim reddedildi mesajı göster
   if (!user.is_admin) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-indigo-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 flex items-center justify-center">
+      <div className="min-h-screen bg-[#181a20] flex items-center justify-center">
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-red-600 dark:text-red-400 mb-4">Erişim Reddedildi</h1>
-          <p className="text-gray-600 dark:text-gray-400">Bu sayfaya erişmek için admin yetkisi gereklidir.</p>
+          <h1 className="text-2xl font-bold text-[#f6465d] mb-4">Erişim Reddedildi</h1>
+          <p className="text-[#848e9c] mb-6">Bu sayfaya erişmek için admin yetkisi gereklidir.</p>
+          <a
+            href="/"
+            className="inline-block px-6 py-3 bg-[#0ecb81] hover:bg-[#0bb975] text-white rounded-lg transition-all font-semibold"
+          >
+            Ana Sayfaya Dön
+          </a>
+        </div>
+      </div>
+    );
+  }
+
+  // Admin ise ve hala loading varsa göster
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#181a20] flex items-center justify-center">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-[#0ecb81]"></div>
+          <p className="mt-4 text-[#848e9c]">Yükleniyor...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-indigo-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
+    <div className="min-h-screen bg-[#181a20]">
       {/* Header */}
-      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+      <div className="bg-[#1e2329] border-b border-[#2b3139]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center">
-              <ChartBarIcon className="h-8 w-8 text-purple-600 dark:text-purple-400 mr-3" />
-              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Admin Paneli</h1>
+              <ChartBarIcon className="h-8 w-8 text-[#0ecb81] mr-3" />
+              <h1 className="text-2xl font-bold text-white">Admin Paneli</h1>
             </div>
             <div className="flex items-center gap-4">
               {cacheStatus && (
-                <div className="text-sm text-gray-600 dark:text-gray-400">
+                <div className="text-sm text-[#848e9c]">
                   <span className="font-medium">Cache:</span> {cacheStatus.stocks} hisse, {cacheStatus.cryptos} kripto
                 </div>
               )}
               <button
                 onClick={handleRefreshCache}
                 disabled={cacheRefreshing}
-                className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-400 text-white rounded-lg transition-colors font-medium"
+                className="flex items-center gap-2 px-4 py-2 bg-[#0ecb81] hover:bg-[#0bb975] disabled:bg-[#2b3139] disabled:text-[#848e9c] text-white rounded-lg transition-colors font-medium"
               >
                 <ArrowPathIcon className={`h-5 w-5 ${cacheRefreshing ? 'animate-spin' : ''}`} />
                 {cacheRefreshing ? 'Yenileniyor...' : 'Cache Yenile'}

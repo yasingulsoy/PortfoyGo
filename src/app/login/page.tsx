@@ -5,8 +5,6 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { EyeIcon, EyeSlashIcon, ShieldCheckIcon } from '@heroicons/react/24/outline';
 import { useAuth } from '@/context/AuthContext';
-import DotGrid from '@/components/DotGrid';
-import Image from 'next/image';
 
 function LoginForm() {
   const [formData, setFormData] = useState({
@@ -22,12 +20,12 @@ function LoginForm() {
   const [successMessage, setSuccessMessage] = useState('');
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { user, login } = useAuth();
+  const { user, login, loading: authLoading } = useAuth();
 
 
   // Zaten giriş yapmış kullanıcıyı yönlendir
   useEffect(() => {
-    if (user) {
+    if (!authLoading && user) {
       // Kısa bir gecikme ile yönlendir (başarı mesajının görünmesi için)
       setTimeout(() => {
         const redirectTo = searchParams.get('redirect') || '/';
@@ -35,7 +33,7 @@ function LoginForm() {
         router.push(redirectTo);
       }, 1500);
     }
-  }, [user, router, searchParams]);
+  }, [user, router, searchParams, authLoading]);
 
   // Başarı mesajını göster
   useEffect(() => {
@@ -138,9 +136,9 @@ function LoginForm() {
 
     try {
       // Sadece AuthContext'in login fonksiyonunu kullan
-      const loginSuccess = await login(sanitizedData.email, sanitizedData.password);
+      const result = await login(sanitizedData.email, sanitizedData.password);
       
-      if (loginSuccess) {
+      if (result.success) {
         // Başarılı giriş - deneme sayısını sıfırla
         setAttempts(0);
         setSuccessMessage('Giriş başarılı! Yönlendiriliyorsunuz...');
@@ -150,69 +148,60 @@ function LoginForm() {
       } else {
         // Başarısız giriş - deneme sayısını artır
         setAttempts(prev => prev + 1);
-        setError('Giriş başarısız. Email veya şifre hatalı.');
+        // Backend'den gelen spesifik hata mesajını göster
+        const errorMsg = result.message || 'Giriş başarısız. Email veya şifre hatalı.';
         
         // 3 denemeden sonra uyarı ver
         if (attempts >= 2) {
-          setError(`Giriş başarısız. Email veya şifre hatalı. (${attempts + 1}/5 deneme)`);
+          setError(`${errorMsg} (${attempts + 1}/5 deneme)`);
+        } else {
+          setError(errorMsg);
         }
       }
-    } catch {
+    } catch (error) {
       setAttempts(prev => prev + 1);
-      setError('Sunucuya bağlanılamadı. Lütfen tekrar deneyin.');
+      setError('Beklenmeyen bir hata oluştu. Lütfen tekrar deneyin.');
+      console.error('Login catch error:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 relative">
-      {/* DotGrid Arka Plan */}
-      <div style={{ width: '100%', height: '100%', position: 'absolute', top: 0, left: 0 }}>
-        <DotGrid
-          dotSize={2}
-          gap={15}
-          baseColor="#5227FF"
-          activeColor="#5227FF"
-          proximity={120}
-          shockRadius={250}
-          shockStrength={5}
-          resistance={750}
-          returnDuration={1.5}
-        />
+  // AuthContext yüklenirken loading göster
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-[#181a20] flex items-center justify-center">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-[#0ecb81]"></div>
+          <p className="mt-4 text-[#848e9c]">Yükleniyor...</p>
+        </div>
       </div>
+    );
+  }
 
-      <div className="max-w-md w-full relative z-10">
-        {/* Logo ve Başlık */}
+  return (
+    <div className="min-h-screen bg-[#181a20] flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-md w-full">
+        {/* Başlık */}
         <div className="text-center mb-10">
-          <div className="mx-auto mb-6 flex justify-center">
-            <Image
-              src="/PortfoyGo.png"
-              alt="PortfoyGo Logo"
-              width={180}
-              height={80}
-              className="object-contain"
-              priority
-            />
-          </div>
           <h2 className="text-4xl font-bold text-white mb-2">
             Hoş Geldiniz
           </h2>
-          <p className="text-gray-300 text-base">
+          <p className="text-[#848e9c] text-base">
             Hesabınıza giriş yapın ve yatırım yolculuğunuza başlayın
           </p>
         </div>
 
         {/* Başarı Mesajı */}
         {successMessage && (
-          <div className="mb-6 bg-green-500/20 backdrop-blur-sm border border-green-400/30 text-green-300 px-5 py-4 rounded-xl text-sm text-center shadow-lg">
+          <div className="mb-6 bg-[#0ecb81]/10 border border-[#0ecb81]/30 text-[#0ecb81] px-5 py-4 rounded-xl text-sm text-center">
             {successMessage}
           </div>
         )}
 
         {/* Güvenlik Uyarısı */}
         {attempts > 0 && attempts < 5 && (
-          <div className="mb-6 bg-yellow-500/20 backdrop-blur-sm border border-yellow-400/30 text-yellow-300 px-5 py-4 rounded-xl text-sm text-center shadow-lg">
+          <div className="mb-6 bg-[#f0b90b]/10 border border-[#f0b90b]/30 text-[#f0b90b] px-5 py-4 rounded-xl text-sm text-center">
             <div className="flex items-center justify-center">
               <ShieldCheckIcon className="h-5 w-5 mr-2" />
               Güvenlik: {attempts}/5 deneme hakkınız kaldı
@@ -221,7 +210,7 @@ function LoginForm() {
         )}
 
         {/* Giriş Formu */}
-        <div className="bg-white/10 dark:bg-gray-800/90 backdrop-blur-xl py-10 px-8 shadow-2xl rounded-3xl border border-white/20 dark:border-gray-700">
+        <div className="bg-[#1e2329] rounded-xl border border-[#2b3139] py-10 px-8">
           <form className="space-y-6" onSubmit={handleSubmit}>
             <div>
               <label htmlFor="email" className="block text-sm font-semibold text-white mb-3">
@@ -233,7 +222,7 @@ function LoginForm() {
                 type="email"
                 autoComplete="email"
                 required
-                className="w-full px-5 py-4 border border-white/20 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-white/10 dark:bg-gray-700/50 backdrop-blur-sm text-white placeholder-gray-400 transition-all duration-200"
+                className="w-full px-5 py-4 border border-[#2b3139] rounded-xl focus:ring-2 focus:ring-[#0ecb81] focus:border-[#0ecb81] bg-[#161a1e] text-white placeholder-[#848e9c] transition-all duration-200"
                 placeholder="ornek@email.com"
                 value={formData.email}
                 onChange={handleChange}
@@ -251,7 +240,7 @@ function LoginForm() {
                   type={showPassword ? 'text' : 'password'}
                   autoComplete="current-password"
                   required
-                  className="w-full px-5 py-4 pr-14 border border-white/20 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-white/10 dark:bg-gray-700/50 backdrop-blur-sm text-white placeholder-gray-400 transition-all duration-200"
+                  className="w-full px-5 py-4 pr-14 border border-[#2b3139] rounded-xl focus:ring-2 focus:ring-[#0ecb81] focus:border-[#0ecb81] bg-[#161a1e] text-white placeholder-[#848e9c] transition-all duration-200"
                   placeholder="Şifrenizi girin"
                   value={formData.password}
                   onChange={handleChange}
@@ -262,16 +251,16 @@ function LoginForm() {
                   onClick={() => setShowPassword(!showPassword)}
                 >
                   {showPassword ? (
-                    <EyeSlashIcon className="h-6 w-6 text-gray-400 hover:text-white transition-colors" />
+                    <EyeSlashIcon className="h-6 w-6 text-[#848e9c] hover:text-white transition-colors" />
                   ) : (
-                    <EyeIcon className="h-6 w-6 text-gray-400 hover:text-white transition-colors" />
+                    <EyeIcon className="h-6 w-6 text-[#848e9c] hover:text-white transition-colors" />
                   )}
                 </button>
               </div>
             </div>
 
             {error && (
-              <div className="bg-red-500/20 backdrop-blur-sm border border-red-400/30 text-red-300 px-5 py-4 rounded-xl text-sm shadow-lg">
+              <div className="bg-[#f6465d]/10 border border-[#f6465d]/30 text-[#f6465d] px-5 py-4 rounded-xl text-sm">
                 {error}
               </div>
             )}
@@ -279,7 +268,7 @@ function LoginForm() {
             <button
               type="submit"
               disabled={loading || isBlocked}
-              className="w-full flex justify-center py-4 px-4 border border-transparent rounded-xl shadow-lg text-base font-semibold text-white bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-600 hover:from-purple-700 hover:via-indigo-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 transform hover:scale-[1.02] active:scale-[0.98]"
+              className="w-full flex justify-center py-4 px-4 rounded-xl text-base font-semibold text-white bg-[#0ecb81] hover:bg-[#0bb975] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#0ecb81] disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
             >
               {loading ? (
                 <div className="flex items-center">
@@ -298,10 +287,10 @@ function LoginForm() {
           <div className="mt-8">
             <div className="relative">
               <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-white/20 dark:border-gray-600" />
+                <div className="w-full border-t border-[#2b3139]" />
               </div>
               <div className="relative flex justify-center text-sm">
-                <span className="px-3 bg-white/10 dark:bg-gray-800 text-gray-300 dark:text-gray-400">
+                <span className="px-3 bg-[#1e2329] text-[#848e9c]">
                   Hesabınız yok mu?
                 </span>
               </div>
@@ -310,7 +299,7 @@ function LoginForm() {
             <div className="mt-6">
               <Link
                 href="/register"
-                className="w-full flex justify-center py-4 px-4 border border-white/30 dark:border-gray-600 rounded-xl shadow-md text-base font-semibold text-white bg-white/5 dark:bg-gray-700/30 backdrop-blur-sm hover:bg-white/10 dark:hover:bg-gray-600/50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 transition-all duration-200 transform hover:scale-[1.02] active:scale-[0.98]"
+                className="w-full flex justify-center py-4 px-4 border border-[#2b3139] rounded-xl text-base font-semibold text-white bg-[#2b3139] hover:bg-[#3a4149] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#0ecb81] transition-all duration-200"
               >
                 Yeni Hesap Oluştur
               </Link>
@@ -320,13 +309,13 @@ function LoginForm() {
 
         {/* Alt Bilgi */}
         <div className="mt-8 text-center">
-          <p className="text-xs text-gray-400 dark:text-gray-500">
+          <p className="text-xs text-[#848e9c]">
             Giriş yaparak{' '}
-            <Link href="/terms" className="text-purple-400 hover:text-purple-300 hover:underline transition-colors">
+            <Link href="/terms" className="text-[#0ecb81] hover:text-[#0bb975] hover:underline transition-colors">
               Kullanım Şartları
             </Link>{' '}
             ve{' '}
-            <Link href="/privacy" className="text-purple-400 hover:text-purple-300 hover:underline transition-colors">
+            <Link href="/privacy" className="text-[#0ecb81] hover:text-[#0bb975] hover:underline transition-colors">
               Gizlilik Politikası
             </Link>{' '}
             &apos;nı kabul etmiş olursunuz.
@@ -340,8 +329,8 @@ function LoginForm() {
 export default function LoginPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white"></div>
+      <div className="min-h-screen bg-[#181a20] flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#0ecb81]"></div>
       </div>
     }>
       <LoginForm />

@@ -1,5 +1,8 @@
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/api';
 
+// Logout işleminin sadece bir kez yapılması için flag
+let isLoggingOut = false;
+
 // Token'ı localStorage'dan al
 const getToken = (): string | null => {
   if (typeof window !== 'undefined') {
@@ -26,6 +29,31 @@ const apiCall = async (endpoint: string, options: RequestInit = {}) => {
   });
 
   if (!response.ok) {
+    // 401 Unauthorized veya 403 Forbidden hatası - token geçersiz veya yetkisiz
+    if (response.status === 401 || response.status === 403) {
+      // Token'ı temizle ve kullanıcıyı logout yap (sadece bir kez)
+      if (typeof window !== 'undefined' && !isLoggingOut) {
+        const currentPath = window.location.pathname;
+        // Eğer zaten login sayfasındaysak yönlendirme yapma
+        if (currentPath !== '/login' && currentPath !== '/register') {
+          isLoggingOut = true;
+          // Tüm storage'ı temizle
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+          localStorage.removeItem('portfolio');
+          // Cookie'yi de temizle
+          document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+          // Custom event gönder ki AuthContext dinlesin
+          window.dispatchEvent(new CustomEvent('auth:logout'));
+          // Kısa bir gecikme ile yönlendir (AuthContext'in güncellenmesi için)
+          setTimeout(() => {
+            window.location.replace('/login');
+          }, 100);
+        }
+      }
+      throw new Error('Oturum süreniz doldu. Lütfen tekrar giriş yapın.');
+    }
+    
     const error = await response.json().catch(() => ({ message: 'Bir hata oluştu' }));
     throw new Error(error.message || 'API hatası');
   }
