@@ -16,12 +16,32 @@ export default function Navbar() {
   // Menü açıkken body scroll'unu engelle
   useEffect(() => {
     if (open) {
+      // Scroll pozisyonunu kaydet
+      const scrollY = window.scrollY;
+      
+      // Body'yi fixed yap ve scroll engelini koy
+      document.body.style.position = 'fixed';
+      document.body.style.top = `-${scrollY}px`;
+      document.body.style.width = '100%';
       document.body.style.overflow = 'hidden';
     } else {
-      document.body.style.overflow = 'unset';
+      // Önceki scroll pozisyonunu geri yükle
+      const scrollY = document.body.style.top;
+      document.body.style.position = '';
+      document.body.style.top = '';
+      document.body.style.width = '';
+      document.body.style.overflow = '';
+      
+      if (scrollY) {
+        window.scrollTo(0, parseInt(scrollY || '0') * -1);
+      }
     }
+    
     return () => {
-      document.body.style.overflow = 'unset';
+      document.body.style.position = '';
+      document.body.style.top = '';
+      document.body.style.width = '';
+      document.body.style.overflow = '';
     };
   }, [open]);
 
@@ -155,22 +175,24 @@ export default function Navbar() {
       </div>
 
       {/* Mobile Sidebar Menu - Modern Slide-in from Right */}
-      <>
-        {/* Overlay */}
-        {open && (
+      {open && (
+        <>
+          {/* Overlay */}
           <div
             className="fixed inset-0 bg-black/80 backdrop-blur-sm z-40 lg:hidden transition-opacity duration-300"
             onClick={() => setOpen(false)}
+            onTouchMove={(e) => e.preventDefault()}
+            style={{ touchAction: 'none' }}
           />
-        )}
 
-        {/* Sidebar - Mobil için optimize edilmiş */}
-        <div
-          className={`fixed top-0 right-0 h-full w-full max-w-sm bg-[#1e2329] border-l border-[#2b3139] z-50 lg:hidden transform transition-transform duration-300 ease-in-out shadow-2xl ${
-            open ? 'translate-x-0' : 'translate-x-full'
-          }`}
-          onClick={(e) => e.stopPropagation()}
-        >
+          {/* Sidebar - Mobil için optimize edilmiş */}
+          <div
+            className="fixed top-0 right-0 h-full w-full max-w-sm bg-[#1e2329] border-l border-[#2b3139] z-50 lg:hidden transform translate-x-0 transition-transform duration-300 ease-in-out shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+            onTouchStart={(e) => e.stopPropagation()}
+            onTouchMove={(e) => e.stopPropagation()}
+            style={{ overscrollBehavior: 'contain', touchAction: 'pan-y' }}
+          >
           <div className="flex flex-col h-full bg-[#1e2329]">
             {/* Header */}
             <div className="flex items-center justify-between p-4 sm:p-6 border-b border-[#2b3139] bg-[#181a20] flex-shrink-0">
@@ -435,7 +457,8 @@ export default function Navbar() {
             </div>
           </div>
         </div>
-      </>
+        </>
+      )}
     </header>
   );
 }
