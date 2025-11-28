@@ -17,6 +17,23 @@ import cron from 'node-cron';
 // Environment variables
 dotenv.config();
 
+// Environment variable logları (production'da da görmek için)
+console.log('═══════════════════════════════════════════════════════');
+console.log('🔧 ENVIRONMENT VARIABLES');
+console.log('═══════════════════════════════════════════════════════');
+console.log('NODE_ENV:', process.env.NODE_ENV);
+console.log('PORT:', process.env.PORT || 5001);
+console.log('DATABASE_URL:', process.env.DATABASE_URL ? '✅ Set (hidden)' : '❌ Not set');
+console.log('DB_SSL:', process.env.DB_SSL || 'false');
+console.log('DB_HOST:', process.env.DB_HOST || 'localhost');
+console.log('DB_PORT:', process.env.DB_PORT || '5432');
+console.log('DB_NAME:', process.env.DB_NAME || 'trading_platform');
+console.log('DB_USER:', process.env.DB_USER || 'postgres');
+console.log('DB_PASSWORD:', process.env.DB_PASSWORD ? '✅ Set (hidden)' : '❌ Not set');
+console.log('JWT_SECRET:', process.env.JWT_SECRET ? '✅ Set (hidden)' : '❌ Not set');
+console.log('ALLOWED_ORIGINS:', process.env.ALLOWED_ORIGINS || 'http://localhost:3000');
+console.log('═══════════════════════════════════════════════════════');
+
 const app = express();
 const PORT = process.env.PORT || 5001;
 
@@ -68,6 +85,32 @@ app.use(cors(corsOptions));
 // Tüm OPTIONS request'leri için CORS header'larını gönder
 app.options('*', cors(corsOptions));
 
+// Request logging middleware
+app.use((req, res, next) => {
+  const timestamp = new Date().toISOString();
+  const method = req.method;
+  const url = req.url;
+  const origin = req.headers.origin || 'No Origin';
+  const userAgent = req.headers['user-agent'] || 'No User-Agent';
+  
+  console.log(`\n📥 [${timestamp}] ${method} ${url}`);
+  console.log(`   Origin: ${origin}`);
+  console.log(`   User-Agent: ${userAgent.substring(0, 80)}...`);
+  
+  // Response tamamlandığında log
+  const originalSend = res.send;
+  res.send = function(body) {
+    const statusCode = res.statusCode;
+    const statusEmoji = statusCode >= 200 && statusCode < 300 ? '✅' : 
+                       statusCode >= 400 && statusCode < 500 ? '⚠️' : 
+                       statusCode >= 500 ? '❌' : 'ℹ️';
+    console.log(`📤 [${timestamp}] ${method} ${url} - ${statusEmoji} ${statusCode}`);
+    return originalSend.call(this, body);
+  };
+  
+  next();
+});
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -107,10 +150,21 @@ app.use((req, res) => {
 
 // Error handler
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
-  console.error('Error:', err);
+  const timestamp = new Date().toISOString();
+  console.error('\n❌ ERROR HANDLER');
+  console.error('═══════════════════════════════════════════════════════');
+  console.error(`Timestamp: ${timestamp}`);
+  console.error(`Method: ${req.method}`);
+  console.error(`URL: ${req.url}`);
+  console.error(`Origin: ${req.headers.origin || 'No Origin'}`);
+  console.error(`Error Message: ${err.message || 'Unknown error'}`);
+  console.error(`Error Stack:`, err.stack);
+  console.error('═══════════════════════════════════════════════════════\n');
+  
   res.status(500).json({
     success: false,
-    message: 'Sunucu hatası'
+    message: 'Sunucu hatası',
+    error: process.env.NODE_ENV === 'development' ? err.message : undefined
   });
 });
 

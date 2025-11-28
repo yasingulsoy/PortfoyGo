@@ -76,15 +76,35 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }, [logout]);
 
   const login = async (email: string, password: string): Promise<{ success: boolean; message?: string }> => {
+    const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/api';
+    const loginUrl = `${API_BASE_URL}/auth/login`;
+    const timestamp = new Date().toISOString();
+    
+    console.log('\n🔐 LOGIN ATTEMPT');
+    console.log('═══════════════════════════════════════════════════════');
+    console.log(`Timestamp: ${timestamp}`);
+    console.log(`API URL: ${loginUrl}`);
+    console.log(`Email: ${email}`);
+    console.log(`Password: ${password ? '***' : 'Not provided'}`);
+    console.log(`NEXT_PUBLIC_API_URL: ${process.env.NEXT_PUBLIC_API_URL || 'Not set'}`);
+    console.log(`Window location: ${typeof window !== 'undefined' ? window.location.origin : 'N/A'}`);
+    
     try {
-      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/api';
-      const response = await fetch(`${API_BASE_URL}/auth/login`, {
+      console.log('📤 Sending login request...');
+      const response = await fetch(loginUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'X-Requested-With': 'XMLHttpRequest', // CSRF koruması için
         },
         body: JSON.stringify({ email, password }),
+      });
+
+      console.log(`📥 Response received:`, {
+        status: response.status,
+        statusText: response.statusText,
+        ok: response.ok,
+        headers: Object.fromEntries(response.headers.entries()),
       });
 
       // Response'un başarılı olup olmadığını kontrol et
@@ -100,14 +120,21 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }
         // 401 hatası normal bir durum (yanlış şifre), console.error yerine info log
         if (response.status === 401) {
-          console.info('Login failed:', errorMessage);
+          console.warn('⚠️  Login failed (401):', errorMessage);
         } else {
-          console.error('Login failed:', errorMessage, 'Status:', response.status);
+          console.error('❌ Login failed:', errorMessage, 'Status:', response.status);
         }
+        console.log('═══════════════════════════════════════════════════════\n');
         return { success: false, message: errorMessage };
       }
 
       const data = await response.json();
+      console.log('📦 Response data:', { 
+        success: data.success, 
+        hasToken: !!data.token,
+        hasUser: !!data.user,
+        userEmail: data.user?.email,
+      });
 
       if (data.success) {
         setToken(data.token);
@@ -118,27 +145,52 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         // Cookie'ye de token'ı kaydet (middleware için)
         document.cookie = `token=${data.token}; path=/; max-age=86400; SameSite=Lax`;
         
+        console.log('✅ Login successful!');
+        console.log('═══════════════════════════════════════════════════════\n');
         return { success: true };
       } else {
         const errorMessage = data.message || 'Bilinmeyen hata';
-        console.info('Login failed:', errorMessage);
+        console.warn('⚠️  Login failed:', errorMessage);
+        console.log('═══════════════════════════════════════════════════════\n');
         return { success: false, message: errorMessage };
       }
-    } catch (error) {
-      console.error('Login error:', error);
+    } catch (error: any) {
+      console.error('\n❌ LOGIN ERROR');
+      console.error('═══════════════════════════════════════════════════════');
+      console.error('Error type:', error.name || 'Unknown');
+      console.error('Error message:', error.message || 'Unknown error');
+      console.error('Error stack:', error.stack);
+      console.error('Is TypeError:', error instanceof TypeError);
+      console.error('Is NetworkError:', error.message?.includes('fetch') || error.message?.includes('Failed to fetch'));
+      console.error('═══════════════════════════════════════════════════════\n');
+      
       // Network hatası veya diğer hatalar
       let errorMessage = 'Sunucuya bağlanılamadı. Lütfen tekrar deneyin.';
-      if (error instanceof TypeError && error.message.includes('fetch')) {
+      if (error instanceof TypeError && (error.message.includes('fetch') || error.message.includes('Failed to fetch'))) {
         errorMessage = 'Backend sunucusuna bağlanılamadı. Lütfen sunucunun çalıştığından emin olun.';
+      } else if (error.message?.includes('CORS')) {
+        errorMessage = 'CORS hatası: Sunucu isteği reddetti. Lütfen yöneticiye başvurun.';
       }
       return { success: false, message: errorMessage };
     }
   };
 
   const register = async (username: string, email: string, password: string): Promise<boolean> => {
+    const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/api';
+    const registerUrl = `${API_BASE_URL}/auth/register`;
+    const timestamp = new Date().toISOString();
+    
+    console.log('\n📝 REGISTER ATTEMPT');
+    console.log('═══════════════════════════════════════════════════════');
+    console.log(`Timestamp: ${timestamp}`);
+    console.log(`API URL: ${registerUrl}`);
+    console.log(`Username: ${username}`);
+    console.log(`Email: ${email}`);
+    console.log(`Password: ${password ? '***' : 'Not provided'}`);
+    
     try {
-      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/api';
-      const response = await fetch(`${API_BASE_URL}/auth/register`, {
+      console.log('📤 Sending register request...');
+      const response = await fetch(registerUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -146,10 +198,30 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         body: JSON.stringify({ username, email, password }),
       });
 
+      console.log(`📥 Response received:`, {
+        status: response.status,
+        statusText: response.statusText,
+        ok: response.ok,
+      });
+
       const data = await response.json();
+      console.log('📦 Response data:', { success: data.success, message: data.message });
+      
+      if (data.success) {
+        console.log('✅ Register successful!');
+      } else {
+        console.warn('⚠️  Register failed:', data.message);
+      }
+      console.log('═══════════════════════════════════════════════════════\n');
+      
       return data.success;
-    } catch (error) {
-      console.error('Register error:', error);
+    } catch (error: any) {
+      console.error('\n❌ REGISTER ERROR');
+      console.error('═══════════════════════════════════════════════════════');
+      console.error('Error type:', error.name || 'Unknown');
+      console.error('Error message:', error.message || 'Unknown error');
+      console.error('Error stack:', error.stack);
+      console.error('═══════════════════════════════════════════════════════\n');
       return false;
     }
   };
