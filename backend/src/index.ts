@@ -20,27 +20,61 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 5001;
 
-// Middleware
-const allowedOrigins = (process.env.ALLOWED_ORIGINS
-  ? process.env.ALLOWED_ORIGINS.split(',')
-  : ['http://localhost:3000'])
+// Middleware - CORS yapılandırması
+const allowedOriginsRaw = process.env.ALLOWED_ORIGINS || 'http://localhost:3000';
+// Her satırı ayrı ayrı işle ve temizle
+const allowedOrigins = allowedOriginsRaw
+  .split(',')
   .map(origin => origin.trim())
-  .filter(Boolean);
+  .filter(origin => {
+    // Geçerli URL formatını kontrol et
+    const isValid = origin.startsWith('http://') || origin.startsWith('https://');
+    if (!isValid && origin) {
+      console.warn(`⚠️  Geçersiz origin formatı: ${origin}`);
+    }
+    return isValid && origin.length > 0;
+  });
+
+// Debug için log (production'da da görmek için)
+console.log('🌐 CORS Allowed Origins:', allowedOrigins);
+console.log('🔧 NODE_ENV:', process.env.NODE_ENV);
 
 const corsOptions: cors.CorsOptions = {
-  origin: allowedOrigins,
+  origin: (origin, callback) => {
+    // Origin yoksa (same-origin request veya mobile app) izin ver
+    if (!origin) {
+      return callback(null, true);
+    }
+    
+    // Allowed origins listesinde var mı kontrol et
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      console.warn(`❌ CORS blocked origin: ${origin}`);
+      console.log('📋 Allowed origins:', allowedOrigins);
+      callback(new Error('CORS policy tarafından izin verilmedi'));
+    }
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
   exposedHeaders: ['Content-Length', 'Content-Type'],
   maxAge: 86400,
+  preflightContinue: false,
+  optionsSuccessStatus: 204,
 };
 
 app.use(cors(corsOptions));
+// Tüm OPTIONS request'leri için CORS header'larını gönder
 app.options('*', cors(corsOptions));
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Root endpoint (plain OK text)
+app.get('/', (_req, res) => {
+  res.type('text/plain').send('OK');
+});
 
 // Routes
 app.use('/api/auth', authRoutes);
