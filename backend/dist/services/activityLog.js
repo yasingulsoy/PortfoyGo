@@ -24,7 +24,7 @@ class ActivityLogService {
             user_id: log.user_id,
             activity_type: log.activity_type,
             description: log.description,
-            metadata: log.metadata ? JSON.parse(log.metadata) : null,
+            metadata: log.metadata ? (typeof log.metadata === 'string' ? JSON.parse(log.metadata) : log.metadata) : null,
             ip_address: log.ip_address,
             user_agent: log.user_agent,
             created_at: log.created_at
