@@ -48,7 +48,18 @@ const allowedOrigins = allowedOriginsRaw
     const isValid = origin.startsWith('http://') || origin.startsWith('https://');
     if (!isValid && origin) {
       console.warn(`⚠️  Geçersiz origin formatı: ${origin}`);
+      return false;
     }
+    
+    // Production'da localhost'u filtrele (güvenlik için)
+    if (process.env.NODE_ENV === 'production') {
+      const isLocalhost = origin.includes('localhost') || origin.includes('127.0.0.1') || origin.includes('0.0.0.0');
+      if (isLocalhost) {
+        console.warn(`⚠️  Production'da localhost origin filtrelendi: ${origin}`);
+        return false;
+      }
+    }
+    
     return isValid && origin.length > 0;
   });
 

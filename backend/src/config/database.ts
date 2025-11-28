@@ -29,15 +29,27 @@ if (dbPassword !== undefined && dbPassword !== null && dbPassword.trim() !== '')
 // Eğer DATABASE_URL varsa onu kullan
 if (process.env.DATABASE_URL) {
   console.log('Using DATABASE_URL connection string');
-  poolConfig.connectionString = process.env.DATABASE_URL;
+  
+  // DATABASE_URL'den SSL parametrelerini kaldır (database SSL desteklemiyorsa)
+  let connectionString = process.env.DATABASE_URL;
+  
+  // SSL parametrelerini kaldır
+  connectionString = connectionString.replace(/[?&]sslmode=[^&]*/gi, '');
+  connectionString = connectionString.replace(/[?&]ssl=[^&]*/gi, '');
+  
+  poolConfig.connectionString = connectionString;
+  
   // connectionString kullanıldığında diğer parametreleri kaldır
   delete poolConfig.host;
   delete poolConfig.port;
   delete poolConfig.database;
   delete poolConfig.user;
   delete poolConfig.password;
-  poolConfig.ssl = shouldUseSSL ? { rejectUnauthorized: false } : false;
-  console.log('SSL Configuration:', poolConfig.ssl ? 'Enabled' : 'Disabled');
+  
+  // SSL'i kapat (database SSL desteklemiyor)
+  poolConfig.ssl = false;
+  console.log('SSL Configuration: Disabled (database does not support SSL)');
+  console.log('Connection String (sanitized):', connectionString.replace(/:[^:@]+@/, ':****@'));
 } else {
   console.log('Using individual database parameters');
   console.log('Host:', poolConfig.host);
