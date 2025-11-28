@@ -29,8 +29,9 @@ function LoginForm() {
       // Kısa bir gecikme ile yönlendir (başarı mesajının görünmesi için)
       setTimeout(() => {
         const redirectTo = searchParams.get('redirect') || '/';
-        router.push(redirectTo);
-      }, 1500);
+        // window.location.href kullan (router.push bazen çalışmıyor)
+        window.location.href = redirectTo;
+      }, 1000);
     }
   }, [user, router, searchParams, authLoading]);
 
@@ -142,8 +143,12 @@ function LoginForm() {
         setAttempts(0);
         setSuccessMessage('Giriş başarılı! Yönlendiriliyorsunuz...');
         
-        // user state'i güncellendiğinde useEffect ile yönlendirme yapılacak
-        // Burada ekstra yönlendirme yapmaya gerek yok
+        // Yönlendirmeyi hemen yap (useEffect'e güvenmek yerine)
+        const redirectTo = searchParams.get('redirect') || '/';
+        setTimeout(() => {
+          // window.location.href kullan (router.push bazen çalışmıyor)
+          window.location.href = redirectTo;
+        }, 1000);
       } else {
         // Başarısız giriş - deneme sayısını artır
         setAttempts(prev => prev + 1);
