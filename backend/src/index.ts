@@ -39,14 +39,19 @@ const PORT = process.env.PORT || 5001;
 
 // Middleware - CORS yapılandırması
 const allowedOriginsRaw = process.env.ALLOWED_ORIGINS || 'http://localhost:3000';
-// Her satırı ayrı ayrı işle ve temizle
+// Her satırı ayrı ayrı işle ve temizle - yeni satırları da temizle
 const allowedOrigins = allowedOriginsRaw
-  .split(',')
+  .split(/[,\n\r]+/) // Virgül, yeni satır veya carriage return ile ayır
   .map(origin => origin.trim())
   .filter(origin => {
+    // Boş string'leri filtrele
+    if (!origin || origin.length === 0) {
+      return false;
+    }
+    
     // Geçerli URL formatını kontrol et
     const isValid = origin.startsWith('http://') || origin.startsWith('https://');
-    if (!isValid && origin) {
+    if (!isValid) {
       console.warn(`⚠️  Geçersiz origin formatı: ${origin}`);
       return false;
     }
@@ -60,7 +65,7 @@ const allowedOrigins = allowedOriginsRaw
       }
     }
     
-    return isValid && origin.length > 0;
+    return true;
   });
 
 // Debug için log (production'da da görmek için)
@@ -125,12 +130,13 @@ app.use((req, res, next) => {
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Root endpoint - API bilgileri
-app.get('/', (_req, res) => {
+// Root endpoint - API bilgileri (hem / hem de /api için)
+const rootHandler = (_req: express.Request, res: express.Response) => {
   res.json({
     success: true,
     message: 'Trading Platform API',
     version: '1.0.0',
+    status: 'online',
     endpoints: {
       health: '/api/health',
       auth: '/api/auth',
@@ -142,7 +148,10 @@ app.get('/', (_req, res) => {
     },
     timestamp: new Date().toISOString()
   });
-});
+};
+
+app.get('/', rootHandler);
+app.get('/api', rootHandler);
 
 // Routes
 app.use('/api/auth', authRoutes);
