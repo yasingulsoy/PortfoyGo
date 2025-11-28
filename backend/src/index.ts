@@ -39,10 +39,12 @@ const PORT = process.env.PORT || 5001;
 
 // Middleware - CORS yapılandırması
 const allowedOriginsRaw = process.env.ALLOWED_ORIGINS || 'http://localhost:3000';
+console.log('📝 Raw ALLOWED_ORIGINS:', allowedOriginsRaw);
+
 // Her satırı ayrı ayrı işle ve temizle - yeni satırları da temizle
 const allowedOrigins = allowedOriginsRaw
   .split(/[,\n\r]+/) // Virgül, yeni satır veya carriage return ile ayır
-  .map(origin => origin.trim())
+  .map(origin => origin.trim()) // Boşlukları temizle
   .filter(origin => {
     // Boş string'leri filtrele
     if (!origin || origin.length === 0) {
@@ -69,23 +71,31 @@ const allowedOrigins = allowedOriginsRaw
   });
 
 // Debug için log (production'da da görmek için)
-console.log('🌐 CORS Allowed Origins:', allowedOrigins);
+console.log('🌐 CORS Allowed Origins (parsed):', JSON.stringify(allowedOrigins, null, 2));
 console.log('🔧 NODE_ENV:', process.env.NODE_ENV);
+console.log('📊 Total allowed origins:', allowedOrigins.length);
 
 const corsOptions: cors.CorsOptions = {
   origin: (origin, callback) => {
     // Origin yoksa (same-origin request veya mobile app) izin ver
     if (!origin) {
+      console.log('✅ CORS: No origin header (same-origin or mobile app) - allowing');
       return callback(null, true);
     }
     
+    console.log(`🔍 CORS check - Request origin: ${origin}`);
+    console.log(`📋 Checking against ${allowedOrigins.length} allowed origins`);
+    
     // Allowed origins listesinde var mı kontrol et
     if (allowedOrigins.includes(origin)) {
+      console.log(`✅ CORS: Origin ${origin} is allowed`);
       callback(null, true);
     } else {
       console.warn(`❌ CORS blocked origin: ${origin}`);
       console.log('📋 Allowed origins:', allowedOrigins);
-      callback(new Error('CORS policy tarafından izin verilmedi'));
+      console.log('🔍 Exact match check:', allowedOrigins.map(o => `"${o}"`).join(', '));
+      // CORS hatası için false döndür (null yerine)
+      callback(null, false);
     }
   },
   credentials: true,
@@ -97,8 +107,10 @@ const corsOptions: cors.CorsOptions = {
   optionsSuccessStatus: 204,
 };
 
+// CORS middleware'i tüm route'lardan önce uygula
 app.use(cors(corsOptions));
-// Tüm OPTIONS request'leri için CORS header'larını gönder
+
+// Preflight request'ler için ek güvence - CORS middleware zaten handle ediyor ama ekstra kontrol
 app.options('*', cors(corsOptions));
 
 // Request logging middleware
