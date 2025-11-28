@@ -50,13 +50,25 @@ export default function Navbar() {
     setOpen(false);
   }, [pathname]);
 
+  // Debug: Admin kontrolü
+  useEffect(() => {
+    if (user) {
+      console.log('👤 User object:', { 
+        id: user.id, 
+        username: user.username, 
+        is_admin: user.is_admin,
+        is_admin_type: typeof user.is_admin 
+      });
+    }
+  }, [user]);
+
   const navItems = [
     { href: '/', label: 'Ana Sayfa', icon: HomeIcon },
     { href: '/portfolio', label: 'Portföyüm', icon: BriefcaseIcon },
     { href: '/transactions', label: 'İşlemler', icon: ClockIcon },
     { href: '/leaderboard', label: 'Liderlik', icon: TrophyIcon },
     { href: '/profile', label: 'Profilim', icon: UserIcon },
-    ...(user?.is_admin ? [{ href: '/admin', label: 'Admin', icon: Cog6ToothIcon }] : []),
+    ...(user && (user.is_admin === true || user.is_admin === 'true') ? [{ href: '/admin', label: 'Admin', icon: Cog6ToothIcon }] : []),
   ];
 
   const isActive = (href: string) => {
