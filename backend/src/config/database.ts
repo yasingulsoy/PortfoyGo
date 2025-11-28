@@ -3,13 +3,15 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
+const shouldUseSSL = process.env.DB_SSL === 'true';
+
 // Pool yapılandırması - connectionString yerine ayrı parametreler kullan
 const poolConfig: any = {
   host: process.env.DB_HOST || 'localhost',
   port: parseInt(process.env.DB_PORT || '5432', 10),
   database: process.env.DB_NAME || 'trading_platform',
   user: process.env.DB_USER || 'postgres',
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+  ssl: shouldUseSSL ? { rejectUnauthorized: false } : false,
 };
 
 // Şifre varsa ekle (undefined, null veya boş string değilse)
@@ -27,6 +29,7 @@ if (process.env.DATABASE_URL) {
   delete poolConfig.database;
   delete poolConfig.user;
   delete poolConfig.password;
+  poolConfig.ssl = shouldUseSSL ? { rejectUnauthorized: false } : false;
 }
 
 const pool = new Pool(poolConfig);
