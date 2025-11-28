@@ -97,6 +97,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           'Content-Type': 'application/json',
           'X-Requested-With': 'XMLHttpRequest', // CSRF koruması için
         },
+        credentials: 'include', // CORS için gerekli (backend'de credentials: true var)
         body: JSON.stringify({ email, password }),
       });
 
