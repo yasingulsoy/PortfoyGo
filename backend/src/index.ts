@@ -125,9 +125,23 @@ app.use((req, res, next) => {
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Root endpoint (plain OK text)
+// Root endpoint - API bilgileri
 app.get('/', (_req, res) => {
-  res.type('text/plain').send('OK');
+  res.json({
+    success: true,
+    message: 'Trading Platform API',
+    version: '1.0.0',
+    endpoints: {
+      health: '/api/health',
+      auth: '/api/auth',
+      portfolio: '/api/portfolio',
+      stocks: '/api/stocks',
+      transactions: '/api/transactions',
+      leaderboard: '/api/leaderboard',
+      cryptos: '/api/cryptos'
+    },
+    timestamp: new Date().toISOString()
+  });
 });
 
 // Routes
@@ -153,9 +167,37 @@ app.get('/api/health', (req, res) => {
 
 // 404 handler
 app.use((req, res) => {
+  const timestamp = new Date().toISOString();
+  console.warn('\n⚠️  404 - ENDPOINT NOT FOUND');
+  console.warn('═══════════════════════════════════════════════════════');
+  console.warn(`Timestamp: ${timestamp}`);
+  console.warn(`Method: ${req.method}`);
+  console.warn(`URL: ${req.url}`);
+  console.warn(`Path: ${req.path}`);
+  console.warn(`Original URL: ${req.originalUrl}`);
+  console.warn(`Base URL: ${req.baseUrl}`);
+  console.warn(`Headers:`, {
+    host: req.headers.host,
+    origin: req.headers.origin,
+    'user-agent': req.headers['user-agent']?.substring(0, 80)
+  });
+  console.warn('═══════════════════════════════════════════════════════\n');
+  
   res.status(404).json({
     success: false,
-    message: 'Endpoint bulunamadı'
+    message: 'Endpoint bulunamadı',
+    path: req.path,
+    method: req.method,
+    availableEndpoints: [
+      'GET /',
+      'GET /api/health',
+      'POST /api/auth/login',
+      'POST /api/auth/register',
+      'GET /api/portfolio',
+      'GET /api/stocks',
+      'GET /api/cryptos',
+      'GET /api/leaderboard'
+    ]
   });
 });
 
