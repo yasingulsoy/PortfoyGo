@@ -95,8 +95,8 @@ class MarketCacheService {
                     item.price,
                     item.change,
                     item.change_percent,
-                    Math.floor(item.volume || 0), // BIGINT için tam sayıya çevir
-                    Math.floor(item.market_cap || 0), // BIGINT için tam sayıya çevir
+                    Math.floor(Number(item.volume) || 0), // BIGINT için tam sayıya çevir
+                    Math.floor(Number(item.market_cap) || 0), // BIGINT için tam sayıya çevir
                     item.previous_close || null,
                     item.open_price || null,
                     item.high_price || null,
@@ -144,7 +144,7 @@ class MarketCacheService {
                         change: stock.change,
                         change_percent: stock.changePercent,
                         volume: 0,
-                        market_cap: stock.marketCap || 0,
+                        market_cap: Math.floor(Number(stock.marketCap) || 0), // BIGINT için tam sayıya çevir
                         previous_close: stock.previousClose,
                         open_price: stock.open,
                         high_price: stock.high,
@@ -164,7 +164,7 @@ class MarketCacheService {
                         change: stock.change,
                         change_percent: stock.changePercent,
                         volume: 0,
-                        market_cap: stock.marketCap || 0,
+                        market_cap: Math.floor(Number(stock.marketCap) || 0), // BIGINT için tam sayıya çevir
                         previous_close: stock.previousClose,
                         open_price: stock.open,
                         high_price: stock.high,
@@ -192,7 +192,7 @@ class MarketCacheService {
                         change: stock.change,
                         change_percent: stock.changePercent,
                         volume: 0,
-                        market_cap: stock.marketCap || 0,
+                        market_cap: Math.floor(Number(stock.marketCap) || 0), // BIGINT için tam sayıya çevir
                         previous_close: stock.previousClose,
                         open_price: stock.open,
                         high_price: stock.high,
@@ -217,8 +217,8 @@ class MarketCacheService {
                     price: crypto.current_price,
                     change: crypto.current_price * (crypto.price_change_percentage_24h || 0) / 100,
                     change_percent: crypto.price_change_percentage_24h || 0,
-                    volume: crypto.total_volume || 0,
-                    market_cap: crypto.market_cap || 0,
+                    volume: Math.floor(Number(crypto.total_volume) || 0), // BIGINT için tam sayıya çevir
+                    market_cap: Math.floor(Number(crypto.market_cap) || 0), // BIGINT için tam sayıya çevir
                     metadata: {
                         id: crypto.id,
                         image: crypto.image
