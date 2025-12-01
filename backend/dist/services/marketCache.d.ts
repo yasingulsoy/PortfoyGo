@@ -19,7 +19,7 @@ export interface CachedMarketData {
 export declare class MarketCacheService {
     static getFromCache(assetType: 'stock' | 'crypto', symbol?: string): Promise<CachedMarketData[]>;
     static saveToCache(data: Omit<CachedMarketData, 'id' | 'cached_at' | 'expires_at'>[]): Promise<void>;
-    static refreshCache(): Promise<void>;
+    static refreshCache(forceFullRefresh?: boolean): Promise<void>;
     static getCacheStatus(): Promise<{
         stocks: number;
         cryptos: number;

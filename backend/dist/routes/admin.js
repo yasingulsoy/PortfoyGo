@@ -6,15 +6,10 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
 const admin_1 = require("../services/admin");
 const auth_1 = require("../middleware/auth");
+const admin_2 = require("../middleware/admin");
 const router = express_1.default.Router();
-// Basit admin kontrolü (gerçek uygulamada daha güvenli olmalı)
-const isAdmin = (req, res, next) => {
-    // Şimdilik tüm authenticated kullanıcılara izin ver
-    // Gerçek uygulamada admin rolü kontrolü yapılmalı
-    next();
-};
 // Admin istatistikleri
-router.get('/stats', auth_1.authenticateToken, isAdmin, async (req, res) => {
+router.get('/stats', auth_1.authenticateToken, admin_2.isAdmin, async (req, res) => {
     try {
         const result = await admin_1.AdminService.getStats();
         if (result.success) {
@@ -36,7 +31,7 @@ router.get('/stats', auth_1.authenticateToken, isAdmin, async (req, res) => {
     }
 });
 // Tüm kullanıcıları getir
-router.get('/users', auth_1.authenticateToken, isAdmin, async (req, res) => {
+router.get('/users', auth_1.authenticateToken, admin_2.isAdmin, async (req, res) => {
     try {
         const limit = parseInt(req.query.limit) || 50;
         const offset = parseInt(req.query.offset) || 0;
@@ -53,6 +48,36 @@ router.get('/users', auth_1.authenticateToken, isAdmin, async (req, res) => {
     }
     catch (error) {
         console.error('Admin users route error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Sunucu hatası'
+        });
+    }
+});
+// Kullanıcıyı banla/unban yap
+router.post('/users/:userId/ban', auth_1.authenticateToken, admin_2.isAdmin, async (req, res) => {
+    try {
+        const { userId } = req.params;
+        const { ban } = req.body; // true = ban, false = unban
+        if (typeof ban !== 'boolean') {
+            return res.status(400).json({
+                success: false,
+                message: 'Ban değeri boolean olmalı'
+            });
+        }
+        const result = await admin_1.AdminService.toggleUserBan(userId, ban);
+        if (result.success) {
+            res.json(result);
+        }
+        else {
+            res.status(500).json({
+                success: false,
+                message: result.message || 'İşlem başarısız'
+            });
+        }
+    }
+    catch (error) {
+        console.error('Admin ban route error:', error);
         res.status(500).json({
             success: false,
             message: 'Sunucu hatası'

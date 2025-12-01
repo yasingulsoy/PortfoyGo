@@ -23,9 +23,10 @@ class LeaderboardService {
             ELSE 0
           END as profit_loss_percent
          FROM users
-         WHERE email_verified = true
+         WHERE email_verified = true AND (is_banned IS NULL OR is_banned = false)
          ORDER BY (balance + portfolio_value) DESC
          LIMIT $1`, [limit]);
+            console.log(`Leaderboard query returned ${result.rows.length} users`);
             const leaderboard = result.rows.map((row, index) => ({
                 rank: index + 1,
                 username: row.username,
@@ -47,11 +48,16 @@ class LeaderboardService {
     // Tüm kullanıcıların rank'lerini güncelle
     static async updateRanks() {
         try {
+            // Önce tüm kullanıcıların rank'ini NULL yap (banlı ve doğrulanmamış kullanıcılar için)
+            await database_1.default.query(`UPDATE users 
+         SET rank = NULL 
+         WHERE email_verified = false OR (is_banned IS NOT NULL AND is_banned = true)`);
             // Toplam değere göre sırala (bakiye + portföy değeri)
             const result = await database_1.default.query(`SELECT id, (balance + portfolio_value) as total_value
          FROM users
-         WHERE email_verified = true
+         WHERE email_verified = true AND (is_banned IS NULL OR is_banned = false)
          ORDER BY (balance + portfolio_value) DESC`);
+            console.log(`Updating ranks for ${result.rows.length} users`);
             // Rank'leri güncelle
             for (let i = 0; i < result.rows.length; i++) {
                 await database_1.default.query('UPDATE users SET rank = $1 WHERE id = $2', [i + 1, result.rows[i].id]);

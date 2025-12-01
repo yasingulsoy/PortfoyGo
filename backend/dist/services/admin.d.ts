@@ -16,5 +16,9 @@ export declare class AdminService {
         users?: User[];
         total?: number;
     }>;
+    static toggleUserBan(userId: string, ban: boolean): Promise<{
+        success: boolean;
+        message?: string;
+    }>;
 }
 //# sourceMappingURL=admin.d.ts.map

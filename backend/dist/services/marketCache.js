@@ -23,7 +23,7 @@ async function fetchTopCryptos(limit = 25) {
         return [];
     }
 }
-const CACHE_DURATION_HOURS = 2;
+const CACHE_DURATION_HOURS = 1; // 1 saat (10 hisse olduğu için daha kısa süre yeterli)
 class MarketCacheService {
     // Cache'den veri al
     static async getFromCache(assetType, symbol) {
@@ -95,8 +95,8 @@ class MarketCacheService {
                     item.price,
                     item.change,
                     item.change_percent,
-                    item.volume,
-                    item.market_cap,
+                    Math.floor(item.volume || 0), // BIGINT için tam sayıya çevir
+                    Math.floor(item.market_cap || 0), // BIGINT için tam sayıya çevir
                     item.previous_close || null,
                     item.open_price || null,
                     item.high_price || null,
@@ -118,33 +118,94 @@ class MarketCacheService {
         }
     }
     // Cache'i güncelle (API'den çekip kaydet)
-    static async refreshCache() {
+    // Şu anlık sadece 10 hisseye odaklanıyoruz
+    static async refreshCache(forceFullRefresh = false) {
         try {
             console.log('🔄 Market data cache güncelleniyor...');
+            // Cache durumunu kontrol et
+            const cacheStatus = await this.getCacheStatus();
+            const hasEnoughCache = cacheStatus.stocks >= 10;
+            // Şu anlık sadece 10 hisseye odaklanıyoruz
+            const maxStocks = 10;
+            const minMarketCap = 100000000; // 100 milyon $ üzeri (daha kaliteli hisse senetleri)
             // Hisse senetlerini çek ve cache'e kaydet
             try {
-                const stocks = await (0, finnhub_1.getPopularStocks)();
-                const stockCacheData = stocks.map(stock => ({
-                    asset_type: 'stock',
-                    symbol: stock.symbol,
-                    name: stock.name,
-                    price: stock.price,
-                    change: stock.change,
-                    change_percent: stock.changePercent,
-                    volume: 0, // StockData'da volume yok, default 0
-                    market_cap: stock.marketCap || 0,
-                    previous_close: stock.previousClose,
-                    open_price: stock.open,
-                    high_price: stock.high,
-                    low_price: stock.low,
-                    metadata: {
-                        symbol: stock.symbol // id yerine symbol kullan
-                    }
-                }));
-                await this.saveToCache(stockCacheData);
+                console.log(`📊 ${maxStocks} adet aktif hisse senedi çekiliyor...`);
+                const stocks = await (0, finnhub_1.getActiveStocks)('US', maxStocks, minMarketCap);
+                if (stocks.length === 0) {
+                    console.warn('⚠️  Aktif hisse senetleri çekilemedi, popüler hisse senetlerine dönülüyor...');
+                    // Fallback: Popüler hisse senetleri
+                    const popularStocks = await (0, finnhub_1.getPopularStocks)();
+                    const stockCacheData = popularStocks.map(stock => ({
+                        asset_type: 'stock',
+                        symbol: stock.symbol,
+                        name: stock.name,
+                        price: stock.price,
+                        change: stock.change,
+                        change_percent: stock.changePercent,
+                        volume: 0,
+                        market_cap: stock.marketCap || 0,
+                        previous_close: stock.previousClose,
+                        open_price: stock.open,
+                        high_price: stock.high,
+                        low_price: stock.low,
+                        metadata: {
+                            symbol: stock.symbol
+                        }
+                    }));
+                    await this.saveToCache(stockCacheData);
+                }
+                else {
+                    const stockCacheData = stocks.map(stock => ({
+                        asset_type: 'stock',
+                        symbol: stock.symbol,
+                        name: stock.name,
+                        price: stock.price,
+                        change: stock.change,
+                        change_percent: stock.changePercent,
+                        volume: 0,
+                        market_cap: stock.marketCap || 0,
+                        previous_close: stock.previousClose,
+                        open_price: stock.open,
+                        high_price: stock.high,
+                        low_price: stock.low,
+                        metadata: {
+                            symbol: stock.symbol,
+                            logo: stock.logo,
+                            industry: stock.industry
+                        }
+                    }));
+                    await this.saveToCache(stockCacheData);
+                    console.log(`✅ ${stocks.length} adet hisse senedi cache'e kaydedildi`);
+                }
             }
             catch (error) {
                 console.error('Stocks cache refresh error:', error);
+                // Hata durumunda popüler hisse senetlerine dön
+                try {
+                    const popularStocks = await (0, finnhub_1.getPopularStocks)();
+                    const stockCacheData = popularStocks.map(stock => ({
+                        asset_type: 'stock',
+                        symbol: stock.symbol,
+                        name: stock.name,
+                        price: stock.price,
+                        change: stock.change,
+                        change_percent: stock.changePercent,
+                        volume: 0,
+                        market_cap: stock.marketCap || 0,
+                        previous_close: stock.previousClose,
+                        open_price: stock.open,
+                        high_price: stock.high,
+                        low_price: stock.low,
+                        metadata: {
+                            symbol: stock.symbol
+                        }
+                    }));
+                    await this.saveToCache(stockCacheData);
+                }
+                catch (fallbackError) {
+                    console.error('Fallback stocks cache error:', fallbackError);
+                }
             }
             // Kripto paraları çek ve cache'e kaydet
             try {
