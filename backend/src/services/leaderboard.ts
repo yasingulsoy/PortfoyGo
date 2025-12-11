@@ -16,7 +16,7 @@ export class LeaderboardService {
       // Önce tüm kullanıcıların rank'lerini güncelle
       await this.updateRanks();
 
-      // Liderlik tablosunu getir
+      // Liderlik tablosunu getir - kar/zarar yüzdesine göre sırala
       const result = await pool.query(
         `SELECT 
           username,
@@ -25,12 +25,19 @@ export class LeaderboardService {
           total_profit_loss,
           rank,
           CASE 
-            WHEN portfolio_value > 0 THEN (total_profit_loss / (portfolio_value - total_profit_loss)) * 100
+            WHEN (portfolio_value - total_profit_loss) > 0 THEN (total_profit_loss / (portfolio_value - total_profit_loss)) * 100
+            WHEN portfolio_value = 0 AND total_profit_loss = 0 THEN 0
             ELSE 0
           END as profit_loss_percent
          FROM users
          WHERE email_verified = true AND (is_banned IS NULL OR is_banned = false)
-         ORDER BY (balance + portfolio_value) DESC
+         ORDER BY 
+           CASE 
+             WHEN (portfolio_value - total_profit_loss) > 0 THEN (total_profit_loss / (portfolio_value - total_profit_loss)) * 100
+             WHEN portfolio_value = 0 AND total_profit_loss = 0 THEN 0
+             ELSE 0
+           END DESC,
+           total_profit_loss DESC
          LIMIT $1`,
         [limit]
       );
@@ -66,12 +73,24 @@ export class LeaderboardService {
          WHERE email_verified = false OR (is_banned IS NOT NULL AND is_banned = true)`
       );
 
-      // Toplam değere göre sırala (bakiye + portföy değeri)
+      // Kar/zarar yüzdesine göre sırala
       const result = await pool.query(
-        `SELECT id, (balance + portfolio_value) as total_value
+        `SELECT id, 
+          CASE 
+            WHEN (portfolio_value - total_profit_loss) > 0 THEN (total_profit_loss / (portfolio_value - total_profit_loss)) * 100
+            WHEN portfolio_value = 0 AND total_profit_loss = 0 THEN 0
+            ELSE 0
+          END as profit_loss_percent,
+          total_profit_loss
          FROM users
          WHERE email_verified = true AND (is_banned IS NULL OR is_banned = false)
-         ORDER BY (balance + portfolio_value) DESC`
+         ORDER BY 
+           CASE 
+             WHEN (portfolio_value - total_profit_loss) > 0 THEN (total_profit_loss / (portfolio_value - total_profit_loss)) * 100
+             WHEN portfolio_value = 0 AND total_profit_loss = 0 THEN 0
+             ELSE 0
+           END DESC,
+           total_profit_loss DESC`
       );
 
       console.log(`Updating ranks for ${result.rows.length} users`);
