@@ -20,7 +20,6 @@ export default function StopLossModal({ isOpen, onClose, portfolioItem, currentP
 
   useEffect(() => {
     if (isOpen && portfolioItem) {
-      // Varsayılan olarak mevcut fiyatın %5 altını öner
       const suggestedPrice = currentPrice * 0.95;
       setTriggerPrice(suggestedPrice.toFixed(2));
       setQuantity(portfolioItem.quantity.toString());
@@ -60,11 +59,8 @@ export default function StopLossModal({ isOpen, onClose, portfolioItem, currentP
     setError('');
 
     try {
-      // Portfolio item ID'yi bulmak için backend'e istek gerekebilir
-      // Şimdilik sembol ve asset_type ile bulacağız
-      // Not: Backend'de portfolio_item_id gerekiyor, bu yüzden önce portfolio'yu çekmemiz gerekebilir
       const result = await stopLossApi.create({
-        portfolio_item_id: portfolioItem.id || '', // Bu ID'nin doğru gelmesi gerekiyor
+        portfolio_item_id: portfolioItem.id || '',
         trigger_price: triggerPriceNum,
         quantity: quantityNum
       });
@@ -112,7 +108,6 @@ export default function StopLossModal({ isOpen, onClose, portfolioItem, currentP
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-5">
-          {/* Current Price Display */}
           <div className="bg-[#161a1e] rounded-xl p-5 border border-[#2b3139]">
             <div className="text-[#848e9c] text-sm mb-2">Güncel Fiyat</div>
             <div className="text-3xl font-bold text-white">
@@ -120,7 +115,6 @@ export default function StopLossModal({ isOpen, onClose, portfolioItem, currentP
             </div>
           </div>
 
-          {/* Trigger Price Input */}
           <div className="space-y-2">
             <label className="text-sm text-[#848e9c] font-medium">
               Tetikleme Fiyatı (₺)
@@ -141,7 +135,6 @@ export default function StopLossModal({ isOpen, onClose, portfolioItem, currentP
             )}
           </div>
 
-          {/* Loss Percentage */}
           {triggerPriceNum > 0 && (
             <div className="bg-[#f6465d]/10 rounded-xl p-4 border border-[#f6465d]/30">
               <div className="text-sm text-[#848e9c] mb-1">Potansiyel Zarar</div>
@@ -154,7 +147,6 @@ export default function StopLossModal({ isOpen, onClose, portfolioItem, currentP
             </div>
           )}
 
-          {/* Quantity Input */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <label className="text-sm text-[#848e9c] font-medium">
@@ -175,7 +167,6 @@ export default function StopLossModal({ isOpen, onClose, portfolioItem, currentP
             />
           </div>
 
-          {/* Quick Percentage Buttons */}
           <div className="grid grid-cols-4 gap-2">
             {[0.25, 0.5, 0.75, 1].map((percent) => (
               <button
@@ -189,14 +180,12 @@ export default function StopLossModal({ isOpen, onClose, portfolioItem, currentP
             ))}
           </div>
 
-          {/* Error Message */}
           {error && (
             <div className="bg-[#f6465d]/10 border border-[#f6465d]/30 rounded-xl p-3">
               <p className="text-sm text-[#f6465d] font-medium">{error}</p>
             </div>
           )}
 
-          {/* Action Button */}
           <button
             type="submit"
             disabled={loading || !triggerPrice || !quantity}

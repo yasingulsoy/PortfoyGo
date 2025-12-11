@@ -20,14 +20,13 @@ export default function TradeModal({ isOpen, onClose, stock, type }: TradeModalP
   const [commission, setCommission] = useState(0);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [inputMode, setInputMode] = useState<'quantity' | 'amount'>('quantity'); // Miktar veya Tutar modu
-  const [amountInput, setAmountInput] = useState<string>(''); // Tutar girişi için ayrı state
+  const [inputMode, setInputMode] = useState<'quantity' | 'amount'>('quantity');
+  const [amountInput, setAmountInput] = useState<string>('');
   
-  const { state, buyStock, sellStock, refreshPortfolio } = usePortfolio();
+  const { state, refreshPortfolio } = usePortfolio();
   const { user } = useAuth();
 
-  // USD-TRY dönüşüm oranı (gerçek uygulamada API'den alınır)
-  const USD_TO_TRY = 32.5; // Yaklaşık kur
+  const USD_TO_TRY = 32.5;
 
   // Modal açıldığında quantity'yi sıfırla
   useEffect(() => {
@@ -60,7 +59,6 @@ export default function TradeModal({ isOpen, onClose, stock, type }: TradeModalP
     if (!isNaN(value) && value > 0) {
       setQuantity(value);
     } else if (e.target.value === '' || e.target.value === '.') {
-      // Kullanıcı yazarken geçici olarak boş veya sadece nokta olabilir
       setQuantity(0);
     }
   };
@@ -117,7 +115,6 @@ export default function TradeModal({ isOpen, onClose, stock, type }: TradeModalP
     
     if (!stock || !user) return;
 
-    // Miktar validasyonu
     if (!quantity || quantity <= 0) {
       setError('Miktar 0\'dan büyük olmalıdır!');
       return;
@@ -150,7 +147,6 @@ export default function TradeModal({ isOpen, onClose, stock, type }: TradeModalP
         });
 
         if (result.success) {
-          // Portföyü yenile
           await refreshPortfolio();
           onClose();
           setQuantity(1);
@@ -171,14 +167,12 @@ export default function TradeModal({ isOpen, onClose, stock, type }: TradeModalP
           return;
         }
 
-        // Backend'e satış isteği gönder
         const result = await transactionApi.sell({
           symbol: stock.symbol,
           quantity: quantity
         });
 
         if (result.success) {
-          // Portföyü yenile
           await refreshPortfolio();
           onClose();
           setQuantity(1);
@@ -196,7 +190,6 @@ export default function TradeModal({ isOpen, onClose, stock, type }: TradeModalP
 
   if (!isOpen || !stock) return null;
 
-  // Kripto için USD-TRY dönüşümü
   const isCrypto = stock.symbol.length <= 4;
   const priceInTRY = isCrypto ? stock.price * USD_TO_TRY : stock.price;
   const totalCost = type === 'buy' ? totalAmount + commission : totalAmount - commission;
@@ -254,7 +247,6 @@ export default function TradeModal({ isOpen, onClose, stock, type }: TradeModalP
             </div>
           </div>
 
-          {/* Input Mode Toggle */}
           <div className="flex gap-2 bg-[#161a1e] rounded-lg p-1 border border-[#2b3139]">
             <button
               type="button"
@@ -280,7 +272,6 @@ export default function TradeModal({ isOpen, onClose, stock, type }: TradeModalP
             </button>
           </div>
 
-          {/* Quantity/Amount Input */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <label className="text-sm text-[#848e9c] font-medium">
@@ -321,7 +312,6 @@ export default function TradeModal({ isOpen, onClose, stock, type }: TradeModalP
             </div>
           </div>
 
-          {/* Quick Percentage Buttons */}
           <div className="grid grid-cols-4 gap-2">
             {[0.25, 0.5, 0.75, 1].map((percent) => (
               <button
@@ -335,7 +325,6 @@ export default function TradeModal({ isOpen, onClose, stock, type }: TradeModalP
             ))}
           </div>
 
-          {/* Transaction Summary */}
           <div className="bg-[#161a1e] rounded-xl p-4 border border-[#2b3139] space-y-3">
             <div className="flex justify-between items-center">
               <span className="text-sm text-[#848e9c]">Toplam Tutar</span>
@@ -363,7 +352,6 @@ export default function TradeModal({ isOpen, onClose, stock, type }: TradeModalP
             </div>
           </div>
 
-          {/* Balance Info */}
           {type === 'buy' && (
             <div className="bg-[#0b1529]/50 rounded-xl p-4 border border-[#0ecb81]/20">
               <div className="flex justify-between items-center mb-2">
@@ -394,14 +382,12 @@ export default function TradeModal({ isOpen, onClose, stock, type }: TradeModalP
             </div>
           )}
 
-          {/* Error Message */}
           {error && (
             <div className="bg-[#f6465d]/10 border border-[#f6465d]/30 rounded-xl p-3">
               <p className="text-sm text-[#f6465d] font-medium">{error}</p>
             </div>
           )}
 
-          {/* Action Button - Binance Style */}
           <button
             type="submit"
             disabled={loading || quantity <= 0}
