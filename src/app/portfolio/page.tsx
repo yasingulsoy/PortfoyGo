@@ -15,8 +15,10 @@ import {
 } from '@heroicons/react/24/outline';
 import { usePortfolio } from '@/context/PortfolioContext';
 import { useAuth } from '@/context/AuthContext';
-import { PortfolioItem, Transaction } from '@/types';
+import { PortfolioItem, Transaction, Stock } from '@/types';
 import { useStocks, useCryptos } from '@/hooks/useMarketData';
+import TradeModal from '@/components/TradeModal';
+import StopLossModal from '@/components/StopLossModal';
 
 const USD_TO_TRY = 32.5;
 
@@ -29,6 +31,11 @@ export default function PortfolioPage() {
   const [activeTab, setActiveTab] = useState<'overview' | 'transactions'>('overview');
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [portfolioWithPrices, setPortfolioWithPrices] = useState<PortfolioItem[]>([]);
+  const [selectedStock, setSelectedStock] = useState<Stock | null>(null);
+  const [tradeType, setTradeType] = useState<'buy' | 'sell'>('buy');
+  const [isTradeModalOpen, setIsTradeModalOpen] = useState(false);
+  const [selectedPortfolioItem, setSelectedPortfolioItem] = useState<PortfolioItem | null>(null);
+  const [isStopLossModalOpen, setIsStopLossModalOpen] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -235,13 +242,71 @@ export default function PortfolioPage() {
 
           <div className="p-6">
             {activeTab === 'overview' ? (
-              <PortfolioOverview portfolioItems={portfolioWithPrices} />
+              <PortfolioOverview 
+                portfolioItems={portfolioWithPrices} 
+                stocks={stocks}
+                cryptos={cryptos}
+                onTrade={(item, type) => {
+                  const asset = stocks.find(s => s.symbol.toUpperCase() === item.symbol.toUpperCase()) ||
+                               cryptos.find(c => c.symbol.toUpperCase() === item.symbol.toUpperCase());
+                  if (asset) {
+                    const stockLike: Stock = {
+                      id: asset.id || item.symbol,
+                      symbol: item.symbol,
+                      name: item.name,
+                      price: 'current_price' in asset ? asset.current_price : asset.price,
+                      change: 0,
+                      changePercent: 0,
+                      volume: 'total_volume' in asset ? asset.total_volume : asset.volume || 0,
+                      marketCap: 'market_cap' in asset ? asset.market_cap : asset.marketCap || 0,
+                      previousClose: item.currentPrice / USD_TO_TRY,
+                      open: item.currentPrice / USD_TO_TRY,
+                      high: item.currentPrice / USD_TO_TRY,
+                      low: item.currentPrice / USD_TO_TRY,
+                    };
+                    setSelectedStock(stockLike);
+                    setTradeType(type);
+                    setIsTradeModalOpen(true);
+                  }
+                }}
+                onStopLoss={(item) => {
+                  setSelectedPortfolioItem(item);
+                  setIsStopLossModalOpen(true);
+                }}
+              />
             ) : (
               <TransactionHistory transactions={state.transactions} />
             )}
           </div>
         </div>
       </div>
+
+      {/* Trade Modal */}
+      {selectedStock && (
+        <TradeModal
+          isOpen={isTradeModalOpen}
+          onClose={() => {
+            setIsTradeModalOpen(false);
+            setSelectedStock(null);
+          }}
+          stock={selectedStock}
+          type={tradeType}
+        />
+      )}
+
+      {/* Stop-Loss Modal */}
+      {selectedPortfolioItem && (
+        <StopLossModal
+          isOpen={isStopLossModalOpen}
+          onClose={() => {
+            setIsStopLossModalOpen(false);
+            setSelectedPortfolioItem(null);
+            refreshPortfolio();
+          }}
+          portfolioItem={selectedPortfolioItem}
+          currentPrice={selectedPortfolioItem.currentPrice}
+        />
+      )}
     </div>
   );
 }
@@ -250,7 +315,19 @@ interface ExtendedPortfolioItem extends PortfolioItem {
   currentPriceUSD?: number;
 }
 
-function PortfolioOverview({ portfolioItems }: { portfolioItems: ExtendedPortfolioItem[] }) {
+function PortfolioOverview({ 
+  portfolioItems, 
+  stocks, 
+  cryptos,
+  onTrade,
+  onStopLoss
+}: { 
+  portfolioItems: ExtendedPortfolioItem[];
+  stocks: Stock[];
+  cryptos: any[];
+  onTrade: (item: ExtendedPortfolioItem, type: 'buy' | 'sell') => void;
+  onStopLoss: (item: ExtendedPortfolioItem) => void;
+}) {
   if (portfolioItems.length === 0) {
     return (
       <div className="text-center py-12">
@@ -286,6 +363,9 @@ function PortfolioOverview({ portfolioItems }: { portfolioItems: ExtendedPortfol
             </th>
             <th className="px-6 py-3 text-right text-xs font-semibold text-[#848e9c] uppercase tracking-wider">
               Değişim %
+            </th>
+            <th className="px-6 py-3 text-center text-xs font-semibold text-[#848e9c] uppercase tracking-wider">
+              İşlemler
             </th>
           </tr>
         </thead>
@@ -353,6 +433,29 @@ function PortfolioOverview({ portfolioItems }: { portfolioItems: ExtendedPortfol
                     {isProfit ? <ArrowUpIcon className="h-3 w-3 mr-1" /> : <ArrowDownIcon className="h-3 w-3 mr-1" />}
                     {isProfit ? '+' : ''}{priceChange.toFixed(2)}%
                   </span>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-center">
+                  <div className="flex items-center justify-center gap-2">
+                    <button
+                      onClick={() => onTrade(item, 'buy')}
+                      className="px-3 py-1.5 bg-[#0ecb81] hover:bg-[#0bb975] text-white text-xs font-semibold rounded-lg transition-colors"
+                    >
+                      Al
+                    </button>
+                    <button
+                      onClick={() => onTrade(item, 'sell')}
+                      className="px-3 py-1.5 bg-[#f6465d] hover:bg-[#e03e54] text-white text-xs font-semibold rounded-lg transition-colors"
+                    >
+                      Sat
+                    </button>
+                    <button
+                      onClick={() => onStopLoss(item)}
+                      className="px-3 py-1.5 bg-[#f6465d]/20 hover:bg-[#f6465d]/30 text-[#f6465d] text-xs font-semibold rounded-lg transition-colors border border-[#f6465d]/30"
+                      title="Stop-Loss Emri Oluştur"
+                    >
+                      SL
+                    </button>
+                  </div>
                 </td>
               </tr>
             );

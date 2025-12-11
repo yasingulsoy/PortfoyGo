@@ -205,8 +205,8 @@ export default function TradeModal({ isOpen, onClose, stock, type }: TradeModalP
     : 0;
 
   return (
-    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-start justify-center z-50 p-4 overflow-y-auto pt-8 sm:pt-16">
-      <div className="bg-[#1e2329] rounded-2xl shadow-2xl max-w-lg w-full border border-[#2b3139] overflow-hidden mt-0 max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
+      <div className="bg-[#1e2329] rounded-2xl shadow-2xl max-w-lg w-full border border-[#2b3139] overflow-hidden max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className={`flex items-center justify-between px-6 py-4 border-b border-[#2b3139] ${
           type === 'buy' ? 'bg-[#0b1529]' : 'bg-[#1a0f1a]'

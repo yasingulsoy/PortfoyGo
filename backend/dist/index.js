@@ -16,7 +16,9 @@ const admin_1 = __importDefault(require("./routes/admin"));
 const badges_1 = __importDefault(require("./routes/badges"));
 const activityLogs_1 = __importDefault(require("./routes/activityLogs"));
 const cryptos_1 = __importDefault(require("./routes/cryptos"));
+const stopLoss_1 = __importDefault(require("./routes/stopLoss"));
 const marketCache_1 = require("./services/marketCache");
+const stopLoss_2 = require("./services/stopLoss");
 const node_cron_1 = __importDefault(require("node-cron"));
 // Environment variables
 dotenv_1.default.config();
@@ -160,6 +162,7 @@ app.use('/api/admin', admin_1.default);
 app.use('/api/badges', badges_1.default);
 app.use('/api/activity-logs', activityLogs_1.default);
 app.use('/api/cryptos', cryptos_1.default);
+app.use('/api/stop-loss', stopLoss_1.default);
 // Health check
 app.get('/api/health', (req, res) => {
     res.json({
@@ -247,6 +250,15 @@ node_cron_1.default.schedule('*/30 * * * *', async () => {
     }
     catch (error) {
         console.error('❌ Full cache refresh hatası:', error);
+    }
+});
+// Her 1 dakikada bir stop-loss emirlerini kontrol et
+node_cron_1.default.schedule('* * * * *', async () => {
+    try {
+        await stopLoss_2.StopLossService.checkAndTriggerStopLosses();
+    }
+    catch (error) {
+        console.error('❌ Stop-loss kontrolü hatası:', error);
     }
 });
 // Cache durumunu göster

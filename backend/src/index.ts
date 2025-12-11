@@ -11,7 +11,9 @@ import adminRoutes from './routes/admin';
 import badgesRoutes from './routes/badges';
 import activityLogsRoutes from './routes/activityLogs';
 import cryptosRoutes from './routes/cryptos';
+import stopLossRoutes from './routes/stopLoss';
 import { MarketCacheService } from './services/marketCache';
+import { StopLossService } from './services/stopLoss';
 import cron from 'node-cron';
 
 // Environment variables
@@ -176,6 +178,7 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/badges', badgesRoutes);
 app.use('/api/activity-logs', activityLogsRoutes);
 app.use('/api/cryptos', cryptosRoutes);
+app.use('/api/stop-loss', stopLossRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
@@ -269,6 +272,15 @@ cron.schedule('*/30 * * * *', async () => {
     console.log('✅ Full cache refresh tamamlandı');
   } catch (error) {
     console.error('❌ Full cache refresh hatası:', error);
+  }
+});
+
+// Her 1 dakikada bir stop-loss emirlerini kontrol et
+cron.schedule('* * * * *', async () => {
+  try {
+    await StopLossService.checkAndTriggerStopLosses();
+  } catch (error) {
+    console.error('❌ Stop-loss kontrolü hatası:', error);
   }
 });
 

@@ -211,3 +211,27 @@ export const activityLogsApi = {
     return apiCall('/activity-logs/types');
   },
 };
+
+// Stop-Loss API
+export const stopLossApi = {
+  create: async (data: {
+    portfolio_item_id: string;
+    trigger_price: number;
+    quantity?: number;
+  }) => {
+    return apiCall('/stop-loss', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  getAll: async () => {
+    return apiCall('/stop-loss');
+  },
+
+  cancel: async (id: string) => {
+    return apiCall(`/stop-loss/${id}`, {
+      method: 'DELETE',
+    });
+  },
+};
