@@ -11,37 +11,65 @@ class LeaderboardService {
         try {
             // Önce tüm kullanıcıların rank'lerini güncelle
             await this.updateRanks();
-            // Liderlik tablosunu getir - kar/zarar yüzdesine göre sırala
-            const result = await database_1.default.query(`SELECT 
+            // Tüm kullanıcıları al ve portföy öğelerinden kar/zarar bilgilerini hesapla
+            const usersResult = await database_1.default.query(`SELECT 
+          id,
           username,
           balance,
           portfolio_value,
-          total_profit_loss,
-          rank,
-          CASE 
-            WHEN (portfolio_value - total_profit_loss) > 0 THEN (total_profit_loss / (portfolio_value - total_profit_loss)) * 100
-            WHEN portfolio_value = 0 AND total_profit_loss = 0 THEN 0
-            ELSE 0
-          END as profit_loss_percent
+          total_profit_loss
          FROM users
-         WHERE email_verified = true AND (is_banned IS NULL OR is_banned = false)
-         ORDER BY 
-           CASE 
-             WHEN (portfolio_value - total_profit_loss) > 0 THEN (total_profit_loss / (portfolio_value - total_profit_loss)) * 100
-             WHEN portfolio_value = 0 AND total_profit_loss = 0 THEN 0
-             ELSE 0
-           END DESC,
-           total_profit_loss DESC
-         LIMIT $1`, [limit]);
-            console.log(`Leaderboard query returned ${result.rows.length} users`);
-            const leaderboard = result.rows.map((row, index) => ({
-                rank: index + 1,
-                username: row.username,
-                portfolio_value: parseFloat(row.portfolio_value || 0),
-                total_profit_loss: parseFloat(row.total_profit_loss || 0),
-                profit_loss_percent: parseFloat(row.profit_loss_percent || 0),
-                balance: parseFloat(row.balance || 0)
+         WHERE email_verified = true AND (is_banned IS NULL OR is_banned = false)`);
+            // Her kullanıcı için portföy öğelerinden gerçek kar/zarar bilgilerini hesapla
+            const leaderboardData = await Promise.all(usersResult.rows.map(async (user) => {
+                const portfolioResult = await database_1.default.query(`SELECT quantity, current_price, average_price 
+             FROM portfolio_items 
+             WHERE user_id = $1`, [user.id]);
+                let totalPortfolioValue = 0;
+                let totalProfitLoss = 0;
+                let totalInvestment = 0;
+                for (const item of portfolioResult.rows) {
+                    const quantity = parseFloat(item.quantity || 0);
+                    const currentPrice = parseFloat(item.current_price || 0);
+                    const averagePrice = parseFloat(item.average_price || 0);
+                    const value = quantity * currentPrice;
+                    const profitLoss = (currentPrice - averagePrice) * quantity;
+                    const investment = quantity * averagePrice;
+                    totalPortfolioValue += value;
+                    totalProfitLoss += profitLoss;
+                    totalInvestment += investment;
+                }
+                // Kar/zarar yüzdesini hesapla
+                const profitLossPercent = totalInvestment > 0
+                    ? (totalProfitLoss / totalInvestment) * 100
+                    : 0;
+                return {
+                    id: user.id,
+                    username: user.username,
+                    balance: parseFloat(user.balance || 0),
+                    portfolio_value: totalPortfolioValue,
+                    total_profit_loss: totalProfitLoss,
+                    profit_loss_percent: profitLossPercent
+                };
             }));
+            // Kar/zarar yüzdesine göre sırala
+            leaderboardData.sort((a, b) => {
+                if (b.profit_loss_percent !== a.profit_loss_percent) {
+                    return b.profit_loss_percent - a.profit_loss_percent;
+                }
+                return b.total_profit_loss - a.total_profit_loss;
+            });
+            // Limit'e göre al
+            const limitedData = leaderboardData.slice(0, limit);
+            const leaderboard = limitedData.map((data, index) => ({
+                rank: index + 1,
+                username: data.username,
+                portfolio_value: data.portfolio_value,
+                total_profit_loss: data.total_profit_loss,
+                profit_loss_percent: data.profit_loss_percent,
+                balance: data.balance
+            }));
+            console.log(`Leaderboard query returned ${leaderboard.length} users`);
             return {
                 success: true,
                 leaderboard
@@ -59,27 +87,46 @@ class LeaderboardService {
             await database_1.default.query(`UPDATE users 
          SET rank = NULL 
          WHERE email_verified = false OR (is_banned IS NOT NULL AND is_banned = true)`);
+            // Tüm kullanıcıları al
+            const usersResult = await database_1.default.query(`SELECT id FROM users
+         WHERE email_verified = true AND (is_banned IS NULL OR is_banned = false)`);
+            // Her kullanıcı için portföy öğelerinden kar/zarar bilgilerini hesapla
+            const userRankData = await Promise.all(usersResult.rows.map(async (user) => {
+                const portfolioResult = await database_1.default.query(`SELECT quantity, current_price, average_price 
+             FROM portfolio_items 
+             WHERE user_id = $1`, [user.id]);
+                let totalProfitLoss = 0;
+                let totalInvestment = 0;
+                for (const item of portfolioResult.rows) {
+                    const quantity = parseFloat(item.quantity || 0);
+                    const currentPrice = parseFloat(item.current_price || 0);
+                    const averagePrice = parseFloat(item.average_price || 0);
+                    const profitLoss = (currentPrice - averagePrice) * quantity;
+                    const investment = quantity * averagePrice;
+                    totalProfitLoss += profitLoss;
+                    totalInvestment += investment;
+                }
+                // Kar/zarar yüzdesini hesapla
+                const profitLossPercent = totalInvestment > 0
+                    ? (totalProfitLoss / totalInvestment) * 100
+                    : 0;
+                return {
+                    id: user.id,
+                    profit_loss_percent: profitLossPercent,
+                    total_profit_loss: totalProfitLoss
+                };
+            }));
             // Kar/zarar yüzdesine göre sırala
-            const result = await database_1.default.query(`SELECT id, 
-          CASE 
-            WHEN (portfolio_value - total_profit_loss) > 0 THEN (total_profit_loss / (portfolio_value - total_profit_loss)) * 100
-            WHEN portfolio_value = 0 AND total_profit_loss = 0 THEN 0
-            ELSE 0
-          END as profit_loss_percent,
-          total_profit_loss
-         FROM users
-         WHERE email_verified = true AND (is_banned IS NULL OR is_banned = false)
-         ORDER BY 
-           CASE 
-             WHEN (portfolio_value - total_profit_loss) > 0 THEN (total_profit_loss / (portfolio_value - total_profit_loss)) * 100
-             WHEN portfolio_value = 0 AND total_profit_loss = 0 THEN 0
-             ELSE 0
-           END DESC,
-           total_profit_loss DESC`);
-            console.log(`Updating ranks for ${result.rows.length} users`);
+            userRankData.sort((a, b) => {
+                if (b.profit_loss_percent !== a.profit_loss_percent) {
+                    return b.profit_loss_percent - a.profit_loss_percent;
+                }
+                return b.total_profit_loss - a.total_profit_loss;
+            });
+            console.log(`Updating ranks for ${userRankData.length} users`);
             // Rank'leri güncelle
-            for (let i = 0; i < result.rows.length; i++) {
-                await database_1.default.query('UPDATE users SET rank = $1 WHERE id = $2', [i + 1, result.rows[i].id]);
+            for (let i = 0; i < userRankData.length; i++) {
+                await database_1.default.query('UPDATE users SET rank = $1 WHERE id = $2', [i + 1, userRankData[i].id]);
             }
         }
         catch (error) {
