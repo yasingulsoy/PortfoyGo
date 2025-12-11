@@ -1,4 +1,5 @@
 import pool from '../config/database';
+import { MarketCacheService } from './marketCache';
 
 export interface LeaderboardEntry {
   rank: number;
@@ -28,11 +29,27 @@ export class LeaderboardService {
          WHERE email_verified = true AND (is_banned IS NULL OR is_banned = false)`
       );
 
+      // Market cache'den tüm güncel fiyatları al (bir kez çek, tüm kullanıcılar için kullan)
+      const cachedStocks = await MarketCacheService.getFromCache('stock');
+      const cachedCryptos = await MarketCacheService.getFromCache('crypto');
+      
+      // Fiyat lookup map'leri oluştur (hızlı erişim için)
+      const stockPriceMap = new Map<string, number>();
+      const cryptoPriceMap = new Map<string, number>();
+      
+      cachedStocks.forEach(stock => {
+        stockPriceMap.set(stock.symbol.toUpperCase(), stock.price);
+      });
+      
+      cachedCryptos.forEach(crypto => {
+        cryptoPriceMap.set(crypto.symbol.toUpperCase(), crypto.price);
+      });
+
       // Her kullanıcı için portföy öğelerinden gerçek kar/zarar bilgilerini hesapla
       const leaderboardData = await Promise.all(
         usersResult.rows.map(async (user: any) => {
           const portfolioResult = await pool.query(
-            `SELECT quantity, current_price, average_price 
+            `SELECT quantity, current_price, average_price, symbol, asset_type 
              FROM portfolio_items 
              WHERE user_id = $1`,
             [user.id]
@@ -44,12 +61,26 @@ export class LeaderboardService {
 
           for (const item of portfolioResult.rows) {
             const quantity = parseFloat(item.quantity || 0);
-            const currentPrice = parseFloat(item.current_price || 0);
             const averagePrice = parseFloat(item.average_price || 0);
+            const symbol = item.symbol.toUpperCase();
+            const assetType = item.asset_type;
 
-            const value = quantity * currentPrice;
-            const profitLoss = (currentPrice - averagePrice) * quantity;
-            const investment = quantity * averagePrice;
+            // Güncel fiyatı market cache'den al
+            let currentPriceUSD = 0;
+            if (assetType === 'crypto') {
+              currentPriceUSD = cryptoPriceMap.get(symbol) || parseFloat(item.current_price || 0);
+            } else {
+              currentPriceUSD = stockPriceMap.get(symbol) || parseFloat(item.current_price || 0);
+            }
+
+            // USD'den TRY'ye çevir (USD_TO_TRY = 32.5)
+            const USD_TO_TRY = 32.5;
+            const currentPriceTRY = currentPriceUSD * USD_TO_TRY;
+            const averagePriceTRY = averagePrice; // average_price zaten TRY cinsinden kaydediliyor
+
+            const value = quantity * currentPriceTRY;
+            const profitLoss = (currentPriceTRY - averagePriceTRY) * quantity;
+            const investment = quantity * averagePriceTRY;
 
             totalPortfolioValue += value;
             totalProfitLoss += profitLoss;
@@ -120,11 +151,27 @@ export class LeaderboardService {
          WHERE email_verified = true AND (is_banned IS NULL OR is_banned = false)`
       );
 
+      // Market cache'den tüm güncel fiyatları al
+      const cachedStocks = await MarketCacheService.getFromCache('stock');
+      const cachedCryptos = await MarketCacheService.getFromCache('crypto');
+      
+      // Fiyat lookup map'leri oluştur
+      const stockPriceMap = new Map<string, number>();
+      const cryptoPriceMap = new Map<string, number>();
+      
+      cachedStocks.forEach(stock => {
+        stockPriceMap.set(stock.symbol.toUpperCase(), stock.price);
+      });
+      
+      cachedCryptos.forEach(crypto => {
+        cryptoPriceMap.set(crypto.symbol.toUpperCase(), crypto.price);
+      });
+
       // Her kullanıcı için portföy öğelerinden kar/zarar bilgilerini hesapla
       const userRankData = await Promise.all(
         usersResult.rows.map(async (user: any) => {
           const portfolioResult = await pool.query(
-            `SELECT quantity, current_price, average_price 
+            `SELECT quantity, current_price, average_price, symbol, asset_type 
              FROM portfolio_items 
              WHERE user_id = $1`,
             [user.id]
@@ -135,11 +182,25 @@ export class LeaderboardService {
 
           for (const item of portfolioResult.rows) {
             const quantity = parseFloat(item.quantity || 0);
-            const currentPrice = parseFloat(item.current_price || 0);
             const averagePrice = parseFloat(item.average_price || 0);
+            const symbol = item.symbol.toUpperCase();
+            const assetType = item.asset_type;
 
-            const profitLoss = (currentPrice - averagePrice) * quantity;
-            const investment = quantity * averagePrice;
+            // Güncel fiyatı market cache'den al
+            let currentPriceUSD = 0;
+            if (assetType === 'crypto') {
+              currentPriceUSD = cryptoPriceMap.get(symbol) || parseFloat(item.current_price || 0);
+            } else {
+              currentPriceUSD = stockPriceMap.get(symbol) || parseFloat(item.current_price || 0);
+            }
+
+            // USD'den TRY'ye çevir
+            const USD_TO_TRY = 32.5;
+            const currentPriceTRY = currentPriceUSD * USD_TO_TRY;
+            const averagePriceTRY = averagePrice;
+
+            const profitLoss = (currentPriceTRY - averagePriceTRY) * quantity;
+            const investment = quantity * averagePriceTRY;
 
             totalProfitLoss += profitLoss;
             totalInvestment += investment;
