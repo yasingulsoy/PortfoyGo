@@ -21,7 +21,7 @@ export const metadata: Metadata = {
   title: "Sanal Yatırım - Finansal Oyun",
   description: "Gerçek piyasa verileriyle sanal yatırım yapın, portföyünüzü büyütün ve liderlik tablosunda yarışın!",
   icons: {
-    icon: "/cardano_ada_crypto_icon_264359.ico",
+    icon: "/fav.ico",
   },
 };
 
