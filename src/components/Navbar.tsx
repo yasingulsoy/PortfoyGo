@@ -157,7 +157,7 @@ export default function Navbar() {
             )}
             <button
               onClick={() => setOpen(!open)}
-              className="inline-flex items-center justify-center p-2 rounded-lg text-[#848e9c] hover:text-white hover:bg-[#2b3139] focus:outline-none transition-colors relative z-50"
+              className="inline-flex items-center justify-center p-2 rounded-lg text-[#848e9c] hover:text-white hover:bg-[#2b3139] focus:outline-none transition-colors relative z-[100]"
               aria-label="Toggle navigation"
             >
               {open ? (
@@ -174,14 +174,14 @@ export default function Navbar() {
       {open && (
         <>
           <div
-            className="fixed inset-0 bg-black/70 backdrop-blur-[6px] z-40 lg:hidden"
+            className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[80] lg:hidden"
             onClick={() => setOpen(false)}
             onTouchMove={(e) => e.preventDefault()}
             style={{ touchAction: 'none' }}
           />
 
           <div
-            className="fixed top-0 right-0 h-full w-full max-w-[340px] bg-[#0b0e11] z-50 lg:hidden shadow-2xl shadow-black/50"
+            className="fixed top-0 right-0 h-screen w-[85vw] max-w-[340px] bg-[#0b0e11] z-[90] lg:hidden shadow-2xl shadow-black/60"
             onClick={(e) => e.stopPropagation()}
             onTouchStart={(e) => e.stopPropagation()}
             onTouchMove={(e) => e.stopPropagation()}

@@ -1,180 +1,179 @@
-# PortfoyGo — Uygulama Kabiliyetleri ve Yol Haritası
+# PortfoyGo — Platform Durumu ve Geliştirme Önerileri
 
-**Belge Versiyonu:** 1.0  
-**Son Güncelleme:** 7 Mart 2025  
-**Proje:** PortfoyGo — Sanal Yatırım ve Portföy Yönetim Platformu
-
----
-
-## 1. Yönetici Özeti
-
-PortfoyGo, gerçek piyasa verileriyle sanal yatırım yapılmasına olanak tanıyan, kullanıcıların portföylerini yönetebildiği ve liderlik tablosunda yarışabildiği bir web uygulamasıdır. Uygulama, hisse senetleri, kripto paralar ve emtialar üzerinden işlem yapılmasına imkân sağlamaktadır.
+**Hazırlayan:** Geliştirme Ekibi  
+**Son Güncelleme:** 7 Mart 2026  
+**Hedef Kitle:** Proje paydaşları, yatırımcılar ve karar vericiler
 
 ---
 
-## 2. Mevcut Uygulama Kabiliyetleri
+## 1. Platform Nedir?
 
-### 2.1 Kimlik Doğrulama ve Kullanıcı Yönetimi
+PortfoyGo, kullanıcıların **gerçek piyasa verileriyle sanal para üzerinden yatırım yapabildiği** bir web platformudur. Herhangi bir gerçek para riski olmadan hisse senedi, kripto para, emtia ve döviz alıp satılabilir. Kullanıcılar birbirleriyle liderlik tablosu üzerinden yarışır.
 
-| Özellik | Açıklama | Durum |
-|---------|----------|-------|
-| Kayıt | Kullanıcı adı, e-posta ve şifre ile kayıt | ✅ Aktif |
-| Giriş | E-posta ve şifre ile oturum açma | ✅ Aktif |
-| E-posta Doğrulama | Kayıt sonrası e-posta doğrulama akışı | ✅ Aktif |
-| JWT Kimlik Doğrulama | Token tabanlı oturum yönetimi | ✅ Aktif |
-| Şifre Güvenliği | bcrypt ile hash’lenmiş şifre saklama | ✅ Aktif |
-
-### 2.2 Piyasa Verileri
-
-| Özellik | Veri Kaynağı | Açıklama | Durum |
-|---------|--------------|----------|-------|
-| Hisse Senetleri | Finnhub API | Popüler hisse senetleri (ör. AAPL, GOOGL, MSFT) | ✅ Aktif |
-| Kripto Paralar | CoinGecko API | Gerçek zamanlı kripto fiyatları | ✅ Aktif |
-| Emtialar | NosyAPI (EMTIA) | Altın, gümüş, petrol, doğalgaz vb. | ✅ Aktif |
-| Market Cache | Dahili cache servisi | 2 dakikada bir güncelleme, API limitlerini azaltma | ✅ Aktif |
-
-### 2.3 Portföy ve İşlem Yönetimi
-
-| Özellik | Açıklama | Durum |
-|---------|----------|-------|
-| Sanal Bakiye | Başlangıç: 1.000 ₺ sanal bakiye | ✅ Aktif |
-| Alım İşlemi | Hisse, kripto ve emtia alımı | ✅ Aktif |
-| Satış İşlemi | Portföydeki varlıkların satışı | ✅ Aktif |
-| Komisyon Hesaplama | %0,1 komisyon oranı | ✅ Aktif |
-| Ortalama Maliyet | Ortalama alış fiyatı takibi | ✅ Aktif |
-| Kar/Zarar Takibi | Anlık kar/zarar hesaplaması | ✅ Aktif |
-
-### 2.4 Stop-Loss Sistemi
-
-| Özellik | Açıklama | Durum |
-|---------|----------|-------|
-| Stop-Loss Emri Oluşturma | Portföy öğesi için tetikleme fiyatı belirleme | ✅ Aktif |
-| Otomatik Tetikleme | Cron job ile dakikada bir kontrol | ✅ Aktif |
-| Stop-Loss İptali | Aktif emirlerin iptal edilmesi | ✅ Aktif |
-
-### 2.5 Liderlik ve Sosyal Özellikler
-
-| Özellik | Açıklama | Durum |
-|---------|----------|-------|
-| Liderlik Tablosu | Kar/zarar yüzdesine göre sıralama | ✅ Aktif |
-| Kullanıcı Sıralaması | E-posta doğrulanmış kullanıcılar dahil | ✅ Aktif |
-| Rozet Sistemi | İşlem sayısı, kâr, portföy değeri vb. kriterlere göre rozetler | ✅ Aktif |
-
-### 2.6 Grafik ve Görselleştirme
-
-| Özellik | Açıklama | Durum |
-|---------|----------|-------|
-| Fiyat Grafikleri | Lightweight Charts ile interaktif grafikler | ✅ Aktif |
-| Varlık Detay Sayfası | Her varlık için ayrı sayfa ve grafik | ✅ Aktif |
-| Fiyat Animasyonları | Fiyat değişimlerinde görsel geri bildirim | ✅ Aktif |
-
-### 2.7 Yönetim ve Güvenlik
-
-| Özellik | Açıklama | Durum |
-|---------|----------|-------|
-| Admin Paneli | İstatistikler, kullanıcı listesi | ✅ Aktif |
-| Kullanıcı Banlama | Admin tarafından kullanıcı engelleme | ✅ Aktif |
-| Aktivite Logları | Giriş, işlem vb. olayların kaydı | ✅ Aktif |
-| Rate Limiting | API çağrı limitleri (örn. Finnhub: 60/dk) | ✅ Aktif |
-
-### 2.8 Kullanıcı Arayüzü
-
-| Özellik | Açıklama | Durum |
-|---------|----------|-------|
-| Responsive Tasarım | Mobil, tablet ve masaüstü uyumlu | ✅ Aktif |
-| Dark/Light Mode | Tema seçenekleri (Light, Dark, System) | ✅ Aktif |
-| Sayfa Geçişleri | GSAP ile animasyonlu geçişler | ✅ Aktif |
-| Piyasa Sekmeleri | Hisse, kripto ve emtia sekmeleri | ✅ Aktif |
-
-### 2.9 Yasal ve Bilgilendirme
-
-| Özellik | Açıklama | Durum |
-|---------|----------|-------|
-| Gizlilik Politikası | KVKK uyumlu gizlilik metni | ✅ Aktif |
-| Kullanım Koşulları | Kullanım şartları sayfası | ✅ Aktif |
+Kısacası: **Borsa simülasyonu + eğitim aracı + rekabet platformu.**
 
 ---
 
-## 3. Teknik Altyapı
+## 2. Şu An Neler Yapılabiliyor?
 
-### 3.1 Frontend
+### Kullanıcı Girişi ve Hesap
+- E-posta ve şifre ile kayıt olunabiliyor
+- Kayıt sonrası e-posta doğrulaması yapılıyor
+- Her kullanıcıya **100.000 ₺ sanal bakiye** veriliyor
 
-- **Framework:** Next.js 15, React 19
-- **Dil:** TypeScript
-- **Stil:** Tailwind CSS 4
-- **State:** React Context + useReducer
-- **Veri Çekme:** SWR
-- **Grafik:** Lightweight Charts, Recharts
+### Piyasa Takibi
+- **Hisse senetleri** (Apple, Microsoft, Google, Tesla vb.) canlı olarak takip edilebiliyor
+- **Kripto paralar** (Bitcoin, Ethereum ve 25+ kripto) gerçek zamanlı fiyatlarla görülebiliyor
+- **Emtialar** (altın, gümüş, petrol, doğalgaz vb.) izlenebiliyor
+- **Döviz kurları** (USD, EUR, GBP, CHF, JPY, gram altın) canlı olarak yansıyor
+- Fiyatlar ortalama **2 dakikada bir** güncelleniyor
 
-### 3.2 Backend
+### Alım-Satım
+- Hisse, kripto, emtia ve döviz alınıp satılabiliyor
+- Her işlemde **%0,1 komisyon** uygulanıyor (borsa gerçekliğini yansıtmak için)
+- Ortalama maliyet fiyatı otomatik hesaplanıyor
+- Anlık kâr/zarar görülebiliyor
 
-- **Runtime:** Node.js
-- **Framework:** Express.js
-- **Veritabanı:** PostgreSQL
-- **Zamanlanmış Görevler:** node-cron
+### Stop-Loss (Zarar Durdurma)
+- Kullanıcı bir varlık için zarar durdurma emri verebiliyor
+- Fiyat belirlenen seviyenin altına düşerse **otomatik satış** tetikleniyor
+- Emirler dakikada bir kontrol ediliyor
 
-### 3.3 Harici API’ler
+### Liderlik ve Yarışma
+- Tüm kullanıcılar kâr/zarar yüzdesine göre sıralanıyor
+- Ana sayfada **Top 3** podium şeklinde gösteriliyor
+- Rozetler kazanılabiliyor (ilk işlem, kârlı satış sayısı, portföy büyüklüğü vb.)
 
-> **Not:** Mevcut API’ler veri kalitesi, güncellik ve limitler açısından yetersiz kalmaktadır. Bu durumun iyileştirilmesi yol haritasında öncelikli olarak planlanmaktadır.
+### Haber Akışı
+- BS Ekonomi'den (bsekonomi.com) güncel ekonomi ve finans haberleri otomatik çekiliyor
+- Ana sayfada son haberler görünüyor, ayrı bir haber sayfası da mevcut
 
-| API | Kullanım | Limit |
-|-----|----------|-------|
-| CoinGecko | Kripto fiyatları | Ücretsiz, key gerektirmez |
-| Finnhub | Hisse fiyatları | 60 çağrı/dakika (ücretsiz) |
-| NosyAPI (EMTIA) | Emtia fiyatları | API key gerekli |
+### Yönetim (Admin)
+- Admin panelinden kullanıcı istatistikleri görülebiliyor
+- Sorunlu kullanıcılar banlanabiliyor
+- Tüm kullanıcı işlemleri (giriş, alım, satım vb.) log olarak kaydediliyor
 
----
-
-## 4. Planlanan Geliştirmeler ve Yol Haritası
-
-### 4.1 Kısa Vadeli (1–3 Ay)
-
-| Öncelik | Geliştirme | Açıklama |
-|---------|------------|----------|
-| Yüksek | API Altyapısı İyileştirmesi | Mevcut API’lerin yetersizliği; daha güvenilir, güncel ve kapsamlı veri kaynaklarına geçiş |
-| Yüksek | Hisse Verisi İyileştirmesi | Hisse verilerinin mock’tan canlı Finnhub verisine tam geçişi |
-| Yüksek | Rozet Hesaplama İyileştirmesi | Kârlı işlem sayısının portföy öğelerinden doğru hesaplanması |
-| Orta | USD/TRY Döviz Kuru | Sabit 32.5 yerine gerçek zamanlı döviz kuru entegrasyonu |
-| Orta | Bildirim Sistemi | Stop-loss tetikleme, portföy uyarıları için e-posta/push bildirimleri |
-| Orta | Portföy Performans Grafiği | Zaman içinde portföy değeri grafiği |
-
-### 4.2 Orta Vadeli (3–6 Ay)
-
-| Öncelik | Geliştirme | Açıklama |
-|---------|------------|----------|
-| Yüksek | Limit Emirler | Belirli fiyattan alım/satım emirleri |
-| Orta | Take-Profit Emirleri | Hedef fiyata ulaşınca otomatik satış |
-| Orta | Portföy Çeşitlendirme Analizi | Varlık dağılımı ve risk analizi |
-| Orta | Mobil Uygulama | PWA veya native mobil uygulama |
-| Düşük | Sosyal Özellikler | Kullanıcı profilleri, takip sistemi |
-
-### 4.3 Uzun Vadeli (6+ Ay)
-
-| Öncelik | Geliştirme | Açıklama |
-|---------|------------|----------|
-| Orta | Yapay Zeka Önerileri | Portföy ve işlem önerileri |
-| Orta | Eğitim Modülleri | Yatırım eğitimi, simülasyon senaryoları |
-| Düşük | Çoklu Dil Desteği | İngilizce ve diğer diller |
-| Düşük | API Erişimi | Geliştiriciler için public API |
+### Grafikler
+- Her varlık için interaktif fiyat grafikleri mevcut
+- Fiyat değişimleri anlık animasyonlarla gösteriliyor
 
 ---
 
-## 5. Bilinen Sınırlamalar
+## 3. Neler Eksik? Neden Önemli?
 
-1. **API Yetersizliği:** Şu an kullanılan harici API’ler (Finnhub, CoinGecko, NosyAPI) veri çeşitliliği, güncellik ve limitler açısından yetersiz kalmaktadır. Bu durum kullanıcı deneyimini ve veri kalitesini olumsuz etkilemektedir. **API altyapısının iyileştirilmesi planlanmaktadır.**
-2. **Hisse Verileri:** Hisse fiyatları şu an cache/mock veri kullanıyor; tam canlı veri geçişi planlanıyor.
-3. **Döviz Kuru:** USD/TRY oranı sabit (32.5); gerçek zamanlı kur entegrasyonu yapılacak.
-4. **Emtia API:** NosyAPI (EMTIA) key gerektirir; key yoksa mock veri kullanılıyor.
-5. **Rozet Sistemi:** Kârlı işlem sayısı hesaplaması basitleştirilmiş; portföy bazlı iyileştirme planlanıyor.
+Aşağıdaki tabloda platformda henüz bulunmayan özellikler, bunların olmamasının yarattığı sorunlar ve eklenmesi halinde sağlayacağı faydalar özetlenmektedir.
+
+### 3.1 Güvenlik ve Doğrulama
+
+| Eksik | Sorun | Eklenirse Ne Olur? |
+|-------|-------|---------------------|
+| **SMS doğrulaması** | Sahte hesap açılmasını engelleyecek ikinci bir katman yok. Sadece e-posta doğrulaması mevcut. | Sahte hesaplar büyük ölçüde önlenir. Liderlik tablosu daha güvenilir hale gelir. Kullanıcı güveni artar. |
+| **Şifre sıfırlama** | Şifresini unutan kullanıcı hesabına erişemiyor. | Kullanıcı kaybı azalır. Destek talepleri düşer. |
+| **İki faktörlü doğrulama (2FA)** | Hesap güvenliği tek katmanlı. | Profesyonel düzeyde güvenlik sağlanır. Kurumsal kullanıma uygun hale gelir. |
+
+### 3.2 Piyasa Verileri
+
+| Eksik | Sorun | Eklenirse Ne Olur? |
+|-------|-------|---------------------|
+| **BIST (Borsa İstanbul) hisseleri** | Türk yatırımcılar için en doğal piyasa olan BIST verileri yok. Sadece ABD hisseleri takip ediliyor. | Türk kullanıcılar kendi piyasalarıyla pratik yapabilir. Kullanıcı tabanı genişler. |
+| **Daha fazla emtia ve döviz çifti** | Mevcut emtia ve döviz çeşitliliği sınırlı. | Portföy çeşitlendirmesi daha gerçekçi olur. Eğitim değeri artar. |
+| **Gerçek zamanlı veri (WebSocket)** | Fiyatlar 2 dakikada bir güncelleniyor, anlık değil. | Daha gerçekçi bir borsa deneyimi sağlanır. Scalping ve kısa vadeli stratejiler denenebilir. |
+
+### 3.3 İşlem Özellikleri
+
+| Eksik | Sorun | Eklenirse Ne Olur? |
+|-------|-------|---------------------|
+| **Limit emir** | Kullanıcı sadece mevcut fiyattan işlem yapabiliyor. "Şu fiyata gelince al" diyemiyor. | Gerçek borsa deneyimine çok daha yakın olur. Strateji geliştirme imkânı artar. |
+| **Take-Profit (Kâr Al) emri** | Stop-loss var ama kâr hedefine ulaşınca otomatik satış yok. | Kullanıcılar tam bir emir yönetimi yapabilir hale gelir. |
+| **Kaldıraçlı işlem (opsiyonel)** | Kaldıraç mekanizması yok. | İleri düzey yatırımcılar için eğitim ortamı oluşur. Riskin ne demek olduğu pratik olarak öğretilir. |
+| **Açığa satış** | Sadece sahip olunan varlıklar satılabiliyor. Düşüşten kâr elde etmek mümkün değil. | Piyasa düşüşlerinde de strateji uygulanabilir. |
+
+### 3.4 Analiz ve Raporlama
+
+| Eksik | Sorun | Eklenirse Ne Olur? |
+|-------|-------|---------------------|
+| **Portföy performans grafiği** | Portföyün zaman içindeki değeri görselleştirilemiyor. Kullanıcı sadece anlık durumu görebiliyor. | Yatırım kararlarının sonuçları uzun vadede izlenebilir. Eğitim açısından çok değerli. |
+| **Varlık dağılımı (pie chart)** | Portföyün ne kadarı hisse, ne kadarı kripto gibi bir görsel yok. | Çeşitlendirme analizi yapılabilir. Risk yönetimi öğretilebilir. |
+| **İşlem geçmişi analizi** | İşlemler listelenebiliyor ama analiz yapılamıyor (en kârlı varlık, ortalama tutma süresi vb.). | Kullanıcı kendi yatırım alışkanlıklarını anlayabilir. |
+| **PDF/Excel rapor çıktısı** | Portföy durumunun dışarıya aktarılması mümkün değil. | Kurumsal kullanım ve eğitim amaçlı raporlama yapılabilir. |
+
+### 3.5 Bildirim ve İletişim
+
+| Eksik | Sorun | Eklenirse Ne Olur? |
+|-------|-------|---------------------|
+| **Push bildirimleri** | Fiyat alarmı veya stop-loss tetiklenmesi gibi önemli olaylarda kullanıcı bilgilendirilemiyor. | Kullanıcılar kritik anları kaçırmaz. Platform bağlılığı artar. |
+| **E-posta bildirimleri** | İşlem onayı, haftalık portföy özeti gibi bilgilendirmeler yapılamıyor. | Profesyonel bir yatırım platformu izlenimi verilir. |
+| **Fiyat alarmı** | "Bitcoin 100.000$'ı geçerse beni uyar" gibi bir özellik yok. | Kullanıcılar stratejilerini önceden planlayabilir. |
+
+### 3.6 Sosyal ve Eğitim
+
+| Eksik | Sorun | Eklenirse Ne Olur? |
+|-------|-------|---------------------|
+| **Kullanıcı profil sayfaları (public)** | Başka kullanıcıların portföy performansı görülemiyor. | Sosyal öğrenme ortamı oluşur. Başarılı yatırımcılar takip edilebilir. |
+| **Yatırım eğitim modülleri** | Platform sadece simülasyon sunuyor, eğitim içeriği yok. | Yeni başlayanlar temel kavramları öğrenebilir. Platform bir eğitim aracı haline gelir. |
+| **Yarışmalar / Turnuvalar** | Sürekli bir liderlik tablosu var ama dönemsel yarışmalar düzenlenemiyor. | Kullanıcı katılımı ve geri dönüşü artar. Sponsorluk ve ortaklık fırsatları doğar. |
+
+### 3.7 Mobil Deneyim
+
+| Eksik | Sorun | Eklenirse Ne Olur? |
+|-------|-------|---------------------|
+| **Mobil uygulama (iOS/Android)** | Platform sadece web üzerinden erişilebiliyor. Mobil uygulama yok. | Kullanıcılar her an her yerden erişebilir. Günlük aktif kullanım katlanarak artar. |
+| **PWA (Progressive Web App)** | Tarayıcıdan ana ekrana eklenemiyor, çevrimdışı çalışmıyor. | Uygulama mağazası olmadan mobil uygulama deneyimi sağlanır. Geliştirme maliyeti düşer. |
 
 ---
 
-## 6. Doküman Geçmişi
+## 4. Mevcut Teknik Sınırlamalar (Basitleştirilmiş)
 
-| Versiyon | Tarih | Değişiklik |
-|----------|-------|------------|
-| 1.0 | 7 Mart 2025 | İlk sürüm — mevcut kabiliyetler ve yol haritası |
+| Konu | Durum | Etkisi |
+|------|-------|--------|
+| **Piyasa verileri** | Ücretsiz API'ler kullanılıyor. Güncelleme sıklığı ve veri çeşitliliği sınırlı. | Fiyatlar anlık değil, birkaç dakika gecikmeli. Bazı varlıklar takip edilemiyor. |
+| **Sunucu kapasitesi** | Tek sunucu üzerinde çalışıyor. | Çok sayıda eşzamanlı kullanıcıda yavaşlama olabilir. |
+| **Veri saklama** | Sadece işlem geçmişi kaydediliyor. Fiyat geçmişi saklanmıyor. | Detaylı performans analizi yapılamıyor. |
 
 ---
 
-*Bu belge, PortfoyGo projesinin mevcut durumunu ve planlanan geliştirmelerini özetlemektedir. Güncellemeler proje ilerlemesine göre yapılacaktır.*
+## 5. Önerilen Geliştirme Öncelikleri
+
+Aşağıdaki sıralama, **kullanıcı deneyimine ve platformun büyümesine katkısına** göre yapılmıştır:
+
+### Hemen Yapılması Gereken (1–4 Hafta)
+1. **Şifre sıfırlama** — Kullanıcı kaybını önler
+2. **Portföy performans grafiği** — Platformun eğitim değerini artırır
+3. **Fiyat alarmı** — Kullanıcı bağlılığını artırır
+4. **Push/e-posta bildirimleri** — Kritik olaylardan haberdar eder
+
+### Kısa Vadede Yapılması Gereken (1–3 Ay)
+5. **Limit emir ve Take-Profit** — Gerçekçi işlem deneyimi sağlar
+6. **BIST verileri** — Türk kullanıcı tabanını genişletir
+7. **Varlık dağılımı görseli** — Risk yönetimi farkındalığı yaratır
+8. **SMS doğrulaması** — Platform güvenilirliğini artırır
+
+### Orta Vadede Yapılması Gereken (3–6 Ay)
+9. **Mobil uygulama veya PWA** — Erişilebilirliği katlar
+10. **Dönemsel yarışmalar** — Kullanıcı katılımını artırır
+11. **Yatırım eğitim modülleri** — Platformu farklılaştırır
+12. **PDF/Excel rapor çıktısı** — Kurumsal kullanıma kapı açar
+
+### Uzun Vadede Düşünülebilecek (6+ Ay)
+13. **Yapay zekâ destekli öneriler** — Kişiselleştirilmiş yatırım önerileri
+14. **Açığa satış ve kaldıraç** — İleri seviye yatırımcılar için
+15. **Çoklu dil desteği** — Uluslararası kullanıcı tabanı
+
+---
+
+## 6. Sonuç
+
+PortfoyGo, şu anki haliyle **temel bir sanal yatırım deneyimi sunmaktadır**. Kullanıcılar kayıt olabilir, piyasaları takip edebilir, alım-satım yapabilir ve birbirleriyle yarışabilir. Haber akışı, stop-loss sistemi ve rozet mekanizması gibi özellikler platformu zenginleştirmektedir.
+
+Ancak platformun **profesyonel bir finans eğitim ve simülasyon aracına** dönüşmesi için yukarıda listelenen eksiklerin giderilmesi gerekmektedir. Özellikle:
+
+- **Güvenlik katmanlarının güçlendirilmesi** (SMS, 2FA, şifre sıfırlama) platformun güvenilirliğini artıracaktır
+- **Piyasa verisi çeşitliliğinin genişletilmesi** (BIST, daha fazla emtia) Türk kullanıcılara daha yakın bir deneyim sunacaktır
+- **Analiz ve raporlama araçlarının eklenmesi** platformu basit bir oyundan gerçek bir eğitim aracına dönüştürecektir
+- **Mobil erişim** günlük aktif kullanımı ve kullanıcı bağlılığını önemli ölçüde artıracaktır
+
+Bu geliştirmeler yapıldığında PortfoyGo, üniversiteler, finans eğitim kurumları ve bireysel yatırımcılar için **değerli bir araç** haline gelebilir.
+
+---
+
+*Bu belge, platformun mevcut durumunu ve geliştirme potansiyelini teknik olmayan bir dille özetlemektedir.*
