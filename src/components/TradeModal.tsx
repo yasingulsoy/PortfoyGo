@@ -30,8 +30,10 @@ export default function TradeModal({ isOpen, onClose, stock, type }: TradeModalP
   const USD_TO_TRY = 32.5;
 
   const getIsCrypto = () => stock?.assetType === 'crypto';
+  const getIsCurrency = () => stock?.assetType === 'currency';
   const getPriceInTRY = () => {
     if (!stock) return 0;
+    if (stock.assetType === 'currency') return stock.price; // Döviz fiyatı zaten TRY
     return stock.price * USD_TO_TRY;
   };
 
