@@ -291,7 +291,8 @@ export const PortfolioProvider: React.FC<{ children: ReactNode }> = ({ children 
           currentPrice: item.current_price,
           totalValue: item.total_value,
           profitLoss: item.profit_loss,
-          profitLossPercent: item.profit_loss_percent
+          profitLossPercent: item.profit_loss_percent,
+          assetType: item.asset_type || 'stock',
         }));
 
         // Transactions'ı da al

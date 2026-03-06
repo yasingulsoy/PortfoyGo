@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   ClockIcon,
   FunnelIcon,
@@ -13,6 +13,11 @@ export default function TransactionsPage() {
   const [filterType, setFilterType] = useState<'all' | 'buy' | 'sell'>('all');
   const [sortBy, setSortBy] = useState<'date' | 'amount' | 'symbol'>('date');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const formatDate = (date: Date) => {
     return new Intl.DateTimeFormat('tr-TR', {
@@ -97,6 +102,14 @@ export default function TransactionsPage() {
     link.click();
     document.body.removeChild(link);
   };
+
+  if (!mounted) {
+    return (
+      <div className="min-h-screen bg-[#181a20] flex items-center justify-center">
+        <div className="inline-block animate-spin rounded-full h-10 w-10 border-2 border-transparent border-t-[#0ecb81]" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#181a20]">

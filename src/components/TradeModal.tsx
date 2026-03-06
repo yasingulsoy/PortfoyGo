@@ -29,7 +29,12 @@ export default function TradeModal({ isOpen, onClose, stock, type }: TradeModalP
 
   const USD_TO_TRY = 32.5;
 
-  // Modal açıldığında quantity'yi sıfırla
+  const getIsCrypto = () => stock?.assetType === 'crypto';
+  const getPriceInTRY = () => {
+    if (!stock) return 0;
+    return stock.price * USD_TO_TRY;
+  };
+
   useEffect(() => {
     if (isOpen && stock) {
       setQuantity(1);
@@ -39,7 +44,6 @@ export default function TradeModal({ isOpen, onClose, stock, type }: TradeModalP
     }
   }, [isOpen, stock]);
 
-  // Modal açıkken body scrollbar'ını gizle
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden';
@@ -51,12 +55,9 @@ export default function TradeModal({ isOpen, onClose, stock, type }: TradeModalP
 
   useEffect(() => {
     if (stock && quantity > 0) {
-      // Kripto için USD-TRY dönüşümü yap
-      const isCrypto = stock.symbol.length <= 4; // Kripto sembolleri genelde kısa
-      const priceInTRY = isCrypto ? stock.price * USD_TO_TRY : stock.price;
-      
+      const priceInTRY = getPriceInTRY();
       const amount = quantity * priceInTRY;
-      const comm = amount * 0.0025; // %0.25 komisyon (gerçekçi komisyon oranı)
+      const comm = amount * 0.0025;
       setTotalAmount(amount);
       setCommission(comm);
     } else {
@@ -84,16 +85,13 @@ export default function TradeModal({ isOpen, onClose, stock, type }: TradeModalP
     }
     const amountValue = parseFloat(inputValue);
     if (!isNaN(amountValue) && amountValue >= 0 && stock) {
-      const isCrypto = stock.symbol.length <= 4;
-      const priceInTRY = isCrypto ? stock.price * USD_TO_TRY : stock.price;
+      const priceInTRY = getPriceInTRY();
       if (priceInTRY > 0) {
-        const calculatedQuantity = amountValue / priceInTRY;
-        setQuantity(calculatedQuantity);
+        setQuantity(roundQuantity(amountValue / priceInTRY));
       }
     }
   };
 
-  // Input modu değiştiğinde amountInput'u güncelle
   useEffect(() => {
     if (inputMode === 'amount') {
       if (totalAmount > 0) {
@@ -104,19 +102,22 @@ export default function TradeModal({ isOpen, onClose, stock, type }: TradeModalP
     }
   }, [inputMode, totalAmount]);
 
+  const roundQuantity = (val: number) => {
+    return Math.floor(val * 1e8) / 1e8;
+  };
+
   const setQuickQuantity = (percentage: number) => {
     if (!stock) return;
     
     if (type === 'buy') {
-      const isCrypto = stock.symbol.length <= 4;
-      const priceInTRY = isCrypto ? stock.price * USD_TO_TRY : stock.price;
-      const maxAmount = state.balance * 0.99; // Komisyon için küçük bir pay bırak
-      const maxQuantity = maxAmount / (priceInTRY * 1.0025); // Komisyon dahil
-      setQuantity(maxQuantity * percentage);
+      const priceInTRY = getPriceInTRY();
+      const maxAmount = state.balance * 0.99;
+      const maxQuantity = maxAmount / (priceInTRY * 1.0025);
+      setQuantity(roundQuantity(maxQuantity * percentage));
     } else {
       const portfolioItem = state.portfolioItems.find(item => item.symbol === stock.symbol);
       if (portfolioItem) {
-        setQuantity(portfolioItem.quantity * percentage);
+        setQuantity(roundQuantity(portfolioItem.quantity * percentage));
       }
     }
   };
@@ -127,7 +128,7 @@ export default function TradeModal({ isOpen, onClose, stock, type }: TradeModalP
     if (!stock || !user) return;
 
     if (!quantity || quantity <= 0) {
-      setError('Miktar 0\'dan büyük olmalıdır!');
+      setError('Miktar 0\'dan buyuk olmalidir!');
       return;
     }
 
@@ -135,10 +136,8 @@ export default function TradeModal({ isOpen, onClose, stock, type }: TradeModalP
     setError('');
 
     try {
-      // Kripto için asset_type belirleme
-      const assetType = stock.symbol.length <= 4 ? 'crypto' : 'stock';
-      const isCrypto = stock.symbol.length <= 4;
-      const priceInTRY = isCrypto ? stock.price * USD_TO_TRY : stock.price;
+      const assetType = stock.assetType || 'stock';
+      const priceInTRY = getPriceInTRY();
       
       if (type === 'buy') {
         const totalCost = totalAmount + commission;
@@ -148,7 +147,6 @@ export default function TradeModal({ isOpen, onClose, stock, type }: TradeModalP
           return;
         }
 
-        // Backend'e alış isteği gönder
         const result = await transactionApi.buy({
           symbol: stock.symbol,
           name: stock.name,
@@ -163,12 +161,12 @@ export default function TradeModal({ isOpen, onClose, stock, type }: TradeModalP
           setQuantity(1);
           setError('');
         } else {
-          setError(result.message || 'İşlem başarısız!');
+          setError(result.message || 'Islem basarisiz!');
         }
       } else {
         const portfolioItem = state.portfolioItems.find(item => item.symbol === stock.symbol);
         if (!portfolioItem) {
-          setError('Portföyde bu varlık bulunamadı!');
+          setError('Portfoyde bu varlik bulunamadi!');
           setLoading(false);
           return;
         }
@@ -189,11 +187,11 @@ export default function TradeModal({ isOpen, onClose, stock, type }: TradeModalP
           setQuantity(1);
           setError('');
         } else {
-          setError(result.message || 'İşlem başarısız!');
+          setError(result.message || 'Islem basarisiz!');
         }
       }
     } catch (err: any) {
-      setError(err.message || 'Bir hata oluştu!');
+      setError(err.message || 'Bir hata olustu!');
     } finally {
       setLoading(false);
     }
@@ -201,8 +199,8 @@ export default function TradeModal({ isOpen, onClose, stock, type }: TradeModalP
 
   if (!isOpen || !stock) return null;
 
-  const isCrypto = stock.symbol.length <= 4;
-  const priceInTRY = isCrypto ? stock.price * USD_TO_TRY : stock.price;
+  const isCrypto = getIsCrypto();
+  const priceInTRY = getPriceInTRY();
   const totalCost = type === 'buy' ? totalAmount + commission : totalAmount - commission;
   const availableQuantity = type === 'sell' 
     ? (state.portfolioItems.find(item => item.symbol === stock.symbol)?.quantity || 0)
@@ -211,7 +209,6 @@ export default function TradeModal({ isOpen, onClose, stock, type }: TradeModalP
   return createPortal(
     <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
         <div className="w-full max-w-lg max-h-[90vh] bg-[#1e2329] rounded-2xl shadow-2xl border border-[#2b3139] overflow-hidden flex flex-col">
-        {/* Header - sabit */}
         <div className={`flex-shrink-0 flex items-center justify-between px-6 py-4 border-b border-[#2b3139] ${
           type === 'buy' ? 'bg-[#0b1529]' : 'bg-[#1a0f1a]'
         }`}>
@@ -229,7 +226,7 @@ export default function TradeModal({ isOpen, onClose, stock, type }: TradeModalP
               <h2 className={`text-xl font-bold ${
                 type === 'buy' ? 'text-[#0ecb81]' : 'text-[#f6465d]'
               }`}>
-                {type === 'buy' ? 'ALIŞ' : 'SATIŞ'}
+                {type === 'buy' ? 'ALIS' : 'SATIS'}
               </h2>
               <p className="text-sm text-[#848e9c]">{stock.name} ({stock.symbol})</p>
             </div>
@@ -243,18 +240,15 @@ export default function TradeModal({ isOpen, onClose, stock, type }: TradeModalP
         </div>
 
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto min-h-0 p-6 space-y-5 pb-8">
-          {/* Price Display - Binance Style */}
           <div className="bg-[#161a1e] rounded-xl p-5 border border-[#2b3139]">
-            <div className="text-[#848e9c] text-sm mb-2">Güncel Fiyat</div>
+            <div className="text-[#848e9c] text-sm mb-2">Guncel Fiyat</div>
             <div className="flex items-baseline gap-2">
               <span className="text-3xl font-bold text-white">
-                ₺{priceInTRY.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                {priceInTRY.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
               </span>
-              {isCrypto && (
-                <span className="text-lg text-[#848e9c]">
-                  ${stock.price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </span>
-              )}
+              <span className="text-lg text-[#848e9c]">
+                ${stock.price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </span>
             </div>
           </div>
 
@@ -279,7 +273,7 @@ export default function TradeModal({ isOpen, onClose, stock, type }: TradeModalP
                   : 'text-[#848e9c] hover:text-white'
               }`}
             >
-              Tutar (₺)
+              Tutar (TL)
             </button>
           </div>
 
@@ -290,10 +284,10 @@ export default function TradeModal({ isOpen, onClose, stock, type }: TradeModalP
               </label>
               <span className="text-xs text-[#848e9c]">
                 {type === 'buy' 
-                  ? `Mevcut Bakiye: ₺${state.balance.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}`
+                  ? `Mevcut Bakiye: ${state.balance.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} TL`
                   : inputMode === 'quantity' 
                     ? `Mevcut: ${availableQuantity > 0 ? availableQuantity.toFixed(8) : '0'} ${stock.symbol}`
-                    : `Mevcut: ₺${(availableQuantity * priceInTRY).toLocaleString('tr-TR', { minimumFractionDigits: 2 })}`
+                    : `Mevcut: ${(availableQuantity * priceInTRY).toLocaleString('tr-TR', { minimumFractionDigits: 2 })} TL`
                 }
               </span>
             </div>
@@ -302,7 +296,7 @@ export default function TradeModal({ isOpen, onClose, stock, type }: TradeModalP
                 <input
                   type="number"
                   min="0"
-                  step="0.00000001"
+                  step="any"
                   value={quantity || ''}
                   onChange={handleQuantityChange}
                   className="w-full px-4 py-4 bg-[#161a1e] border-2 border-[#2b3139] rounded-xl text-white text-lg font-semibold focus:outline-none focus:border-[#0ecb81] transition-colors placeholder:text-[#848e9c]"
@@ -312,7 +306,7 @@ export default function TradeModal({ isOpen, onClose, stock, type }: TradeModalP
                 <input
                   type="number"
                   min="0"
-                  step="0.01"
+                  step="any"
                   value={amountInput}
                   onChange={handleAmountChange}
                   className="w-full px-4 py-4 bg-[#161a1e] border-2 border-[#2b3139] rounded-xl text-white text-lg font-semibold focus:outline-none focus:border-[#0ecb81] transition-colors placeholder:text-[#848e9c]"
@@ -320,7 +314,7 @@ export default function TradeModal({ isOpen, onClose, stock, type }: TradeModalP
                 />
               )}
               <div className="absolute right-3 top-1/2 -translate-y-1/2 text-[#848e9c] text-sm">
-                {inputMode === 'quantity' ? stock.symbol : '₺'}
+                {inputMode === 'quantity' ? stock.symbol : 'TL'}
               </div>
             </div>
           </div>
@@ -342,13 +336,13 @@ export default function TradeModal({ isOpen, onClose, stock, type }: TradeModalP
             <div className="flex justify-between items-center">
               <span className="text-sm text-[#848e9c]">Toplam Tutar</span>
               <span className="text-sm font-medium text-white">
-                ₺{totalAmount.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                {totalAmount.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
               </span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-sm text-[#848e9c]">Komisyon (%0.25)</span>
               <span className="text-sm font-medium text-white">
-                ₺{commission.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                {commission.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
               </span>
             </div>
             <div className="border-t border-[#2b3139] pt-3">
@@ -359,7 +353,7 @@ export default function TradeModal({ isOpen, onClose, stock, type }: TradeModalP
                 <span className={`text-lg font-bold ${
                   type === 'buy' ? 'text-[#f6465d]' : 'text-[#0ecb81]'
                 }`}>
-                  ₺{totalCost.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  {totalCost.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
                 </span>
               </div>
             </div>
@@ -370,15 +364,15 @@ export default function TradeModal({ isOpen, onClose, stock, type }: TradeModalP
               <div className="flex justify-between items-center mb-2">
                 <span className="text-sm text-[#848e9c]">Mevcut Bakiye</span>
                 <span className="text-sm font-semibold text-white">
-                  ₺{state.balance.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  {state.balance.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
                 </span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-sm text-[#848e9c]">İşlem Sonrası Bakiye</span>
+                <span className="text-sm text-[#848e9c]">Islem Sonrasi Bakiye</span>
                 <span className={`text-sm font-semibold ${
                   state.balance - totalCost >= 0 ? 'text-[#0ecb81]' : 'text-[#f6465d]'
                 }`}>
-                  ₺{(state.balance - totalCost).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  {(state.balance - totalCost).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
                 </span>
               </div>
             </div>
@@ -416,7 +410,7 @@ export default function TradeModal({ isOpen, onClose, stock, type }: TradeModalP
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
-                İşleniyor...
+                Isleniyor...
               </span>
             ) : (
               type === 'buy' ? 'SATIN AL' : 'SAT'

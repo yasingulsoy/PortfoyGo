@@ -11,6 +11,17 @@ export interface Stock {
   open: number;
   high: number;
   low: number;
+  assetType?: 'stock' | 'crypto' | 'commodity';
+}
+
+export interface Commodity {
+  code: string;
+  name: string;
+  buying: number;
+  selling: number;
+  price: number;
+  change_rate: number;
+  datetime: string;
 }
 
 export interface PortfolioItem {
@@ -23,6 +34,7 @@ export interface PortfolioItem {
   totalValue: number;
   profitLoss: number;
   profitLossPercent: number;
+  assetType?: 'stock' | 'crypto' | 'commodity';
 }
 
 export interface Transaction {

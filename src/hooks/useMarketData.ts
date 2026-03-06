@@ -1,5 +1,5 @@
 import useSWR from 'swr';
-import { Stock } from '@/types';
+import { Stock, Commodity } from '@/types';
 import type { CryptoCoin } from '@/services/crypto';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/api';
@@ -47,6 +47,24 @@ export function useCryptos() {
 
   return {
     cryptos: data ?? [],
+    isLoading,
+    isError: error,
+    refresh: mutate,
+  };
+}
+
+export function useCommodities() {
+  const { data, error, isLoading, mutate } = useSWR<Commodity[], Error, string>(
+    `${API_BASE_URL}/commodities`,
+    (url) => jsonFetcher<Commodity[]>(url),
+    {
+      refreshInterval: 60000,
+      revalidateOnFocus: true,
+    }
+  );
+
+  return {
+    commodities: data ?? [],
     isLoading,
     isError: error,
     refresh: mutate,

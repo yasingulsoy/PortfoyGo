@@ -95,6 +95,7 @@ export default function AssetDetailPage({ params }: { params: Promise<{ symbol: 
     open: priceUSD,
     high: priceUSD,
     low: priceUSD,
+    assetType: type === 'crypto' ? 'crypto' : 'stock',
   };
 
   if (!symbol) {

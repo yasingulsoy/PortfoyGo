@@ -16,14 +16,16 @@ import { usePortfolio } from '@/context/PortfolioContext';
 import { useAuth } from '@/context/AuthContext';
 import TradeModal from '@/components/TradeModal';
 import MarketTabs from '@/components/MarketTabs';
-import { useStocks, useCryptos } from '@/hooks/useMarketData';
+import { useStocks, useCryptos, useCommodities } from '@/hooks/useMarketData';
 import { CryptoCoin } from '@/services/crypto';
+import { Commodity } from '@/types';
 import { leaderboardApi } from '@/services/backendApi';
 
 export default function Home() {
   const { state, refreshPortfolio, updatePrices } = usePortfolio();
   const { stocks } = useStocks();
   const { cryptos } = useCryptos();
+  const { commodities } = useCommodities();
   const { user, loading } = useAuth();
   const router = useRouter();
 
@@ -197,6 +199,27 @@ export default function Home() {
       open: price,
       high: price,
       low: price,
+      assetType: 'crypto',
+    };
+  }, []);
+
+  const toStockFromCommodity = useCallback((c: Commodity): Stock => {
+    const price = c.price;
+    const change = price * (c.change_rate / 100);
+    return {
+      id: c.code,
+      symbol: c.code.toUpperCase(),
+      name: c.name,
+      price,
+      change,
+      changePercent: c.change_rate,
+      volume: 0,
+      marketCap: 0,
+      previousClose: price - change,
+      open: price,
+      high: price,
+      low: price,
+      assetType: 'commodity',
     };
   }, []);
 
@@ -287,12 +310,18 @@ export default function Home() {
     setIsTradeModalOpen(true);
   };
 
-  const onBuy = (symbol: string, type: 'stock' | 'crypto') => {
+  const onBuy = (symbol: string, type: 'stock' | 'crypto' | 'commodity') => {
     if (type === 'stock') {
       const s = stocks.find(x => x.symbol === symbol);
       if (s) {
         setTradeType('buy');
-        openTrade(s);
+        openTrade({ ...s, assetType: 'stock' });
+      }
+    } else if (type === 'commodity') {
+      const c = commodities.find(x => x.code.toUpperCase() === symbol || x.code === symbol);
+      if (c) {
+        setTradeType('buy');
+        openTrade(toStockFromCommodity(c));
       }
     } else {
       const c = cryptos.find(x => x.symbol.toUpperCase() === symbol);
@@ -303,12 +332,18 @@ export default function Home() {
     }
   };
 
-  const onSell = (symbol: string, type: 'stock' | 'crypto') => {
+  const onSell = (symbol: string, type: 'stock' | 'crypto' | 'commodity') => {
     if (type === 'stock') {
       const s = stocks.find(x => x.symbol === symbol);
       if (s) {
         setTradeType('sell');
-        openTrade(s);
+        openTrade({ ...s, assetType: 'stock' });
+      }
+    } else if (type === 'commodity') {
+      const c = commodities.find(x => x.code.toUpperCase() === symbol || x.code === symbol);
+      if (c) {
+        setTradeType('sell');
+        openTrade(toStockFromCommodity(c));
       }
     } else {
       const c = cryptos.find(x => x.symbol.toUpperCase() === symbol);
@@ -538,6 +573,65 @@ export default function Home() {
           </div>
         </div>
 
+        {/* Emtia Grid */}
+        {commodities.length > 0 && (
+          <div className="mb-8">
+            <div className="bg-[#1e2329] rounded-xl border border-[#2b3139] overflow-hidden">
+              <div className="flex items-center justify-between px-6 py-4 border-b border-[#2b3139] bg-[#161a1e]">
+                <h2 className="text-xl font-bold text-white">Emtia</h2>
+                <span className="text-sm text-[#848e9c] bg-[#2b3139] px-3 py-1 rounded-full">{commodities.length} emtia</span>
+              </div>
+              
+              <div className="p-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
+                  {commodities.map((commodity) => {
+                    const USD_TO_TRY = 32.5;
+                    return (
+                      <div key={commodity.code} className="bg-[#161a1e] rounded-lg p-4 border border-[#2b3139] hover:border-[#f0b90b]/30 transition-all hover:bg-[#1e2329]">
+                        <div className="flex items-center gap-3 mb-3">
+                          <div className="h-10 w-10 bg-[#f0b90b]/10 rounded-lg flex items-center justify-center">
+                            <span className="text-lg font-bold text-[#f0b90b]">
+                              {commodity.name.charAt(0).toUpperCase()}
+                            </span>
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="text-sm font-semibold text-white truncate">{commodity.name}</div>
+                            <div className="text-xs text-[#848e9c] truncate">{commodity.code}</div>
+                          </div>
+                        </div>
+                        <div className="mb-3">
+                          <div className="text-base font-bold text-white">${commodity.price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                          <div className="text-xs text-[#848e9c]">₺{(commodity.price * USD_TO_TRY).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                          <div className={`text-xs inline-flex items-center font-medium mt-1 ${commodity.change_rate >= 0 ? 'text-[#0ecb81]' : 'text-[#f6465d]'}`}>
+                            {commodity.change_rate >= 0 ? <ArrowUpIcon className="h-3 w-3 mr-1" /> : <ArrowDownIcon className="h-3 w-3 mr-1" />}
+                            {commodity.change_rate >= 0 ? '+' : ''}{commodity.change_rate.toFixed(2)}%
+                          </div>
+                        </div>
+                        {user && (
+                          <div className="flex gap-2">
+                            <button 
+                              onClick={() => onBuy(commodity.code.toUpperCase(), 'commodity')} 
+                              className="flex-1 bg-[#0ecb81] hover:bg-[#0bb975] text-white py-2 px-3 rounded-lg text-xs font-semibold transition-all"
+                            >
+                              Al
+                            </button>
+                            <button 
+                              onClick={() => onSell(commodity.code.toUpperCase(), 'commodity')} 
+                              className="flex-1 bg-[#f6465d] hover:bg-[#e03e54] text-white py-2 px-3 rounded-lg text-xs font-semibold transition-all"
+                            >
+                              Sat
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Quick Actions & Market Summary - Binance Style */}
         {user && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
@@ -570,6 +664,10 @@ export default function Home() {
                   <span className="font-semibold text-white">{cryptos.length}</span>
                 </div>
                 <div className="flex justify-between items-center py-2 border-b border-[#2b3139]">
+                  <span className="text-sm text-[#848e9c]">Toplam Emtia</span>
+                  <span className="font-semibold text-white">{commodities.length}</span>
+                </div>
+                <div className="flex justify-between items-center py-2 border-b border-[#2b3139]">
                   <span className="text-sm text-[#848e9c]">Komisyon Oranı</span>
                   <span className="font-semibold text-[#0ecb81]">%0.25</span>
                 </div>
@@ -597,6 +695,13 @@ export default function Home() {
                     24/7
                   </span>
                 </div>
+                <div className="flex items-center justify-between py-2 border-b border-[#2b3139]">
+                  <span className="text-sm text-[#848e9c]">Emtia</span>
+                  <span className="text-[#0ecb81] text-sm font-semibold flex items-center gap-1">
+                    <span className="h-2 w-2 bg-[#0ecb81] rounded-full animate-pulse"></span>
+                    Canli
+                  </span>
+                </div>
                 <div className="flex items-center justify-between py-2">
                   <span className="text-sm text-[#848e9c]">API Durumu</span>
                   <span className="text-[#0ecb81] text-sm font-semibold flex items-center gap-1">
@@ -621,7 +726,6 @@ export default function Home() {
             {topLeaders.length > 0 ? (
               topLeaders.map((leader, index) => {
                 const isProfit = leader.profit_loss_percent >= 0;
-                const medalEmoji = leader.rank === 1 ? '🥇' : leader.rank === 2 ? '🥈' : '🥉';
                 const bgColors = leader.rank === 1 
                   ? 'bg-[#f0b90b]/10 border-[#f0b90b]/30'
                   : leader.rank === 2
@@ -637,7 +741,7 @@ export default function Home() {
                   <div key={leader.rank} className={`flex items-center justify-between p-3 sm:p-4 ${bgColors} rounded-lg border hover:border-[#0ecb81]/30 transition-all`}>
                     <div className="flex items-center space-x-2 sm:space-x-3">
                       <div className={`h-10 w-10 sm:h-12 sm:w-12 ${iconColors} rounded-full flex items-center justify-center`}>
-                        <span className="text-white font-bold text-base sm:text-lg">{medalEmoji}</span>
+                        <span className="text-white font-bold text-base sm:text-lg">{leader.rank}</span>
                       </div>
                       <div>
                         <div className="font-semibold text-white text-sm sm:text-base">{leader.username}</div>
@@ -661,7 +765,7 @@ export default function Home() {
                 <div className="flex items-center justify-between p-3 sm:p-4 bg-[#f0b90b]/10 border border-[#f0b90b]/30 rounded-lg hover:border-[#0ecb81]/30 transition-all">
                   <div className="flex items-center space-x-2 sm:space-x-3">
                     <div className="h-10 w-10 sm:h-12 sm:w-12 bg-[#f0b90b] rounded-full flex items-center justify-center">
-                      <span className="text-white font-bold text-base sm:text-lg">🥇</span>
+                      <span className="text-white font-bold text-base sm:text-lg">1</span>
                     </div>
                     <div>
                       <div className="font-semibold text-white text-sm sm:text-base">-</div>
@@ -676,7 +780,7 @@ export default function Home() {
                 <div className="flex items-center justify-between p-3 sm:p-4 bg-[#2b3139] border border-[#2b3139] rounded-lg hover:border-[#0ecb81]/30 transition-all">
                   <div className="flex items-center space-x-2 sm:space-x-3">
                     <div className="h-10 w-10 sm:h-12 sm:w-12 bg-[#848e9c] rounded-full flex items-center justify-center">
-                      <span className="text-white font-bold text-base sm:text-lg">🥈</span>
+                      <span className="text-white font-bold text-base sm:text-lg">2</span>
                     </div>
                     <div>
                       <div className="font-semibold text-white text-sm sm:text-base">-</div>
@@ -691,7 +795,7 @@ export default function Home() {
                 <div className="flex items-center justify-between p-3 sm:p-4 bg-[#f0b90b]/5 border border-[#f0b90b]/20 rounded-lg sm:col-span-2 lg:col-span-1 hover:border-[#0ecb81]/30 transition-all">
                   <div className="flex items-center space-x-2 sm:space-x-3">
                     <div className="h-10 w-10 sm:h-12 sm:w-12 bg-[#f0b90b]/80 rounded-full flex items-center justify-center">
-                      <span className="text-white font-bold text-base sm:text-lg">🥉</span>
+                      <span className="text-white font-bold text-base sm:text-lg">3</span>
                     </div>
                     <div>
                       <div className="font-semibold text-white text-sm sm:text-base">-</div>

@@ -250,11 +250,12 @@ export default function PortfolioPage() {
                   const asset = stocks.find(s => s.symbol.toUpperCase() === item.symbol.toUpperCase()) ||
                                cryptos.find(c => c.symbol.toUpperCase() === item.symbol.toUpperCase());
                   if (asset) {
+                    const isCryptoAsset = 'current_price' in asset;
                     const stockLike: Stock = {
                       id: asset.id || item.symbol,
                       symbol: item.symbol,
                       name: item.name,
-                      price: 'current_price' in asset ? asset.current_price : asset.price,
+                      price: isCryptoAsset ? asset.current_price : asset.price,
                       change: 0,
                       changePercent: 0,
                       volume: 'total_volume' in asset ? asset.total_volume : asset.volume || 0,
@@ -263,6 +264,7 @@ export default function PortfolioPage() {
                       open: item.currentPrice / USD_TO_TRY,
                       high: item.currentPrice / USD_TO_TRY,
                       low: item.currentPrice / USD_TO_TRY,
+                      assetType: isCryptoAsset ? 'crypto' : 'stock',
                     };
                     setSelectedStock(stockLike);
                     setTradeType(type);
@@ -383,7 +385,7 @@ function PortfolioOverview({
                     </div>
                     <div>
                       <Link 
-                        href={`/asset/${item.symbol}?type=${item.symbol.length <= 4 ? 'crypto' : 'stock'}`}
+                        href={`/asset/${item.symbol}?type=${item.assetType || 'stock'}`}
                         className="text-sm font-semibold text-white hover:text-[#0ecb81] transition-colors"
                       >
                         {item.name}

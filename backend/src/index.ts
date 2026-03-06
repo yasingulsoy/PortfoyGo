@@ -11,6 +11,7 @@ import adminRoutes from './routes/admin';
 import badgesRoutes from './routes/badges';
 import activityLogsRoutes from './routes/activityLogs';
 import cryptosRoutes from './routes/cryptos';
+import commoditiesRoutes from './routes/commodities';
 import stopLossRoutes from './routes/stopLoss';
 import { MarketCacheService } from './services/marketCache';
 import { StopLossService } from './services/stopLoss';
@@ -178,6 +179,7 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/badges', badgesRoutes);
 app.use('/api/activity-logs', activityLogsRoutes);
 app.use('/api/cryptos', cryptosRoutes);
+app.use('/api/commodities', commoditiesRoutes);
 app.use('/api/stop-loss', stopLossRoutes);
 
 // Health check

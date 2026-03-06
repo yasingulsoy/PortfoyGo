@@ -67,7 +67,7 @@ export default function PriceChart({ type, symbol, id, days = 30 }: PriceChartPr
         height: 320,
       });
       
-      series = chart.addAreaSeries({
+      series = chart.addSeries(lc.AreaSeries, {
         lineColor: lineColor,
         topColor: topColor,
         bottomColor: 'rgba(79,70,229,0.0)'

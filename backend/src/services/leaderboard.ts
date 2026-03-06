@@ -63,20 +63,22 @@ export class LeaderboardService {
             const quantity = parseFloat(item.quantity || 0);
             const averagePrice = parseFloat(item.average_price || 0);
             const symbol = item.symbol.toUpperCase();
-            const assetType = item.asset_type;
 
-            // Güncel fiyatı market cache'den al
-            let currentPriceUSD = 0;
-            if (assetType === 'crypto') {
-              currentPriceUSD = cryptoPriceMap.get(symbol) || parseFloat(item.current_price || 0);
+            const USD_TO_TRY = 32.5;
+
+            // Her iki cache'de de ara (asset_type yanlis kaydedilmis olabilir)
+            const cachedPriceUSD = stockPriceMap.get(symbol) || cryptoPriceMap.get(symbol);
+
+            let currentPriceTRY: number;
+            if (cachedPriceUSD !== undefined) {
+              currentPriceTRY = cachedPriceUSD * USD_TO_TRY;
             } else {
-              currentPriceUSD = stockPriceMap.get(symbol) || parseFloat(item.current_price || 0);
+              // Cache'de yoksa DB'deki current_price zaten TRY cinsinden
+              currentPriceTRY = parseFloat(item.current_price || 0);
             }
 
-            // USD'den TRY'ye çevir (USD_TO_TRY = 32.5)
-            const USD_TO_TRY = 32.5;
-            const currentPriceTRY = currentPriceUSD * USD_TO_TRY;
-            const averagePriceTRY = averagePrice; // average_price zaten TRY cinsinden kaydediliyor
+            // average_price zaten TRY cinsinden kaydediliyor
+            const averagePriceTRY = averagePrice;
 
             const value = quantity * currentPriceTRY;
             const profitLoss = (currentPriceTRY - averagePriceTRY) * quantity;
@@ -184,19 +186,18 @@ export class LeaderboardService {
             const quantity = parseFloat(item.quantity || 0);
             const averagePrice = parseFloat(item.average_price || 0);
             const symbol = item.symbol.toUpperCase();
-            const assetType = item.asset_type;
 
-            // Güncel fiyatı market cache'den al
-            let currentPriceUSD = 0;
-            if (assetType === 'crypto') {
-              currentPriceUSD = cryptoPriceMap.get(symbol) || parseFloat(item.current_price || 0);
+            const USD_TO_TRY = 32.5;
+
+            const cachedPriceUSD = stockPriceMap.get(symbol) || cryptoPriceMap.get(symbol);
+
+            let currentPriceTRY: number;
+            if (cachedPriceUSD !== undefined) {
+              currentPriceTRY = cachedPriceUSD * USD_TO_TRY;
             } else {
-              currentPriceUSD = stockPriceMap.get(symbol) || parseFloat(item.current_price || 0);
+              currentPriceTRY = parseFloat(item.current_price || 0);
             }
 
-            // USD'den TRY'ye çevir
-            const USD_TO_TRY = 32.5;
-            const currentPriceTRY = currentPriceUSD * USD_TO_TRY;
             const averagePriceTRY = averagePrice;
 
             const profitLoss = (currentPriceTRY - averagePriceTRY) * quantity;
