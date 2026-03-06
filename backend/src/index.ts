@@ -17,6 +17,7 @@ import stopLossRoutes from './routes/stopLoss';
 import { MarketCacheService } from './services/marketCache';
 import { StopLossService } from './services/stopLoss';
 import { CurrencyService } from './services/currency';
+import { PortfolioService } from './services/portfolio';
 import cron from 'node-cron';
 
 // Environment variables
@@ -255,9 +256,14 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
 });
 
 // Cache'i başlangıçta doldur (ilk yükleme - daha fazla hisse çek)
-MarketCacheService.refreshCache(true).catch(err => {
-  console.error('Initial cache refresh error:', err);
-});
+MarketCacheService.refreshCache(true)
+  .then(() => {
+    // Cache dolduktan sonra portföy fiyatlarını güncelle
+    return PortfolioService.updateAllPortfolioPrices();
+  })
+  .catch(err => {
+    console.error('Initial cache/portfolio refresh error:', err);
+  });
 
 // Döviz kurlarını başlangıçta çek (DB boşsa doldurur)
 CurrencyService.fetchAndSaveToDb().catch(err => {
@@ -295,6 +301,16 @@ cron.schedule('* * * * *', async () => {
     await StopLossService.checkAndTriggerStopLosses();
   } catch (error) {
     console.error('❌ Stop-loss kontrolü hatası:', error);
+  }
+});
+
+// Her 2 dakikada bir tüm portföy fiyatlarını cache'den güncelle
+cron.schedule('*/2 * * * *', async () => {
+  console.log('⏰ Portföy fiyatları güncelleniyor...');
+  try {
+    await PortfolioService.updateAllPortfolioPrices();
+  } catch (error) {
+    console.error('❌ Portföy fiyat güncelleme hatası:', error);
   }
 });
 

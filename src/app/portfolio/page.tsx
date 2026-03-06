@@ -16,11 +16,9 @@ import {
 import { usePortfolio } from '@/context/PortfolioContext';
 import { useAuth } from '@/context/AuthContext';
 import { PortfolioItem, Transaction, Stock } from '@/types';
-import { useStocks, useCryptos } from '@/hooks/useMarketData';
+import { useStocks, useCryptos, useCurrencies } from '@/hooks/useMarketData';
 import TradeModal from '@/components/TradeModal';
 import StopLossModal from '@/components/StopLossModal';
-
-const USD_TO_TRY = 32.5;
 
 export default function PortfolioPage() {
   const { state, refreshPortfolio } = usePortfolio();
@@ -28,6 +26,8 @@ export default function PortfolioPage() {
   const router = useRouter();
   const { stocks } = useStocks();
   const { cryptos } = useCryptos();
+  const { currencies, usdToTry } = useCurrencies();
+  const USD_TO_TRY = usdToTry;
   const [activeTab, setActiveTab] = useState<'overview' | 'transactions'>('overview');
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [portfolioWithPrices, setPortfolioWithPrices] = useState<PortfolioItem[]>([]);
@@ -46,8 +46,27 @@ export default function PortfolioPage() {
   // Portföy öğelerini güncel fiyatlarla güncelle
   // Not: Sembol uzunluğuna göre tahmin yapmak yerine gerçekten kriptolarda mı, hisselerde mi olduğuna bakıyoruz.
   useEffect(() => {
-    if (state.portfolioItems.length > 0 && (stocks.length > 0 || cryptos.length > 0)) {
+    if (state.portfolioItems.length > 0 && (stocks.length > 0 || cryptos.length > 0 || currencies.length > 0)) {
       const updated = state.portfolioItems.map(item => {
+        // Döviz (currency) - fiyat zaten TRY
+        const currency = currencies.find(c => c.code.toUpperCase() === item.symbol.toUpperCase());
+        if (currency) {
+          const currentPriceTRY = currency.selling;
+          const averagePriceTRY = item.averagePrice;
+          const profitLoss = (currentPriceTRY - averagePriceTRY) * item.quantity;
+          const profitLossPercent = averagePriceTRY > 0
+            ? ((currentPriceTRY - averagePriceTRY) / averagePriceTRY) * 100
+            : 0;
+          return {
+            ...item,
+            currentPrice: currentPriceTRY,
+            currentPriceUSD: currentPriceTRY / USD_TO_TRY,
+            totalValue: item.quantity * currentPriceTRY,
+            profitLoss,
+            profitLossPercent,
+          };
+        }
+
         // Önce kripto listesinde var mı diye bak
         const crypto = cryptos.find(
           c => c.symbol.toUpperCase() === item.symbol.toUpperCase()
@@ -247,24 +266,48 @@ export default function PortfolioPage() {
                 stocks={stocks}
                 cryptos={cryptos}
                 onTrade={(item, type) => {
-                  const asset = stocks.find(s => s.symbol.toUpperCase() === item.symbol.toUpperCase()) ||
-                               cryptos.find(c => c.symbol.toUpperCase() === item.symbol.toUpperCase());
+                  const currency = currencies.find(c => c.code.toUpperCase() === item.symbol.toUpperCase());
+                  if (currency) {
+                    const stockLike: Stock = {
+                      id: currency.code,
+                      symbol: item.symbol,
+                      name: item.name,
+                      price: currency.selling,
+                      change: 0,
+                      changePercent: currency.change_rate,
+                      volume: 0,
+                      marketCap: 0,
+                      previousClose: currency.selling,
+                      open: currency.selling,
+                      high: currency.selling,
+                      low: currency.selling,
+                      assetType: 'currency',
+                    };
+                    setSelectedStock(stockLike);
+                    setTradeType(type);
+                    setIsTradeModalOpen(true);
+                    return;
+                  }
+                  const cryptoAsset = cryptos.find(c => c.symbol.toUpperCase() === item.symbol.toUpperCase());
+                  const stockAsset = stocks.find(s => s.symbol.toUpperCase() === item.symbol.toUpperCase());
+                  const asset = stockAsset || cryptoAsset;
                   if (asset) {
-                    const isCryptoAsset = 'current_price' in asset;
+                    const isCrypto = !!cryptoAsset && !stockAsset;
+                    const resolvedType = item.assetType || (isCrypto ? 'crypto' : 'stock');
                     const stockLike: Stock = {
                       id: asset.id || item.symbol,
                       symbol: item.symbol,
                       name: item.name,
-                      price: isCryptoAsset ? asset.current_price : asset.price,
+                      price: isCrypto ? (asset as any).current_price : (asset as any).price,
                       change: 0,
                       changePercent: 0,
-                      volume: 'total_volume' in asset ? asset.total_volume : asset.volume || 0,
-                      marketCap: 'market_cap' in asset ? asset.market_cap : asset.marketCap || 0,
+                      volume: isCrypto ? (asset as any).total_volume || 0 : (asset as any).volume || 0,
+                      marketCap: isCrypto ? (asset as any).market_cap || 0 : (asset as any).marketCap || 0,
                       previousClose: item.currentPrice / USD_TO_TRY,
                       open: item.currentPrice / USD_TO_TRY,
                       high: item.currentPrice / USD_TO_TRY,
                       low: item.currentPrice / USD_TO_TRY,
-                      assetType: isCryptoAsset ? 'crypto' : 'stock',
+                      assetType: resolvedType,
                     };
                     setSelectedStock(stockLike);
                     setTradeType(type);
@@ -293,6 +336,7 @@ export default function PortfolioPage() {
           }}
           stock={selectedStock}
           type={tradeType}
+          usdToTry={usdToTry}
         />
       )}
 

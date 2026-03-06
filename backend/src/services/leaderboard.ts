@@ -1,5 +1,4 @@
 import pool from '../config/database';
-import { MarketCacheService } from './marketCache';
 
 export interface LeaderboardEntry {
   rank: number;
@@ -14,229 +13,88 @@ export class LeaderboardService {
   // Liderlik tablosunu getir
   static async getLeaderboard(limit: number = 10): Promise<{ success: boolean; leaderboard?: LeaderboardEntry[] }> {
     try {
-      // Önce tüm kullanıcıların rank'lerini güncelle
       await this.updateRanks();
 
-      // Tüm kullanıcıları al ve portföy öğelerinden kar/zarar bilgilerini hesapla
-      const usersResult = await pool.query(
-        `SELECT 
-          id,
-          username,
-          balance,
-          portfolio_value,
-          total_profit_loss
-         FROM users
-         WHERE email_verified = true AND (is_banned IS NULL OR is_banned = false)`
-      );
+      // portfolio_items zaten güncel (cron job her 2 dk günceller)
+      // Tek bir sorgu ile tüm leaderboard verisini çek
+      const result = await pool.query(`
+        SELECT 
+          u.username,
+          u.balance,
+          COALESCE(SUM(pi.total_value), 0) AS portfolio_value,
+          COALESCE(SUM(pi.profit_loss), 0) AS total_profit_loss,
+          CASE 
+            WHEN COALESCE(SUM(pi.quantity * pi.average_price), 0) > 0 
+            THEN (SUM(pi.profit_loss) / SUM(pi.quantity * pi.average_price)) * 100
+            ELSE 0 
+          END AS profit_loss_percent
+        FROM users u
+        LEFT JOIN portfolio_items pi ON u.id = pi.user_id
+        WHERE u.email_verified = true 
+          AND (u.is_banned IS NULL OR u.is_banned = false)
+        GROUP BY u.id, u.username, u.balance
+        ORDER BY profit_loss_percent DESC, total_profit_loss DESC
+        LIMIT $1
+      `, [limit]);
 
-      // Market cache'den tüm güncel fiyatları al (bir kez çek, tüm kullanıcılar için kullan)
-      const cachedStocks = await MarketCacheService.getFromCache('stock');
-      const cachedCryptos = await MarketCacheService.getFromCache('crypto');
-      
-      // Fiyat lookup map'leri oluştur (hızlı erişim için)
-      const stockPriceMap = new Map<string, number>();
-      const cryptoPriceMap = new Map<string, number>();
-      
-      cachedStocks.forEach(stock => {
-        stockPriceMap.set(stock.symbol.toUpperCase(), stock.price);
-      });
-      
-      cachedCryptos.forEach(crypto => {
-        cryptoPriceMap.set(crypto.symbol.toUpperCase(), crypto.price);
-      });
-
-      // Her kullanıcı için portföy öğelerinden gerçek kar/zarar bilgilerini hesapla
-      const leaderboardData = await Promise.all(
-        usersResult.rows.map(async (user: any) => {
-          const portfolioResult = await pool.query(
-            `SELECT quantity, current_price, average_price, symbol, asset_type 
-             FROM portfolio_items 
-             WHERE user_id = $1`,
-            [user.id]
-          );
-
-          let totalPortfolioValue = 0;
-          let totalProfitLoss = 0;
-          let totalInvestment = 0;
-
-          for (const item of portfolioResult.rows) {
-            const quantity = parseFloat(item.quantity || 0);
-            const averagePrice = parseFloat(item.average_price || 0);
-            const symbol = item.symbol.toUpperCase();
-
-            const USD_TO_TRY = 32.5;
-
-            // Her iki cache'de de ara (asset_type yanlis kaydedilmis olabilir)
-            const cachedPriceUSD = stockPriceMap.get(symbol) || cryptoPriceMap.get(symbol);
-
-            let currentPriceTRY: number;
-            if (cachedPriceUSD !== undefined) {
-              currentPriceTRY = cachedPriceUSD * USD_TO_TRY;
-            } else {
-              // Cache'de yoksa DB'deki current_price zaten TRY cinsinden
-              currentPriceTRY = parseFloat(item.current_price || 0);
-            }
-
-            // average_price zaten TRY cinsinden kaydediliyor
-            const averagePriceTRY = averagePrice;
-
-            const value = quantity * currentPriceTRY;
-            const profitLoss = (currentPriceTRY - averagePriceTRY) * quantity;
-            const investment = quantity * averagePriceTRY;
-
-            totalPortfolioValue += value;
-            totalProfitLoss += profitLoss;
-            totalInvestment += investment;
-          }
-
-          // Kar/zarar yüzdesini hesapla
-          const profitLossPercent = totalInvestment > 0 
-            ? (totalProfitLoss / totalInvestment) * 100 
-            : 0;
-
-          return {
-            id: user.id,
-            username: user.username,
-            balance: parseFloat(user.balance || 0),
-            portfolio_value: totalPortfolioValue,
-            total_profit_loss: totalProfitLoss,
-            profit_loss_percent: profitLossPercent
-          };
-        })
-      );
-
-      // Kar/zarar yüzdesine göre sırala
-      leaderboardData.sort((a, b) => {
-        if (b.profit_loss_percent !== a.profit_loss_percent) {
-          return b.profit_loss_percent - a.profit_loss_percent;
-        }
-        return b.total_profit_loss - a.total_profit_loss;
-      });
-
-      // Limit'e göre al
-      const limitedData = leaderboardData.slice(0, limit);
-
-      const leaderboard: LeaderboardEntry[] = limitedData.map((data, index) => ({
+      const leaderboard: LeaderboardEntry[] = result.rows.map((row: any, index: number) => ({
         rank: index + 1,
-        username: data.username,
-        portfolio_value: data.portfolio_value,
-        total_profit_loss: data.total_profit_loss,
-        profit_loss_percent: data.profit_loss_percent,
-        balance: data.balance
+        username: row.username,
+        portfolio_value: parseFloat(row.portfolio_value),
+        total_profit_loss: parseFloat(row.total_profit_loss),
+        profit_loss_percent: parseFloat(row.profit_loss_percent),
+        balance: parseFloat(row.balance)
       }));
 
       console.log(`Leaderboard query returned ${leaderboard.length} users`);
 
-      return {
-        success: true,
-        leaderboard
-      };
+      return { success: true, leaderboard };
     } catch (error) {
       console.error('Get leaderboard error:', error);
       return { success: false };
     }
   }
 
-  // Tüm kullanıcıların rank'lerini güncelle
+  // Tüm kullanıcıların rank'lerini güncelle (tek sorgu ile)
   static async updateRanks(): Promise<void> {
     try {
-      // Önce tüm kullanıcıların rank'ini NULL yap (banlı ve doğrulanmamış kullanıcılar için)
-      await pool.query(
-        `UPDATE users 
-         SET rank = NULL 
-         WHERE email_verified = false OR (is_banned IS NOT NULL AND is_banned = true)`
-      );
+      // Banlı/doğrulanmamış kullanıcıları NULL yap
+      await pool.query(`
+        UPDATE users 
+        SET rank = NULL 
+        WHERE email_verified = false OR (is_banned IS NOT NULL AND is_banned = true)
+      `);
 
-      // Tüm kullanıcıları al
-      const usersResult = await pool.query(
-        `SELECT id FROM users
-         WHERE email_verified = true AND (is_banned IS NULL OR is_banned = false)`
-      );
-
-      // Market cache'den tüm güncel fiyatları al
-      const cachedStocks = await MarketCacheService.getFromCache('stock');
-      const cachedCryptos = await MarketCacheService.getFromCache('crypto');
-      
-      // Fiyat lookup map'leri oluştur
-      const stockPriceMap = new Map<string, number>();
-      const cryptoPriceMap = new Map<string, number>();
-      
-      cachedStocks.forEach(stock => {
-        stockPriceMap.set(stock.symbol.toUpperCase(), stock.price);
-      });
-      
-      cachedCryptos.forEach(crypto => {
-        cryptoPriceMap.set(crypto.symbol.toUpperCase(), crypto.price);
-      });
-
-      // Her kullanıcı için portföy öğelerinden kar/zarar bilgilerini hesapla
-      const userRankData = await Promise.all(
-        usersResult.rows.map(async (user: any) => {
-          const portfolioResult = await pool.query(
-            `SELECT quantity, current_price, average_price, symbol, asset_type 
-             FROM portfolio_items 
-             WHERE user_id = $1`,
-            [user.id]
-          );
-
-          let totalProfitLoss = 0;
-          let totalInvestment = 0;
-
-          for (const item of portfolioResult.rows) {
-            const quantity = parseFloat(item.quantity || 0);
-            const averagePrice = parseFloat(item.average_price || 0);
-            const symbol = item.symbol.toUpperCase();
-
-            const USD_TO_TRY = 32.5;
-
-            const cachedPriceUSD = stockPriceMap.get(symbol) || cryptoPriceMap.get(symbol);
-
-            let currentPriceTRY: number;
-            if (cachedPriceUSD !== undefined) {
-              currentPriceTRY = cachedPriceUSD * USD_TO_TRY;
-            } else {
-              currentPriceTRY = parseFloat(item.current_price || 0);
-            }
-
-            const averagePriceTRY = averagePrice;
-
-            const profitLoss = (currentPriceTRY - averagePriceTRY) * quantity;
-            const investment = quantity * averagePriceTRY;
-
-            totalProfitLoss += profitLoss;
-            totalInvestment += investment;
-          }
-
-          // Kar/zarar yüzdesini hesapla
-          const profitLossPercent = totalInvestment > 0 
-            ? (totalProfitLoss / totalInvestment) * 100 
-            : 0;
-
-          return {
-            id: user.id,
-            profit_loss_percent: profitLossPercent,
-            total_profit_loss: totalProfitLoss
-          };
-        })
-      );
-
-      // Kar/zarar yüzdesine göre sırala
-      userRankData.sort((a, b) => {
-        if (b.profit_loss_percent !== a.profit_loss_percent) {
-          return b.profit_loss_percent - a.profit_loss_percent;
-        }
-        return b.total_profit_loss - a.total_profit_loss;
-      });
-
-      console.log(`Updating ranks for ${userRankData.length} users`);
-
-      // Rank'leri güncelle
-      for (let i = 0; i < userRankData.length; i++) {
-        await pool.query(
-          'UPDATE users SET rank = $1 WHERE id = $2',
-          [i + 1, userRankData[i].id]
-        );
-      }
+      // Tüm aktif kullanıcıları tek sorguda sırala ve rank ata
+      await pool.query(`
+        UPDATE users u
+        SET rank = ranked.rn
+        FROM (
+          SELECT 
+            u2.id,
+            ROW_NUMBER() OVER (
+              ORDER BY 
+                CASE 
+                  WHEN COALESCE(inv.total_investment, 0) > 0 
+                  THEN (COALESCE(inv.total_profit_loss, 0) / inv.total_investment) * 100
+                  ELSE 0 
+                END DESC,
+                COALESCE(inv.total_profit_loss, 0) DESC
+            ) AS rn
+          FROM users u2
+          LEFT JOIN (
+            SELECT 
+              user_id,
+              SUM(profit_loss) AS total_profit_loss,
+              SUM(quantity * average_price) AS total_investment
+            FROM portfolio_items
+            GROUP BY user_id
+          ) inv ON u2.id = inv.user_id
+          WHERE u2.email_verified = true 
+            AND (u2.is_banned IS NULL OR u2.is_banned = false)
+        ) ranked
+        WHERE u.id = ranked.id
+      `);
     } catch (error) {
       console.error('Update ranks error:', error);
     }

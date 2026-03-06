@@ -19,10 +19,10 @@ export interface CommodityPrice {
 
 const MAX_ITEMS = 30;
 
-// En önemli emtialar (öncelik sırasına göre)
+// En önemli emtialar (Silver, Bakır, Platin vb. - öncelik sırasına göre)
 const PRIORITY_CODES = [
-  'GOLD', 'SILVER', 'BRENT_OIL', 'CRUDEOIL', 'NATURAL_GAS',
-  'COPPER', 'PLATINUM', 'PALLADIUM', 'WHEAT', 'CORN',
+  'GOLD', 'SILVER', 'SILVER_FUT', 'COPPER', 'PLATINUM', 'PALLADIUM',
+  'BRENT_OIL', 'CRUDEOIL', 'NATURAL_GAS', 'WHEAT', 'CORN',
   'COTTON2', 'SUGAR', 'SOYBEAN', 'COFFEE', 'COCOA',
   'ALUMINUM', 'HEATING_OIL', 'GASOLINE', 'GAU', 'GOLDTRY',
 ];
@@ -101,11 +101,13 @@ export class CommodityService {
 
     const list = await this.getList();
     const listCodes = list.map(l => l.code);
-    const listSet = new Set(listCodes);
-    // Önce öncelikli emtialar, sonra listeden kalanlar
-    const priorityFirst = PRIORITY_CODES.filter(c => listSet.has(c));
-    const rest = listCodes.filter(c => !PRIORITY_CODES.includes(c));
-    const codes = [...priorityFirst, ...rest].slice(0, MAX_ITEMS);
+    const codeToApi = new Map(listCodes.map(c => [c.toUpperCase(), c]));
+    // Önce öncelikli emtialar (Silver, Bakır, Platin vb.) - büyük/küçük harf duyarsız
+    const priorityMapped = PRIORITY_CODES
+      .map(p => codeToApi.get(p.toUpperCase()))
+      .filter((c): c is string => !!c);
+    const rest = listCodes.filter(c => !priorityMapped.some(p => p.toUpperCase() === c.toUpperCase()));
+    const codes = [...priorityMapped, ...rest].slice(0, MAX_ITEMS);
 
     const results: CommodityPrice[] = [];
     for (const code of codes) {

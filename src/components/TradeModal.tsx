@@ -13,9 +13,10 @@ interface TradeModalProps {
   onClose: () => void;
   stock: Stock | null;
   type: 'buy' | 'sell';
+  usdToTry?: number;
 }
 
-export default function TradeModal({ isOpen, onClose, stock, type }: TradeModalProps) {
+export default function TradeModal({ isOpen, onClose, stock, type, usdToTry: usdToTryProp }: TradeModalProps) {
   const [quantity, setQuantity] = useState<number>(1);
   const [totalAmount, setTotalAmount] = useState(0);
   const [commission, setCommission] = useState(0);
@@ -27,7 +28,7 @@ export default function TradeModal({ isOpen, onClose, stock, type }: TradeModalP
   const { state, refreshPortfolio } = usePortfolio();
   const { user } = useAuth();
 
-  const USD_TO_TRY = 32.5;
+  const USD_TO_TRY = usdToTryProp ?? 32.5;
 
   const getIsCrypto = () => stock?.assetType === 'crypto';
   const getIsCurrency = () => stock?.assetType === 'currency';

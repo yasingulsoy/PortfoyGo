@@ -159,5 +159,98 @@ export class PortfolioService {
       client.release();
     }
   }
+
+  /**
+   * Tüm kullanıcıların portföy fiyatlarını market_data_cache'den toplu günceller.
+   * Ayrıca yanlış kaydedilmiş asset_type'ları da düzeltir.
+   */
+  static async updateAllPortfolioPrices(): Promise<void> {
+    const client = await pool.connect();
+
+    try {
+      await client.query('BEGIN');
+
+      const USD_TO_TRY = 32.5;
+
+      // 1) asset_type'ı market_data_cache'den düzelt (yanlış kaydedilmiş olanlar)
+      await client.query(`
+        UPDATE portfolio_items pi
+        SET asset_type = mdc.asset_type
+        FROM market_data_cache mdc
+        WHERE UPPER(pi.symbol) = UPPER(mdc.symbol)
+          AND mdc.expires_at > CURRENT_TIMESTAMP
+          AND pi.asset_type != mdc.asset_type
+      `);
+
+      // transactions tablosundaki asset_type'ı da düzelt
+      await client.query(`
+        UPDATE transactions t
+        SET asset_type = mdc.asset_type
+        FROM market_data_cache mdc
+        WHERE UPPER(t.symbol) = UPPER(mdc.symbol)
+          AND mdc.expires_at > CURRENT_TIMESTAMP
+          AND t.asset_type != mdc.asset_type
+      `);
+
+      // 2) current_price'ı market_data_cache'den güncelle (USD → TRY)
+      const updated = await client.query(`
+        UPDATE portfolio_items pi
+        SET 
+          current_price = mdc.price * $1,
+          updated_at = CURRENT_TIMESTAMP
+        FROM market_data_cache mdc
+        WHERE UPPER(pi.symbol) = UPPER(mdc.symbol)
+          AND mdc.expires_at > CURRENT_TIMESTAMP
+      `, [USD_TO_TRY]);
+
+      // 3) total_value, profit_loss, profit_loss_percent yeniden hesapla
+      await client.query(`
+        UPDATE portfolio_items
+        SET 
+          total_value = quantity * current_price,
+          profit_loss = (current_price - average_price) * quantity,
+          profit_loss_percent = CASE 
+            WHEN average_price > 0 THEN ((current_price - average_price) / average_price) * 100 
+            ELSE 0 
+          END,
+          updated_at = CURRENT_TIMESTAMP
+      `);
+
+      // 4) users tablosundaki portfolio_value ve total_profit_loss güncelle
+      await client.query(`
+        UPDATE users u
+        SET 
+          portfolio_value = COALESCE(sub.total_value, 0),
+          total_profit_loss = COALESCE(sub.total_profit_loss, 0)
+        FROM (
+          SELECT 
+            user_id,
+            SUM(total_value) as total_value,
+            SUM(profit_loss) as total_profit_loss
+          FROM portfolio_items
+          GROUP BY user_id
+        ) sub
+        WHERE u.id = sub.user_id
+      `);
+
+      // Portföy kalemi olmayan kullanıcıları da sıfırla
+      await client.query(`
+        UPDATE users u
+        SET portfolio_value = 0, total_profit_loss = 0
+        WHERE NOT EXISTS (
+          SELECT 1 FROM portfolio_items pi WHERE pi.user_id = u.id
+        )
+        AND (u.portfolio_value != 0 OR u.total_profit_loss != 0)
+      `);
+
+      await client.query('COMMIT');
+      console.log(`✅ Tüm portföy fiyatları güncellendi (${updated.rowCount} satır)`);
+    } catch (error) {
+      await client.query('ROLLBACK');
+      console.error('❌ updateAllPortfolioPrices error:', error);
+    } finally {
+      client.release();
+    }
+  }
 }
 
