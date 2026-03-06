@@ -50,18 +50,6 @@ export default function Navbar() {
     setOpen(false);
   }, [pathname]);
 
-  // Debug: Admin kontrolü
-  useEffect(() => {
-    if (user) {
-      console.log('👤 User object:', { 
-        id: user.id, 
-        username: user.username, 
-        is_admin: user.is_admin,
-        is_admin_type: typeof user.is_admin 
-      });
-    }
-  }, [user]);
-
   const navItems = [
     { href: '/', label: 'Ana Sayfa', icon: HomeIcon },
     { href: '/portfolio', label: 'Portföyüm', icon: BriefcaseIcon },

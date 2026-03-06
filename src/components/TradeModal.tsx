@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import { Stock } from '@/types';
 import { usePortfolio } from '@/context/PortfolioContext';
@@ -37,6 +38,16 @@ export default function TradeModal({ isOpen, onClose, stock, type }: TradeModalP
       setAmountInput('');
     }
   }, [isOpen, stock]);
+
+  // Modal açıkken body scrollbar'ını gizle
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isOpen]);
 
   useEffect(() => {
     if (stock && quantity > 0) {
@@ -197,11 +208,11 @@ export default function TradeModal({ isOpen, onClose, stock, type }: TradeModalP
     ? (state.portfolioItems.find(item => item.symbol === stock.symbol)?.quantity || 0)
     : 0;
 
-  return (
-    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
-      <div className="bg-[#1e2329] rounded-2xl shadow-2xl max-w-lg w-full border border-[#2b3139] overflow-hidden max-h-[90vh] overflow-y-auto">
-        {/* Header */}
-        <div className={`flex items-center justify-between px-6 py-4 border-b border-[#2b3139] ${
+  return createPortal(
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="w-full max-w-lg max-h-[90vh] bg-[#1e2329] rounded-2xl shadow-2xl border border-[#2b3139] overflow-hidden flex flex-col">
+        {/* Header - sabit */}
+        <div className={`flex-shrink-0 flex items-center justify-between px-6 py-4 border-b border-[#2b3139] ${
           type === 'buy' ? 'bg-[#0b1529]' : 'bg-[#1a0f1a]'
         }`}>
           <div className="flex items-center gap-3">
@@ -231,7 +242,7 @@ export default function TradeModal({ isOpen, onClose, stock, type }: TradeModalP
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-5">
+        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto min-h-0 p-6 space-y-5 pb-8">
           {/* Price Display - Binance Style */}
           <div className="bg-[#161a1e] rounded-xl p-5 border border-[#2b3139]">
             <div className="text-[#848e9c] text-sm mb-2">Güncel Fiyat</div>
@@ -278,9 +289,11 @@ export default function TradeModal({ isOpen, onClose, stock, type }: TradeModalP
                 {inputMode === 'quantity' ? 'Miktar' : 'Tutar'}
               </label>
               <span className="text-xs text-[#848e9c]">
-                {inputMode === 'quantity' 
-                  ? `Mevcut: ${availableQuantity > 0 ? availableQuantity.toFixed(8) : '0'}`
-                  : `Mevcut: ₺${state.balance.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}`
+                {type === 'buy' 
+                  ? `Mevcut Bakiye: ₺${state.balance.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}`
+                  : inputMode === 'quantity' 
+                    ? `Mevcut: ${availableQuantity > 0 ? availableQuantity.toFixed(8) : '0'} ${stock.symbol}`
+                    : `Mevcut: ₺${(availableQuantity * priceInTRY).toLocaleString('tr-TR', { minimumFractionDigits: 2 })}`
                 }
               </span>
             </div>
@@ -410,7 +423,8 @@ export default function TradeModal({ isOpen, onClose, stock, type }: TradeModalP
             )}
           </button>
         </form>
-      </div>
-    </div>
+        </div>
+    </div>,
+    document.body
   );
 }

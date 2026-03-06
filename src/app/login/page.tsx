@@ -22,30 +22,23 @@ function LoginForm() {
   const searchParams = useSearchParams();
   const { user, login, loading: authLoading } = useAuth();
 
-
-  // Zaten giriş yapmış kullanıcıyı yönlendir
   useEffect(() => {
     if (!authLoading && user) {
-      // Kısa bir gecikme ile yönlendir (başarı mesajının görünmesi için)
       setTimeout(() => {
         const redirectTo = searchParams.get('redirect') || '/';
-        // window.location.href kullan (router.push bazen çalışmıyor)
         window.location.href = redirectTo;
       }, 1000);
     }
   }, [user, router, searchParams, authLoading]);
 
-  // Başarı mesajını göster
   useEffect(() => {
     const message = searchParams.get('message');
     if (message) {
       setSuccessMessage(decodeURIComponent(message));
-      // 5 saniye sonra mesajı temizle
       setTimeout(() => setSuccessMessage(''), 5000);
     }
   }, [searchParams]);
 
-  // Blok süresini kontrol et
   useEffect(() => {
     if (isBlocked && blockTime > 0) {
       const timer = setInterval(() => {
@@ -69,93 +62,68 @@ function LoginForm() {
     });
   };
 
-  // Input validasyonu
   const validateInput = () => {
     if (!formData.email || !formData.password) {
       setError('Tüm alanları doldurun');
       return false;
     }
-
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(formData.email)) {
       setError('Geçerli bir email adresi girin');
       return false;
     }
-
     if (formData.password.length < 6) {
       setError('Şifre en az 6 karakter olmalı');
       return false;
     }
-
     return true;
   };
 
-  // Rate limiting kontrolü
   const checkRateLimit = () => {
     if (attempts >= 5) {
       setIsBlocked(true);
-      setBlockTime(300); // 5 dakika blok
+      setBlockTime(300);
       setError('Çok fazla başarısız deneme. 5 dakika bekleyin.');
       return false;
     }
     return true;
   };
 
-  // XSS koruması
   const sanitizeInput = (input: string) => {
     return input.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Blok kontrolü
+
     if (isBlocked) {
       setError(`Çok fazla başarısız deneme. ${blockTime} saniye bekleyin.`);
       return;
     }
-
-    // Rate limiting
-    if (!checkRateLimit()) {
-      return;
-    }
-
-    // Input validasyonu
-    if (!validateInput()) {
-      return;
-    }
+    if (!checkRateLimit()) return;
+    if (!validateInput()) return;
 
     setLoading(true);
     setError('');
 
-    // Input sanitization
     const sanitizedData = {
       email: sanitizeInput(formData.email.trim().toLowerCase()),
       password: formData.password
     };
 
     try {
-      // Sadece AuthContext'in login fonksiyonunu kullan
       const result = await login(sanitizedData.email, sanitizedData.password);
-      
+
       if (result.success) {
-        // Başarılı giriş - deneme sayısını sıfırla
         setAttempts(0);
         setSuccessMessage('Giriş başarılı! Yönlendiriliyorsunuz...');
-        
-        // Yönlendirmeyi hemen yap (useEffect'e güvenmek yerine)
         const redirectTo = searchParams.get('redirect') || '/';
         setTimeout(() => {
-          // window.location.href kullan (router.push bazen çalışmıyor)
           window.location.href = redirectTo;
         }, 1000);
       } else {
-        // Başarısız giriş - deneme sayısını artır
         setAttempts(prev => prev + 1);
-        // Backend'den gelen spesifik hata mesajını göster
         const errorMsg = result.message || 'Giriş başarısız. Email veya şifre hatalı.';
-        
-        // 3 denemeden sonra uyarı ver
         if (attempts >= 2) {
           setError(`${errorMsg} (${attempts + 1}/5 deneme)`);
         } else {
@@ -171,54 +139,93 @@ function LoginForm() {
     }
   };
 
-  // AuthContext yüklenirken loading göster
   if (authLoading) {
     return (
-      <div className="min-h-screen bg-[#181a20] flex items-center justify-center">
+      <div className="min-h-screen bg-[#0b0e11] flex items-center justify-center">
         <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-[#0ecb81]"></div>
-          <p className="mt-4 text-[#848e9c]">Yükleniyor...</p>
+          <div className="inline-block animate-spin rounded-full h-10 w-10 border-2 border-[#0ecb81] border-t-transparent"></div>
+          <p className="mt-4 text-[#848e9c] text-sm">Yükleniyor...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#181a20] flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full">
-        {/* Başlık */}
-        <div className="text-center mb-10">
-          <h2 className="text-4xl font-bold text-white mb-2">
-            Hoş Geldiniz
-          </h2>
-          <p className="text-[#848e9c] text-base">
-            Hesabınıza giriş yapın ve yatırım yolculuğunuza başlayın
-          </p>
-        </div>
+    <div className="min-h-screen bg-[#0b0e11] flex">
+      {/* Sol panel - dekoratif */}
+      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden items-center justify-center">
+        <div className="absolute inset-0 bg-gradient-to-br from-[#0ecb81]/20 via-[#0b0e11] to-[#0ecb81]/5"></div>
+        <div className="absolute top-1/4 -left-20 w-96 h-96 bg-[#0ecb81]/10 rounded-full blur-3xl"></div>
+        <div className="absolute bottom-1/4 right-10 w-72 h-72 bg-[#0ecb81]/5 rounded-full blur-3xl"></div>
 
-        {/* Başarı Mesajı */}
-        {successMessage && (
-          <div className="mb-6 bg-[#0ecb81]/10 border border-[#0ecb81]/30 text-[#0ecb81] px-5 py-4 rounded-xl text-sm text-center">
-            {successMessage}
+        <div className="relative z-10 max-w-md px-12 text-center">
+          <div className="mb-8">
+            <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-[#0ecb81]/10 border border-[#0ecb81]/20 mb-6">
+              <svg className="w-10 h-10 text-[#0ecb81]" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 18L9 11.25l4.306 4.306a11.95 11.95 0 015.814-5.518l2.74-1.22m0 0l-5.94-2.281m5.94 2.28l-2.28 5.941" />
+              </svg>
+            </div>
+            <h1 className="text-4xl font-bold text-white mb-4 tracking-tight">PortfoyGo</h1>
+            <p className="text-[#848e9c] text-lg leading-relaxed">
+              Sanal portföyünüzü oluşturun, kripto dünyasını keşfedin ve risk almadan yatırım stratejilerinizi test edin.
+            </p>
           </div>
-        )}
 
-        {/* Güvenlik Uyarısı */}
-        {attempts > 0 && attempts < 5 && (
-          <div className="mb-6 bg-[#f0b90b]/10 border border-[#f0b90b]/30 text-[#f0b90b] px-5 py-4 rounded-xl text-sm text-center">
-            <div className="flex items-center justify-center">
-              <ShieldCheckIcon className="h-5 w-5 mr-2" />
-              Güvenlik: {attempts}/5 deneme hakkınız kaldı
+          <div className="grid grid-cols-3 gap-4 mt-12">
+            <div className="bg-white/5 backdrop-blur-sm rounded-xl p-4 border border-white/5">
+              <p className="text-[#0ecb81] text-2xl font-bold">100K</p>
+              <p className="text-[#848e9c] text-xs mt-1">Sanal Bakiye</p>
+            </div>
+            <div className="bg-white/5 backdrop-blur-sm rounded-xl p-4 border border-white/5">
+              <p className="text-[#0ecb81] text-2xl font-bold">50+</p>
+              <p className="text-[#848e9c] text-xs mt-1">Kripto Para</p>
+            </div>
+            <div className="bg-white/5 backdrop-blur-sm rounded-xl p-4 border border-white/5">
+              <p className="text-[#0ecb81] text-2xl font-bold">7/24</p>
+              <p className="text-[#848e9c] text-xs mt-1">Canlı Fiyat</p>
             </div>
           </div>
-        )}
+        </div>
+      </div>
 
-        {/* Giriş Formu */}
-        <div className="bg-[#1e2329] rounded-xl border border-[#2b3139] py-10 px-8">
-          <form className="space-y-6" onSubmit={handleSubmit}>
+      {/* Sağ panel - form */}
+      <div className="w-full lg:w-1/2 flex items-center justify-center px-6 py-12">
+        <div className="w-full max-w-[420px]">
+          {/* Logo (mobil) */}
+          <div className="lg:hidden text-center mb-8">
+            <h1 className="text-3xl font-bold text-white tracking-tight">PortfoyGo</h1>
+          </div>
+
+          {/* Başlık */}
+          <div className="mb-8">
+            <h2 className="text-2xl font-bold text-white mb-2">Giriş Yap</h2>
+            <p className="text-[#848e9c] text-sm">
+              Hesabınıza giriş yapın ve yatırım yolculuğunuza devam edin
+            </p>
+          </div>
+
+          {/* Başarı Mesajı */}
+          {successMessage && (
+            <div className="mb-5 bg-[#0ecb81]/10 border border-[#0ecb81]/20 text-[#0ecb81] px-4 py-3 rounded-lg text-sm text-center backdrop-blur-sm">
+              {successMessage}
+            </div>
+          )}
+
+          {/* Güvenlik Uyarısı */}
+          {attempts > 0 && attempts < 5 && (
+            <div className="mb-5 bg-[#f0b90b]/10 border border-[#f0b90b]/20 text-[#f0b90b] px-4 py-3 rounded-lg text-sm">
+              <div className="flex items-center justify-center gap-2">
+                <ShieldCheckIcon className="h-4 w-4 shrink-0" />
+                <span>Güvenlik: {attempts}/5 deneme hakkınız kaldı</span>
+              </div>
+            </div>
+          )}
+
+          {/* Form */}
+          <form onSubmit={handleSubmit} className="space-y-5">
             <div>
-              <label htmlFor="email" className="block text-sm font-semibold text-white mb-3">
-                Email Adresi
+              <label htmlFor="email" className="block text-sm font-medium text-[#eaecef] mb-2">
+                Email
               </label>
               <input
                 id="email"
@@ -226,7 +233,7 @@ function LoginForm() {
                 type="email"
                 autoComplete="email"
                 required
-                className="w-full px-5 py-4 border border-[#2b3139] rounded-xl focus:ring-2 focus:ring-[#0ecb81] focus:border-[#0ecb81] bg-[#161a1e] text-white placeholder-[#848e9c] transition-all duration-200"
+                className="w-full px-4 py-3.5 rounded-lg bg-transparent border border-white/10 text-white placeholder-[#5e6673] focus:border-[#0ecb81] focus:outline-none transition-colors duration-200"
                 placeholder="ornek@email.com"
                 value={formData.email}
                 onChange={handleChange}
@@ -234,7 +241,7 @@ function LoginForm() {
             </div>
 
             <div>
-              <label htmlFor="password" className="block text-sm font-semibold text-white mb-3">
+              <label htmlFor="password" className="block text-sm font-medium text-[#eaecef] mb-2">
                 Şifre
               </label>
               <div className="relative">
@@ -244,27 +251,27 @@ function LoginForm() {
                   type={showPassword ? 'text' : 'password'}
                   autoComplete="current-password"
                   required
-                  className="w-full px-5 py-4 pr-14 border border-[#2b3139] rounded-xl focus:ring-2 focus:ring-[#0ecb81] focus:border-[#0ecb81] bg-[#161a1e] text-white placeholder-[#848e9c] transition-all duration-200"
+                  className="w-full px-4 py-3.5 pr-12 rounded-lg bg-transparent border border-white/10 text-white placeholder-[#5e6673] focus:border-[#0ecb81] focus:outline-none transition-colors duration-200"
                   placeholder="Şifrenizi girin"
                   value={formData.password}
                   onChange={handleChange}
                 />
                 <button
                   type="button"
-                  className="absolute inset-y-0 right-0 pr-4 flex items-center"
+                  className="absolute inset-y-0 right-0 pr-3.5 flex items-center"
                   onClick={() => setShowPassword(!showPassword)}
                 >
                   {showPassword ? (
-                    <EyeSlashIcon className="h-6 w-6 text-[#848e9c] hover:text-white transition-colors" />
+                    <EyeSlashIcon className="h-5 w-5 text-[#5e6673] hover:text-white transition-colors" />
                   ) : (
-                    <EyeIcon className="h-6 w-6 text-[#848e9c] hover:text-white transition-colors" />
+                    <EyeIcon className="h-5 w-5 text-[#5e6673] hover:text-white transition-colors" />
                   )}
                 </button>
               </div>
             </div>
 
             {error && (
-              <div className="bg-[#f6465d]/10 border border-[#f6465d]/30 text-[#f6465d] px-5 py-4 rounded-xl text-sm">
+              <div className="bg-[#f6465d]/10 border border-[#f6465d]/20 text-[#f6465d] px-4 py-3 rounded-lg text-sm">
                 {error}
               </div>
             )}
@@ -272,13 +279,13 @@ function LoginForm() {
             <button
               type="submit"
               disabled={loading || isBlocked}
-              className="w-full flex justify-center py-4 px-4 rounded-xl text-base font-semibold text-white bg-[#0ecb81] hover:bg-[#0bb975] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#0ecb81] disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+              className="w-full py-3.5 rounded-lg text-base font-semibold bg-[#0ecb81] text-[#0b0e11] border border-[#0ecb81] hover:bg-transparent hover:text-[#0ecb81] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-[#0ecb81] disabled:hover:text-[#0b0e11] transition-all duration-300 cursor-pointer"
             >
               {loading ? (
-                <div className="flex items-center">
-                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-3"></div>
+                <span className="inline-flex items-center gap-2">
+                  <span className="animate-spin inline-block h-4 w-4 border-2 border-current border-t-transparent rounded-full"></span>
                   Giriş yapılıyor...
-                </div>
+                </span>
               ) : isBlocked ? (
                 `Bloklu (${blockTime}s)`
               ) : (
@@ -287,41 +294,36 @@ function LoginForm() {
             </button>
           </form>
 
-          {/* Kayıt Ol Butonu */}
-          <div className="mt-8">
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-[#2b3139]" />
-              </div>
-              <div className="relative flex justify-center text-sm">
-                <span className="px-3 bg-[#1e2329] text-[#848e9c]">
-                  Hesabınız yok mu?
-                </span>
-              </div>
+          {/* Ayırıcı */}
+          <div className="relative my-8">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-white/10"></div>
             </div>
-
-            <div className="mt-6">
-              <Link
-                href="/register"
-                className="w-full flex justify-center py-4 px-4 border border-[#2b3139] rounded-xl text-base font-semibold text-white bg-[#2b3139] hover:bg-[#3a4149] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#0ecb81] transition-all duration-200"
-              >
-                Yeni Hesap Oluştur
-              </Link>
+            <div className="relative flex justify-center">
+              <span className="px-4 bg-[#0b0e11] text-[#5e6673] text-sm">
+                Hesabınız yok mu?
+              </span>
             </div>
           </div>
-        </div>
 
-        {/* Alt Bilgi */}
-        <div className="mt-8 text-center">
-          <p className="text-xs text-[#848e9c]">
+          {/* Kayıt Ol */}
+          <Link
+            href="/register"
+            className="w-full flex justify-center py-3.5 rounded-lg text-base font-semibold text-white bg-white/5 border border-white/10 hover:bg-white/10 transition-all duration-300"
+          >
+            Yeni Hesap Oluştur
+          </Link>
+
+          {/* Alt bilgi */}
+          <p className="mt-8 text-center text-xs text-[#5e6673] leading-relaxed">
             Giriş yaparak{' '}
-            <Link href="/terms" className="text-[#0ecb81] hover:text-[#0bb975] hover:underline transition-colors">
+            <Link href="/terms" className="text-[#0ecb81] hover:underline transition-colors">
               Kullanım Şartları
             </Link>{' '}
             ve{' '}
-            <Link href="/privacy" className="text-[#0ecb81] hover:text-[#0bb975] hover:underline transition-colors">
+            <Link href="/privacy" className="text-[#0ecb81] hover:underline transition-colors">
               Gizlilik Politikası
-            </Link>{' '}
+            </Link>
             &apos;nı kabul etmiş olursunuz.
           </p>
         </div>
@@ -333,8 +335,8 @@ function LoginForm() {
 export default function LoginPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen bg-[#181a20] flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#0ecb81]"></div>
+      <div className="min-h-screen bg-[#0b0e11] flex items-center justify-center">
+        <div className="animate-spin rounded-full h-10 w-10 border-2 border-[#0ecb81] border-t-transparent"></div>
       </div>
     }>
       <LoginForm />
