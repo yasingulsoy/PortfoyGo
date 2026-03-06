@@ -1,5 +1,5 @@
 import useSWR from 'swr';
-import { Stock, Commodity } from '@/types';
+import { Stock, Commodity, Currency } from '@/types';
 import type { CryptoCoin } from '@/services/crypto';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/api';
@@ -65,6 +65,28 @@ export function useCommodities() {
 
   return {
     commodities: data ?? [],
+    isLoading,
+    isError: error,
+    refresh: mutate,
+  };
+}
+
+export function useCurrencies() {
+  const { data, error, isLoading, mutate } = useSWR<Currency[], Error, string>(
+    `${API_BASE_URL}/currencies`,
+    (url) => jsonFetcher<Currency[]>(url),
+    {
+      refreshInterval: 300000, // 5 dakika
+      revalidateOnFocus: true,
+    }
+  );
+
+  const currencies = data ?? [];
+  const usdRate = currencies.find(c => c.code === 'USD')?.selling ?? 32.5;
+
+  return {
+    currencies,
+    usdToTry: usdRate,
     isLoading,
     isError: error,
     refresh: mutate,

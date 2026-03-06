@@ -12,9 +12,11 @@ import badgesRoutes from './routes/badges';
 import activityLogsRoutes from './routes/activityLogs';
 import cryptosRoutes from './routes/cryptos';
 import commoditiesRoutes from './routes/commodities';
+import currenciesRoutes from './routes/currencies';
 import stopLossRoutes from './routes/stopLoss';
 import { MarketCacheService } from './services/marketCache';
 import { StopLossService } from './services/stopLoss';
+import { CurrencyService } from './services/currency';
 import cron from 'node-cron';
 
 // Environment variables
@@ -159,7 +161,9 @@ const rootHandler = (_req: express.Request, res: express.Response) => {
       stocks: '/api/stocks',
       transactions: '/api/transactions',
       leaderboard: '/api/leaderboard',
-      cryptos: '/api/cryptos'
+      cryptos: '/api/cryptos',
+      commodities: '/api/commodities',
+      currencies: '/api/currencies'
     },
     timestamp: new Date().toISOString()
   });
@@ -180,6 +184,7 @@ app.use('/api/badges', badgesRoutes);
 app.use('/api/activity-logs', activityLogsRoutes);
 app.use('/api/cryptos', cryptosRoutes);
 app.use('/api/commodities', commoditiesRoutes);
+app.use('/api/currencies', currenciesRoutes);
 app.use('/api/stop-loss', stopLossRoutes);
 
 // Health check
@@ -222,6 +227,8 @@ app.use((req, res) => {
       'GET /api/portfolio',
       'GET /api/stocks',
       'GET /api/cryptos',
+      'GET /api/commodities',
+      'GET /api/currencies',
       'GET /api/leaderboard'
     ]
   });
@@ -250,6 +257,11 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
 // Cache'i başlangıçta doldur (ilk yükleme - daha fazla hisse çek)
 MarketCacheService.refreshCache(true).catch(err => {
   console.error('Initial cache refresh error:', err);
+});
+
+// Döviz kurlarını başlangıçta çek (DB boşsa doldurur)
+CurrencyService.fetchAndSaveToDb().catch(err => {
+  console.error('Initial currency fetch error:', err);
 });
 
 // Her 2 dakikada bir cache'i güncelle (10 hisse - hızlı güncelleme)
@@ -283,6 +295,17 @@ cron.schedule('* * * * *', async () => {
     await StopLossService.checkAndTriggerStopLosses();
   } catch (error) {
     console.error('❌ Stop-loss kontrolü hatası:', error);
+  }
+});
+
+// Her 12 saatte bir döviz kurlarını güncelle
+cron.schedule('0 */12 * * *', async () => {
+  console.log('⏰ Döviz kurları güncelleniyor (12 saat)...');
+  try {
+    await CurrencyService.fetchAndSaveToDb();
+    console.log('✅ Döviz kurları güncellendi (12 saatlik)');
+  } catch (error) {
+    console.error('❌ Döviz kurları güncelleme hatası:', error);
   }
 });
 

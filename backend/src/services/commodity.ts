@@ -17,17 +17,14 @@ export interface CommodityPrice {
   datetime: string;
 }
 
-const POPULAR_COMMODITIES = [
-  'altin-ons',
-  'gumus-ons',
-  'bakir',
-  'platin',
-  'paladyum',
-  'brent-petrol',
-  'dogalgaz',
-  'pamuk',
-  'bugday',
-  'misir',
+const MAX_ITEMS = 30;
+
+// En önemli emtialar (öncelik sırasına göre)
+const PRIORITY_CODES = [
+  'GOLD', 'SILVER', 'BRENT_OIL', 'CRUDEOIL', 'NATURAL_GAS',
+  'COPPER', 'PLATINUM', 'PALLADIUM', 'WHEAT', 'CORN',
+  'COTTON2', 'SUGAR', 'SOYBEAN', 'COFFEE', 'COCOA',
+  'ALUMINUM', 'HEATING_OIL', 'GASOLINE', 'GAU', 'GOLDTRY',
 ];
 
 let cachedList: CommodityListItem[] = [];
@@ -103,14 +100,15 @@ export class CommodityService {
     }
 
     const list = await this.getList();
-    const codes = list.length > 0
-      ? list.map(l => l.code).filter(c => POPULAR_COMMODITIES.some(p => c.includes(p) || p.includes(c))).slice(0, 15)
-      : POPULAR_COMMODITIES;
-
-    const finalCodes = codes.length > 0 ? codes : POPULAR_COMMODITIES;
+    const listCodes = list.map(l => l.code);
+    const listSet = new Set(listCodes);
+    // Önce öncelikli emtialar, sonra listeden kalanlar
+    const priorityFirst = PRIORITY_CODES.filter(c => listSet.has(c));
+    const rest = listCodes.filter(c => !PRIORITY_CODES.includes(c));
+    const codes = [...priorityFirst, ...rest].slice(0, MAX_ITEMS);
 
     const results: CommodityPrice[] = [];
-    for (const code of finalCodes) {
+    for (const code of codes) {
       try {
         const price = await this.getPrice(code);
         if (price && price.selling > 0) {
@@ -127,7 +125,6 @@ export class CommodityService {
       return results;
     }
 
-    // API boş dönerse son bilinen veriyi kullan (veri gelsin diye)
     if (cachedPrices.length > 0) {
       return cachedPrices;
     }

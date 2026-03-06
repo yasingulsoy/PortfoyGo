@@ -49,7 +49,7 @@ async function createAllTables() {
         user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
         symbol VARCHAR(20) NOT NULL,
         name VARCHAR(255) NOT NULL,
-        asset_type VARCHAR(10) NOT NULL CHECK (asset_type IN ('crypto', 'stock')),
+        asset_type VARCHAR(10) NOT NULL CHECK (asset_type IN ('crypto', 'stock', 'commodity', 'currency')),
         quantity DECIMAL(20,8) NOT NULL DEFAULT 0,
         average_price DECIMAL(15,2) NOT NULL DEFAULT 0,
         current_price DECIMAL(15,2) NOT NULL DEFAULT 0,
@@ -72,7 +72,7 @@ async function createAllTables() {
         type VARCHAR(4) NOT NULL CHECK (type IN ('buy', 'sell')),
         symbol VARCHAR(20) NOT NULL,
         name VARCHAR(255) NOT NULL,
-        asset_type VARCHAR(10) NOT NULL CHECK (asset_type IN ('crypto', 'stock')),
+        asset_type VARCHAR(10) NOT NULL CHECK (asset_type IN ('crypto', 'stock', 'commodity', 'currency')),
         quantity DECIMAL(20,8) NOT NULL,
         price DECIMAL(15,2) NOT NULL,
         total_amount DECIMAL(15,2) NOT NULL,
@@ -123,6 +123,23 @@ async function createAllTables() {
       );
     `);
     console.log('✅ Market data cache tablosu oluşturuldu!\n');
+
+    // 7. Currency rates tablosu (döviz kurları - NosyAPI)
+    console.log('📋 Currency rates tablosu oluşturuluyor...');
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS currency_rates (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        code VARCHAR(20) NOT NULL UNIQUE,
+        name VARCHAR(255) NOT NULL,
+        buying DECIMAL(15,4) NOT NULL,
+        selling DECIMAL(15,4) NOT NULL,
+        change_rate DECIMAL(10,4) NOT NULL DEFAULT 0,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_currency_rates_code ON currency_rates(code);`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_currency_rates_updated_at ON currency_rates(updated_at DESC);`);
+    console.log('✅ Currency rates tablosu oluşturuldu!\n');
 
     // Index'ler oluştur
     console.log('📊 Index\'ler oluşturuluyor...');

@@ -6,7 +6,7 @@ const COMMISSION_RATE = 0.0025; // %0.25 komisyon
 export interface BuyRequest {
   symbol: string;
   name: string;
-  asset_type: 'crypto' | 'stock';
+  asset_type: 'crypto' | 'stock' | 'commodity' | 'currency';
   quantity: number;
   price: number;
 }

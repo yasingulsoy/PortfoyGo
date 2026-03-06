@@ -16,7 +16,7 @@ import { usePortfolio } from '@/context/PortfolioContext';
 import { useAuth } from '@/context/AuthContext';
 import TradeModal from '@/components/TradeModal';
 import MarketTabs from '@/components/MarketTabs';
-import { useStocks, useCryptos, useCommodities } from '@/hooks/useMarketData';
+import { useStocks, useCryptos, useCommodities, useCurrencies } from '@/hooks/useMarketData';
 import { CryptoCoin } from '@/services/crypto';
 import { Commodity } from '@/types';
 import { leaderboardApi } from '@/services/backendApi';
@@ -26,6 +26,7 @@ export default function Home() {
   const { stocks } = useStocks();
   const { cryptos } = useCryptos();
   const { commodities } = useCommodities();
+  const { currencies, usdToTry } = useCurrencies();
   const { user, loading } = useAuth();
   const router = useRouter();
 
@@ -35,8 +36,8 @@ export default function Home() {
   const prevPortfolioPricesRef = useRef<Map<string, number>>(new Map());
   const [priceAnimations, setPriceAnimations] = useState<Map<string, 'up' | 'down' | null>>(new Map());
 
-  // USD-TRY dönüşüm oranı
-  const USD_TO_TRY = 32.5;
+  // USD-TRY dönüşüm oranı (currencies API'den, yoksa 32.5)
+  const USD_TO_TRY = usdToTry;
 
   // Portföy öğelerini güncel fiyatlarla güncelle ve toplam değerleri hesapla
   const calculatedTotals = useMemo(() => {
@@ -223,6 +224,26 @@ export default function Home() {
     };
   }, []);
 
+  const toStockFromCurrency = useCallback((c: { code: string; name: string; selling: number; change_rate: number }): Stock => {
+    const price = c.selling; // Döviz fiyatı zaten TRY
+    const change = price * (c.change_rate / 100);
+    return {
+      id: c.code,
+      symbol: c.code.toUpperCase(),
+      name: c.name,
+      price,
+      change,
+      changePercent: c.change_rate,
+      volume: 0,
+      marketCap: 0,
+      previousClose: price - change,
+      open: price,
+      high: price,
+      low: price,
+      assetType: 'currency',
+    };
+  }, []);
+
   // Kullanıcı yüklendiğinde portföyü yenile
   useEffect(() => {
     if (user && !loading) {
@@ -255,11 +276,11 @@ export default function Home() {
       return;
     }
 
-    if (stocks.length > 0 || cryptos.length > 0) {
-      // Stocks ve cryptos'u birleştirip Stock formatına çevir
+    if (stocks.length > 0 || cryptos.length > 0 || currencies.length > 0) {
       const allAssets: Stock[] = [
         ...stocks,
-        ...cryptos.map(c => toStockFromCrypto(c))
+        ...cryptos.map(c => toStockFromCrypto(c)),
+        ...currencies.map(c => toStockFromCurrency(c))
       ];
       
       // Sadece portföyde olan varlıkları filtrele
@@ -283,7 +304,7 @@ export default function Home() {
         updatePrices(portfolioAssets);
       }
     }
-  }, [stocks, cryptos, portfolioSymbolsKey, updatePrices, toStockFromCrypto]);
+  }, [stocks, cryptos, currencies, portfolioSymbolsKey, updatePrices, toStockFromCrypto, toStockFromCurrency]);
 
   // Liderlik verilerini yükle
   useEffect(() => {
@@ -310,7 +331,7 @@ export default function Home() {
     setIsTradeModalOpen(true);
   };
 
-  const onBuy = (symbol: string, type: 'stock' | 'crypto' | 'commodity') => {
+  const onBuy = (symbol: string, type: 'stock' | 'crypto' | 'commodity' | 'currency') => {
     if (type === 'stock') {
       const s = stocks.find(x => x.symbol === symbol);
       if (s) {
@@ -322,6 +343,12 @@ export default function Home() {
       if (c) {
         setTradeType('buy');
         openTrade(toStockFromCommodity(c));
+      }
+    } else if (type === 'currency') {
+      const c = currencies.find(x => x.code.toUpperCase() === symbol || x.code === symbol);
+      if (c) {
+        setTradeType('buy');
+        openTrade(toStockFromCurrency(c));
       }
     } else {
       const c = cryptos.find(x => x.symbol.toUpperCase() === symbol);
@@ -332,7 +359,7 @@ export default function Home() {
     }
   };
 
-  const onSell = (symbol: string, type: 'stock' | 'crypto' | 'commodity') => {
+  const onSell = (symbol: string, type: 'stock' | 'crypto' | 'commodity' | 'currency') => {
     if (type === 'stock') {
       const s = stocks.find(x => x.symbol === symbol);
       if (s) {
@@ -344,6 +371,12 @@ export default function Home() {
       if (c) {
         setTradeType('sell');
         openTrade(toStockFromCommodity(c));
+      }
+    } else if (type === 'currency') {
+      const c = currencies.find(x => x.code.toUpperCase() === symbol || x.code === symbol);
+      if (c) {
+        setTradeType('sell');
+        openTrade(toStockFromCurrency(c));
       }
     } else {
       const c = cryptos.find(x => x.symbol.toUpperCase() === symbol);
