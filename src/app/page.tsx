@@ -5,21 +5,24 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { 
-  CurrencyDollarIcon, 
   TrophyIcon, 
-  UserIcon,
   ArrowUpIcon,
   ArrowDownIcon,
+  ChartBarSquareIcon,
+  WalletIcon,
+  BanknotesIcon,
+  NewspaperIcon,
 } from '@heroicons/react/24/outline';
 import { Stock } from '@/types';
 import { usePortfolio } from '@/context/PortfolioContext';
 import { useAuth } from '@/context/AuthContext';
 import TradeModal from '@/components/TradeModal';
-import MarketTabs from '@/components/MarketTabs';
 import { useStocks, useCryptos, useCommodities, useCurrencies } from '@/hooks/useMarketData';
 import { CryptoCoin } from '@/services/crypto';
 import { Commodity } from '@/types';
-import { leaderboardApi } from '@/services/backendApi';
+import { leaderboardApi, newsApi } from '@/services/backendApi';
+
+type MarketTab = 'stocks' | 'crypto' | 'currencies' | 'commodities';
 
 export default function Home() {
   const { state, refreshPortfolio, updatePrices } = usePortfolio();
@@ -30,65 +33,53 @@ export default function Home() {
   const { user, loading } = useAuth();
   const router = useRouter();
 
-  // Önceki fiyatları takip et (hisse senetleri ve kripto paralar için)
   const prevStockPricesRef = useRef<Map<string, number>>(new Map());
   const prevCryptoPricesRef = useRef<Map<string, number>>(new Map());
   const prevPortfolioPricesRef = useRef<Map<string, number>>(new Map());
   const [priceAnimations, setPriceAnimations] = useState<Map<string, 'up' | 'down' | null>>(new Map());
+  const [marketTab, setMarketTab] = useState<MarketTab>('stocks');
 
-  // USD-TRY dönüşüm oranı (currencies API'den, yoksa 32.5)
   const USD_TO_TRY = usdToTry;
 
-  // Portföy öğelerini güncel fiyatlarla güncelle ve toplam değerleri hesapla
   const calculatedTotals = useMemo(() => {
     if (state.portfolioItems.length > 0 && (stocks.length > 0 || cryptos.length > 0)) {
       let totalValue = 0;
       let totalProfitLoss = 0;
 
       state.portfolioItems.forEach(item => {
-        // Kripto mu hisse senedi mi kontrol et
         const crypto = cryptos.find(c => c.symbol.toUpperCase() === item.symbol.toUpperCase());
         const stock = stocks.find(s => s.symbol === item.symbol);
 
         if (crypto) {
-          // Kripto için
           const currentPriceUSD = crypto.current_price;
           const currentPriceTRY = currentPriceUSD * USD_TO_TRY;
           const averagePriceTRY = item.averagePrice;
           const itemTotalValue = item.quantity * currentPriceTRY;
           const itemProfitLoss = (currentPriceTRY - averagePriceTRY) * item.quantity;
-
           totalValue += itemTotalValue;
           totalProfitLoss += itemProfitLoss;
         } else if (stock) {
-          // Hisse senedi için
           const currentPriceUSD = stock.price;
           const currentPriceTRY = currentPriceUSD * USD_TO_TRY;
           const averagePriceTRY = item.averagePrice;
           const itemTotalValue = item.quantity * currentPriceTRY;
           const itemProfitLoss = (currentPriceTRY - averagePriceTRY) * item.quantity;
-
           totalValue += itemTotalValue;
           totalProfitLoss += itemProfitLoss;
         } else {
-          // Fiyat bulunamadıysa eski değerleri kullan
           totalValue += item.totalValue;
           totalProfitLoss += item.profitLoss;
         }
       });
 
-      return {
-        totalValue,
-        totalProfitLoss
-      };
+      return { totalValue, totalProfitLoss };
     }
 
-    // Portföy boşsa state'teki değerleri kullan
     return {
       totalValue: state.totalValue,
       totalProfitLoss: state.totalProfitLoss
     };
-  }, [state.portfolioItems, stocks, cryptos, state.totalValue, state.totalProfitLoss]);
+  }, [state.portfolioItems, stocks, cryptos, state.totalValue, state.totalProfitLoss, USD_TO_TRY]);
 
   const [selectedStock, setSelectedStock] = useState<Stock | null>(null);
   const [tradeType, setTradeType] = useState<'buy' | 'sell'>('buy');
@@ -101,31 +92,33 @@ export default function Home() {
     portfolio_value: number;
     balance: number;
   }>>([]);
+  const [latestNews, setLatestNews] = useState<Array<{
+    title: string;
+    link: string;
+    pubDate: string;
+    categories: string[];
+    description: string;
+  }>>([]);
 
-  // Giriş kontrolü - giriş yapılmamışsa login sayfasına yönlendir
   useEffect(() => {
     if (!loading && !user) {
-      // Eğer zaten login sayfasındaysak yönlendirme yapma
       if (window.location.pathname !== '/login' && window.location.pathname !== '/register') {
         router.push('/login');
       }
     }
   }, [user, loading, router]);
 
-  // Fiyat değişikliklerini takip et ve animasyon ekle (hisse senetleri)
   useEffect(() => {
     const newAnimations = new Map<string, 'up' | 'down' | null>();
     
     stocks.forEach((stock) => {
       const prevPrice = prevStockPricesRef.current.get(stock.symbol);
       if (prevPrice !== undefined && prevPrice !== stock.price) {
-        // Fiyat değişti
         if (stock.price > prevPrice) {
           newAnimations.set(`stock-${stock.symbol}`, 'up');
         } else {
           newAnimations.set(`stock-${stock.symbol}`, 'down');
         }
-        // Animasyonu 600ms sonra temizle
         setTimeout(() => {
           setPriceAnimations((prev) => {
             const updated = new Map(prev);
@@ -134,7 +127,6 @@ export default function Home() {
           });
         }, 600);
       }
-      // Güncel fiyatı kaydet
       prevStockPricesRef.current.set(stock.symbol, stock.price);
     });
 
@@ -147,20 +139,17 @@ export default function Home() {
     }
   }, [stocks]);
 
-  // Fiyat değişikliklerini takip et ve animasyon ekle (kripto paralar)
   useEffect(() => {
     const newAnimations = new Map<string, 'up' | 'down' | null>();
     
     cryptos.forEach((crypto) => {
       const prevPrice = prevCryptoPricesRef.current.get(crypto.id);
       if (prevPrice !== undefined && prevPrice !== crypto.current_price) {
-        // Fiyat değişti
         if (crypto.current_price > prevPrice) {
           newAnimations.set(`crypto-${crypto.id}`, 'up');
         } else {
           newAnimations.set(`crypto-${crypto.id}`, 'down');
         }
-        // Animasyonu 600ms sonra temizle
         setTimeout(() => {
           setPriceAnimations((prev) => {
             const updated = new Map(prev);
@@ -169,7 +158,6 @@ export default function Home() {
           });
         }, 600);
       }
-      // Güncel fiyatı kaydet
       prevCryptoPricesRef.current.set(crypto.id, crypto.current_price);
     });
 
@@ -182,7 +170,6 @@ export default function Home() {
     }
   }, [cryptos]);
 
-  // Crypto'yu Stock formatına çevir
   const toStockFromCrypto = useCallback((c: CryptoCoin): Stock => {
     const price = c.current_price;
     const changePercent = c.price_change_percentage_24h ?? 0;
@@ -225,7 +212,7 @@ export default function Home() {
   }, []);
 
   const toStockFromCurrency = useCallback((c: { code: string; name: string; selling: number; change_rate: number }): Stock => {
-    const price = c.selling; // Döviz fiyatı zaten TRY
+    const price = c.selling;
     const change = price * (c.change_rate / 100);
     return {
       id: c.code,
@@ -244,11 +231,9 @@ export default function Home() {
     };
   }, []);
 
-  // Kullanıcı yüklendiğinde portföyü yenile
   useEffect(() => {
     if (user && !loading) {
       refreshPortfolio().catch((error) => {
-        // Hata durumunda sessizce logla (backendApi zaten logout yapacak)
         console.error('Portfolio refresh error:', error);
       });
     }
@@ -262,7 +247,6 @@ export default function Home() {
       .join('|');
   }, [state.portfolioItems]);
 
-  // Stocks ve cryptos verileri değiştiğinde portföy fiyatlarını güncelle
   useEffect(() => {
     if (!portfolioSymbolsKey || (stocks.length === 0 && cryptos.length === 0)) {
       return;
@@ -283,12 +267,10 @@ export default function Home() {
         ...currencies.map(c => toStockFromCurrency(c))
       ];
       
-      // Sadece portföyde olan varlıkları filtrele
       const portfolioAssets = allAssets.filter(asset => 
         portfolioSymbolsSet.has(asset.symbol.toUpperCase())
       );
       
-      // Fiyatlar gerçekten değişti mi kontrol et
       const hasPriceChanged = portfolioAssets.some(asset => {
         const prevPrice = prevPortfolioPricesRef.current.get(asset.symbol.toUpperCase());
         const currentPrice = asset.price;
@@ -299,14 +281,12 @@ export default function Home() {
         return changed;
       });
       
-      // Sadece fiyat değiştiyse güncelle
       if (hasPriceChanged && portfolioAssets.length > 0) {
         updatePrices(portfolioAssets);
       }
     }
   }, [stocks, cryptos, currencies, portfolioSymbolsKey, updatePrices, toStockFromCrypto, toStockFromCurrency]);
 
-  // Liderlik verilerini yükle
   useEffect(() => {
     const loadTopLeaders = async () => {
       try {
@@ -326,6 +306,22 @@ export default function Home() {
     }
   }, [user]);
 
+  useEffect(() => {
+    const loadNews = async () => {
+      try {
+        const result = await newsApi.getNews(6);
+        if (result.success && result.data) {
+          setLatestNews(result.data);
+        }
+      } catch (error) {
+        console.error('News load error:', error);
+      }
+    };
+    if (user) {
+      loadNews();
+    }
+  }, [user]);
+
   const openTrade = (asset: Stock) => {
     setSelectedStock(asset);
     setIsTradeModalOpen(true);
@@ -334,56 +330,32 @@ export default function Home() {
   const onBuy = (symbol: string, type: 'stock' | 'crypto' | 'commodity' | 'currency') => {
     if (type === 'stock') {
       const s = stocks.find(x => x.symbol === symbol);
-      if (s) {
-        setTradeType('buy');
-        openTrade({ ...s, assetType: 'stock' });
-      }
+      if (s) { setTradeType('buy'); openTrade({ ...s, assetType: 'stock' }); }
     } else if (type === 'commodity') {
       const c = commodities.find(x => x.code.toUpperCase() === symbol || x.code === symbol);
-      if (c) {
-        setTradeType('buy');
-        openTrade(toStockFromCommodity(c));
-      }
+      if (c) { setTradeType('buy'); openTrade(toStockFromCommodity(c)); }
     } else if (type === 'currency') {
       const c = currencies.find(x => x.code.toUpperCase() === symbol || x.code === symbol);
-      if (c) {
-        setTradeType('buy');
-        openTrade(toStockFromCurrency(c));
-      }
+      if (c) { setTradeType('buy'); openTrade(toStockFromCurrency(c)); }
     } else {
       const c = cryptos.find(x => x.symbol.toUpperCase() === symbol);
-      if (c) {
-        setTradeType('buy');
-        openTrade(toStockFromCrypto(c));
-      }
+      if (c) { setTradeType('buy'); openTrade(toStockFromCrypto(c)); }
     }
   };
 
   const onSell = (symbol: string, type: 'stock' | 'crypto' | 'commodity' | 'currency') => {
     if (type === 'stock') {
       const s = stocks.find(x => x.symbol === symbol);
-      if (s) {
-        setTradeType('sell');
-        openTrade({ ...s, assetType: 'stock' });
-      }
+      if (s) { setTradeType('sell'); openTrade({ ...s, assetType: 'stock' }); }
     } else if (type === 'commodity') {
       const c = commodities.find(x => x.code.toUpperCase() === symbol || x.code === symbol);
-      if (c) {
-        setTradeType('sell');
-        openTrade(toStockFromCommodity(c));
-      }
+      if (c) { setTradeType('sell'); openTrade(toStockFromCommodity(c)); }
     } else if (type === 'currency') {
       const c = currencies.find(x => x.code.toUpperCase() === symbol || x.code === symbol);
-      if (c) {
-        setTradeType('sell');
-        openTrade(toStockFromCurrency(c));
-      }
+      if (c) { setTradeType('sell'); openTrade(toStockFromCurrency(c)); }
     } else {
       const c = cryptos.find(x => x.symbol.toUpperCase() === symbol);
-      if (c) {
-        setTradeType('sell');
-        openTrade(toStockFromCrypto(c));
-      }
+      if (c) { setTradeType('sell'); openTrade(toStockFromCrypto(c)); }
     }
   };
 
@@ -392,518 +364,529 @@ export default function Home() {
     setSelectedStock(null);
   };
 
-  // Loading durumunda loading göster
+  const filteredCurrencies = currencies.filter(c => ['USD', 'EUR', 'GBP', 'CHF', 'JPY', 'GAU'].includes(c.code));
+
+  const marketTabs: { key: MarketTab; label: string; count: number }[] = [
+    { key: 'stocks', label: 'Hisse Senetleri', count: Math.min(stocks.length, 10) },
+    { key: 'crypto', label: 'Kripto Paralar', count: cryptos.length },
+    { key: 'currencies', label: 'Döviz Kurları', count: filteredCurrencies.length },
+    { key: 'commodities', label: 'Emtia', count: commodities.length },
+  ];
+
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#181a20] flex items-center justify-center">
+      <div className="min-h-screen bg-[#0b0e11] flex items-center justify-center">
         <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-[#0ecb81]"></div>
-          <p className="mt-4 text-[#848e9c]">Yükleniyor...</p>
+          <div className="relative">
+            <div className="h-16 w-16 rounded-full border-2 border-[#2b3139] border-t-[#0ecb81] animate-spin" />
+            <div className="absolute inset-0 flex items-center justify-center">
+              <ChartBarSquareIcon className="h-6 w-6 text-[#0ecb81]" />
+            </div>
+          </div>
+          <p className="mt-4 text-[#848e9c] text-sm">Piyasa verileri yükleniyor...</p>
         </div>
       </div>
     );
   }
 
-  // Kullanıcı yoksa null döndür (useEffect zaten yönlendirecek)
   if (!user) {
     return null;
   }
 
   return (
-    <div className="min-h-screen bg-[#181a20]">
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
-        {/* Welcome Section - Binance Style */}
-        <div className="mb-8">
-          <h1 className="text-3xl sm:text-4xl font-bold text-white mb-2">
-            {user ? `Hoş geldin, ${user.username}!` : 'Sanal Yatırım Platformu'}
-          </h1>
-          <p className="text-[#848e9c] text-sm">Piyasaları takip edin ve yatırım yapın</p>
-        </div>
+    <div className="min-h-screen bg-[#0b0e11]">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6">
 
-        {/* Stats Cards - Binance Style */}
-        {user && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-            <div className="bg-[#1e2329] rounded-xl p-5 border border-[#2b3139] hover:border-[#0ecb81]/30 transition-all">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-[#848e9c] mb-1">Portföy Değeri</p>
-                  <p className="text-2xl font-bold text-white">₺{calculatedTotals.totalValue.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-                </div>
-                <div className="p-3 bg-[#0ecb81]/10 rounded-lg">
-                  <CurrencyDollarIcon className="h-6 w-6 text-[#0ecb81]" />
-                </div>
+        {/* ============ HERO / PORTFOLIO OVERVIEW ============ */}
+        <section className="relative overflow-hidden rounded-2xl border border-[#2b3139]/60 p-6 sm:p-8 bg-gradient-to-br from-[#141720] via-[#1a1e28] to-[#121a14]">
+          <div className="absolute -top-32 -right-32 w-80 h-80 bg-[#0ecb81]/[0.06] rounded-full blur-[100px] pointer-events-none" />
+          <div className="absolute -bottom-24 -left-24 w-64 h-64 bg-[#f0b90b]/[0.04] rounded-full blur-[80px] pointer-events-none" />
+
+          <div className="relative z-10">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+              <div>
+                <p className="text-[#848e9c] text-xs uppercase tracking-widest mb-1">Dashboard</p>
+                <h1 className="text-2xl sm:text-3xl font-bold text-white">
+                  Hoş geldin, <span className="text-[#0ecb81]">{user.username}</span>
+                </h1>
+                <p className="text-[#5a6270] text-sm mt-1">Portföy özetin ve canlı piyasa verileri</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Link
+                  href="/portfolio"
+                  className="px-4 py-2.5 bg-[#0ecb81] hover:bg-[#0bb975] text-white rounded-xl text-sm font-semibold transition-all hover:shadow-lg hover:shadow-[#0ecb81]/20"
+                >
+                  Portföyüm
+                </Link>
+                <Link
+                  href="/transactions"
+                  className="px-4 py-2.5 bg-white/[0.04] hover:bg-white/[0.08] text-[#eaecef] rounded-xl text-sm font-semibold transition-all border border-[#2b3139]"
+                >
+                  İşlemler
+                </Link>
               </div>
             </div>
 
-            <div className="bg-[#1e2329] rounded-xl p-5 border border-[#2b3139] hover:border-[#0ecb81]/30 transition-all">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-[#848e9c] mb-1">Toplam Kâr/Zarar</p>
-                  <p className={`text-2xl font-bold ${calculatedTotals.totalProfitLoss >= 0 ? 'text-[#0ecb81]' : 'text-[#f6465d]'}`}>
-                    {calculatedTotals.totalProfitLoss >= 0 ? '+' : ''}₺{calculatedTotals.totalProfitLoss.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </p>
-                </div>
-                <div className={`p-3 rounded-lg ${calculatedTotals.totalProfitLoss >= 0 ? 'bg-[#0ecb81]/10' : 'bg-[#f6465d]/10'}`}>
-                  {calculatedTotals.totalProfitLoss >= 0 ? (
-                    <ArrowUpIcon className={`h-6 w-6 text-[#0ecb81]`} />
-                  ) : (
-                    <ArrowDownIcon className={`h-6 w-6 text-[#f6465d]`} />
-                  )}
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-[#1e2329] rounded-xl p-5 border border-[#2b3139] hover:border-[#0ecb81]/30 transition-all">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-[#848e9c] mb-1">Sıralama</p>
-                  <p className="text-2xl font-bold text-white">#{user?.rank || '-'}</p>
-                </div>
-                <div className="p-3 bg-[#f0b90b]/10 rounded-lg">
-                  <TrophyIcon className="h-6 w-6 text-[#f0b90b]" />
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-[#1e2329] rounded-xl p-5 border border-[#2b3139] hover:border-[#0ecb81]/30 transition-all">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-[#848e9c] mb-1">Toplam Hisse</p>
-                  <p className="text-2xl font-bold text-white">{state.portfolioItems.length}</p>
-                </div>
-                <div className="p-3 bg-[#0ecb81]/10 rounded-lg">
-                  <UserIcon className="h-6 w-6 text-[#0ecb81]" />
-                </div>
-              </div>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+              <StatCard
+                icon={<WalletIcon className="h-4 w-4 text-[#0ecb81]" />}
+                label="Portföy Değeri"
+                value={`₺${calculatedTotals.totalValue.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                accent="green"
+              />
+              <StatCard
+                icon={calculatedTotals.totalProfitLoss >= 0
+                  ? <ArrowUpIcon className="h-4 w-4 text-[#0ecb81]" />
+                  : <ArrowDownIcon className="h-4 w-4 text-[#f6465d]" />
+                }
+                label="Kâr / Zarar"
+                value={`${calculatedTotals.totalProfitLoss >= 0 ? '+' : ''}₺${calculatedTotals.totalProfitLoss.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                accent={calculatedTotals.totalProfitLoss >= 0 ? 'green' : 'red'}
+                valueColor={calculatedTotals.totalProfitLoss >= 0 ? 'text-[#0ecb81]' : 'text-[#f6465d]'}
+              />
+              <StatCard
+                icon={<TrophyIcon className="h-4 w-4 text-[#f0b90b]" />}
+                label="Sıralama"
+                value={`#${user?.rank || '-'}`}
+                accent="yellow"
+              />
+              <StatCard
+                icon={<BanknotesIcon className="h-4 w-4 text-[#0ecb81]" />}
+                label="Varlık Sayısı"
+                value={String(state.portfolioItems.length)}
+                accent="green"
+              />
             </div>
           </div>
-        )}
+        </section>
 
-        {/* Market Grid - Binance Style */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6 mb-8">
-          {/* Hisse Senetleri Grid */}
-          <div className="lg:col-span-1 xl:col-span-2">
-            <div className="bg-[#1e2329] rounded-xl border border-[#2b3139] overflow-hidden">
-              <div className="flex items-center justify-between px-6 py-4 border-b border-[#2b3139] bg-[#161a1e]">
-                <h2 className="text-xl font-bold text-white">Hisse Senetleri</h2>
-                <span className="text-sm text-[#848e9c] bg-[#2b3139] px-3 py-1 rounded-full">{Math.min(stocks.length, 10)} hisse</span>
-              </div>
-              
-              <div className="p-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2 gap-3">
-                  {stocks.slice(0, 10).map((stock) => {
-                    const animation = priceAnimations.get(`stock-${stock.symbol}`);
-                    const animationClass = animation === 'up' ? 'price-flash-up' : animation === 'down' ? 'price-flash-down' : '';
-                    
-                    return (
-                    <div key={stock.id} className="bg-[#161a1e] rounded-lg p-4 border border-[#2b3139] hover:border-[#0ecb81]/30 transition-all hover:bg-[#1e2329]">
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center gap-3">
-                          <div className="h-10 w-10 bg-[#0ecb81]/10 rounded-lg flex items-center justify-center">
-                            <span className="text-lg font-bold text-[#0ecb81]">{stock.symbol.slice(0,1)}</span>
-                          </div>
-                          <div>
-                            <Link href={`/asset/${stock.symbol}?type=stock`} className="text-sm font-semibold text-white hover:text-[#0ecb81] transition-colors">
-                              {stock.name}
-                            </Link>
-                            <div className="text-xs text-[#848e9c]">{stock.symbol}</div>
-                          </div>
-                        </div>
-                        <div className={`text-right rounded px-2 py-1 ${animationClass}`}>
-                          <div className="text-base font-bold text-white">${stock.price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-                          <div className="text-xs text-[#848e9c]">₺{(stock.price * USD_TO_TRY).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-                          <div className={`text-xs inline-flex items-center font-medium mt-1 ${stock.change >= 0 ? 'text-[#0ecb81]' : 'text-[#f6465d]'}`}>
-                            {stock.change >= 0 ? <ArrowUpIcon className="h-3 w-3 mr-1" /> : <ArrowDownIcon className="h-3 w-3 mr-1" />}
-                            {stock.change >= 0 ? '+' : ''}${stock.change.toFixed(2)} ({stock.changePercent >= 0 ? '+' : ''}{stock.changePercent.toFixed(2)}%)
-                          </div>
-                        </div>
-                      </div>
-                      {user && (
-                        <div className="flex gap-2 mt-3">
-                          <button 
-                            onClick={() => onBuy(stock.symbol, 'stock')} 
-                            className="flex-1 bg-[#0ecb81] hover:bg-[#0bb975] text-white py-2 px-3 rounded-lg text-sm font-semibold transition-all"
-                          >
-                            Al
-                          </button>
-                          <button 
-                            onClick={() => onSell(stock.symbol, 'stock')} 
-                            className="flex-1 bg-[#f6465d] hover:bg-[#e03e54] text-white py-2 px-3 rounded-lg text-sm font-semibold transition-all"
-                          >
-                            Sat
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Kripto Paralar Grid */}
-          <div className="lg:col-span-1 xl:col-span-1">
-            <div className="bg-[#1e2329] rounded-xl border border-[#2b3139] overflow-hidden">
-              <div className="flex items-center justify-between px-6 py-4 border-b border-[#2b3139] bg-[#161a1e]">
-                <h2 className="text-xl font-bold text-white">Kripto Paralar</h2>
-                <span className="text-sm text-[#848e9c] bg-[#2b3139] px-3 py-1 rounded-full">{cryptos.length} kripto</span>
-              </div>
-              
-              <div className="p-4">
-                <div className="space-y-3">
-                  {cryptos.slice(0, 6).map((crypto) => {
-                    const changePct = crypto.price_change_percentage_24h ?? 0;
-                    const animation = priceAnimations.get(`crypto-${crypto.id}`);
-                    const animationClass = animation === 'up' ? 'price-flash-up' : animation === 'down' ? 'price-flash-down' : '';
-                    
-                    return (
-                      <div key={crypto.id} className="bg-[#161a1e] rounded-lg p-4 border border-[#2b3139] hover:border-[#0ecb81]/30 transition-all hover:bg-[#1e2329]">
-                        <div className="flex items-center justify-between mb-3">
-                          <div className="flex items-center gap-3">
-                            <div className="relative">
-                              <Image src={crypto.image} alt={crypto.name} width={36} height={36} className="rounded-full ring-2 ring-[#2b3139]" />
-                            </div>
-                            <div>
-                              <Link href={`/asset/${crypto.symbol.toUpperCase()}?type=crypto&id=${crypto.id}`} className="text-sm font-semibold text-white hover:text-[#0ecb81] transition-colors">
-                                {crypto.name}
-                              </Link>
-                              <div className="text-xs text-[#848e9c] uppercase">{crypto.symbol}</div>
-                            </div>
-                          </div>
-                          <div className={`text-right rounded px-2 py-1 ${animationClass}`}>
-                            <div className="text-base font-bold text-white">${crypto.current_price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-                            <div className="text-xs text-[#848e9c]">₺{(crypto.current_price * usdToTry).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-                            <div className={`text-xs inline-flex items-center font-medium mt-1 ${changePct >= 0 ? 'text-[#0ecb81]' : 'text-[#f6465d]'}`}>
-                              {changePct >= 0 ? <ArrowUpIcon className="h-3 w-3 mr-1" /> : <ArrowDownIcon className="h-3 w-3 mr-1" />}
-                              {changePct.toFixed(2)}%
-                            </div>
-                          </div>
-                        </div>
-                        {user && (
-                          <div className="flex gap-2 mt-3">
-                            <button 
-                              onClick={() => onBuy(crypto.symbol.toUpperCase(), 'crypto')} 
-                              className="flex-1 bg-[#0ecb81] hover:bg-[#0bb975] text-white py-2 px-3 rounded-lg text-sm font-semibold transition-all"
-                            >
-                              Al
-                            </button>
-                            <button 
-                              onClick={() => onSell(crypto.symbol.toUpperCase(), 'crypto')} 
-                              className="flex-1 bg-[#f6465d] hover:bg-[#e03e54] text-white py-2 px-3 rounded-lg text-sm font-semibold transition-all"
-                            >
-                              Sat
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Döviz Kurları - USD, EUR vb. (NosyAPI) */}
-        {currencies.length > 0 && (
-          <div className="mb-8">
-            <div className="bg-[#1e2329] rounded-xl border border-[#2b3139] overflow-hidden">
-              <div className="flex items-center justify-between px-6 py-4 border-b border-[#2b3139] bg-[#161a1e]">
-                <h2 className="text-xl font-bold text-white">Döviz Kurları</h2>
-                <span className="text-sm text-[#848e9c] bg-[#2b3139] px-3 py-1 rounded-full">
-                  USD: ₺{currencies.find(c => c.code === 'USD')?.selling?.toLocaleString('tr-TR', { minimumFractionDigits: 2 }) ?? '-'}
+        {/* ============ CURRENCY TICKER STRIP ============ */}
+        {filteredCurrencies.length > 0 && (
+          <section className="flex items-center gap-2 overflow-x-auto py-3 px-4 bg-[#1a1d24] rounded-xl border border-[#2b3139]/50 scrollbar-hide">
+            <span className="text-[10px] uppercase tracking-wider text-[#5a6270] font-semibold flex-shrink-0 mr-2">Canlı Kurlar</span>
+            {filteredCurrencies.map((curr, idx) => (
+              <div key={curr.code} className="flex items-center gap-2 flex-shrink-0">
+                {idx > 0 && <div className="w-px h-4 bg-[#2b3139]" />}
+                <span className="text-xs font-bold text-[#eaecef]">{curr.code}</span>
+                <span className="text-xs text-[#848e9c]">₺{curr.selling.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</span>
+                <span className={`text-[10px] font-semibold ${curr.change_rate >= 0 ? 'text-[#0ecb81]' : 'text-[#f6465d]'}`}>
+                  {curr.change_rate >= 0 ? '+' : ''}{curr.change_rate.toFixed(2)}%
                 </span>
               </div>
-              
-              <div className="p-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-3">
-                  {currencies.filter(c => ['USD', 'EUR', 'GBP', 'CHF', 'JPY', 'GAU'].includes(c.code)).map((curr) => (
-                    <div key={curr.code} className="bg-[#161a1e] rounded-lg p-4 border border-[#2b3139] hover:border-[#0ecb81]/30 transition-all hover:bg-[#1e2329]">
+            ))}
+          </section>
+        )}
+
+        {/* ============ TABBED MARKET SECTION ============ */}
+        <section className="bg-[#1a1d24] rounded-2xl border border-[#2b3139]/60 overflow-hidden">
+          <div className="flex items-center border-b border-[#2b3139] overflow-x-auto scrollbar-hide">
+            {marketTabs.map(tab => (
+              <button
+                key={tab.key}
+                onClick={() => setMarketTab(tab.key)}
+                className={`relative px-5 py-4 text-sm font-semibold transition-all whitespace-nowrap flex-shrink-0 ${
+                  marketTab === tab.key
+                    ? 'text-[#0ecb81]'
+                    : 'text-[#5a6270] hover:text-[#848e9c]'
+                }`}
+              >
+                {tab.label}
+                <span className={`ml-2 text-[10px] px-1.5 py-0.5 rounded-md font-bold ${
+                  marketTab === tab.key
+                    ? 'bg-[#0ecb81]/10 text-[#0ecb81]'
+                    : 'bg-[#2b3139] text-[#5a6270]'
+                }`}>
+                  {tab.count}
+                </span>
+                {marketTab === tab.key && (
+                  <span className="absolute bottom-0 left-2 right-2 h-[2px] bg-[#0ecb81] rounded-full" />
+                )}
+              </button>
+            ))}
+          </div>
+
+          <div className="p-4">
+            {/* STOCKS */}
+            {marketTab === 'stocks' && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+                {stocks.slice(0, 10).map((stock) => {
+                  const animation = priceAnimations.get(`stock-${stock.symbol}`);
+                  const animCls = animation === 'up' ? 'price-flash-up' : animation === 'down' ? 'price-flash-down' : '';
+                  return (
+                    <div key={stock.id} className="bg-[#12141a] rounded-xl p-4 border border-[#2b3139]/40 hover:border-[#0ecb81]/30 transition-all group">
                       <div className="flex items-center gap-3 mb-3">
-                        <div className="h-10 w-10 bg-[#0ecb81]/10 rounded-lg flex items-center justify-center">
-                          <span className="text-lg font-bold text-[#0ecb81]">{curr.code.charAt(0)}</span>
+                        <div className="h-10 w-10 bg-[#0ecb81]/8 rounded-lg flex items-center justify-center flex-shrink-0 border border-[#0ecb81]/10">
+                          <span className="text-sm font-bold text-[#0ecb81]">{stock.symbol.slice(0, 2)}</span>
                         </div>
                         <div className="min-w-0 flex-1">
-                          <div className="text-sm font-semibold text-white truncate">{curr.name || curr.code}</div>
-                          <div className="text-xs text-[#848e9c] truncate">{curr.code}</div>
+                          <Link href={`/asset/${stock.symbol}?type=stock`} className="text-sm font-semibold text-[#eaecef] hover:text-[#0ecb81] transition-colors block truncate">
+                            {stock.name}
+                          </Link>
+                          <span className="text-xs text-[#5a6270]">{stock.symbol}</span>
+                        </div>
+                        <div className={`text-right ${animCls} rounded px-1`}>
+                          <div className="text-sm font-bold text-[#eaecef]">${stock.price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                          <div className="text-[10px] text-[#5a6270]">₺{(stock.price * USD_TO_TRY).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                         </div>
                       </div>
-                      <div className="mb-3">
-                        <div className="text-base font-bold text-white">₺{curr.selling.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 4 })}</div>
-                        <div className={`text-xs inline-flex items-center font-medium mt-1 ${curr.change_rate >= 0 ? 'text-[#0ecb81]' : 'text-[#f6465d]'}`}>
-                          {curr.change_rate >= 0 ? <ArrowUpIcon className="h-3 w-3 mr-1" /> : <ArrowDownIcon className="h-3 w-3 mr-1" />}
-                          {curr.change_rate >= 0 ? '+' : ''}{curr.change_rate.toFixed(2)}%
-                        </div>
-                      </div>
-                      {user && (
-                        <div className="flex gap-2">
-                          <button 
-                            onClick={() => onBuy(curr.code, 'currency')} 
-                            className="flex-1 bg-[#0ecb81] hover:bg-[#0bb975] text-white py-2 px-3 rounded-lg text-xs font-semibold transition-all"
-                          >
+                      <div className="flex items-center justify-between">
+                        <span className={`text-xs font-semibold inline-flex items-center gap-0.5 px-2 py-1 rounded-md ${
+                          stock.change >= 0 ? 'bg-[#0ecb81]/10 text-[#0ecb81]' : 'bg-[#f6465d]/10 text-[#f6465d]'
+                        }`}>
+                          {stock.change >= 0 ? <ArrowUpIcon className="h-3 w-3" /> : <ArrowDownIcon className="h-3 w-3" />}
+                          {stock.changePercent >= 0 ? '+' : ''}{stock.changePercent.toFixed(2)}%
+                        </span>
+                        <div className="flex gap-1.5">
+                          <button onClick={() => onBuy(stock.symbol, 'stock')} className="bg-[#0ecb81]/10 hover:bg-[#0ecb81] text-[#0ecb81] hover:text-white px-3 py-1.5 rounded-lg text-xs font-semibold transition-all">
                             Al
                           </button>
-                          <button 
-                            onClick={() => onSell(curr.code, 'currency')} 
-                            className="flex-1 bg-[#f6465d] hover:bg-[#e03e54] text-white py-2 px-3 rounded-lg text-xs font-semibold transition-all"
-                          >
+                          <button onClick={() => onSell(stock.symbol, 'stock')} className="bg-[#f6465d]/10 hover:bg-[#f6465d] text-[#f6465d] hover:text-white px-3 py-1.5 rounded-lg text-xs font-semibold transition-all">
                             Sat
                           </button>
                         </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Emtia Grid */}
-        {commodities.length > 0 && (
-          <div className="mb-8">
-            <div className="bg-[#1e2329] rounded-xl border border-[#2b3139] overflow-hidden">
-              <div className="flex items-center justify-between px-6 py-4 border-b border-[#2b3139] bg-[#161a1e]">
-                <h2 className="text-xl font-bold text-white">Emtia</h2>
-                <span className="text-sm text-[#848e9c] bg-[#2b3139] px-3 py-1 rounded-full">{commodities.length} emtia</span>
-              </div>
-              
-              <div className="p-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
-                  {commodities.map((commodity) => {
-                    return (
-                      <div key={commodity.code} className="bg-[#161a1e] rounded-lg p-4 border border-[#2b3139] hover:border-[#f0b90b]/30 transition-all hover:bg-[#1e2329]">
-                        <div className="flex items-center gap-3 mb-3">
-                          <div className="h-10 w-10 bg-[#f0b90b]/10 rounded-lg flex items-center justify-center">
-                            <span className="text-lg font-bold text-[#f0b90b]">
-                              {commodity.name.charAt(0).toUpperCase()}
-                            </span>
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <div className="text-sm font-semibold text-white truncate">{commodity.name}</div>
-                            <div className="text-xs text-[#848e9c] truncate">{commodity.code}</div>
-                          </div>
-                        </div>
-                        <div className="mb-3">
-                          <div className="text-base font-bold text-white">${commodity.price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-                          <div className="text-xs text-[#848e9c]">₺{(commodity.price * usdToTry).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-                          <div className={`text-xs inline-flex items-center font-medium mt-1 ${commodity.change_rate >= 0 ? 'text-[#0ecb81]' : 'text-[#f6465d]'}`}>
-                            {commodity.change_rate >= 0 ? <ArrowUpIcon className="h-3 w-3 mr-1" /> : <ArrowDownIcon className="h-3 w-3 mr-1" />}
-                            {commodity.change_rate >= 0 ? '+' : ''}{commodity.change_rate.toFixed(2)}%
-                          </div>
-                        </div>
-                        {user && (
-                          <div className="flex gap-2">
-                            <button 
-                              onClick={() => onBuy(commodity.code.toUpperCase(), 'commodity')} 
-                              className="flex-1 bg-[#0ecb81] hover:bg-[#0bb975] text-white py-2 px-3 rounded-lg text-xs font-semibold transition-all"
-                            >
-                              Al
-                            </button>
-                            <button 
-                              onClick={() => onSell(commodity.code.toUpperCase(), 'commodity')} 
-                              className="flex-1 bg-[#f6465d] hover:bg-[#e03e54] text-white py-2 px-3 rounded-lg text-xs font-semibold transition-all"
-                            >
-                              Sat
-                            </button>
-                          </div>
-                        )}
                       </div>
-                    );
-                  })}
-                </div>
+                    </div>
+                  );
+                })}
               </div>
-            </div>
+            )}
+
+            {/* CRYPTO */}
+            {marketTab === 'crypto' && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+                {cryptos.slice(0, 12).map((crypto) => {
+                  const changePct = crypto.price_change_percentage_24h ?? 0;
+                  const animation = priceAnimations.get(`crypto-${crypto.id}`);
+                  const animCls = animation === 'up' ? 'price-flash-up' : animation === 'down' ? 'price-flash-down' : '';
+                  return (
+                    <div key={crypto.id} className="bg-[#12141a] rounded-xl p-4 border border-[#2b3139]/40 hover:border-[#0ecb81]/30 transition-all group">
+                      <div className="flex items-center gap-3 mb-3">
+                        <Image src={crypto.image} alt={crypto.name} width={36} height={36} className="rounded-full ring-2 ring-[#2b3139] flex-shrink-0" />
+                        <div className="min-w-0 flex-1">
+                          <Link href={`/asset/${crypto.symbol.toUpperCase()}?type=crypto&id=${crypto.id}`} className="text-sm font-semibold text-[#eaecef] hover:text-[#0ecb81] transition-colors block truncate">
+                            {crypto.name}
+                          </Link>
+                          <span className="text-xs text-[#5a6270] uppercase">{crypto.symbol}</span>
+                        </div>
+                        <div className={`text-right ${animCls} rounded px-1`}>
+                          <div className="text-sm font-bold text-[#eaecef]">${crypto.current_price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                          <div className="text-[10px] text-[#5a6270]">₺{(crypto.current_price * usdToTry).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className={`text-xs font-semibold inline-flex items-center gap-0.5 px-2 py-1 rounded-md ${
+                          changePct >= 0 ? 'bg-[#0ecb81]/10 text-[#0ecb81]' : 'bg-[#f6465d]/10 text-[#f6465d]'
+                        }`}>
+                          {changePct >= 0 ? <ArrowUpIcon className="h-3 w-3" /> : <ArrowDownIcon className="h-3 w-3" />}
+                          {changePct >= 0 ? '+' : ''}{changePct.toFixed(2)}%
+                        </span>
+                        <div className="flex gap-1.5">
+                          <button onClick={() => onBuy(crypto.symbol.toUpperCase(), 'crypto')} className="bg-[#0ecb81]/10 hover:bg-[#0ecb81] text-[#0ecb81] hover:text-white px-3 py-1.5 rounded-lg text-xs font-semibold transition-all">
+                            Al
+                          </button>
+                          <button onClick={() => onSell(crypto.symbol.toUpperCase(), 'crypto')} className="bg-[#f6465d]/10 hover:bg-[#f6465d] text-[#f6465d] hover:text-white px-3 py-1.5 rounded-lg text-xs font-semibold transition-all">
+                            Sat
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* CURRENCIES */}
+            {marketTab === 'currencies' && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+                {filteredCurrencies.map((curr) => (
+                  <div key={curr.code} className="bg-[#12141a] rounded-xl p-4 border border-[#2b3139]/40 hover:border-[#0ecb81]/30 transition-all group">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="h-10 w-10 bg-[#0ecb81]/8 rounded-lg flex items-center justify-center flex-shrink-0 border border-[#0ecb81]/10">
+                        <span className="text-sm font-bold text-[#0ecb81]">{curr.code.slice(0, 2)}</span>
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="text-sm font-semibold text-[#eaecef] truncate">{curr.name || curr.code}</div>
+                        <span className="text-xs text-[#5a6270]">{curr.code}</span>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-sm font-bold text-[#eaecef]">₺{curr.selling.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 4 })}</div>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className={`text-xs font-semibold inline-flex items-center gap-0.5 px-2 py-1 rounded-md ${
+                        curr.change_rate >= 0 ? 'bg-[#0ecb81]/10 text-[#0ecb81]' : 'bg-[#f6465d]/10 text-[#f6465d]'
+                      }`}>
+                        {curr.change_rate >= 0 ? <ArrowUpIcon className="h-3 w-3" /> : <ArrowDownIcon className="h-3 w-3" />}
+                        {curr.change_rate >= 0 ? '+' : ''}{curr.change_rate.toFixed(2)}%
+                      </span>
+                      <div className="flex gap-1.5">
+                        <button onClick={() => onBuy(curr.code, 'currency')} className="bg-[#0ecb81]/10 hover:bg-[#0ecb81] text-[#0ecb81] hover:text-white px-3 py-1.5 rounded-lg text-xs font-semibold transition-all">
+                          Al
+                        </button>
+                        <button onClick={() => onSell(curr.code, 'currency')} className="bg-[#f6465d]/10 hover:bg-[#f6465d] text-[#f6465d] hover:text-white px-3 py-1.5 rounded-lg text-xs font-semibold transition-all">
+                          Sat
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* COMMODITIES */}
+            {marketTab === 'commodities' && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+                {commodities.map((commodity) => (
+                  <div key={commodity.code} className="bg-[#12141a] rounded-xl p-4 border border-[#2b3139]/40 hover:border-[#f0b90b]/30 transition-all group">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="h-10 w-10 bg-[#f0b90b]/8 rounded-lg flex items-center justify-center flex-shrink-0 border border-[#f0b90b]/10">
+                        <span className="text-sm font-bold text-[#f0b90b]">{commodity.name.charAt(0).toUpperCase()}</span>
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="text-sm font-semibold text-[#eaecef] truncate">{commodity.name}</div>
+                        <span className="text-xs text-[#5a6270]">{commodity.code}</span>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-sm font-bold text-[#eaecef]">${commodity.price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                        <div className="text-[10px] text-[#5a6270]">₺{(commodity.price * usdToTry).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className={`text-xs font-semibold inline-flex items-center gap-0.5 px-2 py-1 rounded-md ${
+                        commodity.change_rate >= 0 ? 'bg-[#0ecb81]/10 text-[#0ecb81]' : 'bg-[#f6465d]/10 text-[#f6465d]'
+                      }`}>
+                        {commodity.change_rate >= 0 ? <ArrowUpIcon className="h-3 w-3" /> : <ArrowDownIcon className="h-3 w-3" />}
+                        {commodity.change_rate >= 0 ? '+' : ''}{commodity.change_rate.toFixed(2)}%
+                      </span>
+                      <div className="flex gap-1.5">
+                        <button onClick={() => onBuy(commodity.code.toUpperCase(), 'commodity')} className="bg-[#0ecb81]/10 hover:bg-[#0ecb81] text-[#0ecb81] hover:text-white px-3 py-1.5 rounded-lg text-xs font-semibold transition-all">
+                          Al
+                        </button>
+                        <button onClick={() => onSell(commodity.code.toUpperCase(), 'commodity')} className="bg-[#f6465d]/10 hover:bg-[#f6465d] text-[#f6465d] hover:text-white px-3 py-1.5 rounded-lg text-xs font-semibold transition-all">
+                          Sat
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
-        )}
+        </section>
 
-        {/* Quick Actions & Market Summary - Binance Style */}
-        {user && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-            {/* Quick Actions */}
-            <div className="bg-[#1e2329] rounded-xl border border-[#2b3139] p-6">
-              <h3 className="text-lg font-bold text-white mb-4">Hızlı İşlemler</h3>
-              <div className="space-y-3">
-                <Link href="/portfolio" className="block w-full bg-[#0ecb81] hover:bg-[#0bb975] text-white py-3 px-4 rounded-lg transition-all text-center font-semibold">
-                  Portföyümü Görüntüle
-                </Link>
-                <Link href="/transactions" className="block w-full bg-[#2b3139] hover:bg-[#3a4149] text-white py-3 px-4 rounded-lg transition-all text-center font-semibold">
-                  Geçmiş İşlemler
-                </Link>
-                <Link href="/leaderboard" className="block w-full bg-[#f0b90b] hover:bg-[#d4a308] text-white py-3 px-4 rounded-lg transition-all text-center font-semibold">
-                  Liderlik Tablosu
-                </Link>
+        {/* ============ BOTTOM: LEADERBOARD + SIDEBAR ============ */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+          {/* Leaderboard */}
+          <section className="lg:col-span-2 bg-[#1a1d24] rounded-2xl border border-[#2b3139]/60 overflow-hidden">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-[#2b3139]">
+              <div className="flex items-center gap-2">
+                <TrophyIcon className="h-5 w-5 text-[#f0b90b]" />
+                <h3 className="text-lg font-bold text-white">En İyi Performans</h3>
+              </div>
+              <Link href="/leaderboard" className="text-[#0ecb81] hover:text-[#0bb975] text-xs font-semibold transition-colors">
+                Tümünü Gör &rarr;
+              </Link>
+            </div>
+            <div className="p-4 sm:p-6">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {(topLeaders.length > 0 ? topLeaders : defaultLeaders).map((leader) => {
+                  const isProfit = leader.profit_loss_percent >= 0;
+                  const medalColor = leader.rank === 1
+                    ? 'from-[#f0b90b] to-[#c99a07]'
+                    : leader.rank === 2
+                    ? 'from-[#848e9c] to-[#636b75]'
+                    : 'from-[#cd7f32] to-[#a0622a]';
+                  const cardBorder = leader.rank === 1
+                    ? 'border-[#f0b90b]/30 hover:border-[#f0b90b]/50'
+                    : leader.rank === 2
+                    ? 'border-[#848e9c]/20 hover:border-[#848e9c]/40'
+                    : 'border-[#cd7f32]/20 hover:border-[#cd7f32]/40';
+
+                  return (
+                    <div key={leader.rank} className={`relative bg-[#12141a] rounded-xl p-5 border ${cardBorder} transition-all text-center`}>
+                      <div className={`inline-flex items-center justify-center h-12 w-12 rounded-full bg-gradient-to-br ${medalColor} mb-3 shadow-lg`}>
+                        <span className="text-white font-bold text-lg">{leader.rank}</span>
+                      </div>
+                      <div className="font-semibold text-white text-sm mb-1 truncate">{leader.username}</div>
+                      <div className="text-xs text-[#5a6270] mb-3">{leader.rank}. Sıra</div>
+                      <div className={`text-lg font-bold ${isProfit ? 'text-[#0ecb81]' : 'text-[#f6465d]'}`}>
+                        {isProfit ? '+' : ''}₺{leader.total_profit_loss.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </div>
+                      <div className={`text-xs font-medium mt-1 ${isProfit ? 'text-[#0ecb81]' : 'text-[#f6465d]'}`}>
+                        {isProfit ? '+' : ''}{leader.profit_loss_percent.toFixed(2)}%
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
+          </section>
 
+          {/* Sidebar: Market Summary + Status */}
+          <section className="space-y-6">
             {/* Market Summary */}
-            <div className="bg-[#1e2329] rounded-xl border border-[#2b3139] p-6">
-              <h3 className="text-lg font-bold text-white mb-4">Piyasa Özeti</h3>
+            <div className="bg-[#1a1d24] rounded-2xl border border-[#2b3139]/60 p-5">
+              <h3 className="text-sm font-bold text-white mb-4 flex items-center gap-2">
+                <ChartBarSquareIcon className="h-4 w-4 text-[#0ecb81]" />
+                Piyasa Özeti
+              </h3>
               <div className="space-y-3">
-                <div className="flex justify-between items-center py-2 border-b border-[#2b3139]">
-                  <span className="text-sm text-[#848e9c]">Toplam Hisse</span>
-                  <span className="font-semibold text-white">{Math.min(stocks.length, 10)}</span>
-                </div>
-                <div className="flex justify-between items-center py-2 border-b border-[#2b3139]">
-                  <span className="text-sm text-[#848e9c]">Toplam Kripto</span>
-                  <span className="font-semibold text-white">{cryptos.length}</span>
-                </div>
-                <div className="flex justify-between items-center py-2 border-b border-[#2b3139]">
-                  <span className="text-sm text-[#848e9c]">Toplam Emtia</span>
-                  <span className="font-semibold text-white">{commodities.length}</span>
-                </div>
-                <div className="flex justify-between items-center py-2 border-b border-[#2b3139]">
-                  <span className="text-sm text-[#848e9c]">USD/TRY</span>
-                  <span className="font-semibold text-white">₺{usdToTry.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</span>
-                </div>
-                <div className="flex justify-between items-center py-2 border-b border-[#2b3139]">
-                  <span className="text-sm text-[#848e9c]">Komisyon Oranı</span>
-                  <span className="font-semibold text-[#0ecb81]">%0.25</span>
-                </div>
-                <div className="pt-3 border-t border-[#2b3139]">
+                <SummaryRow label="Hisse Senetleri" value={String(Math.min(stocks.length, 10))} />
+                <SummaryRow label="Kripto Paralar" value={String(cryptos.length)} />
+                <SummaryRow label="Emtia" value={String(commodities.length)} />
+                <SummaryRow label="USD/TRY" value={`₺${usdToTry.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}`} highlight />
+                <SummaryRow label="Komisyon" value="%0.25" highlight />
+                <div className="pt-3 mt-3 border-t border-[#2b3139]">
                   <ClientOnlyTime />
                 </div>
               </div>
             </div>
 
             {/* Market Status */}
-            <div className="bg-[#1e2329] rounded-xl border border-[#2b3139] p-6">
-              <h3 className="text-lg font-bold text-white mb-4">Piyasa Durumu</h3>
+            <div className="bg-[#1a1d24] rounded-2xl border border-[#2b3139]/60 p-5">
+              <h3 className="text-sm font-bold text-white mb-4">Piyasa Durumu</h3>
               <div className="space-y-3">
-                <div className="flex items-center justify-between py-2 border-b border-[#2b3139]">
-                  <span className="text-sm text-[#848e9c]">Hisse Senetleri</span>
-                  <span className="text-[#0ecb81] text-sm font-semibold flex items-center gap-1">
-                    <span className="h-2 w-2 bg-[#0ecb81] rounded-full animate-pulse"></span>
-                    Açık
-                  </span>
-                </div>
-                <div className="flex items-center justify-between py-2 border-b border-[#2b3139]">
-                  <span className="text-sm text-[#848e9c]">Kripto Paralar</span>
-                  <span className="text-[#0ecb81] text-sm font-semibold flex items-center gap-1">
-                    <span className="h-2 w-2 bg-[#0ecb81] rounded-full animate-pulse"></span>
-                    24/7
-                  </span>
-                </div>
-                <div className="flex items-center justify-between py-2 border-b border-[#2b3139]">
-                  <span className="text-sm text-[#848e9c]">Emtia</span>
-                  <span className="text-[#0ecb81] text-sm font-semibold flex items-center gap-1">
-                    <span className="h-2 w-2 bg-[#0ecb81] rounded-full animate-pulse"></span>
-                    Canli
-                  </span>
-                </div>
-                <div className="flex items-center justify-between py-2">
-                  <span className="text-sm text-[#848e9c]">API Durumu</span>
-                  <span className="text-[#0ecb81] text-sm font-semibold flex items-center gap-1">
-                    <span className="h-2 w-2 bg-[#0ecb81] rounded-full animate-pulse"></span>
-                    Çalışıyor
-                  </span>
-                </div>
+                <StatusRow label="Hisse Senetleri" status="Açık" />
+                <StatusRow label="Kripto Paralar" status="24/7" />
+                <StatusRow label="Emtia" status="Canlı" />
+                <StatusRow label="API" status="Çalışıyor" />
               </div>
             </div>
-          </div>
-        )}
 
-        {/* Mini Leaderboard - Binance Style */}
-        <div className="bg-[#1e2329] rounded-xl border border-[#2b3139] p-4 sm:p-6">
-          <div className="flex items-center justify-between mb-4 sm:mb-6">
-            <h3 className="text-lg sm:text-xl font-bold text-white">En İyi Performans</h3>
-            <Link href="/leaderboard" className="text-[#0ecb81] hover:text-[#0bb975] text-xs sm:text-sm font-semibold transition-colors">
-              Tümünü Gör →
-            </Link>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-            {topLeaders.length > 0 ? (
-              topLeaders.map((leader, index) => {
-                const isProfit = leader.profit_loss_percent >= 0;
-                const bgColors = leader.rank === 1 
-                  ? 'bg-[#f0b90b]/10 border-[#f0b90b]/30'
-                  : leader.rank === 2
-                  ? 'bg-[#2b3139] border-[#2b3139]'
-                  : 'bg-[#f0b90b]/5 border-[#f0b90b]/20';
-                const iconColors = leader.rank === 1
-                  ? 'bg-[#f0b90b]'
-                  : leader.rank === 2
-                  ? 'bg-[#848e9c]'
-                  : 'bg-[#f0b90b]/80';
-                
-                return (
-                  <div key={leader.rank} className={`flex items-center justify-between p-3 sm:p-4 ${bgColors} rounded-lg border hover:border-[#0ecb81]/30 transition-all`}>
-                    <div className="flex items-center space-x-2 sm:space-x-3">
-                      <div className={`h-10 w-10 sm:h-12 sm:w-12 ${iconColors} rounded-full flex items-center justify-center`}>
-                        <span className="text-white font-bold text-base sm:text-lg">{leader.rank}</span>
-                      </div>
-                      <div>
-                        <div className="font-semibold text-white text-sm sm:text-base">{leader.username}</div>
-                        <div className="text-xs sm:text-sm text-[#848e9c]">{leader.rank}. Sıra</div>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className={`text-sm sm:text-lg font-bold ${isProfit ? 'text-[#0ecb81]' : 'text-[#f6465d]'}`}>
-                        {isProfit ? '+' : ''}₺{leader.total_profit_loss.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </div>
-                      <div className={`text-xs sm:text-sm ${isProfit ? 'text-[#0ecb81]' : 'text-[#f6465d]'}`}>
-                        {isProfit ? '+' : ''}{leader.profit_loss_percent.toFixed(2)}%
-                      </div>
-                    </div>
-                  </div>
-                );
-              })
-            ) : (
-              // Fallback: Eğer veri yoksa placeholder göster
-              <>
-                <div className="flex items-center justify-between p-3 sm:p-4 bg-[#f0b90b]/10 border border-[#f0b90b]/30 rounded-lg hover:border-[#0ecb81]/30 transition-all">
-                  <div className="flex items-center space-x-2 sm:space-x-3">
-                    <div className="h-10 w-10 sm:h-12 sm:w-12 bg-[#f0b90b] rounded-full flex items-center justify-center">
-                      <span className="text-white font-bold text-base sm:text-lg">1</span>
-                    </div>
-                    <div>
-                      <div className="font-semibold text-white text-sm sm:text-base">-</div>
-                      <div className="text-xs sm:text-sm text-[#848e9c]">1. Sıra</div>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-sm sm:text-lg font-bold text-[#848e9c]">-</div>
-                    <div className="text-xs sm:text-sm text-[#848e9c]">-</div>
-                  </div>
-                </div>
-                <div className="flex items-center justify-between p-3 sm:p-4 bg-[#2b3139] border border-[#2b3139] rounded-lg hover:border-[#0ecb81]/30 transition-all">
-                  <div className="flex items-center space-x-2 sm:space-x-3">
-                    <div className="h-10 w-10 sm:h-12 sm:w-12 bg-[#848e9c] rounded-full flex items-center justify-center">
-                      <span className="text-white font-bold text-base sm:text-lg">2</span>
-                    </div>
-                    <div>
-                      <div className="font-semibold text-white text-sm sm:text-base">-</div>
-                      <div className="text-xs sm:text-sm text-[#848e9c]">2. Sıra</div>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-sm sm:text-lg font-bold text-[#848e9c]">-</div>
-                    <div className="text-xs sm:text-sm text-[#848e9c]">-</div>
-                  </div>
-                </div>
-                <div className="flex items-center justify-between p-3 sm:p-4 bg-[#f0b90b]/5 border border-[#f0b90b]/20 rounded-lg sm:col-span-2 lg:col-span-1 hover:border-[#0ecb81]/30 transition-all">
-                  <div className="flex items-center space-x-2 sm:space-x-3">
-                    <div className="h-10 w-10 sm:h-12 sm:w-12 bg-[#f0b90b]/80 rounded-full flex items-center justify-center">
-                      <span className="text-white font-bold text-base sm:text-lg">3</span>
-                    </div>
-                    <div>
-                      <div className="font-semibold text-white text-sm sm:text-base">-</div>
-                      <div className="text-xs sm:text-sm text-[#848e9c]">3. Sıra</div>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-sm sm:text-lg font-bold text-[#848e9c]">-</div>
-                    <div className="text-xs sm:text-sm text-[#848e9c]">-</div>
-                  </div>
-                </div>
-              </>
-            )}
-          </div>
+            {/* Quick Actions */}
+            <div className="bg-[#1a1d24] rounded-2xl border border-[#2b3139]/60 p-5">
+              <h3 className="text-sm font-bold text-white mb-3">Hızlı Erişim</h3>
+              <div className="flex flex-col gap-2">
+                <Link href="/portfolio" className="text-center py-2.5 bg-[#0ecb81]/10 hover:bg-[#0ecb81] text-[#0ecb81] hover:text-white rounded-xl text-xs font-semibold transition-all">
+                  Portföyümü Görüntüle
+                </Link>
+                <Link href="/leaderboard" className="text-center py-2.5 bg-[#f0b90b]/10 hover:bg-[#f0b90b] text-[#f0b90b] hover:text-white rounded-xl text-xs font-semibold transition-all">
+                  Liderlik Tablosu
+                </Link>
+              </div>
+            </div>
+
+          </section>
         </div>
+
+        {/* ============ NEWS SECTION (FOOTER ÜZERİ) ============ */}
+        <section className="relative overflow-hidden rounded-2xl border border-[#2b3139]/60 bg-gradient-to-br from-[#141720] via-[#1a1e28] to-[#1a1418]">
+          <div className="absolute -top-40 -right-40 w-96 h-96 bg-[#f0b90b]/[0.04] rounded-full blur-[120px] pointer-events-none" />
+          <div className="absolute -bottom-32 -left-32 w-72 h-72 bg-[#0ecb81]/[0.03] rounded-full blur-[100px] pointer-events-none" />
+
+          <div className="relative z-10">
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-5 border-b border-[#2b3139]">
+              <div className="flex items-center gap-3">
+                <div className="h-9 w-9 bg-[#f0b90b]/10 rounded-lg flex items-center justify-center border border-[#f0b90b]/20">
+                  <NewspaperIcon className="h-4.5 w-4.5 text-[#f0b90b]" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-white">Ekonomi & Finans Haberleri</h3>
+                  <p className="text-[10px] text-[#5a6270] uppercase tracking-wider">BS Ekonomi • Güncel Haberler</p>
+                </div>
+              </div>
+              <Link
+                href="/news"
+                className="px-4 py-2 bg-[#f0b90b]/10 hover:bg-[#f0b90b] text-[#f0b90b] hover:text-white rounded-xl text-xs font-semibold transition-all border border-[#f0b90b]/20 hover:border-[#f0b90b]"
+              >
+                Tüm Haberler &rarr;
+              </Link>
+            </div>
+
+            {/* News Content */}
+            <div className="p-5 sm:p-6">
+              {latestNews.length > 0 ? (
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+                  {/* Featured News (Sol - büyük) */}
+                  <a
+                    href={latestNews[0].link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="lg:col-span-5 group block"
+                  >
+                    <div className="bg-[#12141a] rounded-xl border border-[#2b3139]/40 hover:border-[#f0b90b]/40 transition-all p-5 h-full flex flex-col">
+                      <div className="flex items-center gap-2 mb-3">
+                        <span className="px-2 py-0.5 bg-[#f6465d]/10 text-[#f6465d] text-[9px] font-bold uppercase tracking-wider rounded-md animate-pulse">
+                          Son Dakika
+                        </span>
+                        {latestNews[0].categories.slice(0, 1).map((cat) => (
+                          <span key={cat} className="px-2 py-0.5 bg-[#2b3139] text-[#848e9c] text-[9px] rounded-md font-medium">
+                            {cat}
+                          </span>
+                        ))}
+                      </div>
+                      <h4 className="text-base sm:text-lg font-bold text-white group-hover:text-[#f0b90b] transition-colors leading-snug mb-3 flex-shrink-0">
+                        {latestNews[0].title}
+                      </h4>
+                      <p className="text-[#5a6270] text-xs leading-relaxed line-clamp-4 flex-1">
+                        {latestNews[0].description}
+                      </p>
+                      <div className="flex items-center gap-2 mt-4 pt-3 border-t border-[#2b3139]/60">
+                        <span className="text-[#0ecb81] text-xs font-semibold group-hover:underline">Devamını Oku</span>
+                        <span className="text-[#5a6270] text-[10px]">→</span>
+                      </div>
+                    </div>
+                  </a>
+
+                  {/* Other News (Sağ - liste) */}
+                  <div className="lg:col-span-7 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {latestNews.slice(1, 5).map((item, idx) => (
+                      <a
+                        key={idx}
+                        href={item.link}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block group"
+                      >
+                        <div className="bg-[#12141a] rounded-xl border border-[#2b3139]/40 hover:border-[#0ecb81]/30 transition-all p-4 h-full flex flex-col">
+                          <div className="flex items-center gap-1.5 mb-2 flex-wrap">
+                            {item.categories.slice(0, 2).map((cat) => (
+                              <span key={cat} className="px-1.5 py-0.5 bg-[#2b3139] text-[#5a6270] text-[8px] rounded font-medium">
+                                {cat}
+                              </span>
+                            ))}
+                          </div>
+                          <h5 className="text-sm font-semibold text-[#eaecef] group-hover:text-[#0ecb81] transition-colors leading-snug line-clamp-2 mb-2 flex-shrink-0">
+                            {item.title}
+                          </h5>
+                          <p className="text-[#5a6270] text-[11px] leading-relaxed line-clamp-2 flex-1">
+                            {item.description}
+                          </p>
+                        </div>
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {[...Array(3)].map((_, i) => (
+                    <div key={i} className="bg-[#12141a] rounded-xl border border-[#2b3139]/40 p-4 animate-pulse">
+                      <div className="h-3 bg-[#2b3139] rounded w-1/4 mb-3" />
+                      <div className="h-4 bg-[#2b3139] rounded w-3/4 mb-2" />
+                      <div className="h-3 bg-[#2b3139] rounded w-full mb-2" />
+                      <div className="h-3 bg-[#2b3139] rounded w-2/3" />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Source */}
+            <div className="px-6 pb-4 text-right">
+              <span className="text-[10px] text-[#5a6270]">
+                Kaynak:{' '}
+                <a href="https://bsekonomi.com" target="_blank" rel="noopener noreferrer" className="text-[#0ecb81] hover:underline">
+                  bsekonomi.com
+                </a>
+              </span>
+            </div>
+          </div>
+        </section>
+
       </main>
 
-      {/* Trade Modal */}
       <TradeModal
         isOpen={isTradeModalOpen}
         onClose={closeTradeModal}
@@ -911,6 +894,68 @@ export default function Home() {
         type={tradeType}
         usdToTry={usdToTry}
       />
+    </div>
+  );
+}
+
+/* =============== SUB COMPONENTS =============== */
+
+const defaultLeaders = [
+  { rank: 1, username: '-', profit_loss_percent: 0, total_profit_loss: 0, portfolio_value: 0, balance: 0 },
+  { rank: 2, username: '-', profit_loss_percent: 0, total_profit_loss: 0, portfolio_value: 0, balance: 0 },
+  { rank: 3, username: '-', profit_loss_percent: 0, total_profit_loss: 0, portfolio_value: 0, balance: 0 },
+];
+
+function StatCard({ icon, label, value, accent, valueColor }: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+  accent: 'green' | 'red' | 'yellow';
+  valueColor?: string;
+}) {
+  const accentMap = {
+    green: 'bg-[#0ecb81]/8 border-[#0ecb81]/10 hover:border-[#0ecb81]/30',
+    red: 'bg-[#f6465d]/8 border-[#f6465d]/10 hover:border-[#f6465d]/30',
+    yellow: 'bg-[#f0b90b]/8 border-[#f0b90b]/10 hover:border-[#f0b90b]/30',
+  };
+  const iconBg = {
+    green: 'bg-[#0ecb81]/10',
+    red: 'bg-[#f6465d]/10',
+    yellow: 'bg-[#f0b90b]/10',
+  };
+
+  return (
+    <div className={`${accentMap[accent]} backdrop-blur-sm rounded-xl p-4 border transition-all`}>
+      <div className="flex items-center gap-2 mb-3">
+        <div className={`h-8 w-8 ${iconBg[accent]} rounded-lg flex items-center justify-center`}>
+          {icon}
+        </div>
+        <span className="text-[11px] text-[#5a6270] font-medium">{label}</span>
+      </div>
+      <p className={`text-lg sm:text-xl font-bold tracking-tight ${valueColor || 'text-white'}`}>
+        {value}
+      </p>
+    </div>
+  );
+}
+
+function SummaryRow({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
+  return (
+    <div className="flex justify-between items-center py-1.5">
+      <span className="text-xs text-[#5a6270]">{label}</span>
+      <span className={`text-xs font-semibold ${highlight ? 'text-[#0ecb81]' : 'text-[#eaecef]'}`}>{value}</span>
+    </div>
+  );
+}
+
+function StatusRow({ label, status }: { label: string; status: string }) {
+  return (
+    <div className="flex items-center justify-between py-1.5">
+      <span className="text-xs text-[#5a6270]">{label}</span>
+      <span className="text-[#0ecb81] text-xs font-semibold flex items-center gap-1.5">
+        <span className="h-1.5 w-1.5 bg-[#0ecb81] rounded-full animate-pulse" />
+        {status}
+      </span>
     </div>
   );
 }
@@ -926,7 +971,7 @@ function ClientOnlyTime() {
   }, []);
 
   return (
-    <div className="text-xs text-[#848e9c] text-center">
+    <div className="text-[10px] text-[#5a6270] text-center">
       Son güncelleme: {timeText ?? '—'}
     </div>
   );

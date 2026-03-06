@@ -16,31 +16,37 @@
     "create-admin": "ts-node src/scripts/createAdminUser.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": ["trading", "crypto", "stocks", "api"],
+  "keywords": [
+    "trading",
+    "crypto",
+    "stocks",
+    "api"
+  ],
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "express": "^4.18.2",
+    "axios": "^1.6.2",
+    "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
-    "pg": "^8.11.3",
-    "bcryptjs": "^2.4.3",
+    "express": "^4.18.2",
     "jsonwebtoken": "^9.0.2",
-    "nodemailer": "^6.9.7",
     "node-cron": "^3.0.3",
-    "axios": "^1.6.2"
+    "nodemailer": "^6.9.7",
+    "pg": "^8.11.3",
+    "rss-parser": "^3.13.0"
   },
   "devDependencies": {
-    "@types/express": "^4.17.21",
-    "@types/cors": "^2.8.17",
-    "@types/node": "^20.11.0",
-    "@types/pg": "^8.10.9",
     "@types/bcryptjs": "^2.4.6",
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
     "@types/jsonwebtoken": "^9.0.5",
-    "@types/nodemailer": "^6.4.14",
+    "@types/node": "^20.11.0",
     "@types/node-cron": "^3.0.11",
-    "typescript": "^5.3.3",
+    "@types/nodemailer": "^6.4.14",
+    "@types/pg": "^8.10.9",
+    "nodemon": "^3.0.2",
     "ts-node": "^10.9.2",
-    "nodemon": "^3.0.2"
+    "typescript": "^5.3.3"
   }
 }

@@ -62,3 +62,11 @@ body {
 .price-flash-down {
   animation: priceFlashDown 0.6s ease-out;
 }
+
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}

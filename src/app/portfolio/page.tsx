@@ -265,6 +265,7 @@ export default function PortfolioPage() {
                 portfolioItems={portfolioWithPrices} 
                 stocks={stocks}
                 cryptos={cryptos}
+                usdToTry={USD_TO_TRY}
                 onTrade={(item, type) => {
                   const currency = currencies.find(c => c.code.toUpperCase() === item.symbol.toUpperCase());
                   if (currency) {
@@ -320,7 +321,7 @@ export default function PortfolioPage() {
                 }}
               />
             ) : (
-              <TransactionHistory transactions={state.transactions} />
+              <TransactionHistory transactions={state.transactions} usdToTry={USD_TO_TRY} />
             )}
           </div>
         </div>
@@ -365,15 +366,18 @@ function PortfolioOverview({
   portfolioItems, 
   stocks, 
   cryptos,
+  usdToTry,
   onTrade,
   onStopLoss
 }: { 
   portfolioItems: ExtendedPortfolioItem[];
   stocks: Stock[];
   cryptos: any[];
+  usdToTry: number;
   onTrade: (item: ExtendedPortfolioItem, type: 'buy' | 'sell') => void;
   onStopLoss: (item: ExtendedPortfolioItem) => void;
 }) {
+  const USD_TO_TRY = usdToTry;
   if (portfolioItems.length === 0) {
     return (
       <div className="text-center py-12">
@@ -512,7 +516,8 @@ function PortfolioOverview({
   );
 }
 
-function TransactionHistory({ transactions }: { transactions: Transaction[] }) {
+function TransactionHistory({ transactions, usdToTry }: { transactions: Transaction[]; usdToTry: number }) {
+  const USD_TO_TRY = usdToTry;
   const formatDate = (date: Date) => {
     return new Intl.DateTimeFormat('tr-TR', {
       year: 'numeric',

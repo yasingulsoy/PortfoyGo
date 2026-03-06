@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
-import { Bars3Icon, XMarkIcon, HomeIcon, BriefcaseIcon, ClockIcon, TrophyIcon, BellIcon, Cog6ToothIcon, UserIcon, CurrencyDollarIcon, ArrowTrendingUpIcon, ArrowTrendingDownIcon } from '@heroicons/react/24/outline';
+import { Bars3Icon, XMarkIcon, HomeIcon, BriefcaseIcon, ClockIcon, TrophyIcon, BellIcon, Cog6ToothIcon, UserIcon, CurrencyDollarIcon, ArrowTrendingUpIcon, ArrowTrendingDownIcon, NewspaperIcon } from '@heroicons/react/24/outline';
 import { useAuth } from '@/context/AuthContext';
 import { usePortfolio } from '@/context/PortfolioContext';
 
@@ -55,6 +55,7 @@ export default function Navbar() {
     { href: '/portfolio', label: 'Portföyüm', icon: BriefcaseIcon },
     { href: '/transactions', label: 'İşlemler', icon: ClockIcon },
     { href: '/leaderboard', label: 'Liderlik', icon: TrophyIcon },
+    { href: '/news', label: 'Haberler', icon: NewspaperIcon },
     { href: '/profile', label: 'Profilim', icon: UserIcon },
     ...(user && (user.is_admin === true || user.is_admin === 'true') ? [{ href: '/admin', label: 'Admin', icon: Cog6ToothIcon }] : []),
   ];

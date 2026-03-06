@@ -161,6 +161,13 @@ export const activityLogsApi = {
   },
 };
 
+// News API
+export const newsApi = {
+  getNews: async (limit: number = 10) => {
+    return apiCall(`/news?limit=${limit}`);
+  },
+};
+
 // Stop-Loss API
 export const stopLossApi = {
   create: async (data: {

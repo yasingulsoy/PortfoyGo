@@ -14,6 +14,7 @@ import cryptosRoutes from './routes/cryptos';
 import commoditiesRoutes from './routes/commodities';
 import currenciesRoutes from './routes/currencies';
 import stopLossRoutes from './routes/stopLoss';
+import newsRoutes from './routes/news';
 import { MarketCacheService } from './services/marketCache';
 import { StopLossService } from './services/stopLoss';
 import { CurrencyService } from './services/currency';
@@ -164,7 +165,8 @@ const rootHandler = (_req: express.Request, res: express.Response) => {
       leaderboard: '/api/leaderboard',
       cryptos: '/api/cryptos',
       commodities: '/api/commodities',
-      currencies: '/api/currencies'
+      currencies: '/api/currencies',
+      news: '/api/news'
     },
     timestamp: new Date().toISOString()
   });
@@ -187,6 +189,7 @@ app.use('/api/cryptos', cryptosRoutes);
 app.use('/api/commodities', commoditiesRoutes);
 app.use('/api/currencies', currenciesRoutes);
 app.use('/api/stop-loss', stopLossRoutes);
+app.use('/api/news', newsRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
