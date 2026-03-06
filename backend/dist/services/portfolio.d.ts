@@ -16,5 +16,10 @@ export declare class PortfolioService {
         asset_type: string;
         price: number;
     }[]): Promise<void>;
+    /**
+     * Tüm kullanıcıların portföy fiyatlarını market_data_cache'den toplu günceller.
+     * Ayrıca yanlış kaydedilmiş asset_type'ları da düzeltir.
+     */
+    static updateAllPortfolioPrices(): Promise<void>;
 }
 //# sourceMappingURL=portfolio.d.ts.map

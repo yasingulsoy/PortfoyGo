@@ -16,9 +16,14 @@ const admin_1 = __importDefault(require("./routes/admin"));
 const badges_1 = __importDefault(require("./routes/badges"));
 const activityLogs_1 = __importDefault(require("./routes/activityLogs"));
 const cryptos_1 = __importDefault(require("./routes/cryptos"));
+const commodities_1 = __importDefault(require("./routes/commodities"));
+const currencies_1 = __importDefault(require("./routes/currencies"));
 const stopLoss_1 = __importDefault(require("./routes/stopLoss"));
+const news_1 = __importDefault(require("./routes/news"));
 const marketCache_1 = require("./services/marketCache");
 const stopLoss_2 = require("./services/stopLoss");
+const currency_1 = require("./services/currency");
+const portfolio_2 = require("./services/portfolio");
 const node_cron_1 = __importDefault(require("node-cron"));
 // Environment variables
 dotenv_1.default.config();
@@ -144,7 +149,10 @@ const rootHandler = (_req, res) => {
             stocks: '/api/stocks',
             transactions: '/api/transactions',
             leaderboard: '/api/leaderboard',
-            cryptos: '/api/cryptos'
+            cryptos: '/api/cryptos',
+            commodities: '/api/commodities',
+            currencies: '/api/currencies',
+            news: '/api/news'
         },
         timestamp: new Date().toISOString()
     });
@@ -162,7 +170,14 @@ app.use('/api/admin', admin_1.default);
 app.use('/api/badges', badges_1.default);
 app.use('/api/activity-logs', activityLogs_1.default);
 app.use('/api/cryptos', cryptos_1.default);
+app.use('/api/commodities', commodities_1.default);
+app.use('/api/currencies', currencies_1.default);
 app.use('/api/stop-loss', stopLoss_1.default);
+app.use('/api/news', news_1.default);
+// Proxy /api prefix'i siliyorsa: /currencies, /commodities, /news için fallback
+app.use('/commodities', commodities_1.default);
+app.use('/currencies', currencies_1.default);
+app.use('/news', news_1.default);
 // Health check
 app.get('/api/health', (req, res) => {
     res.json({
@@ -201,6 +216,8 @@ app.use((req, res) => {
             'GET /api/portfolio',
             'GET /api/stocks',
             'GET /api/cryptos',
+            'GET /api/commodities',
+            'GET /api/currencies',
             'GET /api/leaderboard'
         ]
     });
@@ -224,8 +241,17 @@ app.use((err, req, res, next) => {
     });
 });
 // Cache'i başlangıçta doldur (ilk yükleme - daha fazla hisse çek)
-marketCache_1.MarketCacheService.refreshCache(true).catch(err => {
-    console.error('Initial cache refresh error:', err);
+marketCache_1.MarketCacheService.refreshCache(true)
+    .then(() => {
+    // Cache dolduktan sonra portföy fiyatlarını güncelle
+    return portfolio_2.PortfolioService.updateAllPortfolioPrices();
+})
+    .catch(err => {
+    console.error('Initial cache/portfolio refresh error:', err);
+});
+// Döviz kurlarını başlangıçta çek (DB boşsa doldurur)
+currency_1.CurrencyService.fetchAndSaveToDb().catch(err => {
+    console.error('Initial currency fetch error:', err);
 });
 // Her 2 dakikada bir cache'i güncelle (10 hisse - hızlı güncelleme)
 // Şu anlık sadece 10 hisseye odaklanıyoruz, bu yüzden daha sık güncelleyebiliriz
@@ -259,6 +285,27 @@ node_cron_1.default.schedule('* * * * *', async () => {
     }
     catch (error) {
         console.error('❌ Stop-loss kontrolü hatası:', error);
+    }
+});
+// Her 2 dakikada bir tüm portföy fiyatlarını cache'den güncelle
+node_cron_1.default.schedule('*/2 * * * *', async () => {
+    console.log('⏰ Portföy fiyatları güncelleniyor...');
+    try {
+        await portfolio_2.PortfolioService.updateAllPortfolioPrices();
+    }
+    catch (error) {
+        console.error('❌ Portföy fiyat güncelleme hatası:', error);
+    }
+});
+// Her 12 saatte bir döviz kurlarını güncelle
+node_cron_1.default.schedule('0 */12 * * *', async () => {
+    console.log('⏰ Döviz kurları güncelleniyor (12 saat)...');
+    try {
+        await currency_1.CurrencyService.fetchAndSaveToDb();
+        console.log('✅ Döviz kurları güncellendi (12 saatlik)');
+    }
+    catch (error) {
+        console.error('❌ Döviz kurları güncelleme hatası:', error);
     }
 });
 // Cache durumunu göster

@@ -39,7 +39,7 @@ router.post('/buy', auth_1.authenticateToken, async (req, res) => {
                 message: 'Fiyat 0\'dan büyük olmalı'
             });
         }
-        if (!['crypto', 'stock'].includes(asset_type)) {
+        if (!['crypto', 'stock', 'commodity', 'currency'].includes(asset_type)) {
             return res.status(400).json({
                 success: false,
                 message: 'Geçersiz varlık tipi'

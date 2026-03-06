@@ -191,6 +191,11 @@ app.use('/api/currencies', currenciesRoutes);
 app.use('/api/stop-loss', stopLossRoutes);
 app.use('/api/news', newsRoutes);
 
+// Proxy /api prefix'i siliyorsa: /currencies, /commodities, /news için fallback
+app.use('/commodities', commoditiesRoutes);
+app.use('/currencies', currenciesRoutes);
+app.use('/news', newsRoutes);
+
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ 

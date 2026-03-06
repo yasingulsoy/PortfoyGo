@@ -2,7 +2,7 @@ import { PortfolioItem, Transaction } from '../types';
 export interface BuyRequest {
     symbol: string;
     name: string;
-    asset_type: 'crypto' | 'stock';
+    asset_type: 'crypto' | 'stock' | 'commodity' | 'currency';
     quantity: number;
     price: number;
 }
