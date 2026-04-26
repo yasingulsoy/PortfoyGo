@@ -24,6 +24,14 @@ async function createAllTables() {
         last_login TIMESTAMP
       );
     `);
+    await pool.query(`
+      ALTER TABLE users
+      ADD COLUMN IF NOT EXISTS week_baseline_equity DECIMAL(15,2) DEFAULT 100000;
+    `);
+    await pool.query(`
+      ALTER TABLE users
+      ADD COLUMN IF NOT EXISTS week_baseline_iso_key VARCHAR(12);
+    `);
     console.log('✅ Users tablosu oluşturuldu!\n');
 
     // 2. Email verifications tablosu

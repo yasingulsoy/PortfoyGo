@@ -25,10 +25,25 @@ export class AuthService {
       const saltRounds = 10;
       const passwordHash = await bcrypt.hash(data.password, saltRounds);
 
-      // Kullanıcıyı oluştur
+      // Kullanıcıyı oluştur (haftalık liderlik referansı: başlangıç 100.000 TL + mevcut ISO hafta)
       const result = await pool.query(
-        `INSERT INTO users (username, email, password_hash, email_verified) 
-         VALUES ($1, $2, $3, $4) 
+        `INSERT INTO users (
+            username, email, password_hash, email_verified,
+            week_baseline_equity, week_baseline_iso_key
+          )
+         VALUES (
+            $1, $2, $3, $4,
+            100000,
+            (SELECT
+              to_char(
+                (CURRENT_TIMESTAMP AT TIME ZONE 'Europe/Istanbul')::date,
+                'IYYY'
+              ) || '-' || to_char(
+                (CURRENT_TIMESTAMP AT TIME ZONE 'Europe/Istanbul')::date,
+                'IW'
+              )
+            )
+          )
          RETURNING id, username, email, email_verified, balance, portfolio_value, total_profit_loss, rank, created_at`,
         [data.username, data.email, passwordHash, false]
       );

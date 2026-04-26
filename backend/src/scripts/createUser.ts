@@ -72,27 +72,40 @@ async function createNewUser(userData: UserData) {
     const passwordHash = await bcrypt.hash(userData.password, saltRounds);
 
     // Kullanıcıyı oluştur
+    const startBal = userData.balance ?? 100000.0;
     const result = await pool.query(
       `INSERT INTO users (
-        username, 
-        email, 
-        password_hash, 
-        email_verified, 
+        username,
+        email,
+        password_hash,
+        email_verified,
         balance,
         portfolio_value,
         total_profit_loss,
-        rank
-      ) 
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8) 
+        rank,
+        week_baseline_equity,
+        week_baseline_iso_key
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $5,
+        (SELECT
+          to_char(
+            (CURRENT_TIMESTAMP AT TIME ZONE 'Europe/Istanbul')::date,
+            'IYYY'
+          ) || '-' || to_char(
+            (CURRENT_TIMESTAMP AT TIME ZONE 'Europe/Istanbul')::date,
+            'IW'
+          )
+        )
+      )
       RETURNING id, username, email, email_verified, balance, created_at`,
       [
         userData.username,
         userData.email,
         passwordHash,
         userData.email_verified ?? true,
-        userData.balance ?? 100000.00,
-        0.00,
-        0.00,
+        startBal,
+        0.0,
+        0.0,
         0
       ]
     );

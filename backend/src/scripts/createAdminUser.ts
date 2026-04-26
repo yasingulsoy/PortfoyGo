@@ -33,8 +33,21 @@ async function createAdminUser() {
     } else {
       // Yeni admin kullanıcısı oluştur
       await pool.query(
-        `INSERT INTO users (username, email, password_hash, email_verified, is_admin, is_banned, balance)
-         VALUES ($1, $2, $3, TRUE, TRUE, FALSE, 1000000.00)
+        `INSERT INTO users (
+            username, email, password_hash, email_verified, is_admin, is_banned, balance,
+            week_baseline_equity, week_baseline_iso_key
+          )
+         VALUES ($1, $2, $3, TRUE, TRUE, FALSE, 1000000.00, 1000000.00,
+            (SELECT
+              to_char(
+                (CURRENT_TIMESTAMP AT TIME ZONE 'Europe/Istanbul')::date,
+                'IYYY'
+              ) || '-' || to_char(
+                (CURRENT_TIMESTAMP AT TIME ZONE 'Europe/Istanbul')::date,
+                'IW'
+              )
+            )
+         )
          ON CONFLICT (username) DO UPDATE SET
            is_admin = TRUE,
            is_banned = FALSE,

@@ -57,10 +57,24 @@ async function createTestUsers() {
 
       // Kullanıcıyı oluştur
       const result = await pool.query(
-        `INSERT INTO users (username, email, password_hash, email_verified, balance) 
-         VALUES ($1, $2, $3, $4, $5) 
+        `INSERT INTO users (
+            username, email, password_hash, email_verified, balance,
+            week_baseline_equity, week_baseline_iso_key
+          )
+         VALUES (
+            $1, $2, $3, $4, $5, $5,
+            (SELECT
+              to_char(
+                (CURRENT_TIMESTAMP AT TIME ZONE 'Europe/Istanbul')::date,
+                'IYYY'
+              ) || '-' || to_char(
+                (CURRENT_TIMESTAMP AT TIME ZONE 'Europe/Istanbul')::date,
+                'IW'
+              )
+            )
+          )
          RETURNING id, username, email`,
-        [user.username, user.email, passwordHash, user.email_verified, 100000.00]
+        [user.username, user.email, passwordHash, user.email_verified, 100000.0]
       );
 
       const newUser = result.rows[0];

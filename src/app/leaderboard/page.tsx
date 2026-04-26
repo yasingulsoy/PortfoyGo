@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   TrophyIcon,
   ArrowTrendingUpIcon,
@@ -9,6 +9,8 @@ import {
 } from '@heroicons/react/24/outline';
 import { leaderboardApi } from '@/services/backendApi';
 
+type Board = 'alltime' | 'week';
+
 interface Leader {
   rank: number;
   username: string;
@@ -16,25 +18,21 @@ interface Leader {
   portfolio_value: number;
   total_profit_loss: number;
   balance: number;
+  board?: Board;
+  week_profit_loss_tl?: number;
 }
 
 export default function LeaderboardPage() {
   const [leaders, setLeaders] = useState<Leader[]>([]);
+  const [board, setBoard] = useState<Board>('alltime');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [mounted, setMounted] = useState(false);
 
-  useEffect(() => {
-    setMounted(true);
-    loadLeaderboard();
-    const interval = setInterval(loadLeaderboard, 30000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const loadLeaderboard = async () => {
+  const loadLeaderboard = useCallback(async () => {
     try {
       setLoading(true);
-      const result = await leaderboardApi.getLeaderboard(50);
+      const result = await leaderboardApi.getLeaderboard(50, board);
       if (result.success && result.leaderboard) {
         setLeaders(result.leaderboard);
         setError('');
@@ -46,7 +44,18 @@ export default function LeaderboardPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [board]);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!mounted) return;
+    loadLeaderboard();
+    const interval = setInterval(loadLeaderboard, 30000);
+    return () => clearInterval(interval);
+  }, [mounted, loadLeaderboard]);
 
   if (!mounted) {
     return (
@@ -75,7 +84,11 @@ export default function LeaderboardPage() {
               </div>
               <div>
                 <h1 className="text-lg font-bold text-white">Liderlik Tablosu</h1>
-                <p className="text-xs text-[#848e9c]">En iyi yatirimcilar</p>
+                <p className="text-xs text-[#848e9c]">
+                  {board === 'alltime'
+                    ? 'Hesap büyümesi (100.000 TL başlangıca göre)'
+                    : 'Bu haftanın getirisi (ISO haftası, Pazartesi referans)'}
+                </p>
               </div>
             </div>
             <button
@@ -91,6 +104,35 @@ export default function LeaderboardPage() {
       </div>
 
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="flex flex-wrap gap-2 mb-6">
+          <button
+            type="button"
+            onClick={() => setBoard('alltime')}
+            className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all border ${
+              board === 'alltime'
+                ? 'bg-[#f0b90b]/15 border-[#f0b90b]/40 text-[#f0b90b]'
+                : 'bg-[#1e2329] border-[#2b3139] text-[#848e9c] hover:text-white'
+            }`}
+          >
+            Kümülatif sıralama
+          </button>
+          <button
+            type="button"
+            onClick={() => setBoard('week')}
+            className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all border ${
+              board === 'week'
+                ? 'bg-[#f0b90b]/15 border-[#f0b90b]/40 text-[#f0b90b]'
+                : 'bg-[#1e2329] border-[#2b3139] text-[#848e9c] hover:text-white'
+            }`}
+          >
+            Haftanın liderleri
+          </button>
+        </div>
+        <p className="text-xs text-[#848e9c] mb-6 max-w-2xl leading-relaxed">
+          {board === 'alltime'
+            ? 'Herkes aynı sanal başlangıç (100.000 TL) üzerinden değerlendirilir; ne zaman kayıt olursanız olun, hesabınızı yüzde kaç büyüttüğünüzle sıralanırsınız.'
+            : 'O haftaya girerkenki toplam varlığınıza göre bu ISO haftasında ne kadar getiri elde ettiğiniz ölçülür; dün giren de eski giren de aynı hafta penceresinde kıyaslanır.'}
+        </p>
         {loading && leaders.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20">
             <div className="w-12 h-12 rounded-full border-2 border-transparent border-t-[#f0b90b] animate-spin mb-4" />
@@ -168,7 +210,9 @@ export default function LeaderboardPage() {
             {/* Full Table */}
             <div className="bg-[#1e2329] rounded-2xl border border-[#2b3139] overflow-hidden">
               <div className="px-6 py-4 border-b border-[#2b3139] bg-[#161a1e]">
-                <h2 className="text-base font-semibold text-white">Genel Siralama</h2>
+                <h2 className="text-base font-semibold text-white">
+                  {board === 'alltime' ? 'Hesap büyümesi' : 'Hafta getirisi'}
+                </h2>
               </div>
               <div className="overflow-x-auto">
                 <table className="min-w-full">
@@ -176,7 +220,9 @@ export default function LeaderboardPage() {
                     <tr className="border-b border-[#2b3139]">
                       <th className="px-4 sm:px-6 py-3 text-left text-xs font-semibold text-[#848e9c] uppercase tracking-wider w-16">Sira</th>
                       <th className="px-4 sm:px-6 py-3 text-left text-xs font-semibold text-[#848e9c] uppercase tracking-wider">Kullanici</th>
-                      <th className="px-4 sm:px-6 py-3 text-right text-xs font-semibold text-[#848e9c] uppercase tracking-wider">Kar/Zarar</th>
+                      <th className="px-4 sm:px-6 py-3 text-right text-xs font-semibold text-[#848e9c] uppercase tracking-wider">
+                        {board === 'alltime' ? 'Hesap K/Z' : 'Hafta K/Z'}
+                      </th>
                       <th className="px-4 sm:px-6 py-3 text-right text-xs font-semibold text-[#848e9c] uppercase tracking-wider hidden sm:table-cell">Portfoy</th>
                       <th className="px-4 sm:px-6 py-3 text-right text-xs font-semibold text-[#848e9c] uppercase tracking-wider">Toplam Varlik</th>
                     </tr>
@@ -212,7 +258,9 @@ export default function LeaderboardPage() {
                                 {isProfit ? '+' : ''}{leader.profit_loss_percent.toFixed(2)}%
                               </span>
                               <span className={`text-xs ${isProfit ? 'text-[#0ecb81]/70' : 'text-[#f6465d]/70'}`}>
-                                {isProfit ? '+' : ''}{leader.total_profit_loss.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL
+                                {board === 'week' && leader.week_profit_loss_tl != null
+                                  ? `${leader.week_profit_loss_tl >= 0 ? '+' : ''}${leader.week_profit_loss_tl.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL (hafta)`
+                                  : `${isProfit ? '+' : ''}${leader.total_profit_loss.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL`}
                               </span>
                             </div>
                           </td>

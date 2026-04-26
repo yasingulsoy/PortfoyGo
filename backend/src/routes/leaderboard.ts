@@ -5,10 +5,13 @@ import { authenticateToken } from '../middleware/auth';
 const router = express.Router();
 
 // Liderlik tablosunu getir
+// ?board=alltime | week — alltime: başlangıç 100.000 TL’e göre kümülatif; week: bu ISO haftası getirisi
 router.get('/', async (req, res) => {
   try {
     const limit = parseInt(req.query.limit as string) || 10;
-    const result = await LeaderboardService.getLeaderboard(limit);
+    const board =
+      (req.query.board as string) === 'week' ? 'week' : 'alltime';
+    const result = await LeaderboardService.getLeaderboard(limit, board);
     
     if (result.success) {
       res.json(result);
@@ -31,7 +34,7 @@ router.get('/', async (req, res) => {
 router.get('/my-rank', authenticateToken, async (req: any, res) => {
   try {
     const result = await LeaderboardService.getUserRank(req.user.id);
-    
+    // { rank: kümülatif, rankWeek: bu hafta (doğrulanmış kullanıcılar) }
     if (result.success) {
       res.json(result);
     } else {

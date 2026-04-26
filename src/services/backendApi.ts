@@ -104,9 +104,11 @@ export const portfolioApi = {
 };
 
 // Leaderboard API
+// board: 'alltime' = başlangıç 100.000 TL’e göre kümülatif; 'week' = bu ISO haftasının getirisi
 export const leaderboardApi = {
-  getLeaderboard: async (limit: number = 10) => {
-    return apiCall(`/leaderboard?limit=${limit}`);
+  getLeaderboard: async (limit: number = 10, board: 'alltime' | 'week' = 'alltime') => {
+    const b = board === 'week' ? 'week' : 'alltime';
+    return apiCall(`/leaderboard?limit=${limit}&board=${b}`);
   },
 
   getMyRank: async () => {

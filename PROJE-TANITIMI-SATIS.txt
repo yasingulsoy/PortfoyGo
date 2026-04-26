@@ -1,0 +1,164 @@
+PortfoyGo — Proje Tanıtımı
+===========================
+
+
+Ne İş Yapar?
+-------------
+PortfoyGo, gerçek piyasa verileriyle çalışan bir sanal yatırım platformu.
+Kullanıcılar gerçek para riski almadan hisse, kripto, emtia ve döviz
+alım-satımı yapabiliyor, portföylerini takip edebiliyor ve birbirleriyle
+liderlik tablosunda yarışabiliyor.
+
+Kısacası: yatırım yapmayı öğrenmek, denemek veya eğlenmek isteyen herkes
+için bir simülasyon ortamı.
+
+
+Şu An Ne Yapıyor? (Demo Durumu)
+---------------------------------
+Platform şu an demo aşamasında. Temel alım-satım döngüsü sorunsuz
+çalışıyor. Aşağıda şu an aktif olan özelliklerin özeti var:
+
+  - Kullanıcı kaydı ve girişi çalışıyor.
+  - Hisse, kripto, emtia ve döviz verileri anlık olarak çekiliyor.
+  - Sanal bakiye ile alım-satım yapılabiliyor, komisyon hesaplanıyor.
+  - Portföy ekranında toplam değer, kar/zarar, varlık dağılımı görünüyor.
+  - Tüm işlem geçmişi kayıt altında.
+  - Her varlık için canlı fiyat grafikleri var.
+  - Liderlik tablosu aktif; en iyi performans gösterenler sıralanıyor.
+  - Rozet ve başarı sistemi var; alım-satım yaptıkça otomatik rozet kazanılıyor.
+  - Finans haberleri akışı mevcut.
+  - Admin paneli çalışıyor (kullanıcı yönetimi, istatistikler).
+  - Koyu/açık tema desteği ve mobil uyumlu tasarım hazır.
+  - Stop-loss emri tanımlama özelliği kodlanmış durumda.
+
+
+Tamamlamamız Gereken Şeyler
+-----------------------------
+Platform demo olarak çalışıyor ama üretime açmak için bazı şeyleri
+halletmemiz gerekiyor:
+
+  Mail ile doğrulama yok.
+    Altyapısı yazılmış ama henüz aktif değil. Kullanıcı kayıt oluyor
+    ama mail doğrulaması istenmiyor. Bunu açmamız ve bir mail servisi
+    bağlamamız lazım.
+
+  SMS doğrulama yok.
+    Şu an hiç SMS altyapısı yok. Telefon numarası ile doğrulama
+    istiyorsak bir SMS sağlayıcı (Netgsm, Twilio vb.) entegre
+    etmemiz gerekiyor.
+
+  Şifremi unuttum akışı yarım.
+    Sıfırlama kodu gönderme kısmı var ama kullanıcının yeni şifre
+    belirleyeceği ekran henüz yapılmadı. Tamamlanması lazım.
+
+  API'ler şu an ücretsiz.
+    Piyasa verilerini çektiğimiz servisler (borsa, kripto vb.) şu an
+    ücretsiz planlarında çalışıyor. Bu planlarda veri hızı ve kota
+    sınırlı. Platformu gerçek kullanıcılara açtığımızda ücretli API
+    planlarına geçmemiz lazım ki veri akışı kesintisiz ve hızlı olsun.
+
+  Ödeme sistemi yok.
+    Pro üyelik, turnuva girişi veya herhangi bir ücretli özellik için
+    bir ödeme altyapısı (kredi kartı, havale vb.) entegre etmemiz
+    gerekiyor.
+
+  Bildirim sistemi yok.
+    Fiyat alarmı, işlem onayı, stop-loss tetiklenme bildirimi gibi
+    kullanıcıya anlık bilgi verecek bir yapı henüz yok.
+
+  Mobil uygulama yok.
+    Şu an sadece web tarayıcısından kullanılıyor. App Store ve Google
+    Play'e çıkmak istiyorsak ayrıca mobil uygulama geliştirmemiz
+    lazım.
+
+
+Platformdan Nasıl Para Kazanılır?
+-----------------------------------
+Projenin birden fazla gelir kanalı var. Bunları kısa, orta ve uzun
+vadeli olarak sıralıyorum:
+
+Kısa vadede hemen başlanabilecekler:
+
+  Reklam geliri.
+    Haber sayfası, portföy ekranı gibi yoğun trafik alan sayfalara
+    reklam yerleştirilebilir. Düşük riskli, hemen uygulanabilir.
+
+  Pro abonelik.
+    Ücretsiz kullanıcıya temel özellikler, aylık veya yıllık ücret
+    ödeyenlere reklamsız deneyim, gelişmiş grafikler, ekstra sanal
+    sermaye gibi avantajlar sunulabilir. Düzenli ve öngörülebilir
+    bir gelir kaynağı.
+
+Orta vadede güçlü gelir kanalları:
+
+  Ödüllü yatırım turnuvaları.
+    Haftalık veya aylık dönemlerle düzenlenen yarışmalara kullanıcılar
+    giriş ücreti ödeyerek katılır. En iyi performansı gösterenler
+    ödül havuzundan pay alır. Kurumsal sponsorlarla desteklendiğinde
+    hem ödüller büyür hem platform komisyon keser.
+
+  Finans bilgi yarışmaları.
+    Quiz formatında haftalık yarışmalar. Ekonomi, borsa, kripto
+    sorularını doğru yanıtlayanlar ödül kazanır. Hem eğitici hem
+    eğlenceli; kullanıcıyı platforma düzenli geri getirir.
+
+  Görev ve meydan okuma sistemi.
+    "Bu hafta 3 farklı sektörden hisse al", "Portföyünü %5 büyüt"
+    gibi günlük/haftalık görevler. Tamamlayanlar puan ve rozet
+    kazanır; puanlar hediye çeki veya Pro üyelik süresine
+    dönüştürülebilir.
+
+  Battle pass (sezon sistemi).
+    3 aylık dönemler halinde ücretsiz ve ücretli ödül yolu. Ücretli
+    yolda özel temalar, turnuva biletleri, ekstra sermaye gibi
+    ödüller. Oyun dünyasından bilinen, kanıtlanmış bir model.
+
+  Referans programı.
+    Mevcut kullanıcılar arkadaşlarını davet ettikçe her iki tarafa
+    bonus verilir. Doğrudan gelir üretmese de kullanıcı tabanını
+    büyüterek diğer tüm gelir kanallarını katlar.
+
+  Sanal mağaza.
+    Profil temaları, özel rozetler, animasyonlu kartlar gibi dijital
+    ürünler. Hem puanla hem gerçek parayla alınabilir.
+
+Uzun vadede büyük potansiyel:
+
+  Kurumsal satış (B2B).
+    Platformun markalı sürümünü bankalara, fintech şirketlerine veya
+    eğitim kurumlarına satmak. "X Bankası Yatırım Akademisi" gibi
+    kurumsal ürünler. Birim başına gelir yüksek.
+
+  Liderlik tablosu sponsorlukları.
+    "Bu haftanın sıralaması X markası sunuyor" gibi sponsor alanları.
+    Sponsor hem marka bilinirliği kazanır hem ödül havuzuna katkı
+    sağlar.
+
+  Premium içerik.
+    Haftalık piyasa bülteni, video eğitim serileri, uzman analiz
+    yazıları. Abonelik veya tek seferlik satın alma ile sunulabilir.
+
+  Mobil mağaza gelirleri.
+    App Store ve Google Play üzerinden abonelik ve uygulama içi
+    satın alma.
+
+  Finansal eğitim ortaklıkları.
+    Lisanslı aracı kurumlarla affiliate anlaşmaları. Kullanıcı
+    yönlendirmesi başına komisyon. Yasal uyum sağlandıktan sonra
+    devreye alınabilir.
+
+
+Neden Bu Proje?
+----------------
+Bu platformu sıfırdan yazmak aylar sürer. Burada temel iskelet hazır:
+kullanıcı sistemi, gerçek piyasa verisi entegrasyonu, alım-satım
+mantığı, portföy takibi, liderlik tablosu, rozet sistemi, admin
+paneli, haber akışı ve grafik altyapısı çalışır durumda.
+
+Üzerine ödeme sistemi, bildirimler ve yukarıdaki gelir kanallarını
+ekleyerek kısa sürede üretime hazır, para kazanan bir platform elde
+etmek mümkün.
+
+Dört farklı varlık türü (hisse, kripto, emtia, döviz), modern
+teknoloji altyapısı ve genişletilebilir yapısıyla hem bireysel
+kullanıcıya hem kurumsal müşteriye hitap edebilir.

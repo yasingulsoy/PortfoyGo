@@ -1,0 +1,166 @@
+1. Abonelik Modeli (Freemium / Pro)
+------------------------------------
+Temel kullanım ücretsiz kalacak; Pro üyelik ile reklamsız deneyim, gelişmiş
+grafik araçları, daha fazla geçmiş veriye erişim ve ekstra sanal başlangıç
+sermayesi gibi avantajlar sunulacak. Ödeme tarafında Stripe veya yerel ödeme
+sağlayıcıları entegre edilebilir. Aylık ya da yıllık abonelik modeli
+düzenli ve öngörülebilir bir gelir akışı sağlar.
+
+
+2. Uygulama İçi Satın Almalar
+-------------------------------
+Kullanıcılara kozmetik öğeler (profil çerçevesi, özel rozet paketleri,
+liderlik tablosunda öne çıkma gibi) sunulabilir. Sezonluk görev ve ödül
+paketleri de bu kategoriye girer. Burada dikkat edilmesi gereken nokta,
+tüm satın almaların eğitim ve eğlence odaklı kalması; kumar algısı
+oluşturacak mekaniklerden uzak durulmasıdır.
+
+
+3. Reklam Geliri
+-----------------
+Haber ve portföy sayfaları gibi yoğun trafik alan ekranlara display
+reklamlar (AdSense vb.) yerleştirilebilir. Bunun yanında sponsorlu haber
+veya markalı eğitim içerikleri de gelir kaynağı olabilir. Reklamların
+kullanıcı deneyimini bozmayacak şekilde konumlandırılması önemli;
+Pro üyeler için reklamsız deneyim de abonelik satışını destekler.
+
+
+4. Finansal Eğitim Ortaklıkları ve Yönlendirmeler
+---------------------------------------------------
+Lisanslı aracı kurumlar veya finansal eğitim platformlarıyla affiliate
+anlaşmaları yapılabilir. Kullanıcı yönlendirmeleri üzerinden komisyon
+modeli uygulanır. Türkiye özelinde SPK düzenlemeleri ve KVKK
+gerekliliklerine tam uyum şarttır; yalnızca lisanslı kurumlarla ve
+şeffaf bilgilendirme metinleriyle çalışılmalıdır.
+
+
+5. Kurumsal Satış / White-Label (B2B)
+---------------------------------------
+Platformun en güçlü gelir potansiyeli burada yatıyor. Bankalar, fintech
+şirketleri veya eğitim kurumlarına markalı sürüm (white-label) olarak
+sunulabilir. Üniversiteler ve okullar için sınıf lisansı modeli
+düşünülebilir: öğrenci yarışmaları, öğretmen paneli, toplu hesap
+yönetimi gibi özelliklerle. Gelir yapısı genelde sabit proje ücreti +
+yıllık bakım/destek anlaşması şeklinde kurgulanır.
+
+
+6. Ödüllü Yatırım Turnuvaları
+-------------------------------
+Haftalık veya aylık periyotlarla düzenlenen sanal yatırım turnuvaları
+platformun en dikkat çekici gelir ve kullanıcı çekme aracı olabilir.
+Kullanıcılar belirli bir giriş ücreti ödeyerek turnuvaya katılır,
+belirlenen süre içinde sanal portföyünü en çok büyüten ilk üç veya
+beş kişi ödül havuzundan pay alır. Ödüller nakit, hediye çeki veya
+sponsor ürünler olabilir. Kurumsal sponsorlukla desteklendiğinde
+ödül havuzu büyür, platform komisyon keser. Sezon finali gibi büyük
+etkinliklerle yıl içinde zirve noktaları yaratılabilir.
+
+
+7. Finans Bilgi Yarışmaları
+-----------------------------
+Yatırım dışında tamamen bilgi tabanlı yarışmalar da düzenlenebilir.
+"Haftanın finans quizi" gibi formatlarda kullanıcılar ekonomi, borsa,
+kripto ve genel finans sorularını yanıtlar. Doğru cevap sayısına göre
+sıralama yapılır ve ilk sıralara küçük ödüller verilir. Giriş ücretsiz
+olabilir (reklam destekli) ya da premium quiz serileri ücretli olabilir.
+Böylece hem eğitim hem eğlence bir arada sunulmuş olur ve kullanıcılar
+platforma düzenli olarak geri döner.
+
+
+8. Günlük / Haftalık Görev ve Meydan Okumalar
+-----------------------------------------------
+Kullanıcılara her gün veya her hafta küçük görevler verilir: "Bu hafta
+en az 3 farklı sektörden hisse al", "Portföyünü %5 büyüt", "5 gün
+üst üste giriş yap" gibi. Görevleri tamamlayanlar puan, rozet veya
+küçük ödüller kazanır. Bu sistem kullanıcıyı aktif tutar ve günlük
+aktif kullanıcı sayısını doğrudan artırır. Puanlar belirli eşiklerde
+gerçek ödüllere (hediye çeki, Pro üyelik süresi vb.) dönüştürülebilir.
+
+
+9. Sezonluk Battle Pass Sistemi
+---------------------------------
+Oyun dünyasından alışık olunan sezon pasını finans eğitimine uyarlamak
+mümkün. Her sezon (örneğin 3 aylık dönem) için ücretsiz ve ücretli
+olmak üzere iki ödül yolu sunulur. Ücretsiz yolda temel rozetler ve
+kozmetikler, ücretli yolda özel profil temaları, ekstra sanal sermaye,
+turnuva biletleri ve özel analiz raporları yer alır. Kullanıcı seviye
+atladıkça ödülleri açar. Bu model hem düzenli gelir hem de uzun
+süreli bağlılık sağlar.
+
+
+10. Sosyal Özellikler ve Takip Sistemi
+---------------------------------------
+Kullanıcıların birbirini takip edebilmesi, portföy performanslarını
+karşılaştırması ve başarılarını paylaşması platformu sosyal bir ağa
+dönüştürür. "En çok takip edilen yatırımcılar" listesi, kullanıcı
+üretimi içerik ve tartışma alanları organik büyümeyi tetikler.
+Popüler kullanıcılara "onaylı yatırımcı" rozeti verilerek içerik
+üretmeleri teşvik edilir. Sosyal paylaşım butonları sayesinde
+kullanıcılar kendi başarılarını dış platformlara taşır ve organik
+kullanıcı kazanımı sağlanır.
+
+
+11. Referans (Davet) Programı
+------------------------------
+Mevcut kullanıcılar arkadaşlarını davet ettiğinde her iki tarafa da
+bonus sanal sermaye veya Pro üyelik süresi verilir. Viral büyümenin
+en etkili yollarından biridir. Davet eden kişi, getirdiği her aktif
+kullanıcı için ek ödüller kazanmaya devam edebilir (kademeli referans
+bonusu). Bu sistem doğrudan gelir üretmese de kullanıcı tabanını
+büyüterek reklam, turnuva ve abonelik gelirlerini katlar.
+
+
+12. Premium İçerik ve Eğitim Paketleri
+----------------------------------------
+Haftalık piyasa bülteni, derinlemesine analiz yazıları, video eğitim
+serileri veya "yatırıma giriş" kursları abonelik kapsamında ya da
+tek seferlik satın alma ile sunulabilir. Haber akışına "özet + yorum"
+katmanı eklenerek içerik bazlı gelir modeli oluşturulabilir. Uzman
+konuk analistlerle canlı yayın veya AMA (soru-cevap) seansları da
+premium içerik kapsamında değerlendirilebilir.
+
+
+13. Liderlik Tablosu Sponsorlukları
+-------------------------------------
+Liderlik tablosu platformun en çok ziyaret edilen bölümlerinden biri.
+Bu alanın sponsorluk hakkı belirli dönemler için markalara satılabilir:
+"X Bankası sunar: Haftalık En İyi Yatırımcılar" gibi. Sponsor, hem
+marka bilinirliği kazanır hem de ödül havuzuna katkıda bulunarak
+yarışmanın cazibesini artırır. Platform ise sponsorluk ücreti ve
+artan kullanıcı etkileşiminden faydalanır.
+
+
+14. Sanal Mağaza (PortfoyGo Shop)
+-----------------------------------
+Kullanıcıların turnuva, görev ve günlük aktivitelerden kazandığı
+puanları harcayabilecekleri bir mağaza kurulabilir. Mağazada profil
+temaları, özel rozetler, animasyonlu portföy kartları, turnuva
+biletleri gibi dijital ürünler yer alır. Puanlar aynı zamanda
+doğrudan satın alma ile de edinilebilir. Bu ikili yapı hem aktif
+kullanıcıları ödüllendirir hem de satın alma yoluyla gelir üretir.
+
+
+15. Mobil Uygulama (Gelecek Aşama)
+------------------------------------
+React Native veya PWA ile mobil mağazalara (App Store, Google Play)
+çıkıldığında, uygulama içi satın alma ve abonelik modelleri doğrudan
+mağaza üzerinden de çalıştırılabilir. Push bildirimlerle turnuva
+hatırlatmaları, fiyat alarmları ve günlük görev uyarıları gönderilerek
+kullanıcı geri dönüş oranı artırılabilir. Apple ve Google komisyon
+payları fiyatlandırmada hesaba katılmalıdır.
+
+
+Öncelik Sıralaması
+-------------------
+Kısa vade  :  Reklam entegrasyonu (düşük risk, hızlı test), basit Pro
+              abonelik paketi ve haftalık bilgi yarışması.
+Orta vade  :  Ödüllü turnuvalar, battle pass, görev sistemi, referans
+              programı ve B2B / white-label satış.
+Uzun vade  :  Mobil uygulama, premium içerik platformu, liderlik
+              tablosu sponsorlukları ve sanal mağaza.
+
+
+Not: Bu belge genel bir gelir modeli çerçevesi sunar. Özellikle ödüllü
+yarışma ve turnuva formatlarında tüketici mevzuatı, ödül yarışması
+hukuku ve kişisel verilerin korunması düzenlemeleri mutlaka
+değerlendirilmelidir.

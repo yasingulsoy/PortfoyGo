@@ -290,7 +290,7 @@ export default function Home() {
   useEffect(() => {
     const loadTopLeaders = async () => {
       try {
-        const result = await leaderboardApi.getLeaderboard(3);
+        const result = await leaderboardApi.getLeaderboard(3, 'alltime');
         if (result.success && result.leaderboard && result.leaderboard.length > 0) {
           setTopLeaders(result.leaderboard);
         } else {

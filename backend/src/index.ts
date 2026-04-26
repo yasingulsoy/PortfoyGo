@@ -19,6 +19,7 @@ import { MarketCacheService } from './services/marketCache';
 import { StopLossService } from './services/stopLoss';
 import { CurrencyService } from './services/currency';
 import { PortfolioService } from './services/portfolio';
+import { LeaderboardService } from './services/leaderboard';
 import cron from 'node-cron';
 
 // Environment variables
@@ -333,6 +334,15 @@ cron.schedule('0 */12 * * *', async () => {
   }
 });
 
+// Her Pazartesi 00:05: haftalık liderlik tablosu için referans varlık (ISO hafta)
+cron.schedule('5 0 * * 1', async () => {
+  try {
+    await LeaderboardService.tryResetWeekBaselinesIfNeeded();
+  } catch (error) {
+    console.error('❌ Haftalık liderlik baseline hatası:', error);
+  }
+});
+
 // Cache durumunu göster
 setInterval(async () => {
   const status = await MarketCacheService.getCacheStatus();
@@ -349,4 +359,7 @@ app.listen(PORT, () => {
   console.log(`📊 Trading Platform API ready!`);
   console.log(`🌐 Health check: http://localhost:${PORT}/api/health`);
   console.log(`🔄 Cache otomatik güncelleme: Her 2 dakikada bir (10 hisse)`);
+  LeaderboardService.tryResetWeekBaselinesIfNeeded().catch((e) => {
+    console.error('Liderlik hafta kontrolü (başlangıç):', e);
+  });
 });
