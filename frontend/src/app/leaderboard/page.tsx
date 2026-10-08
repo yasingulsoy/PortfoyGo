@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import useSWR from 'swr';
+import useSWR, { useSWRConfig } from 'swr';
 import { ArrowPathIcon, ListBulletIcon, TrophyIcon } from '@heroicons/react/20/solid';
 import { useRequireAuth } from '@/hooks/useRequireAuth';
 import { leaderboardApi } from '@/lib/api';
@@ -16,31 +16,44 @@ import Podium, { PodiumSkeleton } from '@/components/leaderboard/Podium';
 import RankList, { RankListSkeleton } from '@/components/leaderboard/RankList';
 import MyRankCard from '@/components/leaderboard/MyRankCard';
 import { BOARD_COPY, normalizeLeaders, type Board } from '@/components/leaderboard/model';
+import SeasonBoard from '@/components/season/SeasonBoard';
+import type { User } from '@/types';
 
 const LIMIT = 50;
 
-const BOARDS: { value: Board; label: string }[] = [
+type View = 'season' | Board;
+
+const VIEWS: { value: View; label: string }[] = [
+  { value: 'season', label: 'Sezon' },
   { value: 'alltime', label: 'Tüm zamanlar' },
   { value: 'week', label: 'Bu hafta' },
 ];
 
+const SEASON_DESCRIPTION =
+  'Her ay yeni bir sezon başlar. Bakiyen sıfırlanmaz; sezona girdiğin andaki varlığına göre yüzde kaç getiri elde ettiğinle sıralanırsın.';
+
+/** Yenile düğmesi bu sayfadaki tüm sıralama verilerini (sezon dahil) tazeler. */
+const isRankingKey = (key: unknown) => {
+  const k = Array.isArray(key) ? key[0] : key;
+  return typeof k === 'string' && (k.startsWith('leaderboard:') || k.startsWith('seasons:'));
+};
+
 export default function LeaderboardPage() {
   const { user, ready } = useRequireAuth();
-  const [board, setBoard] = useState<Board>('alltime');
-
-  const { data, error, isLoading, isValidating, mutate } = useSWR(
-    ready ? `leaderboard:${board}:${LIMIT}` : null,
-    () => leaderboardApi.list(LIMIT, board),
-    { refreshInterval: 60_000 },
-  );
-
-  const leaders = useMemo(() => normalizeLeaders(data, board), [data, board]);
+  const [view, setView] = useState<View>('season');
+  const { mutate } = useSWRConfig();
+  const [refreshing, setRefreshing] = useState(false);
 
   if (!ready || !user) return <PageLoader />;
 
-  const copy = BOARD_COPY[board];
-  const rest = leaders.slice(3);
-  const showSkeleton = isLoading && leaders.length === 0;
+  const refresh = async () => {
+    setRefreshing(true);
+    try {
+      await mutate(isRankingKey);
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -52,9 +65,9 @@ export default function LeaderboardPage() {
           <Button
             variant="secondary"
             size="sm"
-            onClick={() => void mutate()}
-            disabled={isValidating}
-            icon={<ArrowPathIcon className={cn('h-4 w-4', isValidating && 'animate-spin')} aria-hidden="true" />}
+            onClick={() => void refresh()}
+            disabled={refreshing}
+            icon={<ArrowPathIcon className={cn('h-4 w-4', refreshing && 'animate-spin')} aria-hidden="true" />}
           >
             Yenile
           </Button>
@@ -62,59 +75,78 @@ export default function LeaderboardPage() {
       />
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <Tabs label="Sıralama türü" items={BOARDS} value={board} onChange={setBoard} className="self-start" />
-        <p className="max-w-xl text-xs leading-relaxed text-muted sm:text-right">{copy.description}</p>
+        <Tabs label="Sıralama türü" items={VIEWS} value={view} onChange={setView} className="self-start" />
+        <p className="max-w-xl text-xs leading-relaxed text-muted sm:text-right">
+          {view === 'season' ? SEASON_DESCRIPTION : BOARD_COPY[view].description}
+        </p>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
-        <div className="min-w-0 space-y-6">
-          {error && leaders.length > 0 && <Alert tone="error">Tablo güncellenemedi; son alınan sıralama gösteriliyor.</Alert>}
+      {view === 'season' ? <SeasonBoard user={user} /> : <ClassicBoard board={view} user={user} />}
+    </div>
+  );
+}
 
-          {showSkeleton ? (
-            <PodiumSkeleton />
-          ) : error && leaders.length === 0 ? (
-            <Card>
-              <EmptyState
-                icon={<TrophyIcon />}
-                title="Liderlik tablosu yüklenemedi"
-                description={error instanceof Error ? error.message : 'Beklenmeyen bir hata oluştu.'}
-                action={<Button variant="secondary" size="sm" onClick={() => void mutate()}>Tekrar dene</Button>}
-              />
-            </Card>
-          ) : leaders.length === 0 ? (
-            <Card>
-              <EmptyState
-                icon={<TrophyIcon />}
-                title="Henüz sıralama yok"
-                description={board === 'week' ? 'Bu hafta henüz işlem yapan doğrulanmış oyuncu yok.' : 'İlk işlemi yapan oyuncular burada görünecek.'}
-              />
-            </Card>
-          ) : (
-            <Podium leaders={leaders} currentUsername={user.username} />
-          )}
+/** Tüm zamanlar / bu hafta sıralaması. */
+function ClassicBoard({ board, user }: { board: Board; user: User }) {
+  const { data, error, isLoading, mutate } = useSWR(`leaderboard:${board}:${LIMIT}`, () => leaderboardApi.list(LIMIT, board), {
+    refreshInterval: 60_000,
+  });
 
-          {(showSkeleton || rest.length > 0) && (
-            <Card className="overflow-hidden">
-              <CardHeader
-                icon={<ListBulletIcon />}
-                title={copy.title}
-                description={showSkeleton ? 'Yükleniyor' : `4–${leaders.length}. sıralar`}
-              />
-              {showSkeleton ? (
-                <RankListSkeleton />
-              ) : (
-                <RankList leaders={rest} currentUsername={user.username} plLabel={board === 'week' ? 'Hafta K/Z' : 'K/Z'} />
-              )}
-            </Card>
-          )}
+  const leaders = useMemo(() => normalizeLeaders(data, board), [data, board]);
+
+  const copy = BOARD_COPY[board];
+  const rest = leaders.slice(3);
+  const showSkeleton = isLoading && leaders.length === 0;
+
+  return (
+    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+      <div className="min-w-0 space-y-6">
+        {error && leaders.length > 0 && <Alert tone="error">Tablo güncellenemedi; son alınan sıralama gösteriliyor.</Alert>}
+
+        {showSkeleton ? (
+          <PodiumSkeleton />
+        ) : error && leaders.length === 0 ? (
+          <Card>
+            <EmptyState
+              icon={<TrophyIcon />}
+              title="Liderlik tablosu yüklenemedi"
+              description={error instanceof Error ? error.message : 'Beklenmeyen bir hata oluştu.'}
+              action={<Button variant="secondary" size="sm" onClick={() => void mutate()}>Tekrar dene</Button>}
+            />
+          </Card>
+        ) : leaders.length === 0 ? (
+          <Card>
+            <EmptyState
+              icon={<TrophyIcon />}
+              title="Henüz sıralama yok"
+              description={board === 'week' ? 'Bu hafta henüz işlem yapan doğrulanmış oyuncu yok.' : 'İlk işlemi yapan oyuncular burada görünecek.'}
+            />
+          </Card>
+        ) : (
+          <Podium leaders={leaders} currentUsername={user.username} />
+        )}
+
+        {(showSkeleton || rest.length > 0) && (
+          <Card className="overflow-hidden">
+            <CardHeader
+              icon={<ListBulletIcon />}
+              title={copy.title}
+              description={showSkeleton ? 'Yükleniyor' : `4–${leaders.length}. sıralar`}
+            />
+            {showSkeleton ? (
+              <RankListSkeleton />
+            ) : (
+              <RankList leaders={rest} currentUsername={user.username} plLabel={board === 'week' ? 'Hafta K/Z' : 'K/Z'} />
+            )}
+          </Card>
+        )}
+      </div>
+
+      <aside className="order-first lg:order-none">
+        <div className="lg:sticky lg:top-24">
+          <MyRankCard board={board} verified={user.email_verified} leaders={leaders} username={user.username} />
         </div>
-
-        <aside className="order-first lg:order-none">
-          <div className="lg:sticky lg:top-24">
-            <MyRankCard board={board} verified={user.email_verified} leaders={leaders} username={user.username} />
-          </div>
-        </aside>
-      </div>
+      </aside>
     </div>
   );
 }

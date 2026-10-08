@@ -11,6 +11,7 @@ import { Alert } from '@portfoygo/shared/ui/Feedback';
 import { Field } from '@portfoygo/shared/ui/Field';
 import { PageLoader } from '@portfoygo/shared/ui/Spinner';
 import { safeRedirect } from '@portfoygo/shared/url';
+import DevQuickLogin from '@portfoygo/shared/ui/DevQuickLogin';
 import { useAdminAuth } from '@/lib/auth';
 
 export default function AdminLoginPage() {
@@ -22,7 +23,7 @@ export default function AdminLoginPage() {
 }
 
 function LoginForm() {
-  const { status, login } = useAdminAuth();
+  const { status, login, devLogin } = useAdminAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirectTo = safeRedirect(searchParams.get('redirect'));
@@ -71,6 +72,17 @@ function LoginForm() {
               Oturum açık olan hesabın yönetici yetkisi yok. Yönetici hesabıyla giriş yapın.
             </Alert>
           )}
+
+          <div className="mt-5">
+            <DevQuickLogin
+              adminOnly
+              onLogin={async (username) => {
+                const res = await devLogin(username);
+                if (res.success) router.replace(redirectTo);
+                return res;
+              }}
+            />
+          </div>
 
           <form onSubmit={submit} noValidate className="mt-5 space-y-4">
             <Field label="E-posta" type="email" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} />

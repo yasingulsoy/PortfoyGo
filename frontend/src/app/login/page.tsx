@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { safeRedirect } from '@/hooks/useRequireAuth';
 import AuthLayout from '@/components/auth/AuthLayout';
+import DevQuickLogin from '@portfoygo/shared/ui/DevQuickLogin';
 import { PASSWORD_MAX, validateEmail } from '@/components/auth/authUtils';
 import Button from '@portfoygo/shared/ui/Button';
 import { Alert } from '@portfoygo/shared/ui/Feedback';
@@ -30,7 +31,7 @@ export default function LoginPage() {
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { user, loading: authLoading, login } = useAuth();
+  const { user, loading: authLoading, login, devLogin } = useAuth();
   const redirectTo = safeRedirect(searchParams.get('redirect'));
   const notice = Object.keys(NOTICES).find((key) => searchParams.get(key) === '1');
 
@@ -80,7 +81,16 @@ function LoginForm() {
         </>
       }
     >
-      <form onSubmit={handleSubmit} noValidate className="space-y-4">
+      <DevQuickLogin
+        onLogin={async (username) => {
+          setSubmitting(true);
+          const res = await devLogin(username);
+          if (res.success) router.replace(redirectTo);
+          else setSubmitting(false);
+          return res;
+        }}
+      />
+      <form onSubmit={handleSubmit} noValidate className="mt-4 space-y-4">
         {notice && !formError && <Alert tone="success">{NOTICES[notice]}</Alert>}
         {formError && <Alert tone="error">{formError}</Alert>}
 

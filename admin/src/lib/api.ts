@@ -8,6 +8,8 @@ export const authApi = {
   login: (email: string, password: string) => apiFetch('/auth/login', { ...post({ email, password }), silent401: true }),
   profile: () => apiFetch('/auth/profile', { silent401: true }),
   logout: () => apiFetch('/auth/logout', { ...post({}), silent401: true }),
+  /** Yalnızca yerel geliştirme: şifresiz giriş (uzak DB'de 404) */
+  devLogin: (username: string) => apiFetch('/auth/dev-login', { ...post({ username }), silent401: true }),
 };
 
 export const adminApi = {

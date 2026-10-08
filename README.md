@@ -110,6 +110,8 @@ Bu komut şunları yapar:
 - `backend/.env` içindeki canlı veritabanını, API anahtarlarını ve SMTP'yi **kullanmaz**. Fiyatlar dakikada bir küçük adımlarla oynatılır. E-posta doğrulama ve sıfırlama kodları konsola yazılır.
 
 Adresler: site <http://localhost:3000>, yönetim paneli <http://localhost:3001>, API <http://localhost:5001/api>.
+
+**Hızlı giriş:** Yerel veritabanıyla çalışırken giriş sayfalarında (site ve yönetim paneli) bir "Hızlı giriş" bölümü çıkar. Yerel hesaplardan birine tıklamak yeterlidir; e-posta ve şifre gerekmez. Bu özellik yalnızca backend `localhost`/`127.0.0.1` üzerindeki bir veritabanına bağlıyken ve `NODE_ENV` production değilken açılır. Uzak veritabanında uç 404 döner ve bölüm görünmez. Kapatmak için `DEV_LOGIN=0` ayarlayın.
 Sıfırlamak için `npm run dev:local -w @portfoygo/backend -- --reset` kullanın.
 
 ## Güvenlik notları

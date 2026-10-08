@@ -1,4 +1,5 @@
 import { STARTING_BALANCE } from '@/lib/constants';
+import type { LeagueMember, SeasonEntry } from '@/types';
 
 export type Board = 'alltime' | 'week';
 
@@ -59,3 +60,17 @@ export const BOARD_COPY: Record<Board, { title: string; description: string }> =
       'Bu haftaya (Pazartesi) girerkenki toplam varlığına göre elde ettiğin getiri ölçülür; yeni ve eski oyuncular aynı hafta penceresinde kıyaslanır.',
   },
 };
+
+/**
+ * Sezon / lig satırlarını mevcut kürsü ve liste bileşenlerinin beklediği biçime çevirir:
+ * toplam varlık = güncel varlık, K/Z = sezona (lige) girişten bu yana TL, yüzde = getiri.
+ */
+export function toLeaders(entries: Array<Pick<SeasonEntry | LeagueMember, 'rank' | 'username' | 'equity' | 'profit_tl' | 'return_pct'>>): Leader[] {
+  return entries.map((e) => ({
+    rank: e.rank,
+    username: e.username,
+    totalValue: e.equity,
+    pl: e.profit_tl,
+    plPercent: e.return_pct,
+  }));
+}

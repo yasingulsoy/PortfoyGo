@@ -30,3 +30,10 @@ export const sendResetLimiter = make(60 * MINUTE, 5, emailSendMessage);
 const emailVerifyMessage = 'Çok fazla doğrulama denemesi. Lütfen 15 dakika sonra tekrar deneyin.';
 export const emailVerifyLimiter = make(15 * MINUTE, 10, emailVerifyMessage);
 export const resetPasswordLimiter = make(15 * MINUTE, 10, emailVerifyMessage);
+
+/** Lig davet kodu (önizleme + katılma ortak sayaç): IP başına 15 dakikada 20 — kod tahminini engeller. */
+export const leagueCodeLimiter = make(
+  15 * MINUTE,
+  20,
+  'Çok fazla davet kodu denemesi. Lütfen 15 dakika sonra tekrar deneyin.'
+);

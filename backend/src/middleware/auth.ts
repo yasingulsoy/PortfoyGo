@@ -82,6 +82,38 @@ export function requireUser(req: Request): User {
   return user;
 }
 
+/**
+ * İsteğe bağlı kimlik doğrulama: geçerli bir oturum (çerez veya Bearer) varsa `req.user` doldurulur,
+ * yoksa / geçersizse istek anonim olarak devam eder (401 dönmez). Herkese açık ama oturum açmış
+ * kullanıcıya ek bilgi gösteren uçlar içindir (ör. GET /api/seasons/current → `me`).
+ * CSRF kuralı yine uygulanır: çerezle gelen durum değiştiren isteklerde başlık yoksa 403.
+ */
+export const optionalAuth = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  const cookieToken = readSessionCookie(req);
+  const token = cookieToken ?? readBearer(req);
+  if (!token) return next();
+
+  if (cookieToken && STATE_CHANGING.has(req.method) && !hasCsrfHeader(req)) {
+    return res.status(403).json({
+      success: false,
+      message: 'İstek doğrulanamadı (CSRF koruması)',
+    });
+  }
+
+  try {
+    const user = await AuthService.verifyToken(token);
+    if (user) req.user = user;
+    next();
+  } catch (error) {
+    next(error);
+  }
+};
+
+/** optionalAuth sonrası: oturum varsa kullanıcı ID'si, yoksa undefined. */
+export function optionalUserId(req: Request): string | undefined {
+  return (req as AuthenticatedRequest).user?.id;
+}
+
 export const authenticateToken = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   const cookieToken = readSessionCookie(req);
   const token = cookieToken ?? readBearer(req);

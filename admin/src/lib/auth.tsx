@@ -17,6 +17,8 @@ interface AdminAuthContextType {
   user: AdminUser | null;
   status: Status;
   login: (email: string, password: string) => Promise<{ success: boolean; message?: string }>;
+  /** Yalnızca yerel geliştirme: şifresiz giriş */
+  devLogin: (username: string) => Promise<{ success: boolean; message?: string }>;
   logout: () => Promise<void>;
 }
 
@@ -87,6 +89,21 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
     [apply],
   );
 
+  const devLogin = useCallback(
+    async (username: string) => {
+      try {
+        const res = await authApi.devLogin(username);
+        if (!res?.success || !res.user) return { success: false, message: res?.message || 'Giriş başarısız.' };
+        const u = apply(res.user);
+        if (!u.is_admin) return { success: false, message: 'Bu hesabın yönetim paneline erişim yetkisi yok.' };
+        return { success: true };
+      } catch (err) {
+        return { success: false, message: err instanceof Error ? err.message : 'Giriş başarısız.' };
+      }
+    },
+    [apply],
+  );
+
   const logout = useCallback(async () => {
     try {
       await authApi.logout();
@@ -97,7 +114,7 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
     router.replace('/login');
   }, [router]);
 
-  const value = useMemo(() => ({ user, status, login, logout }), [user, status, login, logout]);
+  const value = useMemo(() => ({ user, status, login, devLogin, logout }), [user, status, login, devLogin, logout]);
   return <AdminAuthContext.Provider value={value}>{children}</AdminAuthContext.Provider>;
 }
 

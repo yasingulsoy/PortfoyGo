@@ -22,6 +22,8 @@ import ordersRoutes from './routes/orders';
 import newsRoutes from './routes/news';
 import marketRoutes from './routes/market';
 import watchlistRoutes from './routes/watchlist';
+import seasonsRoutes from './routes/seasons';
+import leaguesRoutes from './routes/leagues';
 import { globalApiLimiter } from './middleware/rateLimits';
 import { errorHandler, notFoundHandler } from './utils/errors';
 
@@ -143,6 +145,8 @@ export function createApp(): express.Express {
   app.use('/api/news', newsRoutes);
   app.use('/api/market', marketRoutes);
   app.use('/api/watchlist', watchlistRoutes);
+  app.use('/api/seasons', seasonsRoutes);
+  app.use('/api/leagues', leaguesRoutes);
 
   // Proxy /api önekini siliyorsa: /currencies, /commodities, /news için geriye dönük uyumluluk
   app.use(['/commodities', '/currencies', '/news'], globalApiLimiter);

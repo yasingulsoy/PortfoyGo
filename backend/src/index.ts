@@ -13,6 +13,7 @@ import { providers, activeProviders } from './providers';
 import { PortfolioService } from './services/portfolio';
 import { LeaderboardService } from './services/leaderboard';
 import { HistoryService } from './services/history';
+import { SeasonService } from './services/seasons';
 
 const app = createApp();
 const PORT = parseInt(process.env.PORT || '5001', 10);
@@ -77,6 +78,16 @@ schedule('17 * * * *', 'week-baseline-check', () => LeaderboardService.tryResetW
 schedule('2 * * * *', 'history-hourly', () => HistoryService.snapshotHourly());
 schedule('55 23 * * *', 'history-daily', () => HistoryService.snapshotDaily());
 
+// Aylık sezonlar: süresi dolanı sonlandır + güncel sezonu oluştur + yeni uygun kullanıcıları ekle.
+// 5 dakikada bir + ayın 1'i 00:00 (İstanbul) anında kapanış. Sonlandırma idempotenttir ve
+// eşzamanlı çalıştırmaya karşı güvenlidir (sezon satırı FOR UPDATE + status kontrolü).
+const seasonTick = async () => {
+  await SeasonService.ensureCurrentSeason();
+  await SeasonService.enrollEligible();
+};
+schedule('*/5 * * * *', 'seasons', seasonTick);
+schedule('0 0 1 * *', 'season-rollover', seasonTick);
+
 // Açılışta ilk doldurma
 void runGuarded('startup-currency', () => providers.fx.refreshRates());
 void runGuarded('market-cache', async () => {
@@ -87,6 +98,7 @@ void runGuarded('market-cache', async () => {
 });
 void runGuarded('week-baseline', () => LeaderboardService.tryResetWeekBaselinesIfNeeded());
 void runGuarded('ranks', () => LeaderboardService.updateRanks());
+void runGuarded('seasons', seasonTick);
 
 app.listen(PORT, () => {
   console.log(`[server] API ${PORT} portunda çalışıyor (NODE_ENV=${process.env.NODE_ENV || 'development'})`);

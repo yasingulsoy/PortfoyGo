@@ -1,7 +1,18 @@
 // Frontend'e özgü API uçları. Çekirdek istemci (apiFetch, oturum, CSRF) ortak pakettedir.
 
-import type { AssetType } from '@/types';
+import type { AssetType, CreateLeagueRequest } from '@/types';
 import { apiFetch, post } from '@portfoygo/shared/api';
+import {
+  toCurrentSeason,
+  toLeague,
+  toLeagueDetail,
+  toLeaguePreview,
+  toLeagues,
+  toSeasonAwards,
+  toSeasonLeaderboard,
+  toSeasonSummaries,
+  unwrap,
+} from './competition';
 
 export { API_BASE_URL, ApiError, apiFetch, session, swrFetcher } from '@portfoygo/shared/api';
 
@@ -14,8 +25,6 @@ export const authApi = {
   logout: () => apiFetch('/auth/logout', { ...post({}), silent401: true }),
   /** Tüm cihazlardaki oturumları iptal eder. */
   logoutAll: () => apiFetch('/auth/logout-all', post({})),
-  /** Yalnızca yerel geliştirme: hızlı girişte seçilebilecek hesaplar (uzak DB'de 404) */
-  devUsers: () => apiFetch('/auth/dev-login', { silent401: true }),
   /** Yalnızca yerel geliştirme: şifresiz giriş */
   devLogin: (username: string) => apiFetch('/auth/dev-login', { ...post({ username }), silent401: true }),
 };
@@ -113,4 +122,35 @@ export const ordersApi = {
   create: (data: CreateOrderRequest) => apiFetch('/orders', { method: 'POST', body: JSON.stringify(data) }),
   list: (status: 'active' | 'history' | 'all' = 'active') => apiFetch(`/orders?status=${status}`),
   cancel: (id: string) => apiFetch(`/orders/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+};
+
+// ---------------------------------------------------------------------------
+// Sezonlar (aylık, getiri bazlı sıralama) ve özel ligler
+// ---------------------------------------------------------------------------
+
+export const seasonsApi = {
+  /** Aktif sezon; oturum açıksa `me` alanı dolu gelir. */
+  current: () => apiFetch('/seasons/current').then((r) => toCurrentSeason(unwrap(r))),
+  leaderboard: (slug: string, limit = 50, offset = 0) =>
+    apiFetch(`/seasons/${encodeURIComponent(slug)}/leaderboard?limit=${limit}&offset=${offset}`).then((r) =>
+      toSeasonLeaderboard(unwrap(r), offset),
+    ),
+  /** En yeniden eskiye sezonlar ve kazananları. */
+  list: (limit = 12) => apiFetch(`/seasons?limit=${limit}`).then((r) => toSeasonSummaries(unwrap(r))),
+  myAwards: () => apiFetch('/seasons/me/awards').then((r) => toSeasonAwards(unwrap(r))),
+};
+
+export const leaguesApi = {
+  list: () => apiFetch('/leagues').then((r) => toLeagues(unwrap(r))),
+  create: (data: CreateLeagueRequest) => apiFetch('/leagues', post(data)).then((r) => toLeague(unwrap(r))),
+  preview: (code: string) =>
+    apiFetch(`/leagues/preview?code=${encodeURIComponent(code)}`).then((r) => toLeaguePreview(unwrap(r))),
+  join: (code: string) => apiFetch('/leagues/join', post({ code })).then((r) => toLeague(unwrap(r))),
+  get: (id: string) => apiFetch(`/leagues/${encodeURIComponent(id)}`).then((r) => toLeagueDetail(unwrap(r))),
+  leave: (id: string) => apiFetch(`/leagues/${encodeURIComponent(id)}/leave`, post({})),
+  regenerateCode: (id: string) =>
+    apiFetch(`/leagues/${encodeURIComponent(id)}/invite-code`, post({})).then((r) => String(unwrap<any>(r)?.invite_code ?? '')),
+  removeMember: (id: string, userId: string) =>
+    apiFetch(`/leagues/${encodeURIComponent(id)}/members/${encodeURIComponent(userId)}`, { method: 'DELETE' }),
+  remove: (id: string) => apiFetch(`/leagues/${encodeURIComponent(id)}`, { method: 'DELETE' }),
 };

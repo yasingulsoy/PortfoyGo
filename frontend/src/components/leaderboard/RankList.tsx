@@ -7,10 +7,21 @@ import type { Leader } from './model';
 const GRID = 'grid grid-cols-[2.25rem_minmax(0,1fr)_auto] items-center gap-x-3 md:grid-cols-[3rem_minmax(0,1fr)_11rem_10rem_6.5rem] md:gap-x-4';
 
 /** 4. sıradan itibaren liste. Mobilde iki satırlı, md+ genişlikte tablo düzeni. */
-export default function RankList({ leaders, currentUsername, plLabel }: { leaders: Leader[]; currentUsername?: string; plLabel: string }) {
+export default function RankList({
+  leaders,
+  currentUsername,
+  plLabel,
+  showHeader = true,
+}: {
+  leaders: Leader[];
+  currentUsername?: string;
+  plLabel: string;
+  /** Sayfalı listelerde ikinci ve sonraki parçalar sütun başlığını tekrarlamaz. */
+  showHeader?: boolean;
+}) {
   return (
     <div>
-      <div className={cn(GRID, 'hidden border-b border-line px-5 py-2.5 text-xs font-medium text-subtle md:grid')} aria-hidden="true">
+      <div className={cn(GRID, 'hidden border-b border-line px-5 py-2.5 text-xs font-medium text-subtle', showHeader && 'md:grid')} aria-hidden="true">
         <span>Sıra</span>
         <span>Oyuncu</span>
         <span className="text-right">Toplam varlık</span>

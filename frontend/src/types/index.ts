@@ -150,3 +150,125 @@ export interface StopLossOrder {
   status: string;
   created_at: string;
 }
+
+/* ---------- Sezonlar (aylık, getiri bazlı) ---------- */
+
+export type SeasonStatus = 'active' | 'finished';
+
+export interface Season {
+  id: string;
+  slug: string;
+  name: string;
+  starts_at: string;
+  ends_at: string;
+  status: SeasonStatus;
+}
+
+/** Oturumdaki kullanıcının sezondaki durumu (sezona henüz kaydolmadıysa null). */
+export interface SeasonMe {
+  rank: number | null;
+  /** Yüzde (12.5 = %12,5) */
+  return_pct: number;
+  baseline_equity: number;
+  equity: number;
+  profit_tl: number;
+  joined_at: string;
+}
+
+export interface CurrentSeason {
+  season: Season | null;
+  participants: number;
+  me: SeasonMe | null;
+}
+
+export interface SeasonEntry {
+  rank: number;
+  user_id: string;
+  username: string;
+  baseline_equity: number;
+  equity: number;
+  return_pct: number;
+  profit_tl: number;
+  is_me: boolean;
+}
+
+export interface SeasonLeaderboard {
+  season: Season | null;
+  entries: SeasonEntry[];
+  total: number;
+}
+
+export interface SeasonWinner {
+  rank: number;
+  username: string;
+  return_pct: number;
+  title: string;
+}
+
+export interface SeasonSummary {
+  season: Season;
+  participants: number;
+  winners: SeasonWinner[];
+}
+
+export interface SeasonAward {
+  season_slug: string;
+  season_name: string;
+  rank: number;
+  title: string;
+  return_pct: number;
+  awarded_at: string;
+}
+
+/* ---------- Özel ligler ---------- */
+
+export type LeagueRole = 'owner' | 'member';
+
+export interface League {
+  id: string;
+  name: string;
+  description: string | null;
+  invite_code: string;
+  owner_username: string;
+  role: LeagueRole;
+  member_count: number;
+  max_members: number;
+  my_rank: number | null;
+  my_return_pct: number | null;
+  ends_at: string | null;
+  created_at: string;
+}
+
+export interface LeaguePreview {
+  name: string;
+  description: string | null;
+  owner_username: string;
+  member_count: number;
+  max_members: number;
+  ends_at: string | null;
+  already_member: boolean;
+}
+
+export interface LeagueMember {
+  rank: number;
+  user_id: string;
+  username: string;
+  role: LeagueRole;
+  baseline_equity: number;
+  equity: number;
+  return_pct: number;
+  profit_tl: number;
+  joined_at: string;
+  is_me: boolean;
+}
+
+export interface LeagueDetail {
+  league: League & { owner_id: string };
+  members: LeagueMember[];
+}
+
+export interface CreateLeagueRequest {
+  name: string;
+  description?: string;
+  ends_at?: string;
+}
