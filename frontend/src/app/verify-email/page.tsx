@@ -9,9 +9,9 @@ import { emailApi } from '@/lib/api';
 import AuthLayout from '@/components/auth/AuthLayout';
 import CodeInput from '@/components/auth/CodeInput';
 import { CODE_LENGTH, RESEND_COOLDOWN, useCooldown } from '@/components/auth/authUtils';
-import Button, { LinkButton } from '@/components/ui/Button';
-import { Alert } from '@/components/ui/Feedback';
-import { PageLoader } from '@/components/ui/Spinner';
+import Button, { LinkButton } from '@portfoygo/shared/ui/Button';
+import { Alert } from '@portfoygo/shared/ui/Feedback';
+import { PageLoader } from '@portfoygo/shared/ui/Spinner';
 
 export default function VerifyEmailPage() {
   return (

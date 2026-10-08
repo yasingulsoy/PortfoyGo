@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { cn } from '@/lib/format';
+import { cn } from '@portfoygo/shared/format';
 
 /** Değer değiştiğinde yönüne göre kısa bir renk vurgusu yapan fiyat hücresi. */
 export default function PriceTick({ value, children, className }: { value: number | null; children: React.ReactNode; className?: string }) {

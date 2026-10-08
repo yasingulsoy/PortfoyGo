@@ -14,7 +14,8 @@ vi.mock('../src/config/database', () => ({
   },
 }));
 
-const MIGRATIONS = ['000_base.sql', '001_hardening.sql', '003_history_watchlist.sql'];
+// Tüm migration'lar sırayla uygulanır (gerçek ortamla aynı şema)
+const MIGRATIONS = fs.readdirSync(path.resolve(__dirname, '../migrations')).filter((f) => f.endsWith('.sql')).sort();
 const HOUR = 3_600_000;
 const DAY = 86_400_000;
 

@@ -3,10 +3,10 @@
 import { useMemo } from 'react';
 import useSWR from 'swr';
 import { LockClosedIcon, SparklesIcon } from '@heroicons/react/20/solid';
-import { Card, CardHeader } from '@/components/ui/Card';
-import { Alert, EmptyState, Skeleton } from '@/components/ui/Feedback';
+import { Card, CardHeader } from '@portfoygo/shared/ui/Card';
+import { Alert, EmptyState, Skeleton } from '@portfoygo/shared/ui/Feedback';
 import { badgesApi } from '@/lib/api';
-import { cn, formatDate } from '@/lib/format';
+import { cn, formatDate } from '@portfoygo/shared/format';
 import type { Badge } from '@/types';
 
 const CATEGORY_LABELS: Record<string, string> = {

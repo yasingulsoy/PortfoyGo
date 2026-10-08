@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
-import { cn } from '@/lib/format';
+import { cn } from '@portfoygo/shared/format';
 import { NAV_ITEMS, isActive } from './nav';
 
 /** Mobil/tablet için alt sekme çubuğu. */

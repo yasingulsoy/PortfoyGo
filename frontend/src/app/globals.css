@@ -1,0 +1,5 @@
+@import "tailwindcss";
+@import "@portfoygo/shared/styles.css";
+
+/* Ortak paketteki bileşenlerin sınıflarını da tara */
+@source "../../../packages/shared/src";

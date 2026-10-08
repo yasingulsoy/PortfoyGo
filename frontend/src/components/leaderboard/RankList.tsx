@@ -1,7 +1,7 @@
-import { Delta, Money } from '@/components/ui/Delta';
-import { Badge, Skeleton } from '@/components/ui/Feedback';
-import UserInitial from '@/components/profile/UserInitial';
-import { cn, formatTRY } from '@/lib/format';
+import { Delta, Money } from '@portfoygo/shared/ui/Delta';
+import { Badge, Skeleton } from '@portfoygo/shared/ui/Feedback';
+import UserInitial from '@portfoygo/shared/ui/UserInitial';
+import { cn, formatTRY } from '@portfoygo/shared/format';
 import type { Leader } from './model';
 
 const GRID = 'grid grid-cols-[2.25rem_minmax(0,1fr)_auto] items-center gap-x-3 md:grid-cols-[3rem_minmax(0,1fr)_11rem_10rem_6.5rem] md:gap-x-4';

@@ -1,4 +1,4 @@
-import { cn } from '@/lib/format';
+import { cn } from '../format';
 
 /** Logodaki yükselen çubuk + ok motifinden türetilmiş işaret. */
 export function LogoMark({ className }: { className?: string }) {

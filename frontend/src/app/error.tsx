@@ -2,9 +2,9 @@
 
 import { useEffect } from 'react';
 import { ArrowPathIcon, HomeIcon } from '@heroicons/react/20/solid';
-import Button, { LinkButton } from '@/components/ui/Button';
-import { Card } from '@/components/ui/Card';
-import { Alert } from '@/components/ui/Feedback';
+import Button, { LinkButton } from '@portfoygo/shared/ui/Button';
+import { Card } from '@portfoygo/shared/ui/Card';
+import { Alert } from '@portfoygo/shared/ui/Feedback';
 
 /** Rota düzeyinde beklenmeyen hatalar için yakalayıcı. */
 export default function RouteError({ error, retry }: { error: Error & { digest?: string }; retry: () => void }) {

@@ -7,6 +7,10 @@ import type { NextConfig } from "next";
 const apiProxyTarget = process.env.API_PROXY_TARGET?.trim().replace(/\/+$/, "");
 
 const nextConfig: NextConfig = {
+  // next dev'in kökte AGENTS.md üretmesini kapat
+  agentRules: false,
+  // Ortak paket (packages/shared) TypeScript kaynağı olarak derlenir
+  transpilePackages: ["@portfoygo/shared"],
   async rewrites() {
     if (!apiProxyTarget) return [];
     return [{ source: "/api/backend/:path*", destination: `${apiProxyTarget}/api/:path*` }];

@@ -63,7 +63,7 @@ export class LeaderboardService {
          FROM (
            SELECT
              u2.id,
-             u2.balance + COALESCE((
+             u2.balance + u2.reserved_cash + COALESCE((
                SELECT SUM(pi.total_value) FROM portfolio_items pi WHERE pi.user_id = u2.id
              ), 0) AS total_eq
            FROM users u2
@@ -110,13 +110,13 @@ export class LeaderboardService {
         u.balance,
         COALESCE(inv.portfolio_value, 0) AS portfolio_value,
         COALESCE(inv.total_profit_loss, 0) AS total_profit_loss,
-        (u.balance + COALESCE(inv.portfolio_value, 0) - $1) / $1 * 100 AS profit_loss_percent
+        (u.balance + u.reserved_cash + COALESCE(inv.portfolio_value, 0) - $1) / $1 * 100 AS profit_loss_percent
       FROM users u
       LEFT JOIN inv ON u.id = inv.user_id
       WHERE u.email_verified = true
         AND (u.is_banned IS NULL OR u.is_banned = false)
       ORDER BY
-        (u.balance + COALESCE(inv.portfolio_value, 0) - $1) / $1 * 100 DESC NULLS LAST,
+        (u.balance + u.reserved_cash + COALESCE(inv.portfolio_value, 0) - $1) / $1 * 100 DESC NULLS LAST,
         COALESCE(inv.total_profit_loss, 0) DESC,
         u.created_at ASC
       LIMIT $2
@@ -157,11 +157,11 @@ export class LeaderboardService {
         u.week_baseline_equity,
         COALESCE(inv.portfolio_value, 0) AS portfolio_value,
         COALESCE(inv.total_profit_loss, 0) AS total_profit_loss,
-        (u.balance + COALESCE(inv.portfolio_value, 0)) AS total_equity,
+        (u.balance + u.reserved_cash + COALESCE(inv.portfolio_value, 0)) AS total_equity,
         CASE
           WHEN COALESCE(u.week_baseline_equity, 0) > 0
           THEN
-            (u.balance + COALESCE(inv.portfolio_value, 0) - u.week_baseline_equity)
+            (u.balance + u.reserved_cash + COALESCE(inv.portfolio_value, 0) - u.week_baseline_equity)
             / u.week_baseline_equity
             * 100
           ELSE 0
@@ -174,10 +174,10 @@ export class LeaderboardService {
         CASE
           WHEN COALESCE(u.week_baseline_equity, 0) > 0
           THEN
-            (u.balance + COALESCE(inv.portfolio_value, 0) - u.week_baseline_equity)
+            (u.balance + u.reserved_cash + COALESCE(inv.portfolio_value, 0) - u.week_baseline_equity)
             / u.week_baseline_equity
         END DESC NULLS LAST,
-        (u.balance + COALESCE(inv.portfolio_value, 0) - u.week_baseline_equity) DESC NULLS LAST,
+        (u.balance + u.reserved_cash + COALESCE(inv.portfolio_value, 0) - u.week_baseline_equity) DESC NULLS LAST,
         u.created_at ASC
       LIMIT $1
     `,
@@ -217,7 +217,7 @@ export class LeaderboardService {
          SELECT u.id,
                 ROW_NUMBER() OVER (
                   ORDER BY
-                    (u.balance + COALESCE(inv.portfolio_value, 0) - $1) / $1 * 100 DESC NULLS LAST,
+                    (u.balance + u.reserved_cash + COALESCE(inv.portfolio_value, 0) - $1) / $1 * 100 DESC NULLS LAST,
                     COALESCE(inv.total_profit_loss, 0) DESC,
                     u.created_at ASC
                 ) AS rn
@@ -253,7 +253,7 @@ export class LeaderboardService {
              u2.id,
              ROW_NUMBER() OVER (
                ORDER BY
-                 (u2.balance + COALESCE(inv.portfolio_value, 0) - $1) / $1 * 100 DESC NULLS LAST,
+                 (u2.balance + u2.reserved_cash + COALESCE(inv.portfolio_value, 0) - $1) / $1 * 100 DESC NULLS LAST,
                  COALESCE(inv.total_profit_loss, 0) DESC,
                  u2.created_at ASC
              ) AS rn
@@ -297,7 +297,7 @@ export class LeaderboardService {
         WITH ueq AS (
           SELECT
             u2.id,
-            (u2.balance + COALESCE((
+            (u2.balance + u2.reserved_cash + COALESCE((
               SELECT SUM(pi.total_value) FROM portfolio_items pi WHERE pi.user_id = u2.id
             ), 0) - u2.week_baseline_equity)
             / NULLIF(u2.week_baseline_equity, 0)

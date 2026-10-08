@@ -151,7 +151,10 @@ async function closeWithRefund(
 ): Promise<number> {
   const refund = toNumber(order.reserved_cash);
   if (refund > 0) {
-    await client.query('UPDATE users SET balance = balance + $1 WHERE id = $2', [refund, order.user_id]);
+    await client.query(
+      'UPDATE users SET balance = balance + $1, reserved_cash = GREATEST(reserved_cash - $1, 0) WHERE id = $2',
+      [refund, order.user_id]
+    );
   }
   await client.query(
     `UPDATE orders
@@ -246,7 +249,7 @@ export class OrderService {
           throw rejected('Yetersiz bakiye');
         }
         const balRes = await client.query(
-          'UPDATE users SET balance = balance - $1 WHERE id = $2 AND balance >= $1 RETURNING balance',
+          'UPDATE users SET balance = balance - $1, reserved_cash = reserved_cash + $1 WHERE id = $2 AND balance >= $1 RETURNING balance',
           [reserved, userId]
         );
         if (balRes.rowCount === 0) {

@@ -1,7 +1,8 @@
 import pool from '../config/database';
 import { AppError } from '../utils/errors';
 import { AssetType } from '../types';
-import { CommodityService, isTryQuotedCommodity } from './commodity';
+import { providers } from '../providers';
+import { isTryQuotedCommodity } from './commodity';
 
 export { isTryQuotedCommodity };
 
@@ -105,7 +106,7 @@ export class PricingService {
    * Sunucu tarafında belirlenen işlem fiyatı (TL / birim).
    * - stock, crypto: market_data_cache (USD) × USD/TRY
    * - currency: currency_rates satış kuru (zaten TL / birim)
-   * - commodity: CommodityService; GAU ve *TRY kodları TL, diğerleri USD × USD/TRY
+   * - commodity: emtia sağlayıcısı (providers.commodities); GAU ve *TRY kodları TL, diğerleri USD × USD/TRY
    * Fiyat yoksa veya bayatsa PriceUnavailableError fırlatır.
    */
   static async getExecutionPriceTRY(symbol: string, assetType: AssetType): Promise<ExecutionPrice> {
@@ -155,12 +156,12 @@ export class PricingService {
       }
 
       case 'commodity': {
-        const c = await CommodityService.getPriceCached(sym, undefined, maxAge);
+        const c = await providers.commodities.getPrice(sym, undefined, maxAge);
         const price = positive(c?.selling);
         if (!c || !price || Date.now() - c.fetchedAt > maxAge) {
           throw new PriceUnavailableError();
         }
-        const priceTRY = isTryQuotedCommodity(c.code) ? price : price * (await this.requireUsdTry());
+        const priceTRY = providers.commodities.isTryQuoted(c.code) ? price : price * (await this.requireUsdTry());
         return { priceTRY, name: c.name || sym, priceUpdatedAt: new Date(c.fetchedAt) };
       }
 
@@ -215,10 +216,10 @@ export class PricingService {
       const codes = [...new Set(keys.filter((k) => k.asset_type === 'commodity').map((k) => k.symbol.toUpperCase()))];
       for (const code of codes) {
         try {
-          const c = await CommodityService.getPriceCached(code, undefined, MAX_PRICE_AGE_MS.commodity);
+          const c = await providers.commodities.getPrice(code, undefined, MAX_PRICE_AGE_MS.commodity);
           const p = positive(c?.selling);
           if (!c || !p) continue;
-          if (isTryQuotedCommodity(c.code)) {
+          if (providers.commodities.isTryQuoted(c.code)) {
             out.set(priceKey('commodity', code), p);
           } else if (usd) {
             out.set(priceKey('commodity', code), p * usd.rate);

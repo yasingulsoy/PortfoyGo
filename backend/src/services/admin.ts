@@ -42,7 +42,7 @@ export class AdminService {
         `SELECT id, username, email, balance, portfolio_value, total_profit_loss, rank, created_at
          FROM users
          WHERE email_verified = true
-         ORDER BY (balance + portfolio_value) DESC
+         ORDER BY (balance + reserved_cash + portfolio_value) DESC
          LIMIT 10`
       );
 
@@ -78,7 +78,7 @@ export class AdminService {
   static async getAllUsers(limit: number = 50, offset: number = 0): Promise<{ success: boolean; users?: User[]; total?: number }> {
     try {
       const usersResult = await pool.query(
-        `SELECT id, username, email, email_verified, balance, portfolio_value, total_profit_loss, rank, created_at, last_login, is_banned, is_admin
+        `SELECT id, username, email, email_verified, balance, reserved_cash, portfolio_value, total_profit_loss, rank, created_at, last_login, is_banned, is_admin
          FROM users
          ORDER BY created_at DESC
          LIMIT $1 OFFSET $2`,
@@ -98,6 +98,8 @@ export class AdminService {
         total_profit_loss: parseFloat(row.total_profit_loss || 0),
         rank: row.rank,
         created_at: row.created_at,
+        last_login: row.last_login ?? null,
+        reserved_cash: parseFloat(row.reserved_cash || 0),
         is_banned: row.is_banned || false,
         is_admin: row.is_admin || false
       }));

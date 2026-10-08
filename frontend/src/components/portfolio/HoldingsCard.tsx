@@ -6,14 +6,14 @@ import { ArrowTrendingUpIcon, BriefcaseIcon, ChevronDownIcon, FunnelIcon, Shield
 import type { LiveHolding } from '@/context/PortfolioContext';
 import { useTrade } from '@/components/trade/TradeProvider';
 import { assetHref } from '@/components/market/MarketTable';
-import { cn, formatQuantity, formatTRY, trend } from '@/lib/format';
+import { cn, formatQuantity, formatTRY, trend } from '@portfoygo/shared/format';
 import { ASSET_TYPE_LABELS, type AssetType } from '@/types';
-import { Card } from '@/components/ui/Card';
-import Button from '@/components/ui/Button';
-import AssetAvatar from '@/components/ui/AssetAvatar';
-import Tabs from '@/components/ui/Tabs';
-import { Delta, Money } from '@/components/ui/Delta';
-import { Badge, EmptyState, Skeleton } from '@/components/ui/Feedback';
+import { Card } from '@portfoygo/shared/ui/Card';
+import Button from '@portfoygo/shared/ui/Button';
+import AssetAvatar from '@portfoygo/shared/ui/AssetAvatar';
+import Tabs from '@portfoygo/shared/ui/Tabs';
+import { Delta, Money } from '@portfoygo/shared/ui/Delta';
+import { Badge, EmptyState, Skeleton } from '@portfoygo/shared/ui/Feedback';
 import { holdingKey, orderLabel, type OrderRow } from './useOrders';
 
 type Filter = 'all' | AssetType;

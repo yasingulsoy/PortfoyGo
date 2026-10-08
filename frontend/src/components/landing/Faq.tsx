@@ -1,6 +1,6 @@
 import { ChevronDownIcon } from '@heroicons/react/20/solid';
 import { COMMISSION_RATE, STARTING_BALANCE } from '@/lib/constants';
-import { formatNumber } from '@/lib/format';
+import { formatNumber } from '@portfoygo/shared/format';
 import SectionHeading from './SectionHeading';
 
 const commission = `%${(COMMISSION_RATE * 100).toLocaleString('tr-TR')}`;

@@ -1,9 +1,9 @@
 import { ArrowRightIcon, CheckCircleIcon, ShieldCheckIcon, TrophyIcon } from '@heroicons/react/20/solid';
-import { LinkButton } from '@/components/ui/Button';
-import AssetAvatar from '@/components/ui/AssetAvatar';
-import { Delta } from '@/components/ui/Delta';
+import { LinkButton } from '@portfoygo/shared/ui/Button';
+import AssetAvatar from '@portfoygo/shared/ui/AssetAvatar';
+import { Delta } from '@portfoygo/shared/ui/Delta';
 import { STARTING_BALANCE } from '@/lib/constants';
-import { formatNumber } from '@/lib/format';
+import { formatNumber } from '@portfoygo/shared/format';
 import type { AssetType } from '@/types';
 
 const TRUST = ['Kredi kartı gerekmez', `${formatNumber(STARTING_BALANCE, 0)} ₺ sanal bakiye`, 'Hisse · kripto · döviz · emtia'];

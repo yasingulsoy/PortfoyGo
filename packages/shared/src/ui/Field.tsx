@@ -2,7 +2,7 @@
 
 import { forwardRef, useId, useState, type InputHTMLAttributes, type ReactNode } from 'react';
 import { EyeIcon, EyeSlashIcon } from '@heroicons/react/20/solid';
-import { cn } from '@/lib/format';
+import { cn } from '../format';
 
 interface FieldProps extends InputHTMLAttributes<HTMLInputElement> {
   label: string;

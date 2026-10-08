@@ -4,7 +4,7 @@ import { useEffect, useRef } from 'react';
 import { useTheme } from 'next-themes';
 import useSWR from 'swr';
 import { ChartBarIcon } from '@heroicons/react/24/outline';
-import { EmptyState, Skeleton } from '@/components/ui/Feedback';
+import { EmptyState, Skeleton } from '@portfoygo/shared/ui/Feedback';
 
 interface Props {
   type: 'stock' | 'crypto';

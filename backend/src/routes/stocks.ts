@@ -1,22 +1,21 @@
 import express from 'express';
-import {
-  FinnhubService,
-  testFinnhubAPI,
-  getStockCount,
-  getStockSymbols,
-  getExchangeStockCounts,
-  getActiveStocks,
-  StockData,
-} from '../services/finnhub';
+import { providers } from '../providers';
+import type { StockQuote } from '../providers/types';
 import { MarketCacheService, CachedMarketData } from '../services/marketCache';
 import { authenticateToken } from '../middleware/auth';
 import { isAdmin } from '../middleware/admin';
-import { asyncHandler, badRequest } from '../utils/errors';
+import { AppError, asyncHandler, badRequest } from '../utils/errors';
 import { maybeBackgroundRefresh } from './marketRefresh';
 
 const router = express.Router();
 
 const adminOnly = [authenticateToken, isAdmin] as const;
+
+/** Seçili hisse sağlayıcısı bu (isteğe bağlı) yeteneği desteklemiyorsa 501 döner */
+function requireCapability<F extends (...args: any[]) => any>(fn: F | undefined): F {
+  if (!fn) throw new AppError(501, 'Bu işlem seçili veri sağlayıcısı tarafından desteklenmiyor', 'NOT_SUPPORTED');
+  return fn;
+}
 
 /** Frontend'in beklediği hisse DTO'su (cache satırından) */
 const toStockDto = (s: CachedMarketData) => ({
@@ -37,7 +36,7 @@ const toStockDto = (s: CachedMarketData) => ({
 });
 
 /** API'den gelen hisse verisi için aynı DTO */
-const liveStockDto = (s: StockData) => ({
+const liveStockDto = (s: StockQuote) => ({
   id: s.symbol,
   symbol: s.symbol,
   name: s.name,
@@ -63,15 +62,15 @@ const parseExchange = (raw: unknown): string => {
 };
 
 // ---------------------------------------------------------------------------
-// Admin uçları (Finnhub kotası harcar)
+// Admin uçları (hisse veri sağlayıcısının kotasını harcar)
 // ---------------------------------------------------------------------------
 
 router.get(
   '/test',
   ...adminOnly,
   asyncHandler(async (_req, res) => {
-    const isWorking = await testFinnhubAPI();
-    res.json({ success: isWorking, message: isWorking ? 'Finnhub API çalışıyor' : 'Finnhub API çalışmıyor' });
+    const isWorking = await (providers.stocks.testConnection?.() ?? Promise.resolve(providers.stocks.isConfigured()));
+    res.json({ success: isWorking, provider: providers.stocks.id, message: isWorking ? 'Hisse veri sağlayıcısı çalışıyor' : 'Hisse veri sağlayıcısı çalışmıyor' });
   })
 );
 
@@ -94,7 +93,7 @@ router.get(
   ...adminOnly,
   asyncHandler(async (req, res) => {
     const exchange = parseExchange(req.params.exchange);
-    const count = await getStockCount(exchange);
+    const count = await requireCapability(providers.stocks.countSymbols)(exchange);
     res.json({
       success: true,
       data: { exchange, count, message: `${exchange} borsasında toplam ${count} adet hisse senedi bulunmaktadır.` },
@@ -106,7 +105,7 @@ router.get(
   '/counts/all',
   ...adminOnly,
   asyncHandler(async (_req, res) => {
-    const counts = await getExchangeStockCounts();
+    const counts = await requireCapability(providers.stocks.exchangeCounts)();
     const total = counts.reduce((sum, item) => sum + item.count, 0);
     res.json({
       success: true,
@@ -120,7 +119,7 @@ router.get(
   ...adminOnly,
   asyncHandler(async (req, res) => {
     const exchange = parseExchange(req.params.exchange);
-    const symbols = await getStockSymbols(exchange);
+    const symbols = await requireCapability(providers.stocks.listSymbols)(exchange);
     res.json({
       success: true,
       data: {
@@ -142,7 +141,7 @@ router.get(
     const maxStocks = Math.min(100, Math.max(1, parseInt(String(req.query.maxStocks || '20'), 10) || 20));
     // minMarketCap USD cinsinden
     const minMarketCap = Math.max(0, Number(req.query.minMarketCap) || 0);
-    const activeStocks = await getActiveStocks(exchange, maxStocks, minMarketCap);
+    const activeStocks = await requireCapability(providers.stocks.activeStocks)(exchange, maxStocks, minMarketCap);
     res.json({
       success: true,
       data: { count: activeStocks.length, exchange, stocks: activeStocks.map(liveStockDto) },
@@ -182,7 +181,7 @@ router.get(
     }
 
     let stocks = await MarketCacheService.getFromCache('stock');
-    const expected = FinnhubService.getTrackedSymbols().length;
+    const expected = providers.stocks.getTrackedSymbols().length;
     if (!forceRefresh) {
       // Cache boşsa (ilk açılış) bir yenilemeyi bekle; eksikse arka planda yenile (throttle'lı)
       const awaited = await maybeBackgroundRefresh(stocks.length === 0, stocks.length < expected);

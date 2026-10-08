@@ -14,12 +14,12 @@ import {
   KeyIcon,
   UserPlusIcon,
 } from '@heroicons/react/20/solid';
-import { Card, CardHeader } from '@/components/ui/Card';
-import { Alert, EmptyState, Skeleton } from '@/components/ui/Feedback';
-import Button from '@/components/ui/Button';
-import Tabs from '@/components/ui/Tabs';
+import { Card, CardHeader } from '@portfoygo/shared/ui/Card';
+import { Alert, EmptyState, Skeleton } from '@portfoygo/shared/ui/Feedback';
+import Button from '@portfoygo/shared/ui/Button';
+import Tabs from '@portfoygo/shared/ui/Tabs';
 import { activityApi } from '@/lib/api';
-import { cn, formatDateTime, formatNumber, formatRelative } from '@/lib/format';
+import { cn, formatDateTime, formatNumber, formatRelative } from '@portfoygo/shared/format';
 
 const PAGE_SIZE = 10;
 const ALL = '__all__';
@@ -30,6 +30,8 @@ const TYPE_META: Record<string, { label: string; icon: typeof ClockIcon; tone: s
   trade_buy: { label: 'Alış', icon: ArrowUpRightIcon, tone: 'bg-up-soft text-up' },
   trade_sell: { label: 'Satış', icon: ArrowDownRightIcon, tone: 'bg-down-soft text-down' },
   stop_loss: { label: 'Zarar durdur', icon: ArrowDownRightIcon, tone: 'bg-gold-soft text-gold' },
+  order_failed: { label: 'Emir gerçekleşmedi', icon: ClockIcon, tone: 'bg-down-soft text-down' },
+  logout_all: { label: 'Tüm oturumlar kapatıldı', icon: ArrowLeftEndOnRectangleIcon, tone: 'bg-surface-3 text-muted' },
   login: { label: 'Giriş', icon: ArrowRightStartOnRectangleIcon, tone: 'bg-brand-soft text-brand' },
   logout: { label: 'Çıkış', icon: ArrowLeftEndOnRectangleIcon, tone: 'bg-surface-3 text-muted' },
   register: { label: 'Kayıt', icon: UserPlusIcon, tone: 'bg-brand-soft text-brand' },

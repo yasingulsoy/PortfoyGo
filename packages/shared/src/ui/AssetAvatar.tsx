@@ -1,6 +1,6 @@
 import Image from 'next/image';
-import type { AssetType } from '@/types';
-import { cn } from '@/lib/format';
+import type { AssetType } from '../types';
+import { cn } from '../format';
 
 const typeTone: Record<AssetType, string> = {
   stock: 'bg-brand-soft text-brand',

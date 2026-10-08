@@ -3,10 +3,10 @@
 import { useMemo } from 'react';
 import { ChartPieIcon } from '@heroicons/react/20/solid';
 import type { LiveHolding } from '@/context/PortfolioContext';
-import { cn, formatTRY } from '@/lib/format';
+import { cn, formatTRY } from '@portfoygo/shared/format';
 import { ASSET_TYPE_LABELS, type AssetType } from '@/types';
-import { Card, CardHeader } from '@/components/ui/Card';
-import { Skeleton } from '@/components/ui/Feedback';
+import { Card, CardHeader } from '@portfoygo/shared/ui/Card';
+import { Skeleton } from '@portfoygo/shared/ui/Feedback';
 
 type Bucket = AssetType | 'cash';
 

@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, type KeyboardEvent, type ReactNode } from 'react';
-import { cn } from '@/lib/format';
+import { cn } from '../format';
 
 export interface TabItem<T extends string> {
   value: T;

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { ArrowRightStartOnRectangleIcon, ShieldCheckIcon, UserCircleIcon, ChevronDownIcon } from '@heroicons/react/20/solid';
 import { useAuth } from '@/context/AuthContext';
+import { ADMIN_URL } from '@/lib/site';
 
 export default function UserMenu() {
   const { user, logout } = useAuth();
@@ -53,9 +54,9 @@ export default function UserMenu() {
               <UserCircleIcon className="h-4 w-4" /> Profil ve rozetler
             </Link>
             {user.is_admin && (
-              <Link role="menuitem" href="/admin" className={item} onClick={() => setOpen(false)}>
+              <a role="menuitem" href={ADMIN_URL} className={item} onClick={() => setOpen(false)}>
                 <ShieldCheckIcon className="h-4 w-4" /> Yönetim paneli
-              </Link>
+              </a>
             )}
             <button role="menuitem" type="button" onClick={logout} className={`${item} hover:text-down`}>
               <ArrowRightStartOnRectangleIcon className="h-4 w-4" /> Çıkış yap

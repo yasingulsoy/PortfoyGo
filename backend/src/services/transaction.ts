@@ -190,10 +190,11 @@ export class TransactionService {
         }
       } else {
         // Maliyet rezervden karşılandı; kullanılmayan kısmı iade et
-        const refund = round2(reserved - netAmount);
-        if (refund > 0) {
-          await client.query('UPDATE users SET balance = balance + $1 WHERE id = $2', [refund, userId]);
-        }
+        const refund = Math.max(round2(reserved - netAmount), 0);
+        await client.query(
+          'UPDATE users SET balance = balance + $1, reserved_cash = GREATEST(reserved_cash - $2, 0) WHERE id = $3',
+          [refund, reserved, userId]
+        );
       }
 
       // Pozisyonu oluştur veya göreli güncelle (ortalama maliyet = toplam maliyet / toplam miktar)

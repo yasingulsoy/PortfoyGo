@@ -50,7 +50,8 @@ vi.mock('../src/config/database', () => {
 vi.mock('../src/services/activityLog', () => ({ ActivityLogService: { createLog: async () => ({}) } }));
 vi.mock('../src/services/badges', () => ({ BadgeService: { checkAndAwardBadges: async () => undefined } }));
 
-const MIGRATIONS = ['000_base.sql', '001_hardening.sql', '004_orders.sql'];
+// Tüm migration'lar sırayla uygulanır (gerçek ortamla aynı şema)
+const MIGRATIONS = fs.readdirSync(path.resolve(__dirname, '../migrations')).filter((f) => f.endsWith('.sql')).sort();
 const SYMBOL = 'EUR';
 
 type Orders = typeof import('../src/services/orders');
@@ -148,6 +149,25 @@ describe('OrderService (PGlite)', () => {
     const other = await newUser();
     const { order: o2 } = await limitBuy(other, 1, 39);
     await expect(orders.OrderService.cancelOrder(userId, o2.id)).rejects.toMatchObject({ status: 404 });
+  });
+
+  it('bloke edilen nakit toplam varlığa dahildir (users.reserved_cash)', async () => {
+    const userId = await newUser();
+    const reservedOf = async () => num((await h.db.query('SELECT reserved_cash FROM users WHERE id = $1', [userId])).rows[0].reserved_cash);
+
+    const { order } = await limitBuy(userId, 10, 39);
+    expect(await reservedOf()).toBeCloseTo(order.reserved_cash, 2);
+    // Nakit + bloke = başlangıç: limit emri kullanıcıyı fakirleştirmez
+    expect((await balanceOf(userId)) + (await reservedOf())).toBeCloseTo(100_000, 2);
+
+    await orders.OrderService.cancelOrder(userId, order.id);
+    expect(await reservedOf()).toBe(0);
+
+    const { order: o2 } = await limitBuy(userId, 10, 39);
+    await setPrice(38);
+    await orders.OrderService.processOrders();
+    expect((await orderRow(o2.id)).status).toBe('filled');
+    expect(await reservedOf()).toBe(0);
   });
 
   it('executor: fiyat tetiklemeyi geçince limit alışı gerçek fiyattan doldurur ve artanı iade eder', async () => {

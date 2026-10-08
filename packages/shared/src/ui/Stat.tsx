@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { cn } from '@/lib/format';
+import { cn } from '../format';
 
 /** Etiket + büyük değer + opsiyonel alt satırdan oluşan özet kutusu. */
 export default function Stat({ label, value, sub, icon, className }: { label: string; value: ReactNode; sub?: ReactNode; icon?: ReactNode; className?: string }) {

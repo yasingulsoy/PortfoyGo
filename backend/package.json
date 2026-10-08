@@ -1,12 +1,12 @@
 {
-  "name": "trading-platform-backend",
+  "name": "@portfoygo/backend",
   "version": "1.0.0",
   "description": "Trading Platform Backend API",
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc",
     "start": "node dist/index.js",
-    "dev": "nodemon src/index.ts",
+    "dev": "nodemon",
     "kill-port": "powershell -ExecutionPolicy Bypass -File ./kill-port.ps1",
     "dev:clean": "npm run kill-port && npm run dev",
     "create-tables": "ts-node src/scripts/createTables.ts",
@@ -21,7 +21,8 @@
     "create-admin": "ts-node src/scripts/createAdminUser.ts",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "typecheck:test": "tsc -p test/tsconfig.json"
   },
   "keywords": [
     "trading",
@@ -49,7 +50,6 @@
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.8",
-    "@electric-sql/pglite-socket": "^0.2.11",
     "@types/bcryptjs": "^2.4.6",
     "@types/cookie-parser": "^1.4.10",
     "@types/cors": "^2.8.17",

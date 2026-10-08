@@ -1,9 +1,9 @@
 import { TrophyIcon } from '@heroicons/react/20/solid';
-import { Card } from '@/components/ui/Card';
-import { Delta, Money } from '@/components/ui/Delta';
-import { Badge, Skeleton } from '@/components/ui/Feedback';
-import UserInitial from '@/components/profile/UserInitial';
-import { cn, formatTRY } from '@/lib/format';
+import { Card } from '@portfoygo/shared/ui/Card';
+import { Delta, Money } from '@portfoygo/shared/ui/Delta';
+import { Badge, Skeleton } from '@portfoygo/shared/ui/Feedback';
+import UserInitial from '@portfoygo/shared/ui/UserInitial';
+import { cn, formatTRY } from '@portfoygo/shared/format';
 import type { Leader } from './model';
 
 /** 1: altın, 2: nötr koyu, 3: nötr açık (yalnızca tasarım token'ları) */

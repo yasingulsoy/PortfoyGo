@@ -13,7 +13,8 @@ vi.mock('../src/config/database', () => ({
   },
 }));
 
-const MIGRATIONS = ['000_base.sql', '001_hardening.sql', '003_history_watchlist.sql'];
+// Tüm migration'lar sırayla uygulanır (gerçek ortamla aynı şema)
+const MIGRATIONS = fs.readdirSync(path.resolve(__dirname, '../migrations')).filter((f) => f.endsWith('.sql')).sort();
 
 describe('WatchlistService (PGlite)', () => {
   let svc: typeof import('../src/services/watchlist');

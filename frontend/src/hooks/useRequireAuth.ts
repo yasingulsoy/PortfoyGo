@@ -24,9 +24,4 @@ export function useRequireAuth({ adminOnly = false }: { adminOnly?: boolean } = 
   return { user, ready };
 }
 
-/** Yönlendirme parametresini yalnızca site içi göreli yollarla sınırlar (open-redirect / javascript: XSS önlemi). */
-export function safeRedirect(target: string | null | undefined, fallback = '/') {
-  if (!target) return fallback;
-  if (!target.startsWith('/') || target.startsWith('//') || target.startsWith('/\\')) return fallback;
-  return target;
-}
+export { safeRedirect } from '@portfoygo/shared/url';

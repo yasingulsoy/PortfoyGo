@@ -1,5 +1,6 @@
 import express from 'express';
-import { CommodityService, CommodityPrice } from '../services/commodity';
+import { providers } from '../providers';
+import type { CommodityQuote as CommodityPrice } from '../providers/types';
 import { asyncHandler, badRequest } from '../utils/errors';
 
 const router = express.Router();
@@ -22,7 +23,7 @@ const toCommodityDto = (p: CommodityPrice) => ({
 router.get(
   '/',
   asyncHandler(async (_req, res) => {
-    const prices = await CommodityService.getPopularPrices();
+    const prices = await providers.commodities.getPopularPrices();
     res.json({ success: true, data: prices.map(toCommodityDto) });
   })
 );
@@ -30,7 +31,7 @@ router.get(
 router.get(
   '/list',
   asyncHandler(async (_req, res) => {
-    const list = await CommodityService.getList();
+    const list = await providers.commodities.getList();
     res.json({ success: true, data: list });
   })
 );
@@ -43,7 +44,7 @@ router.get(
     if (!/^[A-Z0-9_\-]{1,20}$/.test(code)) {
       throw badRequest('Geçersiz emtia kodu');
     }
-    const price = await CommodityService.getPriceCached(code);
+    const price = await providers.commodities.getPrice(code);
     if (!price) {
       return res.status(404).json({ success: false, message: 'Emtia bulunamadı' });
     }

@@ -152,9 +152,9 @@ export class HistoryService {
               $2::varchar,
               ${bucketExpr},
               $1::timestamptz,
-              COALESCE(u.balance, 0),
+              COALESCE(u.balance, 0) + COALESCE(u.reserved_cash, 0),
               COALESCE(u.portfolio_value, 0),
-              COALESCE(u.balance, 0) + COALESCE(u.portfolio_value, 0)
+              COALESCE(u.balance, 0) + COALESCE(u.reserved_cash, 0) + COALESCE(u.portfolio_value, 0)
          FROM users u
        ON CONFLICT (user_id, granularity, bucket_start) DO UPDATE
           SET taken_at = EXCLUDED.taken_at,
@@ -227,7 +227,7 @@ export class HistoryService {
           ORDER BY taken_at ASC`,
         [userId, Number.isFinite(from) ? new Date(from).toISOString() : null]
       ),
-      pool.query('SELECT balance, portfolio_value FROM users WHERE id = $1', [userId]),
+      pool.query('SELECT balance, reserved_cash, portfolio_value FROM users WHERE id = $1', [userId]),
     ]);
 
     if (user.rows.length === 0) {
@@ -243,7 +243,8 @@ export class HistoryService {
     }));
 
     return buildHistory(rows, range, now, {
-      cash: num(user.rows[0].balance),
+      // Bekleyen limit alışlar için bloke edilen nakit de kullanıcının varlığıdır
+      cash: num(user.rows[0].balance) + num(user.rows[0].reserved_cash),
       holdings: num(user.rows[0].portfolio_value),
     });
   }

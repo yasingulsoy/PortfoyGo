@@ -4,11 +4,11 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { useLivePortfolio } from '@/context/PortfolioContext';
-import { cn, formatTRY } from '@/lib/format';
-import Logo from '@/components/Logo';
-import { LinkButton } from '@/components/ui/Button';
+import { cn, formatTRY } from '@portfoygo/shared/format';
+import Logo from '@portfoygo/shared/ui/Logo';
+import { LinkButton } from '@portfoygo/shared/ui/Button';
 import { SearchTrigger } from '@/components/command/CommandPalette';
-import ThemeToggle from './ThemeToggle';
+import ThemeToggle from '@portfoygo/shared/ui/ThemeToggle';
 import UserMenu from './UserMenu';
 import { NAV_ITEMS, isActive } from './nav';
 

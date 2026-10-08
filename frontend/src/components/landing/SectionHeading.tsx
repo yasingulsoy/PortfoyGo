@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { cn } from '@/lib/format';
+import { cn } from '@portfoygo/shared/format';
 
 /** Tanıtım sayfası bölüm başlığı: küçük üst etiket + başlık + açıklama. */
 export default function SectionHeading({

@@ -5,6 +5,7 @@ import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 import authRoutes from './routes/auth';
+import devLoginRoutes from './routes/devLogin';
 import emailRoutes from './routes/email';
 import stocksRoutes from './routes/stocks';
 import transactionsRoutes from './routes/transactions';
@@ -123,6 +124,8 @@ export function createApp(): express.Express {
   });
 
   app.use('/api', globalApiLimiter);
+  // Yalnızca yerel geliştirme veritabanında etkin (bkz. routes/devLogin.ts); aksi halde 404
+  app.use('/api/auth/dev-login', devLoginRoutes);
   app.use('/api/auth', authRoutes);
   app.use('/api/email', emailRoutes);
   app.use('/api/stocks', stocksRoutes);

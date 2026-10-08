@@ -7,7 +7,7 @@ export default function robots(): MetadataRoute.Robots {
       userAgent: '*',
       allow: ['/', '/login', '/register', '/terms', '/privacy'],
       // Oturum gerektiren uygulama sayfaları ve API dizine eklenmez
-      disallow: ['/portfolio', '/transactions', '/leaderboard', '/news', '/profile', '/admin', '/asset/', '/verify-email', '/forgot-password', '/api/'],
+      disallow: ['/portfolio', '/transactions', '/leaderboard', '/news', '/profile', '/asset/', '/verify-email', '/forgot-password', '/api/'],
     },
     sitemap: `${SITE_URL}/sitemap.xml`,
   };

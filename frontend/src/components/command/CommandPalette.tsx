@@ -23,11 +23,12 @@ import { useMarket } from '@/hooks/useMarketData';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { useTrade } from '@/components/trade/TradeProvider';
 import { assetHref } from '@/components/market/MarketTable';
-import AssetAvatar from '@/components/ui/AssetAvatar';
-import { Delta } from '@/components/ui/Delta';
-import Spinner from '@/components/ui/Spinner';
-import { cn, formatTRY } from '@/lib/format';
+import AssetAvatar from '@portfoygo/shared/ui/AssetAvatar';
+import { Delta } from '@portfoygo/shared/ui/Delta';
+import Spinner from '@portfoygo/shared/ui/Spinner';
+import { cn, formatTRY } from '@portfoygo/shared/format';
 import { ASSET_TYPE_LABELS, type AssetType, type MarketAsset } from '@/types';
+import { ADMIN_URL } from '@/lib/site';
 import { COMMAND_PALETTE_EVENT, anotherDialogOpen, isTypingTarget, openCommandPalette, openShortcutsHelp } from './events';
 
 const RECENT_KEY = 'pg:recent-assets';
@@ -193,7 +194,9 @@ function PaletteBody({ onClose }: { onClose: () => void }) {
       keywords,
       run: () => {
         onClose();
-        router.push(href);
+        // Ayrı uygulamalara (ör. yönetim paneli) tam sayfa geçiş
+        if (/^https?:\/\//.test(href)) window.location.assign(href);
+        else router.push(href);
       },
     });
     const list = [
@@ -204,7 +207,7 @@ function PaletteBody({ onClose }: { onClose: () => void }) {
       nav('nav-news', 'Haberler', '/news', NewspaperIcon, 'haber gundem', 'G H'),
       nav('nav-profile', 'Profil', '/profile', UserCircleIcon, 'profil hesap rozet ayar', 'G O'),
     ];
-    if (user?.is_admin) list.push(nav('nav-admin', 'Yönetim paneli', '/admin', ShieldCheckIcon, 'admin yonetim'));
+    if (user?.is_admin) list.push(nav('nav-admin', 'Yönetim paneli', ADMIN_URL, ShieldCheckIcon, 'admin yonetim'));
     if (!user) {
       list.push(nav('nav-login', 'Giriş yap', '/login', ArrowRightEndOnRectangleIcon, 'giris oturum login'));
       list.push(nav('nav-register', 'Hesap oluştur', '/register', UserPlusIcon, 'kayit hesap olustur register ucretsiz'));

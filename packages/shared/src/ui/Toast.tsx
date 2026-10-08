@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { CheckCircleIcon, ExclamationTriangleIcon, InformationCircleIcon, XMarkIcon } from '@heroicons/react/20/solid';
-import { cn } from '@/lib/format';
+import { cn } from '../format';
 
 type ToastTone = 'success' | 'error' | 'info';
 

@@ -1,5 +1,5 @@
-import { Card, CardHeader } from '@/components/ui/Card';
-import { formatCompact, formatTRY, formatUSD } from '@/lib/format';
+import { Card, CardHeader } from '@portfoygo/shared/ui/Card';
+import { formatCompact, formatTRY, formatUSD } from '@portfoygo/shared/format';
 import type { MarketAsset } from '@/types';
 import { InformationCircleIcon } from '@heroicons/react/20/solid';
 

@@ -20,7 +20,8 @@ export function formatTRY(value: number | null | undefined, opts: { precise?: bo
   const raw = safe(value);
   const digits = opts.precise ? precisionFor(raw) : 2;
   // Kuruş altı değerleri yuvarla; "-₺0,00" görünmesin
-  const v = digits === 2 ? Math.round(raw * 100) / 100 || 0 : raw;
+  // Kayan nokta hatasını telafi ederek yarımları sıfırdan uzağa yuvarla (12,345 → 12,35)
+  const v = digits === 2 ? (Math.sign(raw) * Math.round(Math.abs(raw) * 100 + 1e-7)) / 100 || 0 : raw;
   const text = digits === 2
     ? tryFmt.format(v)
     : new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', minimumFractionDigits: digits, maximumFractionDigits: digits }).format(v);

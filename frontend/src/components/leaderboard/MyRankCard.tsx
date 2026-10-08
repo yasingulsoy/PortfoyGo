@@ -2,14 +2,14 @@
 
 import useSWR from 'swr';
 import { EnvelopeIcon, UserIcon } from '@heroicons/react/20/solid';
-import { Card, CardBody, CardHeader } from '@/components/ui/Card';
-import { Delta } from '@/components/ui/Delta';
-import { LinkButton } from '@/components/ui/Button';
-import { Alert, Skeleton } from '@/components/ui/Feedback';
+import { Card, CardBody, CardHeader } from '@portfoygo/shared/ui/Card';
+import { Delta } from '@portfoygo/shared/ui/Delta';
+import { LinkButton } from '@portfoygo/shared/ui/Button';
+import { Alert, Skeleton } from '@portfoygo/shared/ui/Feedback';
 import { useLivePortfolio } from '@/context/PortfolioContext';
 import { leaderboardApi } from '@/lib/api';
 import { STARTING_BALANCE } from '@/lib/constants';
-import { formatPercent, formatTRY } from '@/lib/format';
+import { formatPercent, formatTRY } from '@portfoygo/shared/format';
 import { normalizeMyRank, type Board, type Leader } from './model';
 
 export const MY_RANK_KEY = 'leaderboard:my-rank';

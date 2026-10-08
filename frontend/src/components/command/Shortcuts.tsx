@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Modal from '@/components/ui/Modal';
+import Modal from '@portfoygo/shared/ui/Modal';
 import { SHORTCUTS_HELP_EVENT, anotherDialogOpen, isTypingTarget } from './events';
 
 /** "g" ardından basılan tuşa göre gidilecek sayfa. */

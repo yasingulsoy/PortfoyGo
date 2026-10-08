@@ -9,7 +9,7 @@ import cron from 'node-cron';
 import { createApp, getAllowedOrigins } from './app';
 import { MarketCacheService } from './services/marketCache';
 import { OrderService } from './services/orders';
-import { CurrencyService } from './services/currency';
+import { providers, activeProviders } from './providers';
 import { PortfolioService } from './services/portfolio';
 import { LeaderboardService } from './services/leaderboard';
 import { HistoryService } from './services/history';
@@ -64,7 +64,7 @@ schedule(`${ODD_MINUTES} * * * *`, 'portfolio-prices', () => PortfolioService.up
 schedule('* * * * *', 'orders', () => OrderService.processOrders());
 
 // Döviz kurları: 12 saatte bir
-schedule('0 */12 * * *', 'currency-rates', () => CurrencyService.fetchAndSaveToDb());
+schedule('0 */12 * * *', 'currency-rates', () => providers.fx.refreshRates());
 
 // Kümülatif sıralama (users.rank): 5 dakikada bir
 schedule('*/5 * * * *', 'ranks', () => LeaderboardService.updateRanks());
@@ -78,7 +78,7 @@ schedule('2 * * * *', 'history-hourly', () => HistoryService.snapshotHourly());
 schedule('55 23 * * *', 'history-daily', () => HistoryService.snapshotDaily());
 
 // Açılışta ilk doldurma
-void runGuarded('startup-currency', () => CurrencyService.fetchAndSaveToDb());
+void runGuarded('startup-currency', () => providers.fx.refreshRates());
 void runGuarded('market-cache', async () => {
   if (!marketRefreshDisabled) {
     await MarketCacheService.refreshCache();
@@ -91,4 +91,5 @@ void runGuarded('ranks', () => LeaderboardService.updateRanks());
 app.listen(PORT, () => {
   console.log(`[server] API ${PORT} portunda çalışıyor (NODE_ENV=${process.env.NODE_ENV || 'development'})`);
   console.log(`[server] CORS izinli origin sayısı: ${getAllowedOrigins().length}`);
+  console.log(`[server] Veri sağlayıcıları: ${Object.entries(activeProviders()).map(([k, v]) => `${k}=${v}`).join(', ')}`);
 });

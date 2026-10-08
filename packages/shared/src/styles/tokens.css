@@ -1,7 +1,6 @@
-@import "tailwindcss";
-
 /*
- * PortfoyGo tasarım token'ları.
+ * PortfoyGo tasarım token'ları (frontend ve admin ortak kullanır).
+ * Uygulama globals.css dosyasında `@import "tailwindcss";` satırından SONRA içe aktarılmalıdır.
  * Açık tema :root üzerinde, koyu tema [data-theme="dark"] üzerinde tanımlıdır.
  * Bileşenler ham hex kullanmaz; her zaman bu token'lardan türeyen utility'leri kullanır
  * (bg-canvas, bg-surface, text-fg, text-muted, border-line, text-brand, text-up, text-down ...).

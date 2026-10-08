@@ -8,8 +8,8 @@ import { usePortfolio } from '@/context/PortfolioContext';
 import { useWatchlist } from '@/hooks/useWatchlist';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { openCommandPalette } from '@/components/command/events';
-import { Card } from '@/components/ui/Card';
-import { cn } from '@/lib/format';
+import { Card } from '@portfoygo/shared/ui/Card';
+import { cn } from '@portfoygo/shared/format';
 
 /** Rehber bu kadar işlemden sonra (ve tamamlanmamış olsa bile) artık gösterilmez. */
 const NEW_USER_TX_LIMIT = 5;

@@ -18,15 +18,15 @@ import { useLivePortfolio, type LiveHolding } from '@/context/PortfolioContext';
 import { FEATURED_CURRENCIES } from '@/hooks/useMarketData';
 import { leaderboardApi, newsApi } from '@/lib/api';
 import { STARTING_BALANCE } from '@/lib/constants';
-import { cn, formatPercent, formatRelative, formatTRY, trend } from '@/lib/format';
+import { cn, formatPercent, formatRelative, formatTRY, trend } from '@portfoygo/shared/format';
 import { ASSET_TYPE_LABELS, type AssetType, type LeaderboardEntry, type NewsItem } from '@/types';
-import { Card, CardHeader } from '@/components/ui/Card';
-import { Delta, Money } from '@/components/ui/Delta';
-import { Alert, EmptyState, Skeleton } from '@/components/ui/Feedback';
-import { LinkButton } from '@/components/ui/Button';
-import { PageLoader } from '@/components/ui/Spinner';
-import Tabs from '@/components/ui/Tabs';
-import AssetAvatar from '@/components/ui/AssetAvatar';
+import { Card, CardHeader } from '@portfoygo/shared/ui/Card';
+import { Delta, Money } from '@portfoygo/shared/ui/Delta';
+import { Alert, EmptyState, Skeleton } from '@portfoygo/shared/ui/Feedback';
+import { LinkButton } from '@portfoygo/shared/ui/Button';
+import { PageLoader } from '@portfoygo/shared/ui/Spinner';
+import Tabs from '@portfoygo/shared/ui/Tabs';
+import AssetAvatar from '@portfoygo/shared/ui/AssetAvatar';
 import MarketTable, { assetHref } from '@/components/market/MarketTable';
 import PerformanceChart from '@/components/portfolio/PerformanceChart';
 import { useWatchlist } from '@/hooks/useWatchlist';
@@ -100,19 +100,19 @@ function greeting() {
 /* ------------------------------------------------------------------ */
 
 function Overview({ rank }: { rank: number | null }) {
-  const { balance, totals, holdings, loaded } = useLivePortfolio();
+  const { balance, reservedCash, totals, holdings, loaded } = useLivePortfolio();
   const allTimeChange = totals.netWorth - STARTING_BALANCE;
   const allTimePct = (allTimeChange / STARTING_BALANCE) * 100;
 
   const allocation = useMemo(() => {
-    const buckets: Record<string, number> = { cash: balance };
+    const buckets: Record<string, number> = { cash: balance + reservedCash };
     for (const h of holdings) buckets[h.assetType] = (buckets[h.assetType] ?? 0) + h.liveValue;
     const total = Object.values(buckets).reduce((s, v) => s + v, 0) || 1;
     return (Object.entries(buckets) as [AssetType | 'cash', number][])
       .filter(([, v]) => v > 0)
       .map(([k, v]) => ({ key: k, value: v, pct: (v / total) * 100 }))
       .sort((a, b) => b.value - a.value);
-  }, [balance, holdings]);
+  }, [balance, reservedCash, holdings]);
 
   return (
     <Card className="overflow-hidden">

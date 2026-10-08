@@ -10,12 +10,13 @@ export class PortfolioService {
     portfolio?: PortfolioItem[];
     balance?: number;
     portfolioValue?: number;
+    reservedCash?: number;
     totalProfitLoss?: number;
     totalValue?: number;
   }> {
     const [portfolioResult, userResult] = await Promise.all([
       pool.query(`SELECT * FROM portfolio_items WHERE user_id = $1 ORDER BY created_at DESC`, [userId]),
-      pool.query('SELECT balance, portfolio_value, total_profit_loss FROM users WHERE id = $1', [userId]),
+      pool.query('SELECT balance, reserved_cash, portfolio_value, total_profit_loss FROM users WHERE id = $1', [userId]),
     ]);
 
     if (userResult.rows.length === 0) {
@@ -26,6 +27,8 @@ export class PortfolioService {
     const portfolio = portfolioResult.rows.map(mapPortfolioRow);
     const balance = toNumber(user.balance);
     const portfolioValue = toNumber(user.portfolio_value);
+    // Bekleyen limit alış emirlerinde bloke edilen nakit (kullanılamaz ama varlığa dahildir)
+    const reservedCash = toNumber(user.reserved_cash);
 
     return {
       success: true,
@@ -33,7 +36,8 @@ export class PortfolioService {
       balance,
       portfolioValue,
       totalProfitLoss: toNumber(user.total_profit_loss),
-      totalValue: balance + portfolioValue,
+      reservedCash,
+      totalValue: balance + reservedCash + portfolioValue,
     };
   }
 

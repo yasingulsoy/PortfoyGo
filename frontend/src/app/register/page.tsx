@@ -14,12 +14,12 @@ import {
   validateNewPassword,
   validateUsername,
 } from '@/components/auth/authUtils';
-import Button from '@/components/ui/Button';
-import { Alert } from '@/components/ui/Feedback';
-import { Field } from '@/components/ui/Field';
-import { PageLoader } from '@/components/ui/Spinner';
+import Button from '@portfoygo/shared/ui/Button';
+import { Alert } from '@portfoygo/shared/ui/Feedback';
+import { Field } from '@portfoygo/shared/ui/Field';
+import { PageLoader } from '@portfoygo/shared/ui/Spinner';
 import { STARTING_BALANCE } from '@/lib/constants';
-import { cn, formatNumber } from '@/lib/format';
+import { cn, formatNumber } from '@portfoygo/shared/format';
 
 type FormKey = 'username' | 'email' | 'password' | 'confirm' | 'terms';
 type Errors = Partial<Record<FormKey, string>>;

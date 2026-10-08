@@ -7,10 +7,10 @@ import { useAuth } from '@/context/AuthContext';
 import { safeRedirect } from '@/hooks/useRequireAuth';
 import AuthLayout from '@/components/auth/AuthLayout';
 import { PASSWORD_MAX, validateEmail } from '@/components/auth/authUtils';
-import Button from '@/components/ui/Button';
-import { Alert } from '@/components/ui/Feedback';
-import { Field } from '@/components/ui/Field';
-import { PageLoader } from '@/components/ui/Spinner';
+import Button from '@portfoygo/shared/ui/Button';
+import { Alert } from '@portfoygo/shared/ui/Feedback';
+import { Field } from '@portfoygo/shared/ui/Field';
+import { PageLoader } from '@portfoygo/shared/ui/Spinner';
 
 /** Yalnızca sabit metinler gösterilir; URL'den gelen serbest metin asla basılmaz. */
 const NOTICES: Record<string, string> = {

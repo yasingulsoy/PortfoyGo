@@ -3,13 +3,13 @@
 import { useMemo, useState } from 'react';
 import useSWR from 'swr';
 import { ChevronLeftIcon, ChevronRightIcon, MagnifyingGlassIcon, UsersIcon } from '@heroicons/react/20/solid';
-import { Card, CardHeader } from '@/components/ui/Card';
-import { Alert, Badge, EmptyState, Skeleton } from '@/components/ui/Feedback';
-import Button from '@/components/ui/Button';
-import Modal from '@/components/ui/Modal';
-import UserInitial from '@/components/profile/UserInitial';
+import { Card, CardHeader } from '@portfoygo/shared/ui/Card';
+import { Alert, Badge, EmptyState, Skeleton } from '@portfoygo/shared/ui/Feedback';
+import Button from '@portfoygo/shared/ui/Button';
+import Modal from '@portfoygo/shared/ui/Modal';
+import UserInitial from '@portfoygo/shared/ui/UserInitial';
 import { adminApi } from '@/lib/api';
-import { cn, formatDate, formatNumber, formatRelative, formatTRY } from '@/lib/format';
+import { cn, formatDate, formatNumber, formatRelative, formatTRY } from '@portfoygo/shared/format';
 import { normalizeUsers, type AdminUser } from './model';
 import { useAdminStats } from './AdminStats';
 

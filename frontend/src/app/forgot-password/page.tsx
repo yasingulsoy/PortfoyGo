@@ -17,9 +17,9 @@ import {
   validateEmail,
   validateNewPassword,
 } from '@/components/auth/authUtils';
-import Button, { LinkButton } from '@/components/ui/Button';
-import { Alert } from '@/components/ui/Feedback';
-import { Field } from '@/components/ui/Field';
+import Button, { LinkButton } from '@portfoygo/shared/ui/Button';
+import { Alert } from '@portfoygo/shared/ui/Feedback';
+import { Field } from '@portfoygo/shared/ui/Field';
 
 type Step = 'request' | 'reset' | 'done';
 

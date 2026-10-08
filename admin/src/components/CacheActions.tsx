@@ -3,11 +3,11 @@
 import { useState } from 'react';
 import useSWR from 'swr';
 import { ArrowPathIcon, CircleStackIcon } from '@heroicons/react/20/solid';
-import { Card, CardHeader } from '@/components/ui/Card';
-import { Alert } from '@/components/ui/Feedback';
-import Button from '@/components/ui/Button';
+import { Card, CardHeader } from '@portfoygo/shared/ui/Card';
+import { Alert } from '@portfoygo/shared/ui/Feedback';
+import Button from '@portfoygo/shared/ui/Button';
 import { adminApi, swrFetcher } from '@/lib/api';
-import { formatNumber, formatRelative } from '@/lib/format';
+import { formatNumber, formatRelative } from '@portfoygo/shared/format';
 import { num } from './model';
 
 type Target = 'stocks' | 'currencies';

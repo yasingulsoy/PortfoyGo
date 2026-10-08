@@ -4,8 +4,8 @@ import type { MouseEvent } from 'react';
 import { StarIcon as StarOutline } from '@heroicons/react/24/outline';
 import { StarIcon as StarSolid } from '@heroicons/react/24/solid';
 import { useWatchlist } from '@/hooks/useWatchlist';
-import { useToast } from '@/components/ui/Toast';
-import { cn } from '@/lib/format';
+import { useToast } from '@portfoygo/shared/ui/Toast';
+import { cn } from '@portfoygo/shared/format';
 import type { AssetType } from '@/types';
 
 interface Props {

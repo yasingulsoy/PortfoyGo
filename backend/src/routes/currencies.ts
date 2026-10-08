@@ -1,5 +1,6 @@
 import express from 'express';
-import { CurrencyService, CurrencyRate } from '../services/currency';
+import { providers } from '../providers';
+import type { FxRate as CurrencyRate } from '../providers/types';
 import { authenticateToken } from '../middleware/auth';
 import { isAdmin } from '../middleware/admin';
 import { asyncHandler, badRequest } from '../utils/errors';
@@ -21,7 +22,7 @@ const toCurrencyDto = (p: CurrencyRate) => ({
 router.get(
   '/',
   asyncHandler(async (_req, res) => {
-    const rates = await CurrencyService.getFromDb();
+    const rates = await providers.fx.getStoredRates();
     res.json({ success: true, data: rates.map(toCurrencyDto) });
   })
 );
@@ -30,7 +31,7 @@ router.get(
 router.get(
   '/list',
   asyncHandler(async (_req, res) => {
-    const rates = await CurrencyService.getFromDb();
+    const rates = await providers.fx.getStoredRates();
     res.json({ success: true, data: rates.map((r) => ({ code: r.code, name: r.name })) });
   })
 );
@@ -41,7 +42,7 @@ router.post(
   authenticateToken,
   isAdmin,
   asyncHandler(async (_req, res) => {
-    const count = await CurrencyService.fetchAndSaveToDb();
+    const count = await providers.fx.refreshRates();
     res.json({ success: true, message: `${count} döviz güncellendi` });
   })
 );
@@ -54,7 +55,7 @@ router.get(
     if (!/^[A-Z0-9_\-]{1,20}$/.test(code)) {
       throw badRequest('Geçersiz döviz kodu');
     }
-    const rate = await CurrencyService.getFromDbByCode(code);
+    const rate = await providers.fx.getStoredRate(code);
     if (!rate) {
       return res.status(404).json({ success: false, message: 'Döviz bulunamadı' });
     }

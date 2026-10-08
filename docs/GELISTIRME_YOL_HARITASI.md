@@ -1,6 +1,6 @@
 # PortfoyGo — Geliştirme Yol Haritası
 
-**Son güncelleme:** 8 Ekim 2026  
+**Son güncelleme:** 8 Ekim 2026 (ikinci dalga ve klasör ayrımı tamamlandı)  
 **Durum işaretleri:** ✅ tamamlandı · 🚧 bu dalgada yapılıyor · 🔜 sıradaki · 💡 fikir / değerlendirilecek
 
 Bu doküman, projenin baştan sona incelenmesinin ardından "demo" seviyesinden **yayına hazır, rekabetçi bir ürüne** geçiş için yapılması gerekenleri öncelik sırasıyla toplar. Her başlıkta *neden önemli* olduğu ve *bitti sayılma kriteri* yazılıdır.
@@ -40,7 +40,7 @@ Bu doküman, projenin baştan sona incelenmesinin ardından "demo" seviyesinden 
 
 ---
 
-## 2. Bu dalgada yapılanlar 🚧
+## 2. İkinci dalgada yapılanlar ✅
 
 | Alan | İş | Neden |
 | --- | --- | --- |
@@ -59,7 +59,7 @@ Bu doküman, projenin baştan sona incelenmesinin ardından "demo" seviyesinden 
 
 ---
 
-## 3. Sıradaki: Mimari yeniden yapılanma 🔜
+## 3. Mimari yeniden yapılanma ✅
 
 **Hedef klasör yapısı** (npm workspaces ile monorepo):
 
@@ -74,10 +74,13 @@ PortfoyGo/
 └─ package.json     workspaces: ["frontend", "admin", "backend", "packages/*"]
 ```
 
-- [ ] Kökteki Next.js uygulamasını `frontend/` klasörüne taşı; yollar, CI ve README güncellensin.
-- [ ] `admin/` iskeletini gerçek yönetim paneline dönüştür: kullanıcılar, işlemler, emirler, önbellek, sistem sağlığı. Ayrı port ve ayrı alan adı (`admin.portfoygo.com`), yalnızca admin oturumu.
-- [ ] `packages/shared`: API tipleri ve zod şemaları tek yerde olsun; frontend ve backend aynı sözleşmeyi kullansın.
-- [ ] Kök `npm run dev` üç uygulamayı birlikte başlatsın.
+- [x] Kullanıcı uygulaması `frontend/` klasörüne taşındı; CI ve README güncellendi.
+- [x] `admin/` gerçek, ayrı bir yönetim paneli oldu (port 3001, yalnızca yönetici oturumu): kullanıcılar, istatistikler, ban, önbellek.
+- [ ] 🔜 Panele işlemler, emirler, sistem sağlığı ve denetim kaydı ekranları; ayrı alan adı (`admin.portfoygo.com`).
+- [x] `packages/shared` (`@portfoygo/shared`): tasarım token'ları, UI bileşenleri, biçimlendirme ve API istemci çekirdeği.
+- [ ] 🔜 API tipleri ve zod şemalarının da `packages/shared`'a alınıp frontend ile backend'in aynı sözleşmeyi kullanması.
+- [x] Kök `npm run dev` ve `npm run dev:local` üç uygulamayı birlikte başlatıyor.
+- [x] Dış veri sağlayıcıları ortak arayüz (`backend/src/providers`) arkasına alındı. Entegrasyonların içi değişmedi; yeni API için tek adaptör dosyası yeterli.
 
 **Bitti kriteri:** `npm install && npm run dev:local` ile üç uygulama ayağa kalkıyor, CI her paketi ayrı ayrı test ediyor.
 
@@ -92,7 +95,7 @@ PortfoyGo/
 - [ ] Liderlik tablosunda risk ayarlı getiri (Sharpe) ve maksimum düşüş gösterimi; yalnızca "en çok kazanan" değil, "en istikrarlı" da ödüllendirilsin.
 
 ### 4.2 İşlem deneyimi
-- [x] Piyasa emri · 🚧 limit, zarar durdur ve kâr al emirleri
+- [x] Piyasa emri, limit alış/satış, zarar durdur ve kâr al emirleri (limit alışta nakit bloke edilir)
 - [ ] Takip eden stop (trailing stop)
 - [ ] Kısmi pozisyon kapatma kısayolları (%25/%50/%100) ve "pozisyonu kapat" tek tıkla
 - [ ] Döviz için gerçekçi alış/satış makası (şu an iki yönde de satış kuru kullanılıyor)
@@ -134,7 +137,7 @@ PortfoyGo/
 ## 6. Teknik kalite
 
 ### 6.1 Test
-- [ ] 🚧 Backend entegrasyon testleri (para mantığı)
+- [x] Backend entegrasyon testleri (para mantığı, emirler, geçmiş, izleme listesi, sağlayıcılar: 75 test)
 - [ ] 🔜 Frontend bileşen testleri ve **Playwright uçtan uca testleri** (kayıt → doğrulama → alım → satış → liderlik)
 - [ ] Kapsama hedefi: para ile ilgili servislerde %90 ve üzeri
 
@@ -160,7 +163,7 @@ PortfoyGo/
 
 ## 7. Güvenlik (kalan işler)
 
-- [ ] 🚧 httpOnly çerez ve CSRF (bu dalga)
+- [x] httpOnly çerez oturumu, CSRF koruması, tüm cihazlardan çıkış
 - [ ] 🔜 Git geçmişinin temizlenmesi (`git filter-repo`) ve **sızmış Finnhub anahtarının yenilenmesi**
 - [ ] İki faktörlü doğrulama (TOTP), özellikle admin hesapları için zorunlu
 - [ ] Bot ve çoklu hesap tespiti: kayıtta Cloudflare Turnstile, aynı cihaz veya IP'den çoklu hesap uyarısı (liderlik adaleti için)
@@ -184,6 +187,10 @@ PortfoyGo/
 ---
 
 ## 9. Veri sağlayıcıları ve maliyet
+
+> **Durum:** Dış veri API'leri ve anahtarları **değişecek**. Yeni sağlayıcılar için araştırma ekip tarafından yapılacak; bu süreçte entegrasyon koduna dokunulmuyor. Aşağıdaki tablo mevcut durumu gösterir.
+>
+> Araştırmada bakılacak ölçütler: lisans (ticari kullanım, gösterim izni), gecikme (gerçek zamanlı / 15 dk), kota ve fiyat, BIST kapsamı, geçmiş (mum) verisi, WebSocket desteği, SLA.
 
 | Veri | Şu an | Risk | Öneri |
 | --- | --- | --- | --- |
@@ -218,9 +225,12 @@ PortfoyGo/
 
 ## 12. Önerilen sıra (özet)
 
-1. **Bu dalga** (🚧): yerel DB, testler ve CI · çerez oturumu · limit ve kâr al emirleri · performans grafiği · izleme listesi · landing · komut paleti
-2. **Klasör ayrımı:** `frontend/` · `admin/` · `backend/` · `packages/shared`
-3. **Yayına hazırlık:** secret yenileme, git geçmişi temizliği, staging, Sentry, yedekleme, E2E testleri
-4. **Rekabet:** sezonlar ve özel ligler
-5. **Kapsam:** BIST, piyasa saatleri, gerçek zamanlı fiyat akışı
-6. **Büyüme:** herkese açık profiller, paylaşılabilir kartlar, haftalık e-posta raporu, kurumsal paket
+1. ✅ Güvenlik, doğruluk ve yeni tasarım
+2. ✅ Yerel DB, testler, CI · çerez oturumu · emirler · performans grafiği · izleme listesi · landing · komut paleti
+3. ✅ Klasör ayrımı (`frontend/` · `admin/` · `backend/` · `packages/shared`) ve veri sağlayıcı arayüzü
+4. **Yeni veri sağlayıcıları** (ekip araştırıyor): kararlaştırılınca `backend/src/providers/adapters/` altına adaptör yazılacak.
+5. **Yayına hazırlık:** migration'ların uygulanması, secret yenileme, git geçmişi temizliği, staging, Sentry, yedekleme, E2E testleri (Playwright).
+6. **Rekabet:** sezonlar ve özel ligler (davet koduyla).
+7. **Admin paneli 2:** işlemler, emirler, sistem sağlığı, denetim kaydı.
+8. **Kapsam:** BIST, piyasa saatleri, gerçek zamanlı fiyat akışı.
+9. **Büyüme:** herkese açık profiller, paylaşılabilir kartlar, haftalık e-posta raporu, kurumsal paket.

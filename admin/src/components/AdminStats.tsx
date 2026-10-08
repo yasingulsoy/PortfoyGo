@@ -11,12 +11,12 @@ import {
   UsersIcon,
   WalletIcon,
 } from '@heroicons/react/20/solid';
-import { Card, CardHeader } from '@/components/ui/Card';
-import { Alert, EmptyState, Skeleton } from '@/components/ui/Feedback';
-import Button from '@/components/ui/Button';
-import UserInitial from '@/components/profile/UserInitial';
+import { Card, CardHeader } from '@portfoygo/shared/ui/Card';
+import { Alert, EmptyState, Skeleton } from '@portfoygo/shared/ui/Feedback';
+import Button from '@portfoygo/shared/ui/Button';
+import UserInitial from '@portfoygo/shared/ui/UserInitial';
 import { adminApi } from '@/lib/api';
-import { cn, formatNumber, formatTRY } from '@/lib/format';
+import { cn, formatNumber, formatTRY } from '@portfoygo/shared/format';
 import { pickStats, pickTopUsers } from './model';
 
 export const ADMIN_STATS_KEY = 'admin:stats';

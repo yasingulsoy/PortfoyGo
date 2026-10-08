@@ -1,0 +1,26 @@
+{
+  "name": "portfoygo",
+  "version": "0.3.0",
+  "private": true,
+  "workspaces": [
+    "frontend",
+    "admin",
+    "backend",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "concurrently --kill-others-on-fail -c cyan,magenta,yellow -n API,WEB,ADMIN \"npm run dev -w @portfoygo/backend\" \"npm run dev -w @portfoygo/frontend\" \"npm run dev -w @portfoygo/admin\"",
+    "dev:local": "concurrently --kill-others -c cyan,magenta,yellow -n DB+API,WEB,ADMIN \"npm run dev:local -w @portfoygo/backend\" \"npm run dev -w @portfoygo/frontend\" \"npm run dev -w @portfoygo/admin\"",
+    "dev:web": "npm run dev -w @portfoygo/frontend",
+    "dev:admin": "npm run dev -w @portfoygo/admin",
+    "dev:api": "npm run dev -w @portfoygo/backend",
+    "build": "npm run build -w @portfoygo/frontend && npm run build -w @portfoygo/admin",
+    "lint": "npm run lint -w @portfoygo/frontend && npm run lint -w @portfoygo/admin",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test -w @portfoygo/frontend && npm run test -w @portfoygo/backend",
+    "migrate": "npm run migrate -w @portfoygo/backend"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
+}

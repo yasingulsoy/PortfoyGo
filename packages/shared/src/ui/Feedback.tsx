@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { ExclamationTriangleIcon, CheckCircleIcon, InformationCircleIcon } from '@heroicons/react/20/solid';
-import { cn } from '@/lib/format';
+import { cn } from '../format';
 
 export function Skeleton({ className }: { className?: string }) {
   // Özel köşe yuvarlaması verildiyse varsayılanı ekleme (cn sınıfları birleştirmez)

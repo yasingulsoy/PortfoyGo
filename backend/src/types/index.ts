@@ -10,6 +10,9 @@ export interface User {
   total_profit_loss: number;
   rank: number | null;
   created_at: Date;
+  last_login?: Date | null;
+  /** Bekleyen limit alışlarda bloke edilen nakit */
+  reserved_cash?: number;
   is_admin?: boolean;
   is_banned?: boolean;
 }

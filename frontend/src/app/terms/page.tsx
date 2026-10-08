@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import LegalDocument, { List, Note, P, Strong, type LegalSection } from '@/components/legal/LegalDocument';
 import { STARTING_BALANCE } from '@/lib/constants';
-import { formatNumber } from '@/lib/format';
+import { formatNumber } from '@portfoygo/shared/format';
 
 export const metadata: Metadata = {
   title: 'Kullanım Şartları',

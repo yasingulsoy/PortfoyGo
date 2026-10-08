@@ -7,9 +7,9 @@ import {
   SparklesIcon,
   AdjustmentsVerticalIcon,
 } from '@heroicons/react/24/outline';
-import AssetAvatar from '@/components/ui/AssetAvatar';
+import AssetAvatar from '@portfoygo/shared/ui/AssetAvatar';
 import { COMMISSION_RATE } from '@/lib/constants';
-import { cn } from '@/lib/format';
+import { cn } from '@portfoygo/shared/format';
 import { ASSET_TYPE_LABELS, type AssetType } from '@/types';
 import SectionHeading from './SectionHeading';
 

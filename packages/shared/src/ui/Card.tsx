@@ -1,5 +1,5 @@
 import type { HTMLAttributes, ReactNode } from 'react';
-import { cn } from '@/lib/format';
+import { cn } from '../format';
 
 export function Card({ className, ...rest }: HTMLAttributes<HTMLDivElement>) {
   return <div className={cn('rounded-2xl border border-line bg-surface shadow-card', className)} {...rest} />;

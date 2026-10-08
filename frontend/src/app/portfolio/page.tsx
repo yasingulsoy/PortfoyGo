@@ -7,14 +7,14 @@ import { useRequireAuth } from '@/hooks/useRequireAuth';
 import { useAuth } from '@/context/AuthContext';
 import { useLivePortfolio, type LiveHolding } from '@/context/PortfolioContext';
 import { STARTING_BALANCE } from '@/lib/constants';
-import { cn, formatPercent, formatQuantity, formatRelative, formatTRY, trend } from '@/lib/format';
-import { Card, CardHeader } from '@/components/ui/Card';
-import { Delta, Money } from '@/components/ui/Delta';
-import { Alert, EmptyState, Skeleton } from '@/components/ui/Feedback';
-import Button, { LinkButton } from '@/components/ui/Button';
-import PageHeader from '@/components/ui/PageHeader';
-import { PageLoader } from '@/components/ui/Spinner';
-import AssetAvatar from '@/components/ui/AssetAvatar';
+import { cn, formatPercent, formatQuantity, formatRelative, formatTRY, trend } from '@portfoygo/shared/format';
+import { Card, CardHeader } from '@portfoygo/shared/ui/Card';
+import { Delta, Money } from '@portfoygo/shared/ui/Delta';
+import { Alert, EmptyState, Skeleton } from '@portfoygo/shared/ui/Feedback';
+import Button, { LinkButton } from '@portfoygo/shared/ui/Button';
+import PageHeader from '@portfoygo/shared/ui/PageHeader';
+import { PageLoader } from '@portfoygo/shared/ui/Spinner';
+import AssetAvatar from '@portfoygo/shared/ui/AssetAvatar';
 import ProtectOrderModal from '@/components/trade/ProtectOrderModal';
 import AllocationCard from '@/components/portfolio/AllocationCard';
 import HoldingsCard from '@/components/portfolio/HoldingsCard';
@@ -31,7 +31,7 @@ export default function PortfolioPage() {
 
 function Portfolio() {
   const { refreshUser } = useAuth();
-  const { holdings, totals, balance, transactions, loaded, error, refresh, market } = useLivePortfolio();
+  const { holdings, totals, balance, reservedCash, transactions, loaded, error, refresh, market } = useLivePortfolio();
   const orders = useOrders();
   const [refreshing, setRefreshing] = useState(false);
   const [slHolding, setSlHolding] = useState<LiveHolding | null>(null);
@@ -122,7 +122,7 @@ function Portfolio() {
           </dl>
           <BestWorst holdings={holdings} loaded={loaded} />
         </Card>
-        <AllocationCard holdings={holdings} balance={balance} loaded={loaded} />
+        <AllocationCard holdings={holdings} balance={balance + reservedCash} loaded={loaded} />
       </div>
 
       {loaded && holdings.length === 0 ? (

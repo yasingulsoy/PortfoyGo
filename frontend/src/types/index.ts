@@ -1,11 +1,6 @@
-export type AssetType = 'stock' | 'crypto' | 'currency' | 'commodity';
+import type { AssetType } from '@portfoygo/shared/types';
 
-export const ASSET_TYPE_LABELS: Record<AssetType, string> = {
-  stock: 'Hisse',
-  crypto: 'Kripto',
-  currency: 'Döviz',
-  commodity: 'Emtia',
-};
+export { ASSET_TYPE_LABELS, type AssetType } from '@portfoygo/shared/types';
 
 /* ---------- Backend'den gelen ham piyasa verileri ---------- */
 

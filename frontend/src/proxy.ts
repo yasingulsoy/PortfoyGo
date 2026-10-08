@@ -10,7 +10,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 // (API_PROXY_TARGET + NEXT_PUBLIC_API_URL=/api/backend). Ayrıntılar: README "Güvenlik notları".
 const AUTH_HINT_COOKIE = 'pg_auth';
 // "/" herkese açıktır: misafirlere tanıtım sayfası, oturum açmışlara panel gösterilir.
-const PROTECTED = ['/portfolio', '/transactions', '/leaderboard', '/news', '/profile', '/admin'];
+const PROTECTED = ['/portfolio', '/transactions', '/leaderboard', '/news', '/profile'];
 
 function isProtected(pathname: string) {
   return PROTECTED.some((p) => (p === '/' ? pathname === '/' : pathname === p || pathname.startsWith(`${p}/`))) || pathname.startsWith('/asset/');

@@ -1,6 +1,6 @@
 import { ArrowsRightLeftIcon, TrophyIcon, UserPlusIcon } from '@heroicons/react/24/outline';
 import { STARTING_BALANCE } from '@/lib/constants';
-import { formatNumber } from '@/lib/format';
+import { formatNumber } from '@portfoygo/shared/format';
 import SectionHeading from './SectionHeading';
 
 const STEPS = [

@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useRef, type ReactNode } from 'react';
 import { XMarkIcon } from '@heroicons/react/20/solid';
-import { cn } from '@/lib/format';
+import { cn } from '../format';
 
 interface ModalProps {
   open: boolean;

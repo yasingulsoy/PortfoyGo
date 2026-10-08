@@ -10,6 +10,8 @@ interface AuthContextType {
   /** İlk açılışta oturum (çerez) backend'e sorulurken true. */
   loading: boolean;
   login: (email: string, password: string) => Promise<{ success: boolean; message?: string }>;
+  /** Yalnızca yerel geliştirme: seçilen hesapla şifresiz giriş */
+  devLogin: (username: string) => Promise<{ success: boolean; message?: string }>;
   register: (username: string, email: string, password: string) => Promise<{ success: boolean; message?: string }>;
   /** Bu tarayıcıdaki oturumu kapatır ve giriş sayfasına yönlendirir. */
   logout: () => void;
@@ -113,6 +115,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const devLogin = useCallback(async (username: string) => {
+    try {
+      const data = await authApi.devLogin(username);
+      if (!data?.success || !data.user) return { success: false, message: data?.message || 'Giriş başarısız.' };
+      session.setActive(true);
+      setUser(normalizeUser(data.user));
+      return { success: true };
+    } catch (err) {
+      return { success: false, message: err instanceof Error ? err.message : 'Giriş başarısız.' };
+    }
+  }, []);
+
   const register = useCallback(async (username: string, email: string, password: string) => {
     try {
       const data = await authApi.register(username.trim(), email.trim().toLowerCase(), password);
@@ -123,8 +137,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ user, loading, login, register, logout, logoutAll, refreshUser }),
-    [user, loading, login, register, logout, logoutAll, refreshUser],
+    () => ({ user, loading, login, devLogin, register, logout, logoutAll, refreshUser }),
+    [user, loading, login, devLogin, register, logout, logoutAll, refreshUser],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

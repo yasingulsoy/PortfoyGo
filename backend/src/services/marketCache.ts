@@ -1,25 +1,6 @@
-import axios from 'axios';
 import pool from '../config/database';
-import { FinnhubService, StockData, describeHttpError } from './finnhub';
-
-const COINGECKO_BASE = 'https://api.coingecko.com/api/v3';
-const getCoinGeckoKey = () => process.env.COINGECKO_API_KEY || process.env.NEXT_PUBLIC_COINGECKO_API_KEY || '';
-
-// CoinGecko'dan kripto paraları çek
-async function fetchTopCryptos(limit: number = 25): Promise<any[]> {
-  try {
-    const key = getCoinGeckoKey();
-    const headers: Record<string, string> = key ? { 'X-CG-Pro-API-Key': key } : {};
-    const url = `${COINGECKO_BASE}/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=${limit}&page=1&sparkline=false&price_change_percentage=24h`;
-
-    const response = await axios.get(url, { headers, timeout: 10000 });
-    const data = response.data;
-    return Array.isArray(data) ? data : [];
-  } catch (error) {
-    console.error(`[coingecko] Kripto verisi alınamadı: ${describeHttpError(error)}`);
-    return [];
-  }
-}
+import { providers } from '../providers';
+import type { StockQuote } from '../providers/types';
 
 export interface CachedMarketData {
   id: string;
@@ -44,7 +25,7 @@ type CacheInput = Omit<CachedMarketData, 'id' | 'cached_at' | 'expires_at'>;
 
 const CACHE_DURATION_HOURS = 1;
 
-const toStockCacheData = (stocks: StockData[]): CacheInput[] =>
+const toStockCacheData = (stocks: StockQuote[]): CacheInput[] =>
   stocks.map((stock) => ({
     asset_type: 'stock' as const,
     symbol: stock.symbol,
@@ -164,7 +145,7 @@ export class MarketCacheService {
   }
 
   /**
-   * Cache'i API'lerden yeniler (hisse: Finnhub, kripto: CoinGecko).
+   * Cache'i veri sağlayıcılarından yeniler (bkz. src/providers; varsayılan hisse: Finnhub, kripto: CoinGecko).
    * Eşzamanlı çağrılar tek bir yenilemede birleştirilir.
    */
   static refreshCache(): Promise<void> {
@@ -178,9 +159,9 @@ export class MarketCacheService {
 
   private static async doRefresh(): Promise<void> {
     // Hisseler (anahtar yoksa atlanır; mevcut cache servis edilmeye devam eder)
-    if (FinnhubService.isConfigured()) {
+    if (providers.stocks.isConfigured()) {
       try {
-        const stocks = await FinnhubService.getPopularStocks();
+        const stocks = await providers.stocks.getPopularStocks();
         await this.saveToCache(toStockCacheData(stocks));
       } catch (error: any) {
         console.error('[market-cache] Hisse cache yenileme hatası:', error?.message);
@@ -189,7 +170,7 @@ export class MarketCacheService {
 
     // Kriptolar
     try {
-      const cryptos = await fetchTopCryptos(25);
+      const cryptos = await providers.crypto.getTopCoins(25);
       const cryptoCacheData: CacheInput[] = cryptos
         .filter((c) => c && typeof c.symbol === 'string' && Number(c.current_price) > 0)
         .map((crypto) => ({

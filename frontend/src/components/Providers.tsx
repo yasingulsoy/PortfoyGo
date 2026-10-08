@@ -5,7 +5,7 @@ import { ThemeProvider } from 'next-themes';
 import { AuthProvider } from '@/context/AuthContext';
 import { PortfolioProvider } from '@/context/PortfolioContext';
 import { TradeProvider } from '@/components/trade/TradeProvider';
-import { ToastProvider } from '@/components/ui/Toast';
+import { ToastProvider } from '@portfoygo/shared/ui/Toast';
 import CommandPalette from '@/components/command/CommandPalette';
 import Shortcuts from '@/components/command/Shortcuts';
 

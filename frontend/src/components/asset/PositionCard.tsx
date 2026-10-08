@@ -1,9 +1,9 @@
 import type { ReactNode } from 'react';
 import { BriefcaseIcon } from '@heroicons/react/20/solid';
-import { Card, CardHeader } from '@/components/ui/Card';
-import { Delta, Money } from '@/components/ui/Delta';
-import Button from '@/components/ui/Button';
-import { formatQuantity, formatTRY } from '@/lib/format';
+import { Card, CardHeader } from '@portfoygo/shared/ui/Card';
+import { Delta, Money } from '@portfoygo/shared/ui/Delta';
+import Button from '@portfoygo/shared/ui/Button';
+import { formatQuantity, formatTRY } from '@portfoygo/shared/format';
 import type { LiveHolding } from '@/context/PortfolioContext';
 
 /** Kullanıcının bu varlıktaki açık pozisyonu (canlı fiyatla değerlenmiş). */

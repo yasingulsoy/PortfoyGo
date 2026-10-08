@@ -2,12 +2,12 @@
 
 import Link from 'next/link';
 import { MagnifyingGlassIcon } from '@heroicons/react/20/solid';
-import AssetAvatar from '@/components/ui/AssetAvatar';
-import { Delta } from '@/components/ui/Delta';
-import Button from '@/components/ui/Button';
-import { EmptyState, Skeleton } from '@/components/ui/Feedback';
+import AssetAvatar from '@portfoygo/shared/ui/AssetAvatar';
+import { Delta } from '@portfoygo/shared/ui/Delta';
+import Button from '@portfoygo/shared/ui/Button';
+import { EmptyState, Skeleton } from '@portfoygo/shared/ui/Feedback';
 import { useTrade } from '@/components/trade/TradeProvider';
-import { formatCompact, formatTRY, formatUSD } from '@/lib/format';
+import { formatCompact, formatTRY, formatUSD } from '@portfoygo/shared/format';
 import type { MarketAsset } from '@/types';
 import PriceTick from './PriceTick';
 import WatchStar from './WatchStar';

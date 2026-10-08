@@ -1,0 +1,61 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+# Monorepo (npm workspaces): frontend/ · admin/ · backend/ · packages/shared
+jobs:
+  web:
+    name: Web (frontend + admin + shared)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      NEXT_TELEMETRY_DISABLED: '1'
+      NEXT_PUBLIC_API_URL: http://localhost:5001/api
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install
+        run: npm ci
+      - name: Typecheck
+        run: |
+          npm run typecheck -w @portfoygo/shared
+          npm run typecheck -w @portfoygo/frontend
+          npm run typecheck -w @portfoygo/admin
+      - name: Lint
+        run: npm run lint
+      - name: Unit tests
+        run: npm run test -w @portfoygo/frontend
+      - name: Build
+        run: npm run build
+
+  backend:
+    name: Backend (typecheck, integration tests)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install
+        run: npm ci
+      - name: Typecheck (src)
+        run: npm run typecheck -w @portfoygo/backend
+      - name: Typecheck (tests)
+        run: npm run typecheck:test -w @portfoygo/backend
+      # Gömülü PGlite (WASM PostgreSQL) kullanır: harici veritabanı veya secret gerekmez
+      - name: Integration tests
+        run: npm run test -w @portfoygo/backend

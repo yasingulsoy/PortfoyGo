@@ -10,7 +10,7 @@ import { closeOnSignals, startLocalDb } from './localDb';
  * backend/.env dosyasındaki değerler (canlı DATABASE_URL, API anahtarları, SMTP) aşağıdaki
  * açık değerlerle EZİLİR: dotenv, ortamda zaten tanımlı (boş bile olsa) değişkenlerin üzerine yazmaz.
  *
- * Seçenekler: --reset (yerel veritabanını sıfırla). PORT (varsayılan 5001), LOCAL_DB_PORT (54329).
+ * Seçenekler: --reset (yerel veritabanını sıfırla). API_PORT (varsayılan 5001), LOCAL_DB_PORT (54329).
  */
 
 const BACKEND_DIR = path.resolve(__dirname, '../..');
@@ -31,7 +31,8 @@ async function main() {
   const env: NodeJS.ProcessEnv = {
     ...process.env,
     NODE_ENV: 'development',
-    PORT: process.env.PORT || '5001',
+    // Genel PORT değişkeni (ör. frontend araçlarının ayarladığı 3000) devralınmasın diye ayrı değişken
+    PORT: process.env.API_PORT || '5001',
     // --- Veritabanı: SADECE yerel PGlite ---
     DATABASE_URL: ldb.url,
     DB_SSL: 'false',
@@ -41,9 +42,11 @@ async function main() {
     JWT_SECRET: process.env.LOCAL_JWT_SECRET || 'dev-only-local-jwt-secret-do-not-use-in-production-000000',
     COOKIE_SECURE: 'false',
     COOKIE_DOMAIN: '',
-    ALLOWED_ORIGINS: 'http://localhost:3000,http://127.0.0.1:3000',
+    ALLOWED_ORIGINS: 'http://localhost:3000,http://127.0.0.1:3000,http://localhost:3001,http://127.0.0.1:3001',
     // --- Dış servisler kapalı: piyasa verisi tohumlanmış cache'ten gelir ---
     DISABLE_MARKET_REFRESH: '1',
+    // SMTP yok: doğrulama/sıfırlama kodları konsola yazılır
+    EMAIL_DEV_LOG: '1',
     ENABLE_BACKGROUND_STOCK_REFRESH: 'false',
     FINNHUB_API_KEY: '',
     FINNHUB_API_KEYS: '',
@@ -60,7 +63,7 @@ async function main() {
 
   console.log(`[dev:local] Backend başlatılıyor → http://localhost:${env.PORT}/api (DB: ${ldb.url})`);
   const nodemonBin = require.resolve('nodemon/bin/nodemon.js', { paths: [BACKEND_DIR] });
-  const child = spawn(process.execPath, [nodemonBin, 'src/index.ts'], {
+  const child = spawn(process.execPath, [nodemonBin] /* nodemon.json: exec ts-node src/index.ts */, {
     cwd: BACKEND_DIR,
     env,
     stdio: 'inherit',

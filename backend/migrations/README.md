@@ -1,8 +1,8 @@
 # Veritabanı Migration'ları
 
-Bu klasördeki `.sql` dosyaları veritabanı şemasını günceller. Dosyalar **idempotent** yazılmıştır
-(birden fazla kez çalıştırmak güvenlidir) ve içlerinde `BEGIN/COMMIT` yoktur; tek bir transaction
-içinde çalıştırılmaları gerekir.
+Bu klasördeki `NNN_ad.sql` dosyaları veritabanı şemasını kurar ve günceller. Dosyalar **idempotent**
+yazılmıştır (birden fazla kez çalıştırmak güvenlidir) ve içlerinde `BEGIN/COMMIT` yoktur; her biri tek
+bir transaction içinde çalıştırılır.
 
 > ⚠️ **Önce yedek alın.** Kolon tipi değişiklikleri tabloları yeniden yazar ve çalıştığı süre boyunca
 > ilgili tabloları kilitler. Mümkünse trafiğin az olduğu bir zamanda çalıştırın.
@@ -10,6 +10,65 @@ içinde çalıştırılmaları gerekir.
 > ```bash
 > pg_dump "$DATABASE_URL" -Fc -f yedek_$(date +%Y%m%d_%H%M).dump
 > ```
+
+## Migration çalıştırıcı (`npm run migrate`)
+
+```bash
+cd backend
+npm run migrate -- --dry-run           # sadece bekleyenleri listeler, hiçbir şey yazmaz
+npm run migrate                        # bekleyen tüm migration'ları uygular
+npm run migrate -- 001_hardening.sql   # sadece bu dosya (uygulanmış olsa bile yeniden)
+```
+
+- Dosyalar **isim sırasıyla** (000, 001, 002 …) uygulanır; klasöre eklenen yeni `NNN_*.sql`
+  dosyaları otomatik olarak bulunur.
+- Her dosya **kendi transaction'ında** çalışır. Hata olursa o dosya tamamen geri alınır ve
+  çalıştırıcı durur (sonraki dosyalar uygulanmaz).
+- Uygulananlar `schema_migrations (filename, applied_at, checksum)` tablosuna yazılır ve sonraki
+  çalıştırmalarda atlanır. Uygulanmış bir dosya sonradan değiştirilirse (checksum farklı) uyarı
+  verilir; dosya yeniden çalıştırılmaz — değişiklik için yeni bir `NNN_*.sql` dosyası ekleyin.
+- Eski çalıştırıcının `schema_migrations (name, applied_at)` tablosu otomatik olarak yeni yapıya
+  yükseltilir (kayıtlar korunur).
+- Hedef: ortamdaki `DATABASE_URL` / `DB_*` değişkenleri; ortamda yoksa `backend/.env`. Komut ilk satırda
+  hangi sunucuya bağlandığını yazar — **çalıştırmadan önce kontrol edin.**
+
+### Mevcut (canlı) veritabanı
+
+1. Yedek alın (yukarıdaki `pg_dump`).
+2. `npm run migrate -- --dry-run` ile hangi dosyaların bekleyeceğini görün.
+3. `npm run migrate` çalıştırın.
+
+`000_base.sql` canlı veritabanında **hiçbir şey değiştirmez** (tüm tablolar/indeksler/trigger'lar
+zaten var; sadece `schema_migrations`'a kaydedilir). Bu, canlı şemanın `pg_dump` çıktısına
+uygulanarak doğrulanmıştır.
+
+### Yeni geliştirici / boş veritabanı
+
+Boş bir PostgreSQL 13+ veritabanında `npm run migrate` tüm şemayı sıfırdan kurar (000 → son dosya).
+Hiç PostgreSQL kurmadan çalışmak için gömülü yerel veritabanını kullanın:
+
+```bash
+cd backend
+npm run db:local     # PGlite (WASM PostgreSQL) → 127.0.0.1:54329, migration + örnek veri
+npm run dev:local    # yerel veritabanı + backend (dış API'ler kapalı)
+```
+
+### Yeni migration yazarken
+
+- Dosya adı: bir sonraki numara + açıklama, örn. `005_ozellik.sql`.
+- İdempotent yazın (`CREATE TABLE IF NOT EXISTS`, `ADD COLUMN IF NOT EXISTS`, `DO $$ … IF NOT EXISTS …`).
+- `BEGIN/COMMIT` koymayın; `CREATE INDEX CONCURRENTLY` gibi transaction dışında çalışması gereken
+  komutlar kullanmayın.
+- `cd backend && npm test` boş bir veritabanına tüm migration'ları uygular; testlerin geçtiğini görün.
+
+## 000_base.sql
+
+Temel şema: `users`, `email_verifications`, `portfolio_items`, `transactions`, `activity_logs`,
+`market_data_cache`, `badges` (+ 12 başlangıç rozeti), `user_badges`, indeksler ve `updated_at`
+trigger'ları — yani 001 öncesindeki canlı şemanın birebir aynısı. Kullanılmayan `competitions` /
+`competition_participants` tabloları dahil değildir. `gen_random_uuid()` PostgreSQL 13+ çekirdeğinde
+vardır; daha eski sürümlerde `pgcrypto` kurulur. Eski `src/scripts/createTables.sql`,
+`setupDatabase.sql`, `createActivityLogsTable.sql` ve `createMarketCacheTable.sql` yerine bunu kullanın.
 
 ## 001_hardening.sql
 
@@ -54,8 +113,7 @@ npm run migrate                       # bekleyen tüm migration'lar
 npm run migrate -- 001_hardening.sql  # sadece bu dosya (tekrar uygular)
 ```
 
-Script `.env` içindeki `DATABASE_URL` / `DB_*` ayarlarını kullanır, her dosyayı tek transaction'da
-çalıştırır ve uygulananları `schema_migrations` tablosuna kaydeder.
+Ayrıntılar için yukarıdaki "Migration çalıştırıcı" bölümüne bakın.
 
 ### Sonrasında (isteğe bağlı)
 

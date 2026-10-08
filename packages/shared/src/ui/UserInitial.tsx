@@ -1,4 +1,4 @@
-import { cn } from '@/lib/format';
+import { cn } from '../format';
 
 const tones = {
   brand: 'bg-brand-soft text-brand',

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useId, useRef, type ClipboardEvent, type KeyboardEvent } from 'react';
-import { cn } from '@/lib/format';
+import { cn } from '@portfoygo/shared/format';
 import { CODE_LENGTH } from './authUtils';
 
 interface CodeInputProps {

@@ -34,7 +34,8 @@ export function toAdminUser(r: any): AdminUser {
     isBanned: bool(r?.is_banned ?? r?.isBanned),
     balance,
     portfolioValue,
-    totalValue: r?.total_value != null ? num(r.total_value) : balance + portfolioValue,
+    // Bekleyen limit alışlarda bloke edilen nakit de varlığa dahildir
+    totalValue: r?.total_value != null ? num(r.total_value) : balance + num(r?.reserved_cash) + portfolioValue,
     profitLoss: num(r?.total_profit_loss ?? r?.totalProfitLoss),
     rank,
     createdAt: String(r?.created_at ?? r?.createdAt ?? ''),

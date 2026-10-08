@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import type { ButtonHTMLAttributes, ComponentProps, ReactNode } from 'react';
-import { cn } from '@/lib/format';
+import { cn } from '../format';
 import Spinner from './Spinner';
 
 type Variant = 'primary' | 'secondary' | 'ghost' | 'up' | 'down' | 'buy' | 'sell' | 'danger';

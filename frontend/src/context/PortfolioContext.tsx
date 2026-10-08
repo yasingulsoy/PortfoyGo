@@ -8,6 +8,8 @@ import type { AssetType, Holding, Transaction } from '@/types';
 
 interface PortfolioState {
   balance: number;
+  /** Bekleyen limit alış emirlerinde bloke edilen nakit (kullanılamaz, ama varlığa dahildir) */
+  reservedCash: number;
   holdings: Holding[];
   transactions: Transaction[];
   loaded: boolean;
@@ -19,7 +21,7 @@ interface PortfolioContextType extends PortfolioState {
   refresh: () => Promise<void>;
 }
 
-const INITIAL: PortfolioState = { balance: 0, holdings: [], transactions: [], loaded: false, error: null };
+const INITIAL: PortfolioState = { balance: 0, reservedCash: 0, holdings: [], transactions: [], loaded: false, error: null };
 
 const PortfolioContext = createContext<PortfolioContextType | undefined>(undefined);
 
@@ -72,6 +74,7 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
       if (id !== requestId.current) return;
       setState({
         balance: num(portfolio?.balance),
+        reservedCash: num(portfolio?.reservedCash),
         holdings: Array.isArray(portfolio?.portfolio) ? portfolio.portfolio.map(mapHolding) : [],
         transactions: Array.isArray(txs?.transactions) ? txs.transactions.map(mapTransaction) : [],
         loaded: true,
@@ -153,9 +156,9 @@ export function useLivePortfolio() {
       value,
       pl,
       plPercent: invested > 0 ? (pl / invested) * 100 : 0,
-      netWorth: portfolio.balance + value,
+      netWorth: portfolio.balance + portfolio.reservedCash + value,
     };
-  }, [holdings, portfolio.balance]);
+  }, [holdings, portfolio.balance, portfolio.reservedCash]);
 
   return { ...portfolio, holdings, totals, market };
 }

@@ -1,4 +1,4 @@
-import { cn } from '@/lib/format';
+import { cn } from '../format';
 
 export default function Spinner({ className }: { className?: string }) {
   return (

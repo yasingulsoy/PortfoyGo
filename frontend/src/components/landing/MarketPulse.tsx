@@ -5,11 +5,11 @@ import Link from 'next/link';
 import { ArrowTrendingDownIcon, ArrowTrendingUpIcon, SignalSlashIcon } from '@heroicons/react/20/solid';
 import { useMarket } from '@/hooks/useMarketData';
 import { assetHref } from '@/components/market/MarketTable';
-import AssetAvatar from '@/components/ui/AssetAvatar';
-import { Card } from '@/components/ui/Card';
-import { Delta } from '@/components/ui/Delta';
-import { Skeleton } from '@/components/ui/Feedback';
-import { cn, formatTRY } from '@/lib/format';
+import AssetAvatar from '@portfoygo/shared/ui/AssetAvatar';
+import { Card } from '@portfoygo/shared/ui/Card';
+import { Delta } from '@portfoygo/shared/ui/Delta';
+import { Skeleton } from '@portfoygo/shared/ui/Feedback';
+import { cn, formatTRY } from '@portfoygo/shared/format';
 import { ASSET_TYPE_LABELS, type MarketAsset } from '@/types';
 import SectionHeading from './SectionHeading';
 

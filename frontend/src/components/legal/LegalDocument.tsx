@@ -1,8 +1,8 @@
 import type { ReactNode } from 'react';
 import Link from 'next/link';
-import { Card } from '@/components/ui/Card';
-import PageHeader from '@/components/ui/PageHeader';
-import { cn } from '@/lib/format';
+import { Card } from '@portfoygo/shared/ui/Card';
+import PageHeader from '@portfoygo/shared/ui/PageHeader';
+import { cn } from '@portfoygo/shared/format';
 
 export interface LegalSection {
   id: string;

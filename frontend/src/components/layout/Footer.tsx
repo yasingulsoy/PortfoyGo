@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import Logo from '@/components/Logo';
+import Logo from '@portfoygo/shared/ui/Logo';
 
 export default function Footer() {
   return (

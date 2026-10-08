@@ -1,10 +1,10 @@
 import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { BoltIcon, BanknotesIcon, TrophyIcon } from '@heroicons/react/20/solid';
-import Logo, { LogoMark } from '@/components/Logo';
-import ThemeToggle from '@/components/layout/ThemeToggle';
+import Logo, { LogoMark } from '@portfoygo/shared/ui/Logo';
+import ThemeToggle from '@portfoygo/shared/ui/ThemeToggle';
 import { STARTING_BALANCE } from '@/lib/constants';
-import { formatNumber } from '@/lib/format';
+import { formatNumber } from '@portfoygo/shared/format';
 
 interface AuthLayoutProps {
   title?: ReactNode;

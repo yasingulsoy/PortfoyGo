@@ -37,6 +37,18 @@ export class EmailService {
     const user = process.env.SMTP_USER;
     const pass = process.env.SMTP_PASS;
     if (!user || !pass) {
+      // Yerel geliştirme: SMTP yoksa e-postalar gönderilmez, içerikleri konsola yazılır
+      if (process.env.EMAIL_DEV_LOG === '1' && process.env.NODE_ENV !== 'production') {
+        this.transporter = nodemailer.createTransport({ jsonTransport: true });
+        this.transporter.use('compile', (mail, done) => {
+          console.log(`
+[email:dev] → ${String(mail.data.to)} | ${String(mail.data.subject)}
+${String(mail.data.text ?? String(mail.data.html ?? '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim())}
+`);
+          done();
+        });
+        return this.transporter;
+      }
       console.warn('[email] SMTP_USER / SMTP_PASS tanımlı değil; email gönderilemiyor.');
       return null;
     }

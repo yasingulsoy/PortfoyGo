@@ -7,11 +7,11 @@ import { ChartBarIcon, ClockIcon } from '@heroicons/react/24/outline';
 import type { IChartApi, ISeriesApi } from 'lightweight-charts';
 import { historyApi, swrFetcher, type HistoryRange } from '@/lib/api';
 import { useAuth } from '@/context/AuthContext';
-import { cn, formatDate, formatDateTime, formatTRY } from '@/lib/format';
-import { Card } from '@/components/ui/Card';
-import { Delta, Money } from '@/components/ui/Delta';
-import { EmptyState, Skeleton } from '@/components/ui/Feedback';
-import Tabs from '@/components/ui/Tabs';
+import { cn, formatDate, formatDateTime, formatTRY } from '@portfoygo/shared/format';
+import { Card } from '@portfoygo/shared/ui/Card';
+import { Delta, Money } from '@portfoygo/shared/ui/Delta';
+import { EmptyState, Skeleton } from '@portfoygo/shared/ui/Feedback';
+import Tabs from '@portfoygo/shared/ui/Tabs';
 
 export interface HistoryPoint {
   /** Unix zaman damgası (saniye, UTC) */

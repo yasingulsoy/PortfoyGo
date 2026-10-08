@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { BriefcaseIcon, HomeIcon } from '@heroicons/react/20/solid';
-import { LinkButton } from '@/components/ui/Button';
+import { LinkButton } from '@portfoygo/shared/ui/Button';
 
 export const metadata: Metadata = {
   title: 'Sayfa bulunamadı',

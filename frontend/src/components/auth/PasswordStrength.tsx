@@ -1,5 +1,5 @@
 import { CheckIcon } from '@heroicons/react/16/solid';
-import { cn } from '@/lib/format';
+import { cn } from '@portfoygo/shared/format';
 import { passwordChecks } from './authUtils';
 
 const LEVELS = [

@@ -1,5 +1,5 @@
 import { ArrowDownRightIcon, ArrowUpRightIcon } from '@heroicons/react/20/solid';
-import { cn, formatPercent, formatTRY, trend } from '@/lib/format';
+import { cn, formatPercent, formatTRY, trend } from '../format';
 
 const tone = {
   up: 'text-up',

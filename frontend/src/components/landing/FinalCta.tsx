@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { ArrowRightIcon, InformationCircleIcon } from '@heroicons/react/20/solid';
 import { STARTING_BALANCE } from '@/lib/constants';
-import { formatNumber } from '@/lib/format';
+import { formatNumber } from '@portfoygo/shared/format';
 
 export default function FinalCta() {
   return (

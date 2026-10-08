@@ -1,20 +1,21 @@
 'use client';
 
-import { useRequireAuth } from '@/hooks/useRequireAuth';
-import PageHeader from '@/components/ui/PageHeader';
-import { PageLoader } from '@/components/ui/Spinner';
-import AdminStats, { RetryStatsButton, TopUsers } from '@/components/admin/AdminStats';
-import UsersTable from '@/components/admin/UsersTable';
-import CacheActions from '@/components/admin/CacheActions';
+import { useRequireAdmin } from '@/lib/auth';
+import PageHeader from '@portfoygo/shared/ui/PageHeader';
+import { PageLoader } from '@portfoygo/shared/ui/Spinner';
+import AdminStats, { RetryStatsButton, TopUsers } from '@/components/AdminStats';
+import UsersTable from '@/components/UsersTable';
+import CacheActions from '@/components/CacheActions';
 
 export default function AdminPage() {
-  const { user, ready } = useRequireAuth({ adminOnly: true });
+  // Yetki kapısı AdminShell'dedir; burada yalnızca kullanıcı bilgisi okunur
+  const { user, ready } = useRequireAdmin();
   if (!ready || !user) return <PageLoader />;
 
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Yönetim"
+        eyebrow="Genel bakış"
         title="Yönetici paneli"
         description="Kullanıcıları yönet, genel istatistikleri izle ve piyasa önbelleğini yenile."
         actions={<RetryStatsButton />}
