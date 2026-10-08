@@ -7,6 +7,7 @@ import { useLivePortfolio } from '@/context/PortfolioContext';
 import { cn, formatTRY } from '@/lib/format';
 import Logo from '@/components/Logo';
 import { LinkButton } from '@/components/ui/Button';
+import { SearchTrigger } from '@/components/command/CommandPalette';
 import ThemeToggle from './ThemeToggle';
 import UserMenu from './UserMenu';
 import { NAV_ITEMS, isActive } from './nav';
@@ -45,6 +46,7 @@ export default function TopBar() {
 
         <div className="ml-auto flex items-center gap-2">
           {user && <NetWorthChip />}
+          <SearchTrigger />
           <ThemeToggle />
           {!loading && !user && (
             <>

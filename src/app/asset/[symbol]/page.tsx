@@ -19,9 +19,11 @@ import { PageLoader } from '@/components/ui/Spinner';
 import Tabs from '@/components/ui/Tabs';
 import AssetAvatar from '@/components/ui/AssetAvatar';
 import PriceTick from '@/components/market/PriceTick';
+import WatchStar from '@/components/market/WatchStar';
 import PriceChart from '@/components/PriceChart';
 import KeyStats from '@/components/asset/KeyStats';
 import PositionCard from '@/components/asset/PositionCard';
+import SymbolOrdersCard from '@/components/trade/SymbolOrdersCard';
 
 const TYPES: AssetType[] = ['stock', 'crypto', 'currency', 'commodity'];
 
@@ -129,6 +131,7 @@ function AssetDetail({ params }: { params: Promise<{ symbol: string }> }) {
           <span className="flex min-w-0 items-center gap-3">
             <AssetAvatar symbol={symbol} type={type} image={asset.image} size={40} />
             <span className="font-mono">{symbol}</span>
+            <WatchStar type={type} symbol={symbol} size="md" />
           </span>
         }
         description={asset.name !== symbol ? asset.name : undefined}
@@ -222,6 +225,8 @@ function AssetDetail({ params }: { params: Promise<{ symbol: string }> }) {
               </CardBody>
             </Card>
           )}
+
+          <SymbolOrdersCard type={type} symbol={symbol} livePrice={asset.priceTRY ?? null} />
 
           <Card>
             <CardBody className="flex items-start gap-3 text-sm">

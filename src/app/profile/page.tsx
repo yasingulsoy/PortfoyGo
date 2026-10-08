@@ -1,29 +1,33 @@
 'use client';
 
-import { useMemo, type ReactNode } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import useSWR from 'swr';
 import {
+  ArrowRightStartOnRectangleIcon,
   ArrowsRightLeftIcon,
   CalendarDaysIcon,
   CheckBadgeIcon,
   ExclamationCircleIcon,
+  LockClosedIcon,
   ScaleIcon,
   ShieldCheckIcon,
   TrophyIcon,
   WalletIcon,
 } from '@heroicons/react/20/solid';
 import { useRequireAuth } from '@/hooks/useRequireAuth';
+import { useAuth } from '@/context/AuthContext';
 import { useLivePortfolio } from '@/context/PortfolioContext';
 import { leaderboardApi } from '@/lib/api';
 import { STARTING_BALANCE } from '@/lib/constants';
 import { formatDate, formatNumber, formatPercent, formatTRY } from '@/lib/format';
 import type { User } from '@/types';
 import PageHeader from '@/components/ui/PageHeader';
-import { Card } from '@/components/ui/Card';
+import { Card, CardBody, CardHeader } from '@/components/ui/Card';
 import { Delta, Money } from '@/components/ui/Delta';
-import { Badge, Skeleton } from '@/components/ui/Feedback';
-import { LinkButton } from '@/components/ui/Button';
+import { Alert, Badge, Skeleton } from '@/components/ui/Feedback';
+import Button, { LinkButton } from '@/components/ui/Button';
+import Modal from '@/components/ui/Modal';
 import Stat from '@/components/ui/Stat';
 import { PageLoader } from '@/components/ui/Spinner';
 import UserInitial from '@/components/profile/UserInitial';
@@ -46,6 +50,7 @@ export default function ProfilePage() {
         <BadgesGrid />
         <ActivityLog />
       </div>
+      <SecurityCard />
     </div>
   );
 }
@@ -196,4 +201,75 @@ function StatsCard() {
 
 function StatCell({ children }: { children: ReactNode }) {
   return <div className="min-w-0 bg-surface p-4 sm:p-5">{children}</div>;
+}
+
+/* ------------------------------------------------------------------ */
+
+function SecurityCard() {
+  const { logoutAll } = useAuth();
+  const [open, setOpen] = useState(false);
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState('');
+
+  const close = () => {
+    if (pending) return;
+    setOpen(false);
+    setError('');
+  };
+
+  const confirm = async () => {
+    setPending(true);
+    setError('');
+    const result = await logoutAll();
+    // Başarılıysa AuthContext giriş sayfasına yönlendirir
+    if (!result.success) {
+      setError(result.message || 'İşlem başarısız. Lütfen tekrar dene.');
+      setPending(false);
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader icon={<LockClosedIcon />} title="Güvenlik" description="Oturumların ve hesap güvenliğin" />
+      <CardBody className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0 text-sm">
+          <p className="font-medium text-fg">Tüm cihazlardan çıkış yap</p>
+          <p className="mt-1 text-muted">
+            Telefon, tablet ve diğer tarayıcılar dahil açık olan tüm oturumların kapatılır. Hesabına tanımadığın bir
+            cihazdan girildiğini düşünüyorsan bunu kullan ve ardından şifreni değiştir.
+          </p>
+        </div>
+        <Button
+          variant="down"
+          className="shrink-0"
+          icon={<ArrowRightStartOnRectangleIcon className="h-4 w-4" aria-hidden="true" />}
+          onClick={() => setOpen(true)}
+        >
+          Tüm cihazlardan çıkış yap
+        </Button>
+      </CardBody>
+
+      <Modal
+        open={open}
+        onClose={close}
+        size="sm"
+        title="Tüm cihazlardan çıkış yapılsın mı?"
+        footer={
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <Button variant="secondary" onClick={close} disabled={pending} data-autofocus>
+              Vazgeç
+            </Button>
+            <Button variant="danger" loading={pending} onClick={() => void confirm()}>
+              Çıkış yap
+            </Button>
+          </div>
+        }
+      >
+        <div className="space-y-3 text-sm text-muted">
+          <p>Bu cihaz dahil tüm oturumların sonlandırılacak. Devam etmek için yeniden giriş yapman gerekecek.</p>
+          {error && <Alert tone="error">{error}</Alert>}
+        </div>
+      </Modal>
+    </Card>
+  );
 }

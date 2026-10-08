@@ -72,3 +72,19 @@ ALTER TABLE transactions VALIDATE CONSTRAINT transactions_quantity_nonnegative;
 Yeni backend kodu `email_verifications.purpose` / `attempts` kolonlarını kullanır. **Yeni kodu
 yayına almadan önce bu migration'ı çalıştırın**; aksi halde email doğrulama ve şifre sıfırlama
 uçları hata verir.
+
+## 002_sessions.sql
+
+`users` tablosuna `token_version INTEGER NOT NULL DEFAULT 0` kolonunu ekler. Oturum JWT'leri bu
+değeri (`tv`) taşır; "Tüm cihazlardan çıkış" ve şifre sıfırlama değeri artırarak kullanıcının
+mevcut tüm oturumlarını iptal eder.
+
+```bash
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 --single-transaction -f migrations/002_sessions.sql
+# veya
+npm run migrate
+```
+
+**Yeni backend kodunu yayına almadan önce çalıştırın**; aksi halde kimlik doğrulama gerektiren tüm
+uçlar hata verir. Not: geçişten sonra eski (localStorage'daki) token'lar `tv` içermediği için
+geçersizdir; kullanıcıların bir kez yeniden giriş yapması gerekir.

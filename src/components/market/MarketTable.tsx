@@ -10,6 +10,7 @@ import { useTrade } from '@/components/trade/TradeProvider';
 import { formatCompact, formatTRY, formatUSD } from '@/lib/format';
 import type { MarketAsset } from '@/types';
 import PriceTick from './PriceTick';
+import WatchStar from './WatchStar';
 
 export function assetHref(a: Pick<MarketAsset, 'type' | 'symbol' | 'coinId'>) {
   const params = new URLSearchParams({ type: a.type });
@@ -100,6 +101,7 @@ export default function MarketTable({ assets, loading, error, query = '', showVo
             )}
             <td className="py-3 pr-5 text-right">
               <div className="flex justify-end gap-1.5">
+                <WatchStar type={a.type} symbol={a.symbol} />
                 <Button size="sm" variant="up" onClick={() => openTrade(a, 'buy')} disabled={a.priceTRY == null} aria-label={`${a.symbol} al`}>
                   Al
                 </Button>

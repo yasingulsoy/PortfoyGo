@@ -36,6 +36,14 @@ export interface TradeResult {
   postCommit?: () => void;
 }
 
+/** Bekleyen emirden (orders) tetiklenen işlemler için bağlam (aktivite logu / metadata). */
+export interface OrderContext {
+  id: string;
+  type: 'limit' | 'stop_loss' | 'take_profit';
+  /** Örn. "Limit alış emri gerçekleşti" */
+  label: string;
+}
+
 export interface SellOptions {
   /** Var olan bir transaction içinde çalış (BEGIN/COMMIT çağıran sorumludur) */
   client?: PoolClient;
@@ -45,6 +53,23 @@ export interface SellOptions {
   capToHolding?: boolean;
   /** Aktivite logu açıklaması için kaynak */
   source?: 'user' | 'stop_loss';
+  /** Bekleyen emirden tetiklendiyse */
+  order?: OrderContext;
+}
+
+export interface BuyOptions {
+  /** Var olan bir transaction içinde çalış (BEGIN/COMMIT çağıran sorumludur) */
+  client?: PoolClient;
+  /** Önceden hesaplanmış işlem fiyatı */
+  quote?: ExecutionPrice;
+  /**
+   * Önceden bakiyeden ayrılmış (rezerve) tutar — limit alış emri.
+   * Verilirse bakiye kontrol edilmez/düşülmez; maliyet bu tutardan karşılanır ve
+   * kullanılmayan kısım bakiyeye iade edilir. Maliyet bu tutarı aşarsa işlem reddedilir.
+   */
+  reservedCash?: number;
+  /** Bekleyen emirden tetiklendiyse */
+  order?: OrderContext;
 }
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
@@ -52,6 +77,19 @@ const ceil2 = (n: number) => Math.ceil(n * 100 - 1e-7) / 100;
 const floor2 = (n: number) => Math.floor(n * 100 + 1e-7) / 100;
 /** Miktarı 8 ondalığa (DB hassasiyeti) aşağı yuvarla */
 const floorQty = (n: number) => Math.floor(n * 1e8 + 1e-6) / 1e8;
+
+export { floorQty as normalizeQuantity, MIN_TRADE_TRY };
+
+/**
+ * Alış maliyeti (TL): brüt tutar, komisyon ve toplam (net) tutar.
+ * Fiyata göre monoton artandır: fiyat <= p ise maliyet <= computeBuyCost(q, p).netAmount
+ * (limit alış rezervi bu fonksiyonla tetikleme fiyatından hesaplanır).
+ */
+export function computeBuyCost(quantity: number, price: number): { totalAmount: number; commission: number; netAmount: number } {
+  const totalAmount = ceil2(quantity * price);
+  const commission = ceil2(totalAmount * COMMISSION_RATE);
+  return { totalAmount, commission, netAmount: round2(totalAmount + commission) };
+}
 
 const insufficient = (msg: string) => new AppError(400, msg, 'TRADE_REJECTED');
 
@@ -98,8 +136,9 @@ export class TransactionService {
   /**
    * Alış. Fiyat SUNUCU tarafından belirlenir (istemcinin gönderdiği fiyat/isim yok sayılır).
    * Kullanıcı satırı ve portföy satırı FOR UPDATE ile kilitlenir; tek transaction.
+   * opts.client verilirse çağıranın transaction'ı içinde çalışır (limit alış emri).
    */
-  static async buy(userId: string, data: BuyRequest): Promise<TradeResult> {
+  static async buy(userId: string, data: BuyRequest, opts: BuyOptions = {}): Promise<TradeResult> {
     const symbol = data.symbol.trim().toUpperCase();
     const quantity = floorQty(data.quantity);
     if (!(quantity > 0)) {
@@ -107,22 +146,24 @@ export class TransactionService {
     }
 
     // Fiyatı transaction dışında al (ağ çağrısı olabilir); kilitleri kısa tut
-    const quote = await PricingService.getExecutionPriceTRY(symbol, data.asset_type);
+    const quote = opts.quote ?? (await PricingService.getExecutionPriceTRY(symbol, data.asset_type));
     const price = quote.priceTRY;
 
-    const totalAmount = ceil2(quantity * price);
+    const { totalAmount, commission, netAmount } = computeBuyCost(quantity, price);
     if (totalAmount < MIN_TRADE_TRY) {
       throw insufficient('İşlem tutarı çok küçük');
     }
-    const commission = ceil2(totalAmount * COMMISSION_RATE);
-    const netAmount = round2(totalAmount + commission);
+    const reserved = opts.reservedCash;
+    if (reserved !== undefined && netAmount > reserved + 1e-9) {
+      throw insufficient('Ayrılan tutar işlem maliyetini karşılamıyor');
+    }
 
-    const { transaction, portfolioItem } = await withTransaction(undefined, async (client) => {
+    const { transaction, portfolioItem } = await withTransaction(opts.client, async (client) => {
       const userRes = await client.query('SELECT id, balance FROM users WHERE id = $1 FOR UPDATE', [userId]);
       if (userRes.rows.length === 0) {
         throw new AppError(404, 'Kullanıcı bulunamadı', 'USER_NOT_FOUND');
       }
-      if (toNumber(userRes.rows[0].balance) < netAmount) {
+      if (reserved === undefined && toNumber(userRes.rows[0].balance) < netAmount) {
         throw insufficient('Yetersiz bakiye');
       }
 
@@ -139,12 +180,20 @@ export class TransactionService {
         [userId, symbol, quote.name, data.asset_type, quantity, price, totalAmount, commission, netAmount]
       );
 
-      const balRes = await client.query(
-        'UPDATE users SET balance = balance - $1 WHERE id = $2 AND balance >= $1 RETURNING balance',
-        [netAmount, userId]
-      );
-      if (balRes.rowCount === 0) {
-        throw insufficient('Yetersiz bakiye');
+      if (reserved === undefined) {
+        const balRes = await client.query(
+          'UPDATE users SET balance = balance - $1 WHERE id = $2 AND balance >= $1 RETURNING balance',
+          [netAmount, userId]
+        );
+        if (balRes.rowCount === 0) {
+          throw insufficient('Yetersiz bakiye');
+        }
+      } else {
+        // Maliyet rezervden karşılandı; kullanılmayan kısmı iade et
+        const refund = round2(reserved - netAmount);
+        if (refund > 0) {
+          await client.query('UPDATE users SET balance = balance + $1 WHERE id = $2', [refund, userId]);
+        }
       }
 
       // Pozisyonu oluştur veya göreli güncelle (ortalama maliyet = toplam maliyet / toplam miktar)
@@ -171,9 +220,11 @@ export class TransactionService {
       };
     });
 
-    afterCommit(userId, {
-      activity_type: 'buy',
-      description: `${quantity} adet ${quote.name} (${symbol}) alındı`,
+    const logEntry = {
+      activity_type: 'buy' as const,
+      description: opts.order
+        ? `${opts.order.label}: ${quantity} adet ${quote.name} (${symbol}) alındı`
+        : `${quantity} adet ${quote.name} (${symbol}) alındı`,
       metadata: {
         symbol,
         name: quote.name,
@@ -184,16 +235,25 @@ export class TransactionService {
         commission,
         net_amount: netAmount,
         transaction_id: transaction.id,
+        ...(opts.order ? { source: 'order', order_id: opts.order.id, order_type: opts.order.type } : {}),
       },
-    });
+    };
 
-    return {
+    const response: TradeResult = {
       success: true,
       message: 'Alış işlemi başarılı',
       transaction,
       portfolioItem,
       executedPrice: transaction.price,
     };
+
+    if (opts.client) {
+      // Çağıranın transaction'ı henüz commit edilmedi
+      response.postCommit = () => afterCommit(userId, logEntry);
+    } else {
+      afterCommit(userId, logEntry);
+    }
+    return response;
   }
 
   /**
@@ -302,8 +362,9 @@ export class TransactionService {
     const { transaction, portfolioItem, item, quantity, totalAmount, commission, netAmount } = result;
     const logEntry = {
       activity_type: 'sell' as const,
-      description:
-        opts.source === 'stop_loss'
+      description: opts.order
+        ? `${opts.order.label}: ${quantity} adet ${item.name} (${item.symbol}) satıldı`
+        : opts.source === 'stop_loss'
           ? `Stop-loss tetiklendi: ${quantity} adet ${item.name} (${item.symbol}) satıldı`
           : `${quantity} adet ${item.name} (${item.symbol}) satıldı`,
       metadata: {
@@ -316,7 +377,11 @@ export class TransactionService {
         commission,
         net_amount: netAmount,
         transaction_id: transaction.id,
-        ...(opts.source === 'stop_loss' ? { source: 'stop_loss' } : {}),
+        ...(opts.order
+          ? { source: 'order', order_id: opts.order.id, order_type: opts.order.type }
+          : opts.source === 'stop_loss'
+            ? { source: 'stop_loss' }
+            : {}),
       },
     };
 

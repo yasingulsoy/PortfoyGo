@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
-import { BriefcaseIcon, ChevronDownIcon, FunnelIcon, ShieldExclamationIcon } from '@heroicons/react/20/solid';
+import { ArrowTrendingUpIcon, BriefcaseIcon, ChevronDownIcon, FunnelIcon, ShieldExclamationIcon } from '@heroicons/react/20/solid';
 import type { LiveHolding } from '@/context/PortfolioContext';
 import { useTrade } from '@/components/trade/TradeProvider';
 import { assetHref } from '@/components/market/MarketTable';
@@ -14,7 +14,7 @@ import AssetAvatar from '@/components/ui/AssetAvatar';
 import Tabs from '@/components/ui/Tabs';
 import { Delta, Money } from '@/components/ui/Delta';
 import { Badge, EmptyState, Skeleton } from '@/components/ui/Feedback';
-import type { StopLossRow } from './useStopLossOrders';
+import { holdingKey, orderLabel, type OrderRow } from './useOrders';
 
 type Filter = 'all' | AssetType;
 type SortKey = 'value' | 'pl' | 'plPercent' | 'day' | 'symbol';
@@ -61,11 +61,13 @@ function sortHoldings(list: LiveHolding[], key: SortKey) {
 interface Props {
   holdings: LiveHolding[];
   loaded: boolean;
-  activeByItem: Map<string, StopLossRow>;
-  onStopLoss: (h: LiveHolding) => void;
+  /** holdingKey(assetType, symbol) → pozisyondaki aktif satış emirleri */
+  ordersByHolding: Map<string, OrderRow[]>;
+  /** "Emir" düğmesi: zarar durdur / kâr al penceresini açar */
+  onOrders: (h: LiveHolding) => void;
 }
 
-export default function HoldingsCard({ holdings, loaded, activeByItem, onStopLoss }: Props) {
+export default function HoldingsCard({ holdings, loaded, ordersByHolding, onOrders }: Props) {
   const [filter, setFilter] = useState<Filter>('all');
   const [sort, setSort] = useState<SortKey>('value');
 
@@ -145,7 +147,7 @@ export default function HoldingsCard({ holdings, loaded, activeByItem, onStopLos
           {/* Küçük ekranlar: yığılmış satırlar */}
           <ul className="divide-y divide-line md:hidden">
             {rows.map((h) => (
-              <MobileRow key={h.id} h={h} order={activeByItem.get(h.id)} onStopLoss={onStopLoss} />
+              <MobileRow key={h.id} h={h} orders={ordersByHolding.get(holdingKey(h.assetType, h.symbol))} onOrders={onOrders} />
             ))}
           </ul>
 
@@ -168,7 +170,7 @@ export default function HoldingsCard({ holdings, loaded, activeByItem, onStopLos
             </thead>
             <tbody className="divide-y divide-line">
               {rows.map((h) => (
-                <TableRow key={h.id} h={h} order={activeByItem.get(h.id)} onStopLoss={onStopLoss} />
+                <TableRow key={h.id} h={h} orders={ordersByHolding.get(holdingKey(h.assetType, h.symbol))} onOrders={onOrders} />
               ))}
             </tbody>
           </table>
@@ -180,7 +182,19 @@ export default function HoldingsCard({ holdings, loaded, activeByItem, onStopLos
 
 /* ------------------------------------------------------------------ */
 
-function AssetCell({ h, order }: { h: LiveHolding; order?: StopLossRow }) {
+/** Rozetler için: en yakın zarar durdur (en yüksek tetikleme) ve en yakın kâr al / limit satış (en düşük tetikleme) */
+function nearestOrders(orders: OrderRow[] | undefined) {
+  if (!orders?.length) return { stop: undefined, upper: undefined };
+  const stops = orders.filter((o) => o.type === 'stop_loss');
+  const uppers = orders.filter((o) => o.type !== 'stop_loss');
+  return {
+    stop: stops.reduce<OrderRow | undefined>((best, o) => (!best || o.triggerPrice > best.triggerPrice ? o : best), undefined),
+    upper: uppers.reduce<OrderRow | undefined>((best, o) => (!best || o.triggerPrice < best.triggerPrice ? o : best), undefined),
+  };
+}
+
+function AssetCell({ h, orders }: { h: LiveHolding; orders?: OrderRow[] }) {
+  const { stop, upper } = nearestOrders(orders);
   return (
     <Link href={assetHref({ type: h.assetType, symbol: h.symbol })} className="group flex min-w-0 items-center gap-3">
       <AssetAvatar symbol={h.symbol} type={h.assetType} image={h.image} />
@@ -188,10 +202,16 @@ function AssetCell({ h, order }: { h: LiveHolding; order?: StopLossRow }) {
         <span className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
           <span className="font-mono text-[13px] font-semibold text-fg group-hover:text-brand">{h.symbol}</span>
           <Badge tone={TYPE_TONE[h.assetType]}>{ASSET_TYPE_LABELS[h.assetType]}</Badge>
-          {order && (
+          {stop && (
             <Badge tone="down" className="num">
               <ShieldExclamationIcon className="h-3 w-3" aria-hidden="true" />
-              <span className="sr-only">Aktif stop-loss:</span> {formatTRY(order.trigger_price, { precise: true })}
+              <span className="sr-only">Aktif {orderLabel(stop).toLocaleLowerCase('tr-TR')} emri:</span> {formatTRY(stop.triggerPrice, { precise: true })}
+            </Badge>
+          )}
+          {upper && (
+            <Badge tone={upper.type === 'take_profit' ? 'gold' : 'brand'} className="num">
+              <ArrowTrendingUpIcon className="h-3 w-3" aria-hidden="true" />
+              <span className="sr-only">Aktif {orderLabel(upper).toLocaleLowerCase('tr-TR')} emri:</span> {formatTRY(upper.triggerPrice, { precise: true })}
             </Badge>
           )}
         </span>
@@ -201,7 +221,8 @@ function AssetCell({ h, order }: { h: LiveHolding; order?: StopLossRow }) {
   );
 }
 
-function Actions({ h, order, onStopLoss, className }: { h: LiveHolding; order?: StopLossRow; onStopLoss: (h: LiveHolding) => void; className?: string }) {
+function Actions({ h, orders, onOrders, className }: { h: LiveHolding; orders?: OrderRow[]; onOrders: (h: LiveHolding) => void; className?: string }) {
+  const count = orders?.length ?? 0;
   const { openTrade } = useTrade();
   const target = { type: h.assetType, symbol: h.symbol, name: h.name, image: h.image };
   return (
@@ -215,11 +236,11 @@ function Actions({ h, order, onStopLoss, className }: { h: LiveHolding; order?: 
       <Button
         size="sm"
         variant="secondary"
-        onClick={() => onStopLoss(h)}
-        aria-label={order ? `${h.symbol} için aktif stop-loss emrini görüntüle` : `${h.symbol} için stop-loss emri oluştur`}
-        icon={<ShieldExclamationIcon className={cn('h-3.5 w-3.5', order ? 'text-down' : 'text-subtle')} aria-hidden="true" />}
+        onClick={() => onOrders(h)}
+        aria-label={count ? `${h.symbol} için zarar durdur / kâr al emri oluştur (${count} aktif emir)` : `${h.symbol} için zarar durdur / kâr al emri oluştur`}
+        icon={<ShieldExclamationIcon className={cn('h-3.5 w-3.5', count ? 'text-brand' : 'text-subtle')} aria-hidden="true" />}
       >
-        Stop-loss
+        Emir
       </Button>
     </div>
   );
@@ -230,11 +251,11 @@ function plTone(v: number) {
   return t === 'up' ? 'text-up' : t === 'down' ? 'text-down' : 'text-muted';
 }
 
-function TableRow({ h, order, onStopLoss }: { h: LiveHolding; order?: StopLossRow; onStopLoss: (h: LiveHolding) => void }) {
+function TableRow({ h, orders, onOrders }: { h: LiveHolding; orders?: OrderRow[]; onOrders: (h: LiveHolding) => void }) {
   return (
     <tr className="transition-colors hover:bg-surface-2/60">
       <td className="py-3 pl-5 pr-3">
-        <AssetCell h={h} order={order} />
+        <AssetCell h={h} orders={orders} />
       </td>
       <td className="num hidden py-3 pr-4 text-right lg:table-cell">{formatQuantity(h.quantity)}</td>
       <td className="num hidden py-3 pr-4 text-right text-muted xl:table-cell">{formatTRY(h.averagePrice, { precise: true })}</td>
@@ -251,17 +272,17 @@ function TableRow({ h, order, onStopLoss }: { h: LiveHolding; order?: StopLossRo
         {h.dayChangePercent != null ? <Delta value={h.dayChangePercent} /> : <span className="text-subtle">—</span>}
       </td>
       <td className="py-3 pr-5">
-        <Actions h={h} order={order} onStopLoss={onStopLoss} />
+        <Actions h={h} orders={orders} onOrders={onOrders} />
       </td>
     </tr>
   );
 }
 
-function MobileRow({ h, order, onStopLoss }: { h: LiveHolding; order?: StopLossRow; onStopLoss: (h: LiveHolding) => void }) {
+function MobileRow({ h, orders, onOrders }: { h: LiveHolding; orders?: OrderRow[]; onOrders: (h: LiveHolding) => void }) {
   return (
     <li className="px-5 py-4">
       <div className="flex items-start justify-between gap-3">
-        <AssetCell h={h} order={order} />
+        <AssetCell h={h} orders={orders} />
         <div className="shrink-0 text-right">
           <p className="num text-sm font-semibold">{formatTRY(h.liveValue)}</p>
           <p className={cn('num mt-0.5 text-xs font-medium', plTone(h.livePL))}>{formatTRY(h.livePL, { sign: true })}</p>
@@ -274,7 +295,7 @@ function MobileRow({ h, order, onStopLoss }: { h: LiveHolding; order?: StopLossR
         <MiniStat label="Güncel fiyat" value={formatTRY(h.livePrice, { precise: true })} />
         <MiniStat label="Günlük" value={h.dayChangePercent != null ? <Delta value={h.dayChangePercent} variant="text" /> : '—'} />
       </dl>
-      <Actions h={h} order={order} onStopLoss={onStopLoss} className="mt-3 [&>button]:flex-1" />
+      <Actions h={h} orders={orders} onOrders={onOrders} className="mt-3 [&>button]:flex-1" />
     </li>
   );
 }

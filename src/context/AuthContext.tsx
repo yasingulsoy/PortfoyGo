@@ -2,15 +2,19 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
-import { ApiError, authApi, tokenStore, userStore } from '@/lib/api';
+import { ApiError, authApi, session } from '@/lib/api';
 import type { User } from '@/types';
 
 interface AuthContextType {
   user: User | null;
+  /** İlk açılışta oturum (çerez) backend'e sorulurken true. */
   loading: boolean;
   login: (email: string, password: string) => Promise<{ success: boolean; message?: string }>;
   register: (username: string, email: string, password: string) => Promise<{ success: boolean; message?: string }>;
+  /** Bu tarayıcıdaki oturumu kapatır ve giriş sayfasına yönlendirir. */
   logout: () => void;
+  /** Tüm cihazlardaki oturumları iptal eder; başarılıysa giriş sayfasına yönlendirir. */
+  logoutAll: () => Promise<{ success: boolean; message?: string }>;
   /** Bakiye, sıralama vb. değerleri backend'den tazeler. */
   refreshUser: () => Promise<void>;
 }
@@ -32,43 +36,64 @@ function normalizeUser(raw: any): User {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-
   const router = useRouter();
-  const logout = useCallback(() => {
-    tokenStore.clear();
+
+  const endSession = useCallback(() => {
+    session.setActive(false);
     setUser(null);
     router.replace('/login');
   }, [router]);
 
+  const logout = useCallback(() => {
+    // Çerezler httpOnly olduğu için yalnızca backend silebilir; istek başarısız olsa da arayüz çıkış yapar
+    void authApi
+      .logout()
+      .catch(() => undefined)
+      .finally(endSession);
+  }, [endSession]);
+
+  const logoutAll = useCallback(async () => {
+    try {
+      await authApi.logoutAll();
+      endSession();
+      return { success: true };
+    } catch (err) {
+      return { success: false, message: err instanceof Error ? err.message : 'İşlem başarısız.' };
+    }
+  }, [endSession]);
+
   const refreshUser = useCallback(async () => {
-    if (!tokenStore.get()) return;
+    if (!session.isActive()) return;
     try {
       const res = await authApi.profile();
-      if (res?.user) {
-        const fresh = normalizeUser(res.user);
-        setUser(fresh);
-        userStore.set(fresh);
-      }
+      if (res?.user) setUser(normalizeUser(res.user));
     } catch (err) {
       // 401 durumunda api katmanı oturumu zaten kapatır
       if (!(err instanceof ApiError) || err.status !== 401) console.error('Profil yenilenemedi', err);
     }
   }, []);
 
-  // İlk yükleme: kayıtlı oturumu geri yükle, süresi dolmuşsa temizle, sonra tazele.
+  // İlk yükleme: oturum httpOnly çerezde; varlığını ve geçerliliğini yalnızca backend bilir.
   useEffect(() => {
-    const token = tokenStore.get();
-    const saved = userStore.get<User>();
-    if (token && saved && !tokenStore.isExpired(token)) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- localStorage yalnızca istemcide okunabilir
-      setUser(normalizeUser(saved));
-      setLoading(false);
-      void refreshUser();
-    } else {
-      if (token) tokenStore.clear();
-      setLoading(false);
-    }
-  }, [refreshUser]);
+    let cancelled = false;
+    session.clearLegacy();
+    authApi
+      .profile({ silent401: true })
+      .then((res) => {
+        if (cancelled || !res?.user) return;
+        session.setActive(true);
+        setUser(normalizeUser(res.user));
+      })
+      .catch((err) => {
+        if (!(err instanceof ApiError) || err.status !== 401) console.error('Oturum kontrol edilemedi', err);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     const onLogout = () => setUser(null);
@@ -79,11 +104,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = useCallback(async (email: string, password: string) => {
     try {
       const data = await authApi.login(email.trim().toLowerCase(), password);
-      if (!data?.success || !data.token) return { success: false, message: data?.message || 'Giriş başarısız.' };
-      tokenStore.set(data.token);
-      const u = normalizeUser(data.user);
-      userStore.set(u);
-      setUser(u);
+      if (!data?.success || !data.user) return { success: false, message: data?.message || 'Giriş başarısız.' };
+      session.setActive(true);
+      setUser(normalizeUser(data.user));
       return { success: true };
     } catch (err) {
       return { success: false, message: err instanceof Error ? err.message : 'Giriş başarısız.' };
@@ -100,8 +123,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ user, loading, login, register, logout, refreshUser }),
-    [user, loading, login, register, logout, refreshUser],
+    () => ({ user, loading, login, register, logout, logoutAll, refreshUser }),
+    [user, loading, login, register, logout, logoutAll, refreshUser],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

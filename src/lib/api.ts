@@ -4,8 +4,15 @@ import type { AssetType } from '@/types';
 
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/api';
 
-const TOKEN_KEY = 'token';
-const USER_KEY = 'user';
+/**
+ * Oturum: backend giriş yanıtında httpOnly `pg_session` çerezini set eder; JavaScript token'ı hiç
+ * görmez. Tüm istekler `credentials: 'include'` ile gider. Durum değiştiren isteklerde backend
+ * CSRF koruması olarak `X-Requested-With: PortfoyGo` başlığını ister (her istekte gönderilir).
+ */
+const CSRF_HEADERS = { 'X-Requested-With': 'PortfoyGo' } as const;
+
+/** Önceki sürümlerden kalan localStorage/çerez kayıtları (token artık tarayıcı JS'inde tutulmaz). */
+const LEGACY_KEYS = ['token', 'user', 'portfolio'];
 
 export class ApiError extends Error {
   constructor(message: string, public status: number) {
@@ -14,82 +21,53 @@ export class ApiError extends Error {
   }
 }
 
-export const tokenStore = {
-  get(): string | null {
-    if (typeof window === 'undefined') return null;
-    try {
-      return localStorage.getItem(TOKEN_KEY);
-    } catch {
-      return null;
-    }
+/**
+ * İstemci tarafı oturum durumu. Yalnızca bir oturum kurulduysa (giriş / profil başarılı)
+ * 401 yanıtı "oturum düştü" olarak ele alınır ve giriş sayfasına yönlendirilir.
+ */
+let sessionActive = false;
+let loggingOut = false;
+
+export const session = {
+  isActive: () => sessionActive,
+  setActive(active: boolean) {
+    sessionActive = active;
+    if (active) loggingOut = false;
   },
-  set(token: string) {
+  /** Eski sürümden kalan token/kullanıcı kayıtlarını siler. */
+  clearLegacy() {
+    if (typeof window === 'undefined') return;
     try {
-      localStorage.setItem(TOKEN_KEY, token);
-    } catch {}
-    // Proxy (route koruması) için çerez. Asıl yetki kontrolü backend'de yapılır.
-    document.cookie = `token=${encodeURIComponent(token)}; path=/; max-age=${7 * 86400}; SameSite=Lax${location.protocol === 'https:' ? '; Secure' : ''}`;
-  },
-  clear() {
-    try {
-      localStorage.removeItem(TOKEN_KEY);
-      localStorage.removeItem(USER_KEY);
-      localStorage.removeItem('portfolio');
+      for (const key of LEGACY_KEYS) localStorage.removeItem(key);
     } catch {}
     document.cookie = 'token=; path=/; max-age=0; SameSite=Lax';
   },
-  /** JWT'nin süresi dolmuş mu? (imza doğrulaması backend'de yapılır) */
-  isExpired(token: string): boolean {
-    try {
-      const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
-      return typeof payload.exp === 'number' && payload.exp * 1000 < Date.now();
-    } catch {
-      return true;
-    }
-  },
 };
-
-export const userStore = {
-  get<T>(): T | null {
-    if (typeof window === 'undefined') return null;
-    try {
-      const raw = localStorage.getItem(USER_KEY);
-      return raw ? (JSON.parse(raw) as T) : null;
-    } catch {
-      return null;
-    }
-  },
-  set(user: unknown) {
-    try {
-      localStorage.setItem(USER_KEY, JSON.stringify(user));
-    } catch {}
-  },
-};
-
-let loggingOut = false;
 
 function handleUnauthorized() {
-  if (typeof window === 'undefined' || loggingOut) return;
+  if (typeof window === 'undefined' || loggingOut || !sessionActive) return;
+  sessionActive = false;
   const path = window.location.pathname;
+  window.dispatchEvent(new CustomEvent('auth:logout'));
   if (['/login', '/register', '/forgot-password', '/verify-email'].includes(path)) return;
   loggingOut = true;
-  tokenStore.clear();
-  window.dispatchEvent(new CustomEvent('auth:logout'));
   window.location.replace(`/login?redirect=${encodeURIComponent(path)}`);
 }
 
-export async function apiFetch<T = any>(endpoint: string, options: RequestInit & { auth?: boolean } = {}): Promise<T> {
-  const { auth = true, headers, ...rest } = options;
-  const token = auth ? tokenStore.get() : null;
+export async function apiFetch<T = any>(
+  endpoint: string,
+  options: RequestInit & { /** 401'de oturumu kapatıp yönlendirme yapılmasın */ silent401?: boolean } = {},
+): Promise<T> {
+  const { silent401 = false, headers, ...rest } = options;
   const finalHeaders: Record<string, string> = {
     'Content-Type': 'application/json',
+    ...CSRF_HEADERS,
     ...(headers as Record<string, string> | undefined),
   };
-  if (token) finalHeaders.Authorization = `Bearer ${token}`;
 
   let response: Response;
   try {
-    response = await fetch(`${API_BASE_URL}${endpoint}`, { ...rest, headers: finalHeaders });
+    response = await fetch(`${API_BASE_URL}${endpoint}`, { ...rest, headers: finalHeaders, credentials: 'include' });
   } catch {
     throw new ApiError('Sunucuya ulaşılamadı. Bağlantınızı kontrol edip tekrar deneyin.', 0);
   }
@@ -97,7 +75,7 @@ export async function apiFetch<T = any>(endpoint: string, options: RequestInit &
   const body = await response.json().catch(() => null);
 
   if (!response.ok) {
-    if (response.status === 401 && token) handleUnauthorized();
+    if (response.status === 401 && !silent401) handleUnauthorized();
     const message = (body && (body.message || body.error)) || 'Beklenmeyen bir hata oluştu.';
     throw new ApiError(message, response.status);
   }
@@ -114,19 +92,22 @@ export async function swrFetcher<T>(endpoint: string): Promise<T> {
 const post = (body: unknown): RequestInit => ({ method: 'POST', body: JSON.stringify(body) });
 
 export const authApi = {
-  login: (email: string, password: string) =>
-    apiFetch('/auth/login', { ...post({ email, password }), auth: false }),
+  login: (email: string, password: string) => apiFetch('/auth/login', { ...post({ email, password }), silent401: true }),
   register: (username: string, email: string, password: string) =>
-    apiFetch('/auth/register', { ...post({ username, email, password }), auth: false }),
-  profile: () => apiFetch('/auth/profile'),
+    apiFetch('/auth/register', post({ username, email, password })),
+  profile: (opts: { silent401?: boolean } = {}) => apiFetch('/auth/profile', opts),
+  /** Bu tarayıcıdaki oturumu kapatır (çerezleri siler). */
+  logout: () => apiFetch('/auth/logout', { ...post({}), silent401: true }),
+  /** Tüm cihazlardaki oturumları iptal eder. */
+  logoutAll: () => apiFetch('/auth/logout-all', post({})),
 };
 
 export const emailApi = {
   sendVerification: () => apiFetch('/email/send-verification', post({})),
   verify: (code: string) => apiFetch('/email/verify', post({ code })),
-  sendReset: (email: string) => apiFetch('/email/send-reset', { ...post({ email }), auth: false }),
+  sendReset: (email: string) => apiFetch('/email/send-reset', post({ email })),
   resetPassword: (email: string, code: string, newPassword: string) =>
-    apiFetch('/email/reset-password', { ...post({ email, code, newPassword }), auth: false }),
+    apiFetch('/email/reset-password', post({ email, code, newPassword })),
 };
 
 export interface TradeRequest {
@@ -174,7 +155,7 @@ export const activityApi = {
 };
 
 export const newsApi = {
-  list: (limit = 10) => apiFetch(`/news?limit=${limit}`, { auth: false }),
+  list: (limit = 10) => apiFetch(`/news?limit=${limit}`),
 };
 
 export const stopLossApi = {
@@ -182,4 +163,44 @@ export const stopLossApi = {
     apiFetch('/stop-loss', post(data)),
   list: () => apiFetch('/stop-loss'),
   cancel: (id: string) => apiFetch(`/stop-loss/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+};
+
+export type HistoryRange = '1W' | '1M' | '3M' | '1Y' | 'ALL';
+
+export const historyApi = {
+  /** SWR anahtarı (swrFetcher ile kullanılır) */
+  key: (range: HistoryRange) => `/portfolio/history?range=${range}`,
+};
+
+export const watchlistApi = {
+  /** SWR anahtarı (swrFetcher ile kullanılır) */
+  key: '/watchlist',
+  add: (asset_type: AssetType, symbol: string) =>
+    apiFetch('/watchlist', { method: 'POST', body: JSON.stringify({ asset_type, symbol }) }),
+  remove: (asset_type: AssetType, symbol: string) =>
+    apiFetch(`/watchlist/${encodeURIComponent(asset_type)}/${encodeURIComponent(symbol)}`, { method: 'DELETE' }),
+};
+
+// ---------------------------------------------------------------------------
+// Bekleyen emirler (limit alış/satış, zarar durdur, kâr al)
+// ---------------------------------------------------------------------------
+
+export type OrderSide = 'buy' | 'sell';
+export type OrderType = 'limit' | 'stop_loss' | 'take_profit';
+
+export interface CreateOrderRequest {
+  asset_type: AssetType;
+  symbol: string;
+  side: OrderSide;
+  type: OrderType;
+  quantity: number;
+  trigger_price: number;
+  /** 1–90 gün; varsayılan 30 */
+  expires_in_days?: number;
+}
+
+export const ordersApi = {
+  create: (data: CreateOrderRequest) => apiFetch('/orders', { method: 'POST', body: JSON.stringify(data) }),
+  list: (status: 'active' | 'history' | 'all' = 'active') => apiFetch(`/orders?status=${status}`),
+  cancel: (id: string) => apiFetch(`/orders/${encodeURIComponent(id)}`, { method: 'DELETE' }),
 };

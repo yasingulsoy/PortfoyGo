@@ -44,6 +44,8 @@
     "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8",
+    "@electric-sql/pglite-socket": "^0.2.11",
     "@types/bcryptjs": "^2.4.6",
     "@types/cookie-parser": "^1.4.10",
     "@types/cors": "^2.8.17",
@@ -52,8 +54,11 @@
     "@types/node": "^20.11.0",
     "@types/nodemailer": "^8.0.2",
     "@types/pg": "^8.10.9",
+    "@types/supertest": "^6.0.3",
     "nodemon": "^3.0.2",
+    "supertest": "^7.3.1",
     "ts-node": "^10.9.2",
-    "typescript": "^5.3.3"
+    "typescript": "^5.3.3",
+    "vitest": "^4.1.11"
   }
 }

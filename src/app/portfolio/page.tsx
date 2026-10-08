@@ -15,11 +15,12 @@ import Button, { LinkButton } from '@/components/ui/Button';
 import PageHeader from '@/components/ui/PageHeader';
 import { PageLoader } from '@/components/ui/Spinner';
 import AssetAvatar from '@/components/ui/AssetAvatar';
-import StopLossModal from '@/components/trade/StopLossModal';
+import ProtectOrderModal from '@/components/trade/ProtectOrderModal';
 import AllocationCard from '@/components/portfolio/AllocationCard';
 import HoldingsCard from '@/components/portfolio/HoldingsCard';
-import StopLossOrdersCard from '@/components/portfolio/StopLossOrdersCard';
-import { useStopLossOrders } from '@/components/portfolio/useStopLossOrders';
+import OrdersCard from '@/components/portfolio/OrdersCard';
+import PerformanceChart from '@/components/portfolio/PerformanceChart';
+import { holdingKey, useOrders } from '@/components/portfolio/useOrders';
 import type { Transaction } from '@/types';
 
 export default function PortfolioPage() {
@@ -31,7 +32,7 @@ export default function PortfolioPage() {
 function Portfolio() {
   const { refreshUser } = useAuth();
   const { holdings, totals, balance, transactions, loaded, error, refresh, market } = useLivePortfolio();
-  const stopLoss = useStopLossOrders();
+  const orders = useOrders();
   const [refreshing, setRefreshing] = useState(false);
   const [slHolding, setSlHolding] = useState<LiveHolding | null>(null);
 
@@ -42,7 +43,7 @@ function Portfolio() {
   const reload = async () => {
     setRefreshing(true);
     try {
-      await Promise.all([refresh(), refreshUser(), stopLoss.refresh()]);
+      await Promise.all([refresh(), refreshUser(), orders.refresh()]);
     } finally {
       setRefreshing(false);
     }
@@ -89,6 +90,8 @@ function Portfolio() {
         <Alert tone="info">Bazı varlıklar için canlı fiyat alınamadı; bu pozisyonlarda sunucunun son değerlemesi gösteriliyor.</Alert>
       )}
 
+      <PerformanceChart />
+
       <div className="grid gap-6 lg:grid-cols-3">
         <Card className="flex flex-col overflow-hidden lg:col-span-2">
           <dl className="grid flex-1 grid-cols-2 gap-px bg-line sm:grid-cols-4 lg:grid-cols-2">
@@ -132,27 +135,27 @@ function Portfolio() {
           />
         </Card>
       ) : (
-        <HoldingsCard holdings={holdings} loaded={loaded} activeByItem={stopLoss.activeByItem} onStopLoss={setSlHolding} />
+        <HoldingsCard holdings={holdings} loaded={loaded} ordersByHolding={orders.activeSellByHolding} onOrders={setSlHolding} />
       )}
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <StopLossOrdersCard
-          active={stopLoss.active}
-          history={stopLoss.history}
-          holdings={holdings}
-          loading={stopLoss.isLoading}
-          error={stopLoss.error}
-          onRetry={() => void stopLoss.refresh()}
-          onChanged={() => stopLoss.refresh()}
+        <OrdersCard
+          id="bekleyen-emirler"
+          active={orders.active}
+          history={orders.history}
+          loading={orders.isLoading}
+          error={orders.error}
+          onRetry={() => void orders.refresh()}
+          onChanged={() => Promise.all([orders.refresh(), refresh(), refreshUser()])}
         />
         <RecentTransactions transactions={transactions} loaded={loaded} />
       </div>
 
-      <StopLossModal
+      <ProtectOrderModal
         holding={slHolding}
-        activeOrder={slHolding ? stopLoss.activeByItem.get(slHolding.id) : null}
+        activeOrders={slHolding ? orders.activeSellByHolding.get(holdingKey(slHolding.assetType, slHolding.symbol)) : undefined}
         onClose={() => setSlHolding(null)}
-        onCreated={() => void stopLoss.refresh()}
+        onCreated={() => void orders.refresh()}
       />
     </div>
   );

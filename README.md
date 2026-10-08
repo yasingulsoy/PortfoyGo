@@ -86,4 +86,31 @@ Bu komut backend'i (`:5001`) ve frontend'i (`:3000`) birlikte başlatır.
 - `.env` dosyalarını ve veritabanı dökümlerini (`*.dump`, `portfoygo.sql`) asla commit etmeyin; `.gitignore` bunları dışlar.
 - Daha önce repoya girmiş anahtarlar **geçersiz sayılmalı ve yenilenmelidir**. Git geçmişindeki eski dosyalar için `git filter-repo` ile temizlik önerilir.
 
-Proje durumu ve yol haritası: [docs/SU_AN_NE_YAPILABIYOR.md](docs/SU_AN_NE_YAPILABIYOR.md)
+- Geliştirme yol haritası: [docs/GELISTIRME_YOL_HARITASI.md](docs/GELISTIRME_YOL_HARITASI.md)
+- Mevcut yetenekler: [docs/SU_AN_NE_YAPILABIYOR.md](docs/SU_AN_NE_YAPILABIYOR.md)
+
+### Oturumlar (çerez tabanlı)
+
+- Giriş başarılı olunca backend JWT'yi gövdede **döndürmez**; `pg_session` adlı **httpOnly** çereze yazar
+  (`SameSite=Lax`, `Path=/`, 7 gün; production'da veya `COOKIE_SECURE=1` ise `Secure`). JavaScript token'ı hiç
+  görmez, localStorage'da token tutulmaz. Yanında hassas bilgi içermeyen `pg_auth=1` ipucu çerezi de yazılır;
+  Next proxy'si (`src/proxy.ts`) sayfa korumasında yalnızca buna bakar. Asıl yetki kontrolü her istekte backend'dedir.
+- **CSRF:** Çerezle doğrulanan `POST/PUT/PATCH/DELETE` isteklerinde `X-Requested-With: PortfoyGo` başlığı zorunludur
+  (yoksa 403). Özel başlık CORS preflight'ını tetikler; preflight da `ALLOWED_ORIGINS` listesiyle korunur
+  (`credentials: true`, asla `*`). `/api/auth/login` yalnızca `application/json` kabul eder.
+- **Script / test:** `Authorization: Bearer <jwt>` hâlâ desteklenir ve CSRF kontrolünden muaftır. Token, giriş
+  yanıtındaki `Set-Cookie: pg_session=...` değerinden alınır. Çerez kavanozu (cookie jar) kullanan istemciler
+  durum değiştiren isteklerde yukarıdaki başlığı göndermelidir.
+- **Oturum iptali:** `POST /api/auth/logout` bu tarayıcının çerezlerini siler. `POST /api/auth/logout-all`
+  (Profil → Güvenlik → "Tüm cihazlardan çıkış yap") `users.token_version` değerini artırır; JWT'deki `tv`
+  uyuşmayan tüm oturumlar 401 alır. Şifre sıfırlama da tüm oturumları kapatır.
+  `migrations/002_sessions.sql` çalıştırılmadan yeni backend yayına alınmamalıdır.
+- **Dağıtım:** Çerezler port ayırt etmediği için geliştirmede `localhost:3000` → `localhost:5001` sorunsuz çalışır
+  (ikisine de `localhost` ile girin; `127.0.0.1` karıştırmayın). Production'da frontend ile API **aynı sitede**
+  olmalıdır:
+  - Alt alan adları: `app.portfoygo.com` + `api.portfoygo.com`, backend'de `COOKIE_DOMAIN=.portfoygo.com`
+    ve `ALLOWED_ORIGINS=https://app.portfoygo.com`.
+  - veya aynı origin: frontend build'inde `API_PROXY_TARGET=https://<api-adresi>` ve
+    `NEXT_PUBLIC_API_URL=/api/backend`; Next, `/api/backend/*` isteklerini backend'e aktarır. Bu durumda
+    backend tüm istekleri Next sunucusundan alır; rate limit için `TRUST_PROXY` ayarını gözden geçirin.
+  - Farklı sitelerde (örn. `*.vercel.app` + `*.onrender.com`) `SameSite=Lax` çerezler gönderilmez; oturum çalışmaz.

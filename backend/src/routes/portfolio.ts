@@ -3,8 +3,25 @@ import { PortfolioService } from '../services/portfolio';
 import { authenticateToken, requireUser } from '../middleware/auth';
 import { asyncHandler } from '../utils/errors';
 import { parseOrThrow, limitSchema } from '../utils/validation';
+import { z } from 'zod';
+import { HistoryService, HISTORY_RANGES } from '../services/history';
 
 const router = express.Router();
+
+const historyQuerySchema = z.object({
+  range: z.enum(HISTORY_RANGES, { message: 'Geçersiz aralık (1W, 1M, 3M, 1Y, ALL)' }).optional().default('1M'),
+});
+
+// Portföy performans geçmişi (?range=1W|1M|3M|1Y|ALL)
+router.get(
+  '/history',
+  authenticateToken,
+  asyncHandler(async (req, res) => {
+    const { range } = parseOrThrow(historyQuerySchema, req.query);
+    const data = await HistoryService.getHistory(requireUser(req).id, range);
+    res.json({ success: true, data });
+  })
+);
 
 // Portföy bilgilerini getir
 router.get(

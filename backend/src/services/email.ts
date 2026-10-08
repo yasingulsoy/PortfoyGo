@@ -278,7 +278,11 @@ export class EmailService {
       }
 
       const hash = await AuthService.hashPassword(newPassword);
-      await client.query('UPDATE users SET password_hash = $2 WHERE id = $1', [user.id, hash]);
+      // token_version + 1: şifre değişince mevcut tüm oturumlar (diğer cihazlar dahil) iptal edilir
+      await client.query('UPDATE users SET password_hash = $2, token_version = token_version + 1 WHERE id = $1', [
+        user.id,
+        hash,
+      ]);
       await client.query(
         `UPDATE email_verifications SET used = true
           WHERE user_id = $1 AND purpose = 'reset' AND used = false`,

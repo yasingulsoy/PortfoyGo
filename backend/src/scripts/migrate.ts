@@ -1,72 +1,61 @@
-import fs from 'fs';
-import path from 'path';
 import pool from '../config/database';
+import { runMigrations } from '../db/migrator';
 
 /**
- * backend/migrations/*.sql dosyalarını isim sırasıyla çalıştırır.
- * Her dosya tek bir transaction içinde çalışır; uygulanan dosyalar schema_migrations
- * tablosuna kaydedilir ve tekrar çalıştırılmaz (dosyalar ayrıca idempotent yazılmıştır).
+ * backend/migrations/*.sql dosyalarını isim sırasıyla uygular (bkz. src/db/migrator.ts).
  *
- * Kullanım:  npm run migrate              → bekleyen tüm migration'lar
- *            npm run migrate -- 001_hardening.sql   → sadece belirtilen dosya
+ * Kullanım:
+ *   npm run migrate                          → bekleyen tüm migration'lar
+ *   npm run migrate -- --dry-run             → sadece bekleyenleri listele, hiçbir şey yazma
+ *   npm run migrate -- 001_hardening.sql     → sadece bu dosya (uygulanmış olsa bile yeniden)
  *
- * ⚠️ .env içindeki DATABASE_URL / DB_* hedefine bağlanır. Önce yedek alın.
+ * ⚠️ DATABASE_URL / DB_* hedefine bağlanır (ortamda tanımlı değilse backend/.env'den okunur).
+ *    Canlı veritabanında çalıştırmadan önce yedek alın.
  */
-const MIGRATIONS_DIR = path.resolve(__dirname, '../../migrations');
+function describeTarget(): string {
+  const url = process.env.DATABASE_URL;
+  if (url) {
+    try {
+      const u = new URL(url);
+      return `${u.hostname}:${u.port || '5432'}${u.pathname}`;
+    } catch {
+      return '(DATABASE_URL)';
+    }
+  }
+  return `${process.env.DB_HOST || 'localhost'}:${process.env.DB_PORT || '5432'}/${process.env.DB_NAME || 'trading_platform'}`;
+}
 
 async function main() {
-  const only = process.argv[2];
-  const files = fs
-    .readdirSync(MIGRATIONS_DIR)
-    .filter((f) => /^\d+_.+\.sql$/.test(f))
-    .filter((f) => !only || f === only)
-    .sort();
-
-  if (files.length === 0) {
-    console.log('Çalıştırılacak migration bulunamadı.');
-    return;
+  const args = process.argv.slice(2);
+  const dryRun = args.includes('--dry-run');
+  const unknown = args.filter((a) => a.startsWith('-') && a !== '--dry-run');
+  if (unknown.length > 0) {
+    throw new Error(`Bilinmeyen seçenek: ${unknown.join(' ')} (desteklenen: --dry-run, <dosya.sql>)`);
   }
+  const only = args.find((a) => !a.startsWith('-'));
 
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS schema_migrations (
-      name VARCHAR(255) PRIMARY KEY,
-      applied_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-    )
-  `);
+  console.log(`[migrate] Hedef: ${describeTarget()}${dryRun ? ' (dry-run)' : ''}`);
+  const result = await runMigrations(pool, { dryRun, only });
 
-  for (const file of files) {
-    const done = await pool.query('SELECT 1 FROM schema_migrations WHERE name = $1', [file]);
-    if (done.rows.length > 0 && !only) {
-      console.log(`↷ ${file} zaten uygulanmış, atlandı`);
-      continue;
-    }
-
-    const sql = fs.readFileSync(path.join(MIGRATIONS_DIR, file), 'utf8');
-    const client = await pool.connect();
-    try {
-      console.log(`→ ${file} uygulanıyor...`);
-      await client.query('BEGIN');
-      await client.query(sql);
-      await client.query(
-        'INSERT INTO schema_migrations (name) VALUES ($1) ON CONFLICT (name) DO UPDATE SET applied_at = CURRENT_TIMESTAMP',
-        [file]
-      );
-      await client.query('COMMIT');
-      console.log(`✓ ${file} tamamlandı`);
-    } catch (error: any) {
-      await client.query('ROLLBACK').catch(() => undefined);
-      console.error(`✗ ${file} başarısız (geri alındı): ${error?.message}`);
-      process.exitCode = 1;
-      return;
-    } finally {
-      client.release();
-    }
+  if (dryRun) {
+    console.log(
+      result.pending.length === 0
+        ? '[migrate] Bekleyen migration yok.'
+        : `[migrate] ${result.pending.length} migration bekliyor: ${result.pending.join(', ')}`
+    );
+  } else {
+    console.log(
+      `[migrate] Bitti: ${result.applied.length} uygulandı, ${result.skipped.length} zaten uygulanmıştı.`
+    );
+  }
+  if (result.changed.length > 0) {
+    console.warn(`[migrate] UYARI: uygulandıktan sonra değişen dosyalar: ${result.changed.join(', ')}`);
   }
 }
 
 main()
   .catch((err) => {
-    console.error('Migration hatası:', err?.message || err);
+    console.error(`[migrate] HATA: ${err?.message || err}`);
     process.exitCode = 1;
   })
   .finally(() => pool.end());

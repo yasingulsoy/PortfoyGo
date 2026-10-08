@@ -61,7 +61,7 @@ export class AuthService {
   static async login(data: LoginRequest): Promise<AuthResponse & { status: number }> {
     const email = data.email.trim().toLowerCase();
     const result = await pool.query(
-      `SELECT ${USER_COLUMNS}, password_hash FROM users WHERE LOWER(email) = $1 LIMIT 1`,
+      `SELECT ${USER_COLUMNS}, password_hash, token_version FROM users WHERE LOWER(email) = $1 LIMIT 1`,
       [email]
     );
     const user = result.rows[0];
@@ -80,10 +80,7 @@ export class AuthService {
       };
     }
 
-    const token = jwt.sign({ userId: user.id }, getJwtSecret(), {
-      algorithm: JWT_ALGORITHM,
-      expiresIn: JWT_EXPIRES_IN,
-    });
+    const token = AuthService.signSessionToken(user.id, user.token_version);
 
     await pool.query('UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = $1', [user.id]);
 
@@ -101,7 +98,26 @@ export class AuthService {
   }
 
   /**
-   * Token doğrulama. Geçersiz/süresi dolmuş token, silinmiş veya yasaklı kullanıcı → null.
+   * Oturum JWT'si üretir. `tv` (users.token_version) her doğrulamada veritabanıyla karşılaştırılır;
+   * değer artırıldığında (tüm cihazlardan çıkış, şifre sıfırlama) eski token'lar geçersiz olur.
+   * Token istemciye gövdede DÖNMEZ; route katmanı httpOnly çereze yazar.
+   */
+  static signSessionToken(userId: string, tokenVersion: unknown): string {
+    const tv = Number(tokenVersion ?? 0);
+    return jwt.sign({ userId, tv: Number.isInteger(tv) ? tv : 0 }, getJwtSecret(), {
+      algorithm: JWT_ALGORITHM,
+      expiresIn: JWT_EXPIRES_IN,
+    });
+  }
+
+  /** Kullanıcının tüm oturumlarını iptal eder (token_version + 1). */
+  static async revokeAllSessions(userId: string): Promise<void> {
+    await pool.query('UPDATE users SET token_version = token_version + 1 WHERE id = $1', [userId]);
+  }
+
+  /**
+   * Token doğrulama. Geçersiz/süresi dolmuş token, iptal edilmiş oturum (tv uyuşmazlığı),
+   * silinmiş veya yasaklı kullanıcı → null.
    * (Her istekte çalıştığı için rank burada yeniden hesaplanmaz; cron'un yazdığı değer döner.)
    */
   static async verifyToken(token: string): Promise<User | null> {
@@ -112,14 +128,20 @@ export class AuthService {
       return null;
     }
 
-    const userId = typeof decoded === 'object' && decoded !== null ? (decoded as any).userId : undefined;
+    const payload = typeof decoded === 'object' && decoded !== null ? (decoded as Record<string, unknown>) : {};
+    const userId = payload.userId;
+    const tv = payload.tv;
     if (typeof userId !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId)) {
       return null;
     }
+    // `tv` içermeyen (eski) token'lar kabul edilmez
+    if (typeof tv !== 'number' || !Number.isInteger(tv)) {
+      return null;
+    }
 
-    const result = await pool.query(`SELECT ${USER_COLUMNS} FROM users WHERE id = $1`, [userId]);
+    const result = await pool.query(`SELECT ${USER_COLUMNS}, token_version FROM users WHERE id = $1`, [userId]);
     const row = result.rows[0];
-    if (!row || row.is_banned) {
+    if (!row || row.is_banned || Number(row.token_version) !== tv) {
       return null;
     }
     return mapUserRow(row);

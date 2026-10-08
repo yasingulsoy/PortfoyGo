@@ -11,7 +11,9 @@ import {
   NewspaperIcon,
   TrophyIcon,
 } from '@heroicons/react/20/solid';
-import { useRequireAuth } from '@/hooks/useRequireAuth';
+import { useAuth } from '@/context/AuthContext';
+import Landing from '@/components/landing/Landing';
+import OnboardingGuide from '@/components/onboarding/OnboardingGuide';
 import { useLivePortfolio, type LiveHolding } from '@/context/PortfolioContext';
 import { FEATURED_CURRENCIES } from '@/hooks/useMarketData';
 import { leaderboardApi, newsApi } from '@/lib/api';
@@ -26,6 +28,12 @@ import { PageLoader } from '@/components/ui/Spinner';
 import Tabs from '@/components/ui/Tabs';
 import AssetAvatar from '@/components/ui/AssetAvatar';
 import MarketTable, { assetHref } from '@/components/market/MarketTable';
+import PerformanceChart from '@/components/portfolio/PerformanceChart';
+import { useWatchlist } from '@/hooks/useWatchlist';
+import { StarIcon } from '@heroicons/react/24/outline';
+import type { MarketAsset } from '@/types';
+
+type MarketTab = AssetType | 'watchlist';
 
 const MARKET_TABS: { value: AssetType; label: string }[] = [
   { value: 'stock', label: 'Hisse' },
@@ -43,8 +51,10 @@ const ALLOCATION_COLORS: Record<AssetType | 'cash', string> = {
 };
 
 export default function DashboardPage() {
-  const { user, ready } = useRequireAuth();
-  if (!ready || !user) return <PageLoader />;
+  const { user, loading } = useAuth();
+  if (loading) return <PageLoader />;
+  // Oturum yoksa yönlendirme yerine herkese açık tanıtım sayfası
+  if (!user) return <Landing />;
 
   return (
     <div className="space-y-6">
@@ -61,6 +71,8 @@ export default function DashboardPage() {
           </span>
         </Alert>
       )}
+
+      <OnboardingGuide />
 
       <Overview rank={user.rank} />
 
@@ -152,6 +164,9 @@ function Overview({ rank }: { rank: number | null }) {
           <Metric label="Genel sıralama" value={rank ? `#${rank}` : '—'} sub={rank ? undefined : 'Doğrulama sonrası'} />
         </dl>
       </div>
+      <div className="border-t border-line px-5 py-4 sm:px-6">
+        <PerformanceChart compact />
+      </div>
     </Card>
   );
 }
@@ -170,10 +185,26 @@ function Metric({ label, value, sub }: { label: string; value: React.ReactNode; 
 
 function Markets({ className }: { className?: string }) {
   const { market } = useLivePortfolio();
-  const [tab, setTab] = useState<AssetType>('stock');
+  const watch = useWatchlist();
+  // Kullanıcı sekme seçene kadar: izleme listesi doluysa onu, değilse hisseleri göster
+  const [picked, setPicked] = useState<MarketTab | null>(null);
+  const tab: MarketTab = picked ?? (watch.items.length > 0 ? 'watchlist' : 'stock');
   const [query, setQuery] = useState('');
 
+  const watchAssets = useMemo<MarketAsset[]>(() => {
+    const out: MarketAsset[] = [];
+    for (const i of watch.items) {
+      const live = market.find(i.asset_type, i.symbol);
+      if (live) out.push(live);
+      // Canlı listede olmayan (ör. ilk 25 dışına düşen kripto) varlık: fiyatsız satır, yıldızla çıkarılabilir
+      else if (!market.isLoading)
+        out.push({ key: `${i.asset_type}:${i.symbol}`, type: i.asset_type, symbol: i.symbol, name: ASSET_TYPE_LABELS[i.asset_type], priceTRY: null, priceUSD: null, changePercent: 0 });
+    }
+    return out;
+  }, [watch.items, market]);
+
   const assets = useMemo(() => {
+    if (tab === 'watchlist') return watchAssets;
     const list = market.byType[tab];
     if (tab !== 'currency') return list;
     // Önce öne çıkan kurlar, sonra diğerleri
@@ -182,7 +213,7 @@ function Markets({ className }: { className?: string }) {
       return i === -1 ? 999 : i;
     };
     return [...list].sort((a, b) => rank(a.symbol) - rank(b.symbol));
-  }, [market.byType, tab]);
+  }, [market.byType, tab, watchAssets]);
 
   return (
     <Card className={cn('overflow-hidden', className)}>
@@ -210,12 +241,38 @@ function Markets({ className }: { className?: string }) {
           variant="underline"
           label="Piyasa türü"
           value={tab}
-          onChange={setTab}
-          items={MARKET_TABS.map((t) => ({ ...t, count: market.byType[t.value].length }))}
+          onChange={setPicked}
+          items={[
+            { value: 'watchlist' as const, label: 'İzleme listesi', count: watch.items.length },
+            ...MARKET_TABS.map((t) => ({ ...t, count: market.byType[t.value].length })),
+          ]}
         />
       </div>
       <div className="lg:max-h-[560px] lg:overflow-y-auto">
-        <MarketTable assets={assets} loading={market.isLoading} error={market.errors[tab]} query={query} showVolume={tab === 'crypto'} />
+        {tab === 'watchlist' && watch.items.length === 0 && !watch.isLoading ? (
+          <EmptyState
+            icon={<StarIcon />}
+            title={watch.error ? 'İzleme listesi yüklenemedi' : 'İzleme listen boş'}
+            description={
+              watch.error ? (
+                'Birazdan otomatik olarak yeniden denenecek.'
+              ) : (
+                <>
+                  Takip etmek istediğin varlıkların satırındaki <StarIcon className="inline h-4 w-4 align-[-3px] text-gold" aria-label="yıldız" /> simgesine
+                  dokun; burada tek bakışta görürsün.
+                </>
+              )
+            }
+          />
+        ) : (
+          <MarketTable
+            assets={assets}
+            loading={tab === 'watchlist' ? watch.isLoading || market.isLoading : market.isLoading}
+            error={tab === 'watchlist' ? watch.error : market.errors[tab]}
+            query={query}
+            showVolume={tab === 'crypto'}
+          />
+        )}
       </div>
     </Card>
   );
