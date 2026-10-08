@@ -1,5 +1,8 @@
 import pool from '../config/database';
+import { AppError } from '../utils/errors';
+import { AssetType, toNumber } from '../types';
 import { TransactionService } from './transaction';
+import { PricingService, PriceUnavailableError, priceKey } from './pricing';
 
 export interface StopLossOrder {
   id: string;
@@ -17,193 +20,205 @@ export interface StopLossOrder {
 export interface CreateStopLossRequest {
   portfolio_item_id: string;
   trigger_price: number;
-  quantity?: number; // Eğer belirtilmezse tüm miktar için
+  quantity?: number; // Belirtilmezse tüm miktar
 }
 
+const mapOrder = (row: any): StopLossOrder => ({
+  id: row.id,
+  user_id: row.user_id,
+  portfolio_item_id: row.portfolio_item_id,
+  symbol: row.symbol,
+  asset_type: row.asset_type,
+  quantity: toNumber(row.quantity),
+  trigger_price: toNumber(row.trigger_price),
+  status: row.status,
+  created_at: row.created_at,
+  triggered_at: row.triggered_at,
+});
+
 export class StopLossService {
-  // Stop-loss emri oluştur
-  static async createStopLoss(userId: string, data: CreateStopLossRequest): Promise<{ success: boolean; message?: string; stopLoss?: StopLossOrder }> {
+  static async createStopLoss(userId: string, data: CreateStopLossRequest): Promise<{ success: true; stopLoss: StopLossOrder }> {
     const client = await pool.connect();
-    
     try {
       await client.query('BEGIN');
 
-      // Portföy öğesini kontrol et
+      // Önce users (işlemlerle aynı kilit sırası), sonra portföy öğesi
+      await client.query('SELECT id FROM users WHERE id = $1 FOR UPDATE', [userId]);
       const portfolioResult = await client.query(
-        'SELECT * FROM portfolio_items WHERE id = $1 AND user_id = $2',
+        'SELECT * FROM portfolio_items WHERE id = $1 AND user_id = $2 FOR UPDATE',
         [data.portfolio_item_id, userId]
       );
-
       if (portfolioResult.rows.length === 0) {
-        await client.query('ROLLBACK');
-        return { success: false, message: 'Portföy öğesi bulunamadı!' };
+        throw new AppError(404, 'Portföy öğesi bulunamadı', 'NOT_FOUND');
       }
 
       const portfolioItem = portfolioResult.rows[0];
-      const quantity = data.quantity || parseFloat(portfolioItem.quantity);
+      const held = toNumber(portfolioItem.quantity);
+      const quantity = data.quantity ?? held;
 
-      // Miktar kontrolü
-      if (quantity > parseFloat(portfolioItem.quantity)) {
-        await client.query('ROLLBACK');
-        return { success: false, message: 'Yetersiz miktar!' };
+      if (!(quantity > 0) || quantity > held) {
+        throw new AppError(400, 'Geçersiz miktar: 0 ile eldeki miktar arasında olmalı', 'INVALID_QUANTITY');
       }
 
-      // Mevcut aktif stop-loss'u kontrol et
-      const existingResult = await client.query(
-        'SELECT id FROM stop_loss_orders WHERE user_id = $1 AND portfolio_item_id = $2 AND status = $3',
-        [userId, data.portfolio_item_id, 'active']
+      const existing = await client.query(
+        `SELECT id FROM stop_loss_orders WHERE user_id = $1 AND portfolio_item_id = $2 AND status = 'active'`,
+        [userId, data.portfolio_item_id]
       );
-
-      if (existingResult.rows.length > 0) {
-        await client.query('ROLLBACK');
-        return { success: false, message: 'Bu varlık için zaten aktif bir stop-loss emri var!' };
+      if (existing.rows.length > 0) {
+        throw new AppError(409, 'Bu varlık için zaten aktif bir stop-loss emri var', 'DUPLICATE');
       }
 
-      // Stop-loss emri oluştur
       const result = await client.query(
-        `INSERT INTO stop_loss_orders 
-         (user_id, portfolio_item_id, symbol, asset_type, quantity, trigger_price, status)
+        `INSERT INTO stop_loss_orders
+           (user_id, portfolio_item_id, symbol, asset_type, quantity, trigger_price, status)
          VALUES ($1, $2, $3, $4, $5, $6, 'active')
          RETURNING *`,
-        [
-          userId,
-          data.portfolio_item_id,
-          portfolioItem.symbol,
-          portfolioItem.asset_type,
-          quantity,
-          data.trigger_price
-        ]
+        [userId, data.portfolio_item_id, portfolioItem.symbol, portfolioItem.asset_type, quantity, data.trigger_price]
       );
 
       await client.query('COMMIT');
-
-      const stopLoss: StopLossOrder = {
-        id: result.rows[0].id,
-        user_id: result.rows[0].user_id,
-        portfolio_item_id: result.rows[0].portfolio_item_id,
-        symbol: result.rows[0].symbol,
-        asset_type: result.rows[0].asset_type,
-        quantity: parseFloat(result.rows[0].quantity),
-        trigger_price: parseFloat(result.rows[0].trigger_price),
-        status: result.rows[0].status,
-        created_at: result.rows[0].created_at,
-        triggered_at: result.rows[0].triggered_at
-      };
-
-      return { success: true, stopLoss };
+      return { success: true, stopLoss: mapOrder(result.rows[0]) };
     } catch (error) {
-      await client.query('ROLLBACK');
-      console.error('Create stop-loss error:', error);
-      return { success: false, message: 'Stop-loss emri oluşturulamadı!' };
+      await client.query('ROLLBACK').catch(() => undefined);
+      throw error;
     } finally {
       client.release();
     }
   }
 
-  // Kullanıcının stop-loss emirlerini getir
-  static async getStopLossOrders(userId: string): Promise<{ success: boolean; stopLossOrders?: StopLossOrder[] }> {
-    try {
-      const result = await pool.query(
-        `SELECT * FROM stop_loss_orders 
-         WHERE user_id = $1 
-         ORDER BY created_at DESC`,
-        [userId]
-      );
-
-      const stopLossOrders: StopLossOrder[] = result.rows.map((row: any) => ({
-        id: row.id,
-        user_id: row.user_id,
-        portfolio_item_id: row.portfolio_item_id,
-        symbol: row.symbol,
-        asset_type: row.asset_type,
-        quantity: parseFloat(row.quantity),
-        trigger_price: parseFloat(row.trigger_price),
-        status: row.status,
-        created_at: row.created_at,
-        triggered_at: row.triggered_at
-      }));
-
-      return { success: true, stopLossOrders };
-    } catch (error) {
-      console.error('Get stop-loss orders error:', error);
-      return { success: false };
-    }
+  static async getStopLossOrders(userId: string): Promise<{ success: true; stopLossOrders: StopLossOrder[] }> {
+    const result = await pool.query(
+      `SELECT * FROM stop_loss_orders
+        WHERE user_id = $1
+        ORDER BY created_at DESC
+        LIMIT 200`,
+      [userId]
+    );
+    return { success: true, stopLossOrders: result.rows.map(mapOrder) };
   }
 
-  // Stop-loss emrini iptal et
   static async cancelStopLoss(userId: string, stopLossId: string): Promise<{ success: boolean; message?: string }> {
-    const client = await pool.connect();
-    
-    try {
-      await client.query('BEGIN');
+    const result = await pool.query(
+      `UPDATE stop_loss_orders SET status = 'cancelled'
+        WHERE id = $1 AND user_id = $2 AND status = 'active'
+        RETURNING id`,
+      [stopLossId, userId]
+    );
+    if (result.rows.length === 0) {
+      return { success: false, message: 'Stop-loss emri bulunamadı veya zaten aktif değil' };
+    }
+    return { success: true, message: 'Stop-loss emri iptal edildi' };
+  }
 
-      const result = await client.query(
-        'UPDATE stop_loss_orders SET status = $1 WHERE id = $2 AND user_id = $3 AND status = $4 RETURNING *',
-        ['cancelled', stopLossId, userId, 'active']
-      );
+  /**
+   * Cron: aktif emirleri kontrol eder; fiyat tetikleme seviyesine indiyse satar.
+   * Her emir kendi transaction'ında işlenir. Kilit sırası: users → stop_loss_orders
+   * (FOR UPDATE SKIP LOCKED) → portfolio_items (TransactionService.sell içinde).
+   */
+  static async checkAndTriggerStopLosses(): Promise<void> {
+    // 1) Pozisyonu artık olmayan aktif emirleri iptal et
+    await pool.query(
+      `UPDATE stop_loss_orders sl
+          SET status = 'cancelled'
+        WHERE sl.status = 'active'
+          AND NOT EXISTS (SELECT 1 FROM portfolio_items pi WHERE pi.id = sl.portfolio_item_id)`
+    );
 
-      if (result.rows.length === 0) {
-        await client.query('ROLLBACK');
-        return { success: false, message: 'Stop-loss emri bulunamadı veya zaten iptal edilmiş!' };
+    // 2) Aday emirler (kilitsiz okuma)
+    const candidates = await pool.query(
+      `SELECT sl.id, sl.user_id, sl.symbol, sl.asset_type, sl.trigger_price
+         FROM stop_loss_orders sl
+        WHERE sl.status = 'active'
+        ORDER BY sl.created_at
+        LIMIT 500`
+    );
+    if (candidates.rows.length === 0) return;
+
+    // 3) Güncel (taze) fiyatlar
+    const keys = candidates.rows.map((r: any) => ({ symbol: String(r.symbol).toUpperCase(), asset_type: r.asset_type as AssetType }));
+    const prices = await PricingService.getPricesTRY(keys, true);
+
+    for (const cand of candidates.rows) {
+      const current = prices.get(priceKey(cand.asset_type, String(cand.symbol)));
+      if (current === undefined || current > toNumber(cand.trigger_price)) {
+        continue;
       }
-
-      await client.query('COMMIT');
-      return { success: true };
-    } catch (error) {
-      await client.query('ROLLBACK');
-      console.error('Cancel stop-loss error:', error);
-      return { success: false, message: 'Stop-loss emri iptal edilemedi!' };
-    } finally {
-      client.release();
+      try {
+        await this.triggerOne(cand.id, cand.user_id);
+      } catch (error: any) {
+        console.error(`[stop-loss] Emir işlenemedi (${cand.id}):`, error?.publicMessage || error?.message);
+      }
     }
   }
 
-  // Aktif stop-loss emirlerini kontrol et ve tetiklenenleri işle
-  static async checkAndTriggerStopLosses(): Promise<void> {
+  private static async triggerOne(orderId: string, userId: string): Promise<void> {
     const client = await pool.connect();
-    
+    let postCommit: (() => void) | undefined;
     try {
       await client.query('BEGIN');
+      await client.query('SELECT id FROM users WHERE id = $1 FOR UPDATE', [userId]);
 
-      // Aktif stop-loss emirlerini getir
-      const result = await client.query(
-        `SELECT sl.*, pi.current_price, pi.name 
-         FROM stop_loss_orders sl
-         JOIN portfolio_items pi ON sl.portfolio_item_id = pi.id
-         WHERE sl.status = 'active'`
+      const orderRes = await client.query(
+        `SELECT * FROM stop_loss_orders
+          WHERE id = $1 AND user_id = $2 AND status = 'active'
+          FOR UPDATE SKIP LOCKED`,
+        [orderId, userId]
       );
-
-      for (const order of result.rows) {
-        const currentPrice = parseFloat(order.current_price);
-        const triggerPrice = parseFloat(order.trigger_price);
-
-        // Fiyat trigger fiyatına ulaştı veya geçti mi?
-        if (currentPrice <= triggerPrice) {
-          // Stop-loss'u tetikle - otomatik satış yap
-          const sellResult = await TransactionService.sell(order.user_id, {
-            symbol: order.symbol,
-            quantity: parseFloat(order.quantity)
-          });
-
-          if (sellResult.success) {
-            // Stop-loss'u tetiklendi olarak işaretle
-            await client.query(
-              'UPDATE stop_loss_orders SET status = $1, triggered_at = CURRENT_TIMESTAMP WHERE id = $2',
-              ['triggered', order.id]
-            );
-            
-            console.log(`Stop-loss tetiklendi: ${order.symbol} - ${order.quantity} adet ${triggerPrice} fiyatından satıldı`);
-          }
-        }
+      const order = orderRes.rows[0];
+      if (!order) {
+        await client.query('ROLLBACK');
+        return; // başka bir süreç işliyor veya artık aktif değil
       }
 
+      const holdingRes = await client.query(
+        'SELECT quantity FROM portfolio_items WHERE id = $1 AND user_id = $2',
+        [order.portfolio_item_id, userId]
+      );
+      const held = holdingRes.rows[0] ? toNumber(holdingRes.rows[0].quantity) : 0;
+      if (held <= 0) {
+        await client.query(`UPDATE stop_loss_orders SET status = 'cancelled' WHERE id = $1`, [orderId]);
+        await client.query('COMMIT');
+        return;
+      }
+
+      // Taze fiyatla tekrar kontrol et (aday seçimi ile bu an arasında fiyat değişmiş olabilir)
+      const quote = await PricingService.getExecutionPriceTRY(order.symbol, order.asset_type);
+      if (quote.priceTRY > toNumber(order.trigger_price)) {
+        await client.query('ROLLBACK');
+        return;
+      }
+
+      const quantity = Math.min(toNumber(order.quantity), held);
+      const result = await TransactionService.sell(
+        userId,
+        { symbol: order.symbol, asset_type: order.asset_type, quantity },
+        { client, quote, capToHolding: true, source: 'stop_loss' }
+      );
+      postCommit = result.postCommit;
+
+      // Pozisyon tamamen kapandıysa FK CASCADE emri silmiş olabilir; UPDATE 0 satır etkiler, sorun değil
+      await client.query(
+        `UPDATE stop_loss_orders SET status = 'triggered', triggered_at = CURRENT_TIMESTAMP WHERE id = $1`,
+        [orderId]
+      );
+
       await client.query('COMMIT');
+      console.log(`[stop-loss] Tetiklendi: ${order.symbol} ${quantity} @ ${quote.priceTRY.toFixed(4)} TL`);
     } catch (error) {
-      await client.query('ROLLBACK');
-      console.error('Check stop-losses error:', error);
+      await client.query('ROLLBACK').catch(() => undefined);
+      if (error instanceof PriceUnavailableError) {
+        return; // fiyat yok: emir aktif kalır, sonraki turda tekrar denenir
+      }
+      if (error instanceof AppError && error.status < 500) {
+        // İş kuralı hatası (ör. tutar çok küçük): emri iptal et ki her dakika tekrar denenmesin
+        await pool
+          .query(`UPDATE stop_loss_orders SET status = 'cancelled' WHERE id = $1 AND status = 'active'`, [orderId])
+          .catch(() => undefined);
+      }
+      throw error;
     } finally {
       client.release();
     }
+    postCommit?.();
   }
 }
-

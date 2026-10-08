@@ -1,232 +1,131 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import pool from '../config/database';
-import { User, LoginRequest, RegisterRequest, AuthResponse } from '../types';
+import { getJwtSecret } from '../config/env';
+import { User, LoginRequest, RegisterRequest, AuthResponse, mapUserRow } from '../types';
 import { LeaderboardService } from './leaderboard';
 
+const BCRYPT_ROUNDS = 10;
+const JWT_ALGORITHM = 'HS256' as const;
+const JWT_EXPIRES_IN = '7d';
+
+// Kullanıcı bulunamadığında da bcrypt karşılaştırması yapılır (zamanlama farkı ile email tespiti engellenir)
+const DUMMY_HASH = bcrypt.hashSync('timing-equalizer-not-a-real-password', BCRYPT_ROUNDS);
+
+const USER_COLUMNS = `id, username, email, email_verified, balance, portfolio_value, total_profit_loss,
+                      rank, created_at, is_admin, is_banned`;
+
 export class AuthService {
-  // Kullanıcı kayıt
-  static async register(data: RegisterRequest): Promise<AuthResponse> {
+  // Kullanıcı kayıt (girdi route katmanında zod ile doğrulanır ve normalize edilir)
+  static async register(data: RegisterRequest): Promise<AuthResponse & { status: number }> {
+    const email = data.email.trim().toLowerCase();
+    const username = data.username.trim();
+
+    const existingUser = await pool.query(
+      'SELECT id FROM users WHERE LOWER(username) = LOWER($1) OR LOWER(email) = $2 LIMIT 1',
+      [username, email]
+    );
+    if (existingUser.rows.length > 0) {
+      return { success: false, status: 409, message: 'Kullanıcı adı veya email zaten kullanılıyor' };
+    }
+
+    const passwordHash = await bcrypt.hash(data.password, BCRYPT_ROUNDS);
+
     try {
-      // Kullanıcı var mı kontrol et
-      const existingUser = await pool.query(
-        'SELECT id FROM users WHERE username = $1 OR email = $2',
-        [data.username, data.email]
-      );
-
-      if (existingUser.rows.length > 0) {
-        return {
-          success: false,
-          message: 'Kullanıcı adı veya email zaten kullanılıyor'
-        };
-      }
-
-      // Şifreyi hashle
-      const saltRounds = 10;
-      const passwordHash = await bcrypt.hash(data.password, saltRounds);
-
-      // Kullanıcıyı oluştur (haftalık liderlik referansı: başlangıç 100.000 TL + mevcut ISO hafta)
+      // Haftalık liderlik referansı: başlangıç 100.000 TL + mevcut ISO hafta
       const result = await pool.query(
         `INSERT INTO users (
             username, email, password_hash, email_verified,
             week_baseline_equity, week_baseline_iso_key
           )
          VALUES (
-            $1, $2, $3, $4,
+            $1, $2, $3, false,
             100000,
-            (SELECT
-              to_char(
-                (CURRENT_TIMESTAMP AT TIME ZONE 'Europe/Istanbul')::date,
-                'IYYY'
-              ) || '-' || to_char(
-                (CURRENT_TIMESTAMP AT TIME ZONE 'Europe/Istanbul')::date,
-                'IW'
-              )
-            )
+            to_char((CURRENT_TIMESTAMP AT TIME ZONE 'Europe/Istanbul')::date, 'IYYY')
+              || '-' ||
+            to_char((CURRENT_TIMESTAMP AT TIME ZONE 'Europe/Istanbul')::date, 'IW')
           )
-         RETURNING id, username, email, email_verified, balance, portfolio_value, total_profit_loss, rank, created_at`,
-        [data.username, data.email, passwordHash, false]
+         RETURNING ${USER_COLUMNS}`,
+        [username, email, passwordHash]
       );
-
-      const user = result.rows[0];
-
-      return {
-        success: true,
-        user: {
-          id: user.id,
-          username: user.username,
-          email: user.email,
-          email_verified: user.email_verified,
-          balance: parseFloat(user.balance),
-          portfolio_value: parseFloat(user.portfolio_value),
-          total_profit_loss: parseFloat(user.total_profit_loss),
-          rank: user.rank,
-          created_at: user.created_at
-        }
-      };
-    } catch (error) {
-      console.error('Register error:', error);
-      return {
-        success: false,
-        message: 'Kayıt sırasında bir hata oluştu'
-      };
+      return { success: true, status: 201, user: mapUserRow(result.rows[0]) };
+    } catch (error: any) {
+      if (error?.code === '23505') {
+        return { success: false, status: 409, message: 'Kullanıcı adı veya email zaten kullanılıyor' };
+      }
+      throw error;
     }
   }
 
   // Kullanıcı giriş
-  static async login(data: LoginRequest): Promise<AuthResponse> {
-    try {
-      // Kullanıcıyı bul
-      const result = await pool.query(
-        'SELECT * FROM users WHERE email = $1',
-        [data.email]
-      );
+  static async login(data: LoginRequest): Promise<AuthResponse & { status: number }> {
+    const email = data.email.trim().toLowerCase();
+    const result = await pool.query(
+      `SELECT ${USER_COLUMNS}, password_hash FROM users WHERE LOWER(email) = $1 LIMIT 1`,
+      [email]
+    );
+    const user = result.rows[0];
 
-      if (result.rows.length === 0) {
-        return {
-          success: false,
-          message: 'Email veya şifre hatalı'
-        };
-      }
+    // Önce şifre (kullanıcı yoksa sahte hash ile) — yasaklı durumu şifre doğrulanmadan açıklanmaz
+    const isValidPassword = await bcrypt.compare(data.password, user?.password_hash || DUMMY_HASH);
+    if (!user || !isValidPassword) {
+      return { success: false, status: 401, message: 'Email veya şifre hatalı' };
+    }
 
-      const user = result.rows[0];
-
-      // Banned kontrolü
-      if (user.is_banned) {
-        return {
-          success: false,
-          message: 'Hesabınız yasaklanmış. Lütfen yönetici ile iletişime geçin.'
-        };
-      }
-
-      // Şifreyi kontrol et
-      const isValidPassword = await bcrypt.compare(data.password, user.password_hash);
-
-      if (!isValidPassword) {
-        return {
-          success: false,
-          message: 'Email veya şifre hatalı'
-        };
-      }
-
-      // JWT token oluştur
-      if (!process.env.JWT_SECRET) {
-        throw new Error('JWT_SECRET is not configured');
-      }
-      
-      const token = jwt.sign(
-        { userId: user.id, email: user.email },
-        process.env.JWT_SECRET,
-        { expiresIn: '7d' }
-      );
-
-      // Son giriş zamanını güncelle
-      await pool.query(
-        'UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = $1',
-        [user.id]
-      );
-
-      // Rank'leri güncelle
-      await LeaderboardService.updateRanks();
-
-      // Güncel rank'i al
-      const rankResult = await pool.query(
-        `SELECT rank FROM users WHERE id = $1`,
-        [user.id]
-      );
-      const currentRank = rankResult.rows[0]?.rank || null;
-
-      return {
-        success: true,
-        user: {
-          id: user.id,
-          username: user.username,
-          email: user.email,
-          email_verified: user.email_verified,
-          balance: parseFloat(user.balance),
-          portfolio_value: parseFloat(user.portfolio_value),
-          total_profit_loss: parseFloat(user.total_profit_loss),
-          rank: currentRank,
-          created_at: user.created_at,
-          is_admin: user.is_admin || false
-        },
-        token
-      };
-    } catch (error: any) {
-      console.error('Login error:', error);
-      
-      // Veritabanı bağlantı hatası kontrolü
-      if (error.code === '28P01') {
-        console.error('PostgreSQL kimlik doğrulama hatası. Lütfen .env dosyasındaki DB_PASSWORD değerini kontrol edin.');
-        return {
-          success: false,
-          message: 'Veritabanı bağlantı hatası: Kimlik doğrulama başarısız. Lütfen veritabanı şifresini kontrol edin.'
-        };
-      }
-      
-      if (error.code === 'ECONNREFUSED' || error.code === 'ENOTFOUND') {
-        console.error('PostgreSQL sunucusuna bağlanılamadı.');
-        return {
-          success: false,
-          message: 'Veritabanı sunucusuna bağlanılamadı. PostgreSQL servisinin çalıştığından emin olun.'
-        };
-      }
-      
+    if (user.is_banned) {
       return {
         success: false,
-        message: error.message || 'Giriş sırasında bir hata oluştu'
+        status: 403,
+        message: 'Hesabınız yasaklanmış. Lütfen yönetici ile iletişime geçin.',
       };
     }
+
+    const token = jwt.sign({ userId: user.id }, getJwtSecret(), {
+      algorithm: JWT_ALGORITHM,
+      expiresIn: JWT_EXPIRES_IN,
+    });
+
+    await pool.query('UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = $1', [user.id]);
+
+    const rank = await LeaderboardService.getAllTimeRank(user.id);
+    return { success: true, status: 200, user: mapUserRow(user, rank), token };
   }
 
-  // Token doğrulama
+  /** Güncel kullanıcı bilgisi (rank sorgu anında window function ile hesaplanır). */
+  static async getProfile(userId: string): Promise<User | null> {
+    const result = await pool.query(`SELECT ${USER_COLUMNS} FROM users WHERE id = $1`, [userId]);
+    const row = result.rows[0];
+    if (!row || row.is_banned) return null;
+    const rank = await LeaderboardService.getAllTimeRank(userId);
+    return mapUserRow(row, rank);
+  }
+
+  /**
+   * Token doğrulama. Geçersiz/süresi dolmuş token, silinmiş veya yasaklı kullanıcı → null.
+   * (Her istekte çalıştığı için rank burada yeniden hesaplanmaz; cron'un yazdığı değer döner.)
+   */
   static async verifyToken(token: string): Promise<User | null> {
+    let decoded: unknown;
     try {
-      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback_secret') as any;
-      
-      const result = await pool.query(
-        'SELECT * FROM users WHERE id = $1',
-        [decoded.userId]
-      );
-
-      if (result.rows.length === 0) {
-        return null;
-      }
-
-      const user = result.rows[0];
-      
-      // Banned kontrolü
-      if (user.is_banned) {
-        return null;
-      }
-
-      // Rank'i güncelle (sadece rank NULL ise)
-      if (!user.rank) {
-        await LeaderboardService.updateRanks();
-      }
-
-      // Güncel rank'i al
-      const rankResult = await pool.query(
-        `SELECT rank FROM users WHERE id = $1`,
-        [user.id]
-      );
-      const currentRank = rankResult.rows[0]?.rank || null;
-
-      return {
-        id: user.id,
-        username: user.username,
-        email: user.email,
-        email_verified: user.email_verified,
-        balance: parseFloat(user.balance),
-        portfolio_value: parseFloat(user.portfolio_value),
-        total_profit_loss: parseFloat(user.total_profit_loss),
-        rank: currentRank,
-        created_at: user.created_at,
-        is_admin: user.is_admin || false
-      };
-    } catch (error) {
-      console.error('Token verification error:', error);
+      decoded = jwt.verify(token, getJwtSecret(), { algorithms: [JWT_ALGORITHM] });
+    } catch {
       return null;
     }
+
+    const userId = typeof decoded === 'object' && decoded !== null ? (decoded as any).userId : undefined;
+    if (typeof userId !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId)) {
+      return null;
+    }
+
+    const result = await pool.query(`SELECT ${USER_COLUMNS} FROM users WHERE id = $1`, [userId]);
+    const row = result.rows[0];
+    if (!row || row.is_banned) {
+      return null;
+    }
+    return mapUserRow(row);
+  }
+
+  static async hashPassword(password: string): Promise<string> {
+    return bcrypt.hash(password, BCRYPT_ROUNDS);
   }
 }

@@ -1,169 +1,114 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
-
-interface User {
-  id: string;
-  username: string;
-  email: string;
-  email_verified: boolean;
-  balance: number;
-  portfolio_value: number;
-  total_profit_loss: number;
-  rank: number;
-  created_at: string;
-  is_admin?: boolean;
-}
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useRouter } from 'next/navigation';
+import { ApiError, authApi, tokenStore, userStore } from '@/lib/api';
+import type { User } from '@/types';
 
 interface AuthContextType {
   user: User | null;
-  token: string | null;
-  login: (email: string, password: string) => Promise<{ success: boolean; message?: string }>;
-  register: (username: string, email: string, password: string) => Promise<boolean>;
-  logout: () => void;
   loading: boolean;
+  login: (email: string, password: string) => Promise<{ success: boolean; message?: string }>;
+  register: (username: string, email: string, password: string) => Promise<{ success: boolean; message?: string }>;
+  logout: () => void;
+  /** Bakiye, sıralama vb. değerleri backend'den tazeler. */
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+function normalizeUser(raw: any): User {
+  return {
+    ...raw,
+    balance: Number(raw?.balance ?? 0),
+    portfolio_value: Number(raw?.portfolio_value ?? 0),
+    total_profit_loss: Number(raw?.total_profit_loss ?? 0),
+    rank: raw?.rank == null ? null : Number(raw.rank),
+    is_admin: raw?.is_admin === true || raw?.is_admin === 'true',
+    email_verified: raw?.email_verified === true || raw?.email_verified === 'true',
+  };
+}
+
+export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Logout fonksiyonunu önce tanımla (useEffect'te kullanılacak)
+  const router = useRouter();
   const logout = useCallback(() => {
+    tokenStore.clear();
     setUser(null);
-    setToken(null);
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    localStorage.removeItem('portfolio');
-    
-    // Cookie'yi de temizle
-    document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
-    
-    // Logout sonrası login sayfasına yönlendir
-    if (typeof window !== 'undefined') {
-      window.location.href = '/login';
+    router.replace('/login');
+  }, [router]);
+
+  const refreshUser = useCallback(async () => {
+    if (!tokenStore.get()) return;
+    try {
+      const res = await authApi.profile();
+      if (res?.user) {
+        const fresh = normalizeUser(res.user);
+        setUser(fresh);
+        userStore.set(fresh);
+      }
+    } catch (err) {
+      // 401 durumunda api katmanı oturumu zaten kapatır
+      if (!(err instanceof ApiError) || err.status !== 401) console.error('Profil yenilenemedi', err);
     }
   }, []);
 
-  // Sayfa yüklendiğinde localStorage'dan kullanıcı bilgilerini yükle
+  // İlk yükleme: kayıtlı oturumu geri yükle, süresi dolmuşsa temizle, sonra tazele.
   useEffect(() => {
-    const savedToken = localStorage.getItem('token');
-    const savedUser = localStorage.getItem('user');
-
-    if (savedToken && savedUser) {
-      setToken(savedToken);
-      setUser(JSON.parse(savedUser));
-      
-      // Cookie'ye de token'ı kaydet (middleware için)
-      document.cookie = `token=${savedToken}; path=/; max-age=86400; SameSite=Lax`;
+    const token = tokenStore.get();
+    const saved = userStore.get<User>();
+    if (token && saved && !tokenStore.isExpired(token)) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- localStorage yalnızca istemcide okunabilir
+      setUser(normalizeUser(saved));
+      setLoading(false);
+      void refreshUser();
+    } else {
+      if (token) tokenStore.clear();
+      setLoading(false);
     }
-    setLoading(false);
+  }, [refreshUser]);
+
+  useEffect(() => {
+    const onLogout = () => setUser(null);
+    window.addEventListener('auth:logout', onLogout);
+    return () => window.removeEventListener('auth:logout', onLogout);
   }, []);
 
-  // Logout event'ini dinle (backendApi'den gelen)
-  useEffect(() => {
-    const handleLogout = () => {
-      logout();
-    };
-
-    window.addEventListener('auth:logout', handleLogout);
-    return () => {
-      window.removeEventListener('auth:logout', handleLogout);
-    };
-  }, [logout]);
-
-  const login = async (email: string, password: string): Promise<{ success: boolean; message?: string }> => {
-    const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/api';
-    const loginUrl = `${API_BASE_URL}/auth/login`;
-    
+  const login = useCallback(async (email: string, password: string) => {
     try {
-      const response = await fetch(loginUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Requested-With': 'XMLHttpRequest',
-        },
-        credentials: 'include',
-        body: JSON.stringify({ email, password }),
-      });
-
-      if (!response.ok) {
-        let errorMessage = 'Giriş başarısız';
-        try {
-          const errorData = await response.json();
-          errorMessage = errorData.message || errorMessage;
-        } catch {
-          errorMessage = response.statusText || 'Sunucu hatası';
-        }
-        return { success: false, message: errorMessage };
-      }
-
-      const data = await response.json();
-
-      if (data.success) {
-        setToken(data.token);
-        setUser(data.user);
-        localStorage.setItem('token', data.token);
-        localStorage.setItem('user', JSON.stringify(data.user));
-        document.cookie = `token=${data.token}; path=/; max-age=86400; SameSite=Lax`;
-        return { success: true };
-      } else {
-        return { success: false, message: data.message || 'Bilinmeyen hata' };
-      }
-    } catch (error: any) {
-      let errorMessage = 'Sunucuya bağlanılamadı. Lütfen tekrar deneyin.';
-      if (error instanceof TypeError && (error.message.includes('fetch') || error.message.includes('Failed to fetch'))) {
-        errorMessage = 'Backend sunucusuna bağlanılamadı. Lütfen sunucunun çalıştığından emin olun.';
-      } else if (error.message?.includes('CORS')) {
-        errorMessage = 'CORS hatası: Sunucu isteği reddetti. Lütfen yöneticiye başvurun.';
-      }
-      return { success: false, message: errorMessage };
+      const data = await authApi.login(email.trim().toLowerCase(), password);
+      if (!data?.success || !data.token) return { success: false, message: data?.message || 'Giriş başarısız.' };
+      tokenStore.set(data.token);
+      const u = normalizeUser(data.user);
+      userStore.set(u);
+      setUser(u);
+      return { success: true };
+    } catch (err) {
+      return { success: false, message: err instanceof Error ? err.message : 'Giriş başarısız.' };
     }
-  };
+  }, []);
 
-  const register = async (username: string, email: string, password: string): Promise<boolean> => {
-    const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/api';
-    const registerUrl = `${API_BASE_URL}/auth/register`;
-    
+  const register = useCallback(async (username: string, email: string, password: string) => {
     try {
-      const response = await fetch(registerUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ username, email, password }),
-      });
-
-      const data = await response.json();
-      return data.success;
-    } catch {
-      return false;
+      const data = await authApi.register(username.trim(), email.trim().toLowerCase(), password);
+      return { success: !!data?.success, message: data?.message };
+    } catch (err) {
+      return { success: false, message: err instanceof Error ? err.message : 'Kayıt başarısız.' };
     }
-  };
+  }, []);
 
-  const value = {
-    user,
-    token,
-    login,
-    register,
-    logout,
-    loading
-  };
-
-  return (
-    <AuthContext.Provider value={value}>
-      {children}
-    </AuthContext.Provider>
+  const value = useMemo(
+    () => ({ user, loading, login, register, logout, refreshUser }),
+    [user, loading, login, register, logout, refreshUser],
   );
-};
 
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
-};
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+}
+
+export function useAuth() {
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error('useAuth, AuthProvider içinde kullanılmalı');
+  return ctx;
+}

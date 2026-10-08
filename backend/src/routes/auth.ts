@@ -1,119 +1,70 @@
 import express from 'express';
 import { AuthService } from '../services/auth';
-import { authenticateToken } from '../middleware/auth';
+import { authenticateToken, requireUser } from '../middleware/auth';
+import { loginLimiter, registerLimiter } from '../middleware/rateLimits';
+import { asyncHandler } from '../utils/errors';
+import { parseOrThrow, registerSchema, loginSchema } from '../utils/validation';
 
 const router = express.Router();
 
 // Kayıt
-router.post('/register', async (req, res) => {
-  try {
-    const { username, email, password } = req.body;
-
-    // Validasyon
-    if (!username || !email || !password) {
-      return res.status(400).json({
-        success: false,
-        message: 'Tüm alanlar gerekli'
-      });
-    }
-
-    if (password.length < 6) {
-      return res.status(400).json({
-        success: false,
-        message: 'Şifre en az 6 karakter olmalı'
-      });
-    }
-
-    const result = await AuthService.register({ username, email, password });
-    
-    if (result.success) {
-      res.status(201).json(result);
-    } else {
-      res.status(400).json(result);
-    }
-  } catch (error) {
-    console.error('Register route error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Sunucu hatası'
-    });
-  }
-});
+router.post(
+  '/register',
+  registerLimiter,
+  asyncHandler(async (req, res) => {
+    const body = parseOrThrow(registerSchema, req.body);
+    const { status, ...result } = await AuthService.register(body);
+    res.status(status).json(result);
+  })
+);
 
 // Giriş
-router.post('/login', async (req, res) => {
-  try {
-    const { email, password } = req.body;
+router.post(
+  '/login',
+  loginLimiter,
+  asyncHandler(async (req, res) => {
+    const body = parseOrThrow(loginSchema, req.body);
+    const { status, ...result } = await AuthService.login(body);
 
-    // Validasyon
-    if (!email || !password) {
-      return res.status(400).json({
-        success: false,
-        message: 'Email ve şifre gerekli'
-      });
-    }
-
-    const result = await AuthService.login({ email, password });
-    
-    if (result.success) {
-      // Activity log kaydı (asenkron)
+    if (result.success && result.user) {
+      const user = result.user;
       setImmediate(async () => {
         try {
           const { ActivityLogService } = await import('../services/activityLog');
-          const ipAddress = req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress;
-          const userAgent = req.headers['user-agent'];
-          
           await ActivityLogService.createLog({
-            user_id: result.user!.id,
+            user_id: user.id,
             activity_type: 'login',
             description: 'Kullanıcı giriş yaptı',
-            metadata: {
-              email: result.user!.email,
-              username: result.user!.username
-            },
-            ip_address: Array.isArray(ipAddress) ? ipAddress[0] : ipAddress,
-            user_agent: userAgent
+            metadata: { username: user.username },
+            ip_address: req.ip,
+            user_agent: req.headers['user-agent']?.slice(0, 500),
           });
-        } catch (error) {
-          console.error('Activity log error:', error);
+        } catch (error: any) {
+          console.error('[auth] Activity log error:', error?.message);
         }
       });
-      
-      res.json(result);
-    } else {
-      res.status(401).json(result);
     }
-  } catch (error) {
-    console.error('Login route error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Sunucu hatası'
-    });
-  }
-});
 
-// Profil bilgileri
-router.get('/profile', authenticateToken, async (req: any, res) => {
-  try {
-    res.json({
-      success: true,
-      user: req.user
-    });
-  } catch (error) {
-    console.error('Profile route error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Sunucu hatası'
-    });
-  }
-});
+    res.status(status).json(result);
+  })
+);
+
+// Profil: veritabanından taze kullanıcı nesnesi (rank anlık hesaplanır)
+router.get(
+  '/profile',
+  authenticateToken,
+  asyncHandler(async (req, res) => {
+    const user = await AuthService.getProfile(requireUser(req).id);
+    if (!user) {
+      return res.status(401).json({ success: false, message: 'Oturum geçersiz veya süresi dolmuş' });
+    }
+    res.json({ success: true, user });
+  })
+);
 
 // Token doğrulama
-router.get('/verify', authenticateToken, async (req: any, res) => {
-  res.json({
-    success: true,
-    user: req.user
-  });
+router.get('/verify', authenticateToken, (req, res) => {
+  res.json({ success: true, user: requireUser(req) });
 });
 
 export default router;

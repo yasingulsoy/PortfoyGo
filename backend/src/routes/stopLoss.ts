@@ -1,89 +1,40 @@
 import express from 'express';
 import { StopLossService } from '../services/stopLoss';
-import { authenticateToken } from '../middleware/auth';
+import { authenticateToken, requireUser } from '../middleware/auth';
+import { asyncHandler } from '../utils/errors';
+import { parseOrThrow, createStopLossSchema, idParamSchema } from '../utils/validation';
 
 const router = express.Router();
 
-// Stop-loss emri oluştur
-router.post('/', authenticateToken, async (req: any, res) => {
-  try {
-    const { portfolio_item_id, trigger_price, quantity } = req.body;
+// Stop-loss emri oluştur — body: { portfolio_item_id, trigger_price, quantity? }
+router.post(
+  '/',
+  authenticateToken,
+  asyncHandler(async (req, res) => {
+    const body = parseOrThrow(createStopLossSchema, req.body);
+    const result = await StopLossService.createStopLoss(requireUser(req).id, body);
+    res.json(result);
+  })
+);
 
-    if (!portfolio_item_id || !trigger_price) {
-      return res.status(400).json({
-        success: false,
-        message: 'Portföy öğesi ID ve tetikleme fiyatı gerekli'
-      });
-    }
-
-    if (trigger_price <= 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'Tetikleme fiyatı 0\'dan büyük olmalı'
-      });
-    }
-
-    const result = await StopLossService.createStopLoss(req.user.id, {
-      portfolio_item_id,
-      trigger_price,
-      quantity
-    });
-
-    if (result.success) {
-      res.json(result);
-    } else {
-      res.status(400).json(result);
-    }
-  } catch (error: any) {
-    console.error('Stop-loss create error:', error);
-    res.status(500).json({
-      success: false,
-      message: error.message || 'Sunucu hatası'
-    });
-  }
-});
-
-// Kullanıcının stop-loss emirlerini getir
-router.get('/', authenticateToken, async (req: any, res) => {
-  try {
-    const result = await StopLossService.getStopLossOrders(req.user.id);
-    
-    if (result.success) {
-      res.json(result);
-    } else {
-      res.status(500).json({
-        success: false,
-        message: 'Stop-loss emirleri alınamadı'
-      });
-    }
-  } catch (error: any) {
-    console.error('Get stop-loss orders error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Sunucu hatası'
-    });
-  }
-});
+// Kullanıcının stop-loss emirleri
+router.get(
+  '/',
+  authenticateToken,
+  asyncHandler(async (req, res) => {
+    res.json(await StopLossService.getStopLossOrders(requireUser(req).id));
+  })
+);
 
 // Stop-loss emrini iptal et
-router.delete('/:id', authenticateToken, async (req: any, res) => {
-  try {
-    const { id } = req.params;
-    const result = await StopLossService.cancelStopLoss(req.user.id, id);
-
-    if (result.success) {
-      res.json(result);
-    } else {
-      res.status(400).json(result);
-    }
-  } catch (error: any) {
-    console.error('Cancel stop-loss error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Sunucu hatası'
-    });
-  }
-});
+router.delete(
+  '/:id',
+  authenticateToken,
+  asyncHandler(async (req, res) => {
+    const { id } = parseOrThrow(idParamSchema, req.params);
+    const result = await StopLossService.cancelStopLoss(requireUser(req).id, id);
+    res.status(result.success ? 200 : 400).json(result);
+  })
+);
 
 export default router;
-

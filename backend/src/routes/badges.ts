@@ -1,52 +1,33 @@
 import express from 'express';
 import { BadgeService } from '../services/badges';
-import { authenticateToken } from '../middleware/auth';
+import { authenticateToken, requireUser } from '../middleware/auth';
+import { asyncHandler } from '../utils/errors';
 
 const router = express.Router();
 
-// Kullanıcının rozetlerini getir
-router.get('/my-badges', authenticateToken, async (req: any, res) => {
-  try {
-    const result = await BadgeService.getUserBadges(req.user.id);
-    
-    if (result.success) {
-      res.json(result);
-    } else {
-      res.status(500).json({
-        success: false,
-        message: 'Rozetler alınamadı'
-      });
+// Kullanıcının rozetleri
+router.get(
+  '/my-badges',
+  authenticateToken,
+  asyncHandler(async (req, res) => {
+    const result = await BadgeService.getUserBadges(requireUser(req).id);
+    if (!result.success) {
+      return res.status(500).json({ success: false, message: 'Rozetler alınamadı' });
     }
-  } catch (error) {
-    console.error('My badges route error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Sunucu hatası'
-    });
-  }
-});
+    res.json(result);
+  })
+);
 
-// Tüm rozetleri getir
-router.get('/', async (req, res) => {
-  try {
+// Tüm rozetler
+router.get(
+  '/',
+  asyncHandler(async (_req, res) => {
     const result = await BadgeService.getAllBadges();
-    
-    if (result.success) {
-      res.json(result);
-    } else {
-      res.status(500).json({
-        success: false,
-        message: 'Rozetler alınamadı'
-      });
+    if (!result.success) {
+      return res.status(500).json({ success: false, message: 'Rozetler alınamadı' });
     }
-  } catch (error) {
-    console.error('All badges route error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Sunucu hatası'
-    });
-  }
-});
+    res.json(result);
+  })
+);
 
 export default router;
-

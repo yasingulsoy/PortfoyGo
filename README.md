@@ -1,117 +1,89 @@
-# Sanal Yatırım - Finansal Oyun
+# PortfoyGo
 
-Gerçek piyasa verileriyle sanal yatırım yapın, portföyünüzü büyütün ve liderlik tablosunda yarışın!
+Gerçek piyasa verileriyle çalışan **sanal yatırım simülasyonu**. Her kullanıcı 100.000 ₺ sanal bakiyeyle başlar; hisse, kripto, döviz ve emtia alıp satar, portföyünü takip eder ve liderlik tablosunda yarışır.
 
-## 🚀 Özellikler
+> PortfoyGo bir oyundur: işlemler sanal parayla yapılır ve hiçbir içerik yatırım tavsiyesi değildir.
 
-- **Gerçek Piyasa Verileri**: CoinGecko (kripto) ve Finnhub (hisse) API'leri
-- **Sanal Portföy Yönetimi**: Alım-satım, komisyon hesaplamaları
-- **Canlı Grafikler**: Lightweight Charts ile fiyat grafikleri
-- **Responsive Tasarım**: Mobil ve desktop uyumlu
-- **Dark/Light Mode**: Tema desteği
-- **İşlem Geçmişi**: Detaylı alım-satım kayıtları
+## Özellikler
 
-## 🛠️ Kurulum
+- **Dört piyasa:** Hisse (Finnhub), kripto (CoinGecko), döviz ve emtia (NosyAPI). Tüm fiyatlar tek, canlı bir USD/TRY kuruyla TL'ye çevrilir.
+- **Güvenli alım-satım:** İşlem fiyatı her zaman **sunucuda** belirlenir. İstemcinin gönderdiği fiyat yok sayılır. Bakiye ve pozisyonlar satır kilitli tek bir transaction içinde güncellenir. Komisyon oranı %0,25.
+- **Portföy:** Canlı değerleme, varlık dağılımı, pozisyon bazında kâr/zarar ve stop-loss emirleri.
+- **İşlem geçmişi:** Güne göre gruplu liste, filtreler ve formül enjeksiyonuna karşı korumalı CSV dışa aktarımı.
+- **Rekabet:** Tüm zamanlar ve haftalık liderlik tablosu, rozetler.
+- **Hesap:** E-posta doğrulama ve şifre sıfırlama (deneme sınırlı kodlarla), rate limit.
+- **Yönetim paneli:** Kullanıcılar, istatistikler, ban işlemleri ve önbellek yenileme.
+- **Arayüz:** Açık/koyu tema, mobilde alt menü, klavye ve ekran okuyucu desteği.
 
-1. **Projeyi klonlayın**
-```bash
-git clone <repo-url>
-cd sanal-yatirim
+## Teknoloji
+
+| Katman | Kullanılanlar |
+| --- | --- |
+| Frontend | Next.js 16 (App Router), React 19, Tailwind CSS v4, SWR, lightweight-charts |
+| Backend | Express 4, PostgreSQL (`pg`), zod, helmet, express-rate-limit, node-cron, nodemailer |
+
+```
+src/                 Next.js uygulaması
+  app/               Sayfalar (App Router)
+  components/ui/     Tasarım sistemi bileşenleri (Button, Card, Modal, Field, Tabs…)
+  components/        Uygulama bileşenleri (layout, market, trade, portfolio…)
+  context/           Auth ve portföy durumu
+  hooks/             Piyasa verisi ve oturum hook'ları
+  lib/               API istemcisi, biçimlendirme, sabitler
+backend/             Express API
+  src/routes|services|middleware
+  migrations/        SQL şema migration'ları
 ```
 
-2. **Bağımlılıkları yükleyin**
+## Kurulum
+
+Gereksinimler: Node.js 20+ ve PostgreSQL 14+.
+
 ```bash
 npm install
+cd backend && npm install && cd ..
 ```
 
-3. **API Key'leri ayarlayın**
-`.env.local` dosyası oluşturun:
+### Ortam değişkenleri
 
-```env
-# Finnhub API Key (Hisse verileri için)
-FINNHUB_API_KEY=your_finnhub_api_key_here
+Hiçbir API anahtarı koda gömülü değildir; tamamı ortam değişkenlerinden okunur.
 
-# Alpha Vantage API Key (Alternatif hisse verisi)
-ALPHA_VANTAGE_API_KEY=your_alpha_vantage_api_key_here
+- **Frontend:** `.env.example` dosyasını `.env.local` olarak kopyalayın.
+- **Backend:** `backend/.env.example` dosyasını `backend/.env` olarak kopyalayın. `JWT_SECRET` zorunludur; tanımlı değilse sunucu açılmaz.
+
+### Veritabanı
+
+Önce yedek alın, ardından migration'ı çalıştırın. Ayrıntılar [backend/migrations/README.md](backend/migrations/README.md) içinde.
+
+```bash
+cd backend && npm run migrate
 ```
 
-### 📊 API Key Alma
+Yönetici hesabı oluşturmak için `ADMIN_EMAIL`, `ADMIN_USERNAME` ve `ADMIN_PASSWORD` değişkenlerini ayarlayın, ardından:
 
-#### **CoinGecko (Kripto - Ücretsiz)**
-- https://www.coingecko.com/en/api/documentation
-- API key gerekmez, ücretsiz kullanım
+```bash
+cd backend && npm run create-admin
+```
 
-#### **Finnhub (Hisse - Ücretsiz)**
-- https://finnhub.io/docs/api
-- Ücretsiz tier: 60 çağrı/dakika
-- Kayıt olup API key alın
+### Geliştirme
 
-#### **Alpha Vantage (Hisse - Alternatif)**
-- https://www.alphavantage.co/support/#api-key
-- Ücretsiz tier: 5 çağrı/dakika, 500 çağrı/gün
-
-4. **Geliştirme sunucusunu başlatın**
 ```bash
 npm run dev
 ```
 
-5. **Tarayıcıda açın**
-```
-http://localhost:3000
-```
+Bu komut backend'i (`:5001`) ve frontend'i (`:3000`) birlikte başlatır.
 
-## 🎮 Nasıl Oynanır
+| Komut | Açıklama |
+| --- | --- |
+| `npm run dev` | Backend ve frontend birlikte |
+| `npm run build` / `npm start` | Frontend production derlemesi ve sunucusu |
+| `npm run lint` | ESLint |
+| `npm run typecheck` | Frontend tip kontrolü |
+| `cd backend && npm run typecheck` | Backend tip kontrolü |
 
-1. **Başlangıç**: 1,000 ₺ sanal bakiye ile başlayın
-2. **Piyasa Analizi**: Hisse ve kripto fiyatlarını inceleyin
-3. **Alım-Satım**: Grafik butonuna tıklayarak fiyat grafiklerini görün
-4. **Portföy Yönetimi**: Yatırımlarınızı takip edin
-5. **Liderlik**: Diğer oyuncularla yarışın
+## Güvenlik notları
 
-## 🔧 Teknik Detaylar
+- `.env` dosyalarını ve veritabanı dökümlerini (`*.dump`, `portfoygo.sql`) asla commit etmeyin; `.gitignore` bunları dışlar.
+- Daha önce repoya girmiş anahtarlar **geçersiz sayılmalı ve yenilenmelidir**. Git geçmişindeki eski dosyalar için `git filter-repo` ile temizlik önerilir.
 
-- **Frontend**: Next.js 15, React, TypeScript
-- **Styling**: Tailwind CSS
-- **Charts**: Lightweight Charts
-- **State Management**: React Context + useReducer
-- **Data Fetching**: SWR
-- **APIs**: CoinGecko, Finnhub
-
-## 📱 Responsive Özellikler
-
-- Mobil cihazlarda kart görünümü
-- Tablet ve desktop'ta tablo görünümü
-- Touch-friendly butonlar
-- Esnek grid sistemi
-
-## 🌙 Tema Desteği
-
-- Light/Dark/System tema seçenekleri
-- Otomatik tema değişimi
-- Tüm bileşenlerde tema uyumu
-
-## 🚀 Production Build
-
-```bash
-npm run build
-npm start
-```
-
-## 📝 Notlar
-
-- CoinGecko API ücretsiz ve key gerektirmez
-- Hisse verileri için Finnhub önerilir (ücretsiz tier mevcut)
-- Grafik özelliği için her varlığa tıklayabilirsiniz
-- Komisyon oranı: %0.1 (gerçekçi)
-
-## 🤝 Katkıda Bulunma
-
-1. Fork yapın
-2. Feature branch oluşturun (`git checkout -b feature/amazing-feature`)
-3. Commit yapın (`git commit -m 'Add amazing feature'`)
-4. Push yapın (`git push origin feature/amazing-feature`)
-5. Pull Request oluşturun
-
-## 📄 Lisans
-
-MIT License - detaylar için `LICENSE` dosyasına bakın.
+Proje durumu ve yol haritası: [docs/SU_AN_NE_YAPILABIYOR.md](docs/SU_AN_NE_YAPILABIYOR.md)

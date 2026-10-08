@@ -1,151 +1,39 @@
 # Kullanıcı Oluşturma Rehberi
 
-## 🚀 Hızlı Başlangıç
+> ⚠️ Bu script'ler `.env` içindeki veritabanına bağlanır. Production veritabanında çalıştırmadan önce iki kez düşünün.
+> Kodda **varsayılan kullanıcı / şifre yoktur**; tüm bilgiler komut satırından veya env'den verilir.
 
-### Yöntem 1: Node.js Scripti (Önerilen) ✅
-
-En kolay ve güvenli yöntem. Şifreler otomatik olarak bcrypt ile hash'lenir.
+## Tek kullanıcı
 
 ```bash
-# Varsayılan kullanıcı oluştur (trading_platform)
-npm run create-user
-
-# Özel kullanıcı oluştur
 npm run create-user <username> <email> <password> [verified] [balance]
-
-# Örnekler:
-npm run create-user trader1 trader1@example.com trader123
-npm run create-user investor1 investor1@example.com investor123 true 200000
 ```
 
-**Varsayılan Kullanıcı:**
-- Username: `trading_platform`
-- Email: `trading@platform.com`
-- Password: `trading123`
-- Balance: `100,000 TL`
-- Email Verified: `true`
+- `password`: 8-72 karakter (zorunlu). Güçlü ve benzersiz bir şifre kullanın.
+- `verified`: Email doğrulandı mı? (`true`/`false`, varsayılan: `true`)
+- `balance`: Başlangıç bakiyesi (varsayılan: `100000`)
 
----
+Şifre ve şifre hash'i ekrana yazdırılmaz.
 
-### Yöntem 2: SQL Scripti (Manuel)
-
-SQL scripti kullanmak için önce Node.js scripti ile şifre hash'ini oluşturun:
+## Admin kullanıcı
 
 ```bash
-npm run create-user trading_platform trading@platform.com trading123
+ADMIN_EMAIL=admin@ornek.com ADMIN_USERNAME=admin_kullanici ADMIN_PASSWORD='en-az-12-karakterli-sifre' npm run create-admin
 ```
 
-Script çıktısında `password_hash` değerini kopyalayın ve SQL scriptine yapıştırın.
+- Aynı email ile kayıtlı kullanıcı varsa admin yapılır ve şifresi güncellenir.
+- Kullanıcı adı eşleşip email'i farklı olan bir hesap **admin yapılmaz**.
 
-Sonra `backend/src/scripts/createUser.sql` dosyasını pgAdmin'de çalıştırın.
+## Test kullanıcıları (sadece yerel geliştirme)
 
----
-
-## 📋 Kullanıcı Bilgileri
-
-### Test Kullanıcısı (trading_platform)
-
-```
-Username: trading_platform
-Email: trading@platform.com
-Password: trading123
-Balance: 100,000 TL
-```
-
----
-
-## 🔧 Script Detayları
-
-### createUser.ts
-
-**Özellikler:**
-- ✅ Otomatik şifre hash'leme (bcrypt)
-- ✅ Mevcut kullanıcı kontrolü
-- ✅ Kullanıcı silme seçeneği
-- ✅ Detaylı çıktı ve bilgilendirme
-- ✅ SQL hash çıktısı
-
-**Kullanım:**
 ```bash
-# Varsayılan
-npm run create-user
-
-# Özel kullanıcı
-npm run create-user username email password [verified] [balance]
+npm run create-users                      # rastgele şifreler üretir ve bir kez yazdırır
+TEST_USER_PASSWORD='...' npm run create-users   # ortak şifre (en az 12 karakter)
 ```
 
-**Parametreler:**
-- `username`: Kullanıcı adı (zorunlu)
-- `email`: Email adresi (zorunlu)
-- `password`: Şifre (zorunlu)
-- `verified`: Email doğrulandı mı? (true/false, varsayılan: true)
-- `balance`: Başlangıç bakiyesi (varsayılan: 100000.00)
+`NODE_ENV=production` iken çalışmaz; sadece `@example.com` adresleri kullanılır.
 
----
+## SQL ile (manuel)
 
-## 📝 Örnek Kullanımlar
-
-### 1. Basit Kullanıcı
-```bash
-npm run create-user testuser test@example.com test123
-```
-
-### 2. Email Doğrulanmamış Kullanıcı
-```bash
-npm run create-user newuser new@example.com newpass false
-```
-
-### 3. Yüksek Bakiye ile Kullanıcı
-```bash
-npm run create-user richuser rich@example.com richpass true 500000
-```
-
-### 4. Tüm Parametrelerle
-```bash
-npm run create-user trader1 trader1@example.com trader123 true 200000
-```
-
----
-
-## ⚠️ Önemli Notlar
-
-1. **Şifre Güvenliği:** Şifreler bcrypt ile hash'lenir (salt rounds: 10)
-2. **Mevcut Kullanıcı:** Script mevcut kullanıcıyı tespit eder ve silme seçeneği sunar
-3. **Email Uniqueness:** Email adresi benzersiz olmalıdır
-4. **Username Uniqueness:** Kullanıcı adı benzersiz olmalıdır
-
----
-
-## 🐛 Sorun Giderme
-
-### Hata: "Kullanıcı zaten mevcut"
-```bash
-# Mevcut kullanıcıyı silmek için scripti tekrar çalıştırın ve 'e' yanıtını verin
-npm run create-user
-```
-
-### Hata: "Database connection failed"
-- PostgreSQL servisinin çalıştığından emin olun
-- `.env` dosyasındaki database bilgilerini kontrol edin
-
-### Hata: "Email already exists"
-- Farklı bir email adresi kullanın
-- Veya mevcut kullanıcıyı silin
-
----
-
-## 📚 İlgili Dosyalar
-
-- `backend/src/scripts/createUser.ts` - Node.js scripti
-- `backend/src/scripts/createUser.sql` - SQL scripti
-- `backend/src/scripts/createTestUsers.ts` - Çoklu test kullanıcıları
-
----
-
-## 💡 İpuçları
-
-1. **Test Kullanıcıları:** Çoklu kullanıcı için `npm run create-users` kullanın
-2. **SQL Hash:** Node.js scripti çıktısında SQL hash'i gösterilir
-3. **Otomatik Silme:** Script mevcut kullanıcıyı silme seçeneği sunar
-4. **Balance:** Varsayılan bakiye 100,000 TL'dir
-
+`createUser.sql` içindeki `password_hash` alanına bcrypt hash'i koymanız gerekir. Düz metin şifreyi
+SQL dosyasına veya repoya yazmayın.

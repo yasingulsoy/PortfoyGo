@@ -1,79 +1,52 @@
 import express from 'express';
-import { MarketCacheService } from '../services/marketCache';
+import { MarketCacheService, CachedMarketData } from '../services/marketCache';
+import { asyncHandler, badRequest } from '../utils/errors';
+import { parseOrThrow, limitSchema } from '../utils/validation';
+import { maybeBackgroundRefresh } from './marketRefresh';
 
 const router = express.Router();
 
-// Popüler kripto paralar (cache'den)
-router.get('/', async (req, res) => {
-  try {
-    const limit = parseInt(req.query.limit as string) || 25;
-    const cryptos = await MarketCacheService.getFromCache('crypto');
-    
-    if (cryptos.length === 0) {
-      // Cache boşsa, cache'i yenile ve tekrar dene
-      try {
-        await MarketCacheService.refreshCache();
-        const refreshedCryptos = await MarketCacheService.getFromCache('crypto');
-        return res.json({ 
-          success: true, 
-          data: refreshedCryptos.slice(0, limit).map(c => ({
-            id: c.metadata?.id || c.symbol.toLowerCase(),
-            symbol: c.symbol.toLowerCase(),
-            name: c.name,
-            current_price: c.price,
-            price_change_percentage_24h: c.change_percent,
-            total_volume: c.volume,
-            market_cap: c.market_cap,
-            image: c.metadata?.image || ''
-          }))
-        });
-      } catch (error) {
-        return res.status(500).json({
-          success: false,
-          message: 'Kripto paralar alınamadı'
-        });
-      }
-    }
-
-    res.json({ 
-      success: true, 
-      data: cryptos.slice(0, limit).map(c => ({
-        id: c.metadata?.id || c.symbol.toLowerCase(),
-        symbol: c.symbol.toLowerCase(),
-        name: c.name,
-        current_price: c.price,
-        price_change_percentage_24h: c.change_percent,
-        total_volume: c.volume,
-        market_cap: c.market_cap,
-        image: c.metadata?.image || ''
-      }))
-    });
-  } catch (error) {
-    console.error('Cryptos route error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Kripto paralar alınamadı',
-      error: error instanceof Error ? error.message : 'Bilinmeyen hata'
-    });
-  }
+/** CoinGecko formatına benzer liste DTO'su (frontend CryptoCoin tipi) */
+const toCryptoListDto = (c: CachedMarketData) => ({
+  id: c.metadata?.id || c.symbol.toLowerCase(),
+  symbol: c.symbol.toLowerCase(),
+  name: c.name,
+  current_price: c.price,
+  price_change_percentage_24h: c.change_percent,
+  total_volume: c.volume,
+  market_cap: c.market_cap,
+  image: c.metadata?.image || '',
 });
 
-// Tek kripto verisi (cache'den)
-router.get('/:symbol', async (req, res) => {
-  try {
-    const { symbol } = req.params;
+// Popüler kripto paralar (cache'den) — ?limit=1..100
+router.get(
+  '/',
+  asyncHandler(async (req, res) => {
+    const { limit } = parseOrThrow(limitSchema(25, 100), req.query);
+    let cryptos = await MarketCacheService.getFromCache('crypto');
+    if (cryptos.length === 0 && (await maybeBackgroundRefresh(true, true))) {
+      cryptos = await MarketCacheService.getFromCache('crypto');
+    }
+    res.json({ success: true, data: cryptos.slice(0, limit).map(toCryptoListDto) });
+  })
+);
+
+// Tek kripto (cache'den, sembol büyük/küçük harf duyarsız)
+router.get(
+  '/:symbol',
+  asyncHandler(async (req, res) => {
+    const symbol = String(req.params.symbol || '').toUpperCase();
+    if (!/^[A-Z0-9.\-_]{1,20}$/.test(symbol)) {
+      throw badRequest('Geçersiz sembol');
+    }
     const cryptos = await MarketCacheService.getFromCache('crypto', symbol);
-    
     if (cryptos.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: 'Kripto para bulunamadı'
-      });
+      return res.status(404).json({ success: false, message: 'Kripto para bulunamadı' });
     }
 
     const crypto = cryptos[0];
-    res.json({ 
-      success: true, 
+    res.json({
+      success: true,
       data: {
         symbol: crypto.symbol,
         name: crypto.name,
@@ -85,18 +58,10 @@ router.get('/:symbol', async (req, res) => {
         previousClose: crypto.previous_close,
         open: crypto.open_price,
         high: crypto.high_price,
-        low: crypto.low_price
-      }
+        low: crypto.low_price,
+      },
     });
-  } catch (error) {
-    console.error('Crypto route error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Kripto para verisi alınamadı',
-      error: error instanceof Error ? error.message : 'Bilinmeyen hata'
-    });
-  }
-});
+  })
+);
 
 export default router;
-

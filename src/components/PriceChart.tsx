@@ -1,95 +1,89 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { useTheme } from 'next-themes';
 import useSWR from 'swr';
+import { ChartBarIcon } from '@heroicons/react/24/outline';
+import { EmptyState, Skeleton } from '@/components/ui/Feedback';
 
-interface PriceChartProps {
+interface Props {
   type: 'stock' | 'crypto';
-  symbol?: string; // stock
-  id?: string; // crypto id
-  days?: number;
+  symbol?: string;
+  coinId?: string;
+  days: number;
+  /** USD → TL çevirme katsayısı; verilmezse seri USD gösterilir */
+  multiplier?: number | null;
+  height?: number;
 }
 
-const fetcher = async (url: string) => {
-  const res = await fetch(url, { cache: 'no-store' });
-  if (!res.ok) throw new Error('network');
-  return res.json();
-};
+type Series = { series: { time: number; value: number }[]; unavailable?: boolean };
 
-export default function PriceChart({ type, symbol, id, days = 30 }: PriceChartProps) {
-  const containerRef = useRef<HTMLDivElement | null>(null);
-  const { theme, systemTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
-  const { data } = useSWR(() =>
-    type === 'stock'
-      ? `/api/asset/history?type=stock&symbol=${symbol}&days=${days}`
-      : `/api/asset/history?type=crypto&id=${id}&days=${days}`,
-    fetcher,
-    { refreshInterval: 60000 }
-  );
+const EMPTY_POINTS: Series['series'] = [];
+
+const fetcher = (url: string) => fetch(url).then((r) => r.json() as Promise<Series>);
+
+function cssVar(name: string) {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+}
+
+export default function PriceChart({ type, symbol, coinId, days, multiplier, height = 320 }: Props) {
+  const ref = useRef<HTMLDivElement>(null);
+  const { resolvedTheme } = useTheme();
+
+  const key = type === 'crypto' ? (coinId ? `/api/asset/history?type=crypto&id=${encodeURIComponent(coinId)}&days=${days}` : null) : symbol ? `/api/asset/history?type=stock&symbol=${encodeURIComponent(symbol)}&days=${days}` : null;
+  const { data, isLoading } = useSWR(key, fetcher, { revalidateOnFocus: false, refreshInterval: 5 * 60_000 });
+
+  const points = data?.series ?? EMPTY_POINTS;
+  const hasData = points.length > 1;
 
   useEffect(() => {
-    let chart: any;
-    let series: any;
-    let dispose = () => {};
+    const el = ref.current;
+    if (!el || !hasData) return;
+    let disposed = false;
+    let cleanup = () => {};
 
-    (async () => {
-      if (!containerRef.current || !data?.series || !mounted) return;
-      const lc = await import('lightweight-charts');
-      
-      // Dark mode desteği (next-themes)
-      const currentTheme = theme === 'system' ? systemTheme : theme;
-      const isDark = currentTheme === 'dark';
-      const bgColor = isDark ? '#1F2937' : '#FFFFFF';
-      const textColor = isDark ? '#F9FAFB' : '#111827';
-      const gridColor = isDark ? '#374151' : '#F3F4F6';
-      const lineColor = isDark ? '#60A5FA' : '#4F46E5';
-      const topColor = isDark ? 'rgba(96,165,250,0.3)' : 'rgba(79,70,229,0.3)';
-      
-      chart = lc.createChart(containerRef.current, {
-        layout: { 
-          background: { color: bgColor }, 
-          textColor: textColor 
-        },
-        grid: { 
-          vertLines: { color: gridColor }, 
-          horzLines: { color: gridColor } 
-        },
-        timeScale: {
-          borderColor: gridColor,
-        },
-        rightPriceScale: {
-          borderColor: gridColor,
-        },
-        width: containerRef.current.clientWidth,
-        height: 320,
+    import('lightweight-charts').then((lc) => {
+      if (disposed || !ref.current) return;
+      const first = points[0].value;
+      const last = points[points.length - 1].value;
+      const color = last >= first ? cssVar('--up') : cssVar('--down');
+      const chart = lc.createChart(el, {
+        height,
+        autoSize: true,
+        layout: { background: { color: 'transparent' }, textColor: cssVar('--subtle'), fontFamily: 'var(--font-geist-sans)', attributionLogo: false },
+        grid: { vertLines: { visible: false }, horzLines: { color: cssVar('--line') } },
+        rightPriceScale: { borderVisible: false },
+        timeScale: { borderVisible: false, timeVisible: days <= 7 },
+        crosshair: { mode: lc.CrosshairMode.Magnet },
+        localization: { locale: 'tr-TR', priceFormatter: (p: number) => p.toLocaleString('tr-TR', { maximumFractionDigits: p < 1 ? 6 : 2 }) },
       });
-      
-      series = chart.addSeries(lc.AreaSeries, {
-        lineColor: lineColor,
-        topColor: topColor,
-        bottomColor: 'rgba(79,70,229,0.0)'
+      const series = chart.addSeries(lc.AreaSeries, {
+        lineColor: color,
+        lineWidth: 2,
+        topColor: color + '33',
+        bottomColor: color + '00',
+        priceLineVisible: false,
       });
-      series.setData(data.series);
-
-      const onResize = () => {
-        if (containerRef.current) chart.applyOptions({ width: containerRef.current.clientWidth });
-      };
-      window.addEventListener('resize', onResize);
-      dispose = () => window.removeEventListener('resize', onResize);
-    })();
+      const k = multiplier ?? 1;
+      series.setData(points.map((p) => ({ time: p.time as never, value: p.value * k })));
+      chart.timeScale().fitContent();
+      cleanup = () => chart.remove();
+    });
 
     return () => {
-      try { dispose(); } catch {}
-      try { chart?.remove(); } catch {}
+      disposed = true;
+      cleanup();
     };
-  }, [data, theme, systemTheme, mounted]);
+    // resolvedTheme: tema değişince renkler yeniden okunur
+  }, [points, hasData, multiplier, height, days, resolvedTheme]);
 
-  return (
-    <div className="w-full">
-      <div ref={containerRef} className="w-full rounded-lg border" />
-    </div>
-  );
+  if (isLoading) return <div style={{ height }}><Skeleton className="h-full w-full rounded-xl" /></div>;
+  if (!hasData) {
+    return (
+      <div style={{ height }} className="flex items-center justify-center">
+        <EmptyState icon={<ChartBarIcon />} title="Grafik verisi şu an mevcut değil" description="Bu varlık için geçmiş fiyat verisi sağlayıcıdan alınamadı." />
+      </div>
+    );
+  }
+  return <div ref={ref} style={{ height }} className="w-full" />;
 }

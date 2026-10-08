@@ -1,126 +1,46 @@
 import express from 'express';
 import { TransactionService } from '../services/transaction';
-import { authenticateToken } from '../middleware/auth';
+import { authenticateToken, requireUser } from '../middleware/auth';
+import { asyncHandler } from '../utils/errors';
+import { parseOrThrow, buySchema, sellSchema } from '../utils/validation';
 
 const router = express.Router();
 
-// Alış işlemi
-router.post('/buy', authenticateToken, async (req: any, res) => {
-  try {
-    const { symbol, name, asset_type, quantity, price } = req.body;
-    
-    console.log('🛒 Alış isteği alındı:', {
-      userId: req.user.id,
+/**
+ * Alış — body: { symbol, asset_type, quantity }
+ * (price / name geriye dönük uyumluluk için kabul edilir ama YOK SAYILIR; fiyatı sunucu belirler)
+ * Yanıt: { success, message, transaction, portfolioItem, executedPrice }
+ */
+router.post(
+  '/buy',
+  authenticateToken,
+  asyncHandler(async (req, res) => {
+    const { symbol, asset_type, quantity } = parseOrThrow(buySchema, req.body);
+    const { postCommit: _ignored, ...result } = await TransactionService.buy(requireUser(req).id, {
       symbol,
-      name,
       asset_type,
       quantity,
-      price
     });
+    res.json(result);
+  })
+);
 
-    // Validasyon
-    if (!symbol || !name || !asset_type || !quantity || !price) {
-      console.log('❌ Validasyon hatası: Tüm alanlar gerekli');
-      return res.status(400).json({
-        success: false,
-        message: 'Tüm alanlar gerekli'
-      });
-    }
-
-    if (quantity <= 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'Miktar 0\'dan büyük olmalı'
-      });
-    }
-
-    if (price <= 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'Fiyat 0\'dan büyük olmalı'
-      });
-    }
-
-    if (!['crypto', 'stock', 'commodity', 'currency'].includes(asset_type)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Geçersiz varlık tipi'
-      });
-    }
-
-    const result = await TransactionService.buy(req.user.id, {
+/**
+ * Satış — body: { symbol, asset_type, quantity }
+ * (asset_type eski istemciler için opsiyonel: sembolle eşleşen tek varlık varsa o kullanılır)
+ */
+router.post(
+  '/sell',
+  authenticateToken,
+  asyncHandler(async (req, res) => {
+    const { symbol, asset_type, quantity } = parseOrThrow(sellSchema, req.body);
+    const { postCommit: _ignored, ...result } = await TransactionService.sell(requireUser(req).id, {
       symbol,
-      name,
       asset_type,
       quantity,
-      price
     });
-
-    if (result.success) {
-      console.log('✅ Alış işlemi başarılı:', result.transaction?.id);
-      res.json(result);
-    } else {
-      console.log('❌ Alış işlemi başarısız:', result.message);
-      res.status(400).json(result);
-    }
-  } catch (error: any) {
-    console.error('❌ Buy route error:', error);
-    console.error('Error stack:', error.stack);
-    res.status(500).json({
-      success: false,
-      message: error.message || 'Sunucu hatası'
-    });
-  }
-});
-
-// Satış işlemi
-router.post('/sell', authenticateToken, async (req: any, res) => {
-  try {
-    const { symbol, quantity } = req.body;
-    
-    console.log('💰 Satış isteği alındı:', {
-      userId: req.user.id,
-      symbol,
-      quantity
-    });
-
-    // Validasyon
-    if (!symbol || !quantity) {
-      console.log('❌ Validasyon hatası: Sembol ve miktar gerekli');
-      return res.status(400).json({
-        success: false,
-        message: 'Sembol ve miktar gerekli'
-      });
-    }
-
-    if (quantity <= 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'Miktar 0\'dan büyük olmalı'
-      });
-    }
-
-    const result = await TransactionService.sell(req.user.id, {
-      symbol,
-      quantity
-    });
-
-    if (result.success) {
-      console.log('✅ Satış işlemi başarılı:', result.transaction?.id);
-      res.json(result);
-    } else {
-      console.log('❌ Satış işlemi başarısız:', result.message);
-      res.status(400).json(result);
-    }
-  } catch (error: any) {
-    console.error('❌ Sell route error:', error);
-    console.error('Error stack:', error.stack);
-    res.status(500).json({
-      success: false,
-      message: error.message || 'Sunucu hatası'
-    });
-  }
-});
+    res.json(result);
+  })
+);
 
 export default router;
-

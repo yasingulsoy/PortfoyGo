@@ -1,312 +1,423 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { 
+import { useMemo, useState } from 'react';
+import Link from 'next/link';
+import {
+  ArrowDownLeftIcon,
+  ArrowDownTrayIcon,
+  ArrowPathIcon,
+  ArrowUpRightIcon,
+  ChevronDownIcon,
   ClockIcon,
-  FunnelIcon,
-  ArrowDownTrayIcon
-} from '@heroicons/react/24/outline';
+  MagnifyingGlassIcon,
+} from '@heroicons/react/20/solid';
+import { useRequireAuth } from '@/hooks/useRequireAuth';
 import { usePortfolio } from '@/context/PortfolioContext';
+import { cn, formatQuantity, formatTRY } from '@/lib/format';
+import { ASSET_TYPE_LABELS, type AssetType, type Transaction } from '@/types';
+import { Card } from '@/components/ui/Card';
+import { Badge, EmptyState, Skeleton } from '@/components/ui/Feedback';
+import Button, { LinkButton } from '@/components/ui/Button';
+import PageHeader from '@/components/ui/PageHeader';
+import { PageLoader } from '@/components/ui/Spinner';
+import Tabs from '@/components/ui/Tabs';
+import { assetHref } from '@/components/market/MarketTable';
+
+type TypeFilter = 'all' | 'buy' | 'sell';
+type AssetFilter = 'all' | AssetType;
+type SortKey = 'newest' | 'oldest' | 'amount';
+
+const PAGE_SIZE = 25;
+
+const SORTS: { value: SortKey; label: string }[] = [
+  { value: 'newest', label: 'En yeni' },
+  { value: 'oldest', label: 'En eski' },
+  { value: 'amount', label: 'Tutar (yüksekten düşüğe)' },
+];
+
+const selectClass =
+  'h-9 w-full appearance-none rounded-lg border border-line bg-surface-2 pl-3 pr-8 text-sm text-fg focus:outline-none focus:ring-2 focus:ring-[var(--ring)]';
 
 export default function TransactionsPage() {
-  const { state } = usePortfolio();
-  const [filterType, setFilterType] = useState<'all' | 'buy' | 'sell'>('all');
-  const [sortBy, setSortBy] = useState<'date' | 'amount' | 'symbol'>('date');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
-  const [mounted, setMounted] = useState(false);
+  const { user, ready } = useRequireAuth();
+  if (!ready || !user) return <PageLoader />;
+  return <Transactions />;
+}
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+function Transactions() {
+  const { transactions, loaded, refresh } = usePortfolio();
+  const [type, setType] = useState<TypeFilter>('all');
+  const [asset, setAsset] = useState<AssetFilter>('all');
+  const [sort, setSort] = useState<SortKey>('newest');
+  const [query, setQuery] = useState('');
+  const [visible, setVisible] = useState(PAGE_SIZE);
+  const [refreshing, setRefreshing] = useState(false);
 
-  const formatDate = (date: Date) => {
-    return new Intl.DateTimeFormat('tr-TR', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    }).format(date);
+  // Filtre değiştiğinde sayfalama başa döner (effect yerine olay işleyicilerinde)
+  const withReset = <T,>(set: (v: T) => void) => (v: T) => {
+    set(v);
+    setVisible(PAGE_SIZE);
   };
 
-  const formatShortDate = (date: Date) => {
-    return new Intl.DateTimeFormat('tr-TR', {
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    }).format(date);
-  };
+  const stats = useMemo(() => {
+    let buy = 0;
+    let sell = 0;
+    let commission = 0;
+    let buyCount = 0;
+    for (const t of transactions) {
+      if (t.type === 'buy') {
+        buy += t.totalAmount;
+        buyCount += 1;
+      } else sell += t.totalAmount;
+      commission += t.commission;
+    }
+    return { buy, sell, commission, buyCount, sellCount: transactions.length - buyCount };
+  }, [transactions]);
 
-  const filteredTransactions = state.transactions
-    .filter(transaction => {
-      if (filterType === 'all') return true;
-      return transaction.type === filterType;
-    })
-    .sort((a, b) => {
-      let comparison = 0;
-      
-      switch (sortBy) {
-        case 'date':
-          comparison = new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
-          break;
-        case 'amount':
-          comparison = b.totalAmount - a.totalAmount;
-          break;
-        case 'symbol':
-          comparison = a.symbol.localeCompare(b.symbol);
-          break;
-      }
-      
-      return sortOrder === 'asc' ? -comparison : comparison;
-    });
+  const assetTypes = useMemo(() => {
+    const set = new Set<AssetType>();
+    for (const t of transactions) set.add(t.assetType);
+    return (Object.keys(ASSET_TYPE_LABELS) as AssetType[]).filter((k) => set.has(k));
+  }, [transactions]);
 
-  const getTotalBuyAmount = () => {
-    return state.transactions
-      .filter(t => t.type === 'buy')
-      .reduce((sum, t) => sum + t.totalAmount, 0);
-  };
-
-  const getTotalSellAmount = () => {
-    return state.transactions
-      .filter(t => t.type === 'sell')
-      .reduce((sum, t) => sum + t.totalAmount, 0);
-  };
-
-  const getTotalCommission = () => {
-    return state.transactions.reduce((sum, t) => sum + t.commission, 0);
-  };
-
-  const exportTransactions = () => {
-    const csvContent = [
-      ['Tarih', 'İşlem', 'Hisse', 'Sembol', 'Miktar', 'Fiyat', 'Toplam', 'Komisyon'],
-      ...filteredTransactions.map(t => [
-        formatDate(t.timestamp),
-        t.type === 'buy' ? 'Alım' : 'Satım',
-        t.name,
-        t.symbol,
-        t.quantity.toString(),
-        t.price.toString(),
-        t.totalAmount.toString(),
-        t.commission.toString()
-      ])
-    ].map(row => row.join(',')).join('\n');
-
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    link.setAttribute('download', `islem-gecmisi-${new Date().toISOString().split('T')[0]}.csv`);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
-  if (!mounted) {
-    return (
-      <div className="min-h-screen bg-[#181a20] flex items-center justify-center">
-        <div className="inline-block animate-spin rounded-full h-10 w-10 border-2 border-transparent border-t-[#0ecb81]" />
-      </div>
+  const filtered = useMemo(() => {
+    const q = query.trim().toLocaleLowerCase('tr');
+    const list = transactions.filter(
+      (t) =>
+        (type === 'all' || t.type === type) &&
+        (asset === 'all' || t.assetType === asset) &&
+        (!q || t.symbol.toLocaleLowerCase('tr').includes(q) || t.name.toLocaleLowerCase('tr').includes(q)),
     );
-  }
+    const time = (t: Transaction) => new Date(t.createdAt).getTime() || 0;
+    if (sort === 'newest') list.sort((a, b) => time(b) - time(a));
+    else if (sort === 'oldest') list.sort((a, b) => time(a) - time(b));
+    else list.sort((a, b) => b.netAmount - a.netAmount);
+    return list;
+  }, [transactions, type, asset, query, sort]);
+
+  const shown = useMemo(() => filtered.slice(0, visible), [filtered, visible]);
+  const groups = useMemo(() => (sort === 'amount' ? null : groupByDay(shown)), [shown, sort]);
+  const hasFilters = type !== 'all' || asset !== 'all' || query.trim() !== '';
+
+  const resetFilters = () => {
+    setType('all');
+    setAsset('all');
+    setQuery('');
+    setVisible(PAGE_SIZE);
+  };
+
+  const reload = async () => {
+    setRefreshing(true);
+    try {
+      await refresh();
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   return (
-    <div className="min-h-screen bg-[#181a20]">
-      {/* Header */}
-      <div className="bg-[#1e2329] border-b border-[#2b3139]">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center h-16">
-            <div className="p-2 bg-[#0ecb81]/10 rounded-lg mr-3">
-              <ClockIcon className="h-6 w-6 text-[#0ecb81]" />
-            </div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-white">İşlem Geçmişi</h1>
+    <div className="space-y-6">
+      <PageHeader
+        eyebrow="Hesap"
+        title="İşlem geçmişi"
+        description="Tüm alım ve satımların; komisyon ve net tutarlarıyla birlikte."
+        actions={
+          <>
+            <Button variant="ghost" onClick={reload} loading={refreshing} icon={<ArrowPathIcon className="h-4 w-4" aria-hidden="true" />}>
+              Yenile
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={() => exportCsv(filtered)}
+              disabled={filtered.length === 0}
+              icon={<ArrowDownTrayIcon className="h-4 w-4" aria-hidden="true" />}
+              aria-label={`${filtered.length} işlemi CSV olarak indir`}
+            >
+              CSV indir
+            </Button>
+          </>
+        }
+      />
+
+      <Card className="overflow-hidden">
+        <dl className="grid grid-cols-2 gap-px bg-line lg:grid-cols-4">
+          <Metric label="Toplam işlem" loading={!loaded} value={transactions.length.toLocaleString('tr-TR')} sub={`${stats.buyCount} alış · ${stats.sellCount} satış`} />
+          <Metric label="Toplam alım hacmi" loading={!loaded} value={formatTRY(stats.buy)} tone="up" />
+          <Metric label="Toplam satım hacmi" loading={!loaded} value={formatTRY(stats.sell)} tone="down" />
+          <Metric label="Ödenen komisyon" loading={!loaded} value={formatTRY(stats.commission)} />
+        </dl>
+      </Card>
+
+      <Card className="overflow-hidden">
+        <div className="flex flex-col gap-3 border-b border-line px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
+          <Tabs<TypeFilter>
+            label="İşlem türü"
+            value={type}
+            onChange={withReset(setType)}
+            items={[
+              { value: 'all', label: 'Tümü', count: transactions.length },
+              { value: 'buy', label: 'Alış', count: stats.buyCount },
+              { value: 'sell', label: 'Satış', count: stats.sellCount },
+            ]}
+            className="self-start"
+          />
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-[minmax(0,1fr)_10rem_10rem] lg:w-[34rem]">
+            <label className="relative col-span-2 block sm:col-span-1">
+              <span className="sr-only">Sembol veya isim ara</span>
+              <MagnifyingGlassIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-subtle" aria-hidden="true" />
+              <input
+                type="search"
+                value={query}
+                onChange={(e) => withReset(setQuery)(e.target.value)}
+                placeholder="Sembol veya isim ara"
+                className="h-9 w-full rounded-lg border border-line bg-surface-2 pl-9 pr-3 text-sm placeholder:text-subtle focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+              />
+            </label>
+            <label className="relative block">
+              <span className="sr-only">Varlık türü</span>
+              <select value={asset} onChange={(e) => withReset(setAsset)(e.target.value as AssetFilter)} className={selectClass}>
+                <option value="all">Tüm varlıklar</option>
+                {assetTypes.map((k) => (
+                  <option key={k} value={k}>{ASSET_TYPE_LABELS[k]}</option>
+                ))}
+              </select>
+              <ChevronDownIcon className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-subtle" aria-hidden="true" />
+            </label>
+            <label className="relative block">
+              <span className="sr-only">Sıralama</span>
+              <select value={sort} onChange={(e) => withReset(setSort)(e.target.value as SortKey)} className={selectClass}>
+                {SORTS.map((s) => (
+                  <option key={s.value} value={s.value}>{s.label}</option>
+                ))}
+              </select>
+              <ChevronDownIcon className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-subtle" aria-hidden="true" />
+            </label>
           </div>
         </div>
-      </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-          <div className="bg-[#1e2329] rounded-xl p-5 border border-[#2b3139] hover:border-[#0ecb81]/30 transition-all">
-            <div className="text-center">
-              <p className="text-xs text-[#848e9c] mb-1">Toplam İşlem</p>
-              <p className="text-2xl font-bold text-white">{state.transactions.length}</p>
-            </div>
-          </div>
-
-          <div className="bg-[#1e2329] rounded-xl p-5 border border-[#2b3139] hover:border-[#0ecb81]/30 transition-all">
-            <div className="text-center">
-              <p className="text-xs text-[#848e9c] mb-1">Toplam Alım</p>
-              <p className="text-2xl font-bold text-[#0ecb81]">₺{getTotalBuyAmount().toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-            </div>
-          </div>
-
-          <div className="bg-[#1e2329] rounded-xl p-5 border border-[#2b3139] hover:border-[#0ecb81]/30 transition-all">
-            <div className="text-center">
-              <p className="text-xs text-[#848e9c] mb-1">Toplam Satım</p>
-              <p className="text-2xl font-bold text-[#f6465d]">₺{getTotalSellAmount().toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-            </div>
-          </div>
-
-          <div className="bg-[#1e2329] rounded-xl p-5 border border-[#2b3139] hover:border-[#0ecb81]/30 transition-all">
-            <div className="text-center">
-              <p className="text-xs text-[#848e9c] mb-1">Toplam Komisyon</p>
-              <p className="text-2xl font-bold text-white">₺{getTotalCommission().toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Filters and Controls */}
-        <div className="bg-[#1e2329] rounded-xl border border-[#2b3139] mb-8">
-          <div className="p-6 border-b border-[#2b3139] bg-[#161a1e]">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
-              <h2 className="text-lg font-bold text-white">İşlem Detayları</h2>
-              
-              <div className="flex flex-wrap items-center gap-3">
-                {/* Filter */}
-                <div className="flex items-center space-x-2">
-                  <FunnelIcon className="h-5 w-5 text-[#848e9c]" />
-                  <select
-                    value={filterType}
-                    onChange={(e) => setFilterType(e.target.value as 'all' | 'buy' | 'sell')}
-                    className="border border-[#2b3139] bg-[#1e2329] text-white rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#0ecb81] focus:border-[#0ecb81] transition-colors"
-                  >
-                    <option value="all">Tüm İşlemler</option>
-                    <option value="buy">Sadece Alımlar</option>
-                    <option value="sell">Sadece Satımlar</option>
-                  </select>
+        {!loaded ? (
+          <div className="divide-y divide-line">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-3 px-5 py-3.5">
+                <Skeleton className="h-9 w-9 rounded-full" />
+                <div className="flex-1 space-y-1.5">
+                  <Skeleton className="h-3.5 w-24" />
+                  <Skeleton className="h-3 w-40" />
                 </div>
-
-                {/* Sort */}
-                <div className="flex items-center space-x-2">
-                  <select
-                    value={sortBy}
-                    onChange={(e) => setSortBy(e.target.value as 'date' | 'amount' | 'symbol')}
-                    className="border border-[#2b3139] bg-[#1e2329] text-white rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#0ecb81] focus:border-[#0ecb81] transition-colors"
-                  >
-                    <option value="date">Tarihe Göre</option>
-                    <option value="amount">Tutara Göre</option>
-                    <option value="symbol">Sembole Göre</option>
-                  </select>
-                  
-                  <button
-                    onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-                    className="p-2 border border-[#2b3139] bg-[#1e2329] text-white rounded-lg hover:bg-[#2b3139] transition-colors"
-                    title={sortOrder === 'asc' ? 'Artan' : 'Azalan'}
-                  >
-                    {sortOrder === 'asc' ? '↑' : '↓'}
-                  </button>
-                </div>
-
-                {/* Export */}
-                <button
-                  onClick={exportTransactions}
-                  className="flex items-center space-x-2 bg-[#0ecb81] hover:bg-[#0bb975] text-white px-4 py-2 rounded-lg transition-all font-semibold"
-                >
-                  <ArrowDownTrayIcon className="h-4 w-4" />
-                  <span className="text-sm">Dışa Aktar</span>
-                </button>
+                <Skeleton className="h-4 w-24" />
               </div>
-            </div>
+            ))}
           </div>
-
-          <div className="p-6">
-            {filteredTransactions.length === 0 ? (
-              <div className="text-center py-16">
-                <div className="mx-auto h-16 w-16 bg-[#2b3139] rounded-full flex items-center justify-center mb-4">
-                  <ClockIcon className="h-8 w-8 text-[#848e9c]" />
-                </div>
-                <h3 className="mt-2 text-base font-semibold text-white">İşlem bulunamadı</h3>
-                <p className="mt-1 text-sm text-[#848e9c]">
-                  {filterType === 'all' 
-                    ? 'Henüz hiç işlem yapılmamış.' 
-                    : `Bu filtrede işlem bulunamadı.`
-                  }
-                </p>
-              </div>
+        ) : transactions.length === 0 ? (
+          <EmptyState
+            icon={<ClockIcon />}
+            title="Henüz işlem yapmadın"
+            description="İlk alımını yaptığında tüm işlemlerin burada tarih sırasıyla listelenir."
+            action={<LinkButton href="/" icon={<MagnifyingGlassIcon className="h-4 w-4" aria-hidden="true" />}>Piyasalara göz at</LinkButton>}
+          />
+        ) : filtered.length === 0 ? (
+          <EmptyState
+            icon={<MagnifyingGlassIcon />}
+            title="Eşleşen işlem bulunamadı"
+            description={query.trim() ? `“${query.trim()}” için seçili filtrelerde sonuç yok.` : 'Seçili filtrelerde işlem yok.'}
+            action={hasFilters && <Button variant="secondary" size="sm" onClick={resetFilters}>Filtreleri temizle</Button>}
+          />
+        ) : (
+          <>
+            {groups ? (
+              groups.map((g) => (
+                <section key={g.key} aria-labelledby={`day-${g.key}`}>
+                  <h3
+                    id={`day-${g.key}`}
+                    className="flex items-center justify-between border-b border-line bg-surface-2/60 px-5 py-2 text-xs font-medium text-muted"
+                  >
+                    <span>{g.label}</span>
+                    <span className="num text-subtle">{g.items.length} işlem</span>
+                  </h3>
+                  <ul className="divide-y divide-line border-b border-line">
+                    {g.items.map((t) => <TxRow key={t.id} t={t} />)}
+                  </ul>
+                </section>
+              ))
             ) : (
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-[#2b3139]">
-                  <thead className="bg-[#161a1e]">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-semibold text-[#848e9c] uppercase tracking-wider">
-                        Tarih
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-semibold text-[#848e9c] uppercase tracking-wider">
-                        İşlem
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-semibold text-[#848e9c] uppercase tracking-wider">
-                        Hisse
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-semibold text-[#848e9c] uppercase tracking-wider">
-                        Miktar
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-semibold text-[#848e9c] uppercase tracking-wider">
-                        Fiyat
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-semibold text-[#848e9c] uppercase tracking-wider">
-                        Toplam
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-semibold text-[#848e9c] uppercase tracking-wider">
-                        Komisyon
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-[#1e2329] divide-y divide-[#2b3139]">
-                    {filteredTransactions.map((transaction) => (
-                      <tr key={transaction.id} className="hover:bg-[#161a1e] transition-colors">
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div>
-                            <div className="text-sm font-semibold text-white">
-                              {formatShortDate(transaction.timestamp)}
-                            </div>
-                            <div className="text-xs text-[#848e9c]">
-                              {formatDate(transaction.timestamp)}
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`inline-flex px-3 py-1 text-xs font-semibold rounded-full ${
-                            transaction.type === 'buy' 
-                              ? 'bg-[#0ecb81]/10 text-[#0ecb81]' 
-                              : 'bg-[#f6465d]/10 text-[#f6465d]'
-                          }`}>
-                            {transaction.type === 'buy' ? 'Alım' : 'Satım'}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center gap-2">
-                            <div className="h-8 w-8 bg-[#0ecb81]/10 rounded-lg flex items-center justify-center">
-                              <span className="text-xs font-bold text-[#0ecb81]">{transaction.symbol.slice(0,1)}</span>
-                            </div>
-                            <div>
-                              <div className="text-sm font-semibold text-white">{transaction.name}</div>
-                              <div className="text-xs text-[#848e9c]">{transaction.symbol}</div>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-white">
-                          {transaction.quantity.toLocaleString('tr-TR', { maximumFractionDigits: 8 })}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-white">
-                          ₺{transaction.price.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-white">
-                          ₺{transaction.totalAmount.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-[#848e9c]">
-                          ₺{transaction.commission.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <ul className="divide-y divide-line border-b border-line">
+                {shown.map((t) => <TxRow key={t.id} t={t} showDate />)}
+              </ul>
             )}
-          </div>
-        </div>
-      </div>
+
+            <div className="flex flex-col items-center gap-3 px-5 py-4 text-xs text-muted sm:flex-row sm:justify-between">
+              <span className="num">
+                {filtered.length} işlemden {shown.length} tanesi gösteriliyor
+              </span>
+              {shown.length < filtered.length && (
+                <Button variant="secondary" size="sm" onClick={() => setVisible((v) => v + PAGE_SIZE)}>
+                  Daha fazla göster
+                </Button>
+              )}
+            </div>
+          </>
+        )}
+      </Card>
     </div>
   );
+}
+
+/* ------------------------------------------------------------------ */
+
+function Metric({ label, value, sub, tone, loading }: { label: string; value: string; sub?: string; tone?: 'up' | 'down'; loading?: boolean }) {
+  return (
+    <div className="min-w-0 bg-surface p-4 sm:p-5">
+      <dt className="flex items-center gap-1.5 text-xs text-muted">
+        {tone && <span className={cn('h-1.5 w-1.5 rounded-full', tone === 'up' ? 'bg-up' : 'bg-down')} aria-hidden="true" />}
+        {label}
+      </dt>
+      {loading ? (
+        <dd>
+          <Skeleton className="mt-2 h-6 w-28" />
+        </dd>
+      ) : (
+        <>
+          <dd className="num mt-1.5 truncate text-lg font-semibold tracking-tight sm:text-xl">{value}</dd>
+          {sub && <dd className="num mt-0.5 text-xs text-subtle">{sub}</dd>}
+        </>
+      )}
+    </div>
+  );
+}
+
+function TxRow({ t, showDate }: { t: Transaction; showDate?: boolean }) {
+  const buy = t.type === 'buy';
+  const Icon = buy ? ArrowDownLeftIcon : ArrowUpRightIcon;
+  const d = new Date(t.createdAt);
+  const valid = !Number.isNaN(d.getTime());
+  const time = valid ? d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }) : '—';
+  const date = valid ? d.toLocaleDateString('tr-TR', { day: '2-digit', month: 'short', year: 'numeric' }) : '';
+
+  return (
+    <li className="flex items-center gap-3 px-5 py-3.5 transition-colors hover:bg-surface-2/60">
+      <span
+        className={cn('flex h-9 w-9 shrink-0 items-center justify-center rounded-full', buy ? 'bg-up-soft text-up' : 'bg-down-soft text-down')}
+        aria-hidden="true"
+      >
+        <Icon className="h-4 w-4" />
+      </span>
+
+      <div className="min-w-0 flex-1 sm:flex sm:items-center sm:gap-4">
+        <div className="min-w-0 sm:w-56 sm:shrink-0">
+          <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
+            <Link href={assetHref({ type: t.assetType, symbol: t.symbol })} className="font-mono text-[13px] font-semibold text-fg hover:text-brand">
+              {t.symbol}
+            </Link>
+            <Badge tone={buy ? 'up' : 'down'}>{buy ? 'Alış' : 'Satış'}</Badge>
+            <Badge className="max-sm:hidden">{ASSET_TYPE_LABELS[t.assetType]}</Badge>
+          </p>
+          <p className="mt-0.5 truncate text-xs text-muted">{t.name}</p>
+        </div>
+        <p className="num mt-0.5 truncate text-xs text-muted sm:mt-0 sm:flex-1 sm:text-sm sm:text-fg">
+          {formatQuantity(t.quantity)} <span className="text-subtle">×</span> {formatTRY(t.price, { precise: true })}
+        </p>
+        <p className="num hidden w-28 shrink-0 text-right text-xs text-subtle md:block">
+          <span className="sr-only">Komisyon: </span>
+          {formatTRY(t.commission)} kom.
+        </p>
+      </div>
+
+      <div className="shrink-0 text-right">
+        <p className={cn('num text-sm font-semibold', buy ? 'text-fg' : 'text-up')}>
+          <span className="sr-only">{buy ? 'Ödenen' : 'Hesaba geçen'}: </span>
+          {buy ? '−' : '+'}
+          {formatTRY(t.netAmount)}
+        </p>
+        <p className="num mt-0.5 text-xs text-subtle">{showDate ? `${date} ${time}` : time}</p>
+      </div>
+    </li>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+
+function pad(n: number) {
+  return String(n).padStart(2, '0');
+}
+
+function localDayKey(d: Date) {
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+/** İşlemleri yerel takvim gününe göre gruplar; sıra korunur. */
+function groupByDay(list: Transaction[]) {
+  const now = new Date();
+  const today = localDayKey(now);
+  const yesterday = localDayKey(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1));
+  const groups: { key: string; label: string; items: Transaction[] }[] = [];
+  const index = new Map<string, number>();
+
+  for (const t of list) {
+    const d = new Date(t.createdAt);
+    const valid = !Number.isNaN(d.getTime());
+    const key = valid ? localDayKey(d) : 'unknown';
+    let i = index.get(key);
+    if (i === undefined) {
+      const label = !valid
+        ? 'Tarihi bilinmeyen'
+        : key === today
+          ? 'Bugün'
+          : key === yesterday
+            ? 'Dün'
+            : d.toLocaleDateString('tr-TR', {
+                weekday: 'long',
+                day: 'numeric',
+                month: 'long',
+                ...(d.getFullYear() !== now.getFullYear() && { year: 'numeric' }),
+              });
+      i = groups.push({ key, label, items: [] }) - 1;
+      index.set(key, i);
+    }
+    groups[i].items.push(t);
+  }
+  return groups;
+}
+
+/* ---------- CSV dışa aktarma ---------- */
+
+/**
+ * Her alanı tırnak içine alır, iç tırnakları ikiler ve formül enjeksiyonuna
+ * (=, +, -, @, sekme, satır başı ile başlayan hücreler) karşı başına ' ekler.
+ */
+function csvCell(value: string | number): string {
+  let s = String(value ?? '');
+  if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`;
+  return `"${s.replace(/"/g, '""')}"`;
+}
+
+function csvDate(iso: string) {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  return `${localDayKey(d)} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+
+function exportCsv(list: Transaction[]) {
+  const header = ['Tarih', 'İşlem', 'Sembol', 'Varlık', 'Varlık türü', 'Miktar', 'Birim fiyat (TRY)', 'Tutar (TRY)', 'Komisyon (TRY)', 'Net tutar (TRY)'];
+  const rows = list.map((t) => [
+    csvDate(t.createdAt),
+    t.type === 'buy' ? 'Alış' : 'Satış',
+    t.symbol,
+    t.name,
+    ASSET_TYPE_LABELS[t.assetType] ?? t.assetType,
+    t.quantity,
+    t.price,
+    t.totalAmount.toFixed(2),
+    t.commission.toFixed(2),
+    t.netAmount.toFixed(2),
+  ]);
+  const content = [header, ...rows].map((r) => r.map(csvCell).join(',')).join('\r\n');
+  const blob = new Blob(['﻿', content], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `portfoygo-islemler-${localDayKey(new Date())}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }

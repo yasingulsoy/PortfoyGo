@@ -1,73 +1,54 @@
 import express from 'express';
-import { CommodityService } from '../services/commodity';
+import { CommodityService, CommodityPrice } from '../services/commodity';
+import { asyncHandler, badRequest } from '../utils/errors';
 
 const router = express.Router();
 
-router.get('/', async (req, res) => {
-  try {
-    const prices = await CommodityService.getPopularPrices();
-    
-    res.json({
-      success: true,
-      data: prices.map(p => ({
-        code: p.code,
-        name: p.name,
-        buying: p.buying,
-        selling: p.selling,
-        price: p.selling,
-        change_rate: p.changeRate,
-        datetime: p.datetime,
-      })),
-    });
-  } catch (error) {
-    console.error('Commodities route error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Emtia verileri alinamadi',
-      error: error instanceof Error ? error.message : 'Bilinmeyen hata',
-    });
-  }
+/**
+ * `price` = satış fiyatı. `quote_currency`: 'TRY' (kod GAU veya *TRY) ya da 'USD' (diğerleri).
+ * TL karşılığı = TRY ise price, USD ise price × USD/TRY (GET /api/market/usd-try).
+ */
+const toCommodityDto = (p: CommodityPrice) => ({
+  code: p.code,
+  name: p.name,
+  buying: p.buying,
+  selling: p.selling,
+  price: p.selling,
+  change_rate: p.changeRate,
+  datetime: p.datetime,
+  quote_currency: p.quoteCurrency,
 });
 
-router.get('/list', async (req, res) => {
-  try {
+router.get(
+  '/',
+  asyncHandler(async (_req, res) => {
+    const prices = await CommodityService.getPopularPrices();
+    res.json({ success: true, data: prices.map(toCommodityDto) });
+  })
+);
+
+router.get(
+  '/list',
+  asyncHandler(async (_req, res) => {
     const list = await CommodityService.getList();
     res.json({ success: true, data: list });
-  } catch (error) {
-    console.error('Commodities list error:', error);
-    res.status(500).json({ success: false, message: 'Emtia listesi alinamadi' });
-  }
-});
+  })
+);
 
-router.get('/:code', async (req, res) => {
-  try {
-    const { code } = req.params;
-    const price = await CommodityService.getPrice(code);
-
-    if (!price) {
-      return res.status(404).json({ success: false, message: 'Emtia bulunamadi' });
+// Tek emtia — önbellekten (sadece listede bilinen kodlar için, TTL'li tazeleme)
+router.get(
+  '/:code',
+  asyncHandler(async (req, res) => {
+    const code = String(req.params.code || '').toUpperCase();
+    if (!/^[A-Z0-9_\-]{1,20}$/.test(code)) {
+      throw badRequest('Geçersiz emtia kodu');
     }
-
-    res.json({
-      success: true,
-      data: {
-        code: price.code,
-        name: price.name,
-        buying: price.buying,
-        selling: price.selling,
-        price: price.selling,
-        change_rate: price.changeRate,
-        datetime: price.datetime,
-      },
-    });
-  } catch (error) {
-    console.error('Commodity route error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Emtia verisi alinamadi',
-      error: error instanceof Error ? error.message : 'Bilinmeyen hata',
-    });
-  }
-});
+    const price = await CommodityService.getPriceCached(code);
+    if (!price) {
+      return res.status(404).json({ success: false, message: 'Emtia bulunamadı' });
+    }
+    res.json({ success: true, data: toCommodityDto(price) });
+  })
+);
 
 export default router;

@@ -1,195 +1,90 @@
+import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 import pool from '../config/database';
 
+/**
+ * YEREL GELİŞTİRME için test kullanıcıları oluşturur.
+ *
+ * - Email adresleri @example.com (gerçek adres yok).
+ * - Şifre: TEST_USER_PASSWORD env değişkeni verilmişse (en az 12 karakter) o kullanılır,
+ *   yoksa her kullanıcı için rastgele güçlü bir şifre üretilir ve SADECE BİR KEZ ekrana yazılır.
+ * - NODE_ENV=production iken çalışmayı reddeder.
+ * - Örnek portföy verisi eklenmez (fiyatlar sunucu tarafından belirlenir).
+ */
+
+const TEST_USERS = [
+  { username: 'testuser1', email: 'test1@example.com' },
+  { username: 'testuser2', email: 'test2@example.com' },
+  { username: 'trader1', email: 'trader1@example.com' },
+  { username: 'investor1', email: 'investor1@example.com' },
+];
+
+function randomPassword(): string {
+  return crypto.randomBytes(12).toString('base64url'); // 16 karakter
+}
+
 async function createTestUsers() {
+  if (process.env.NODE_ENV === 'production') {
+    console.error('❌ Bu script production ortamında çalıştırılamaz.');
+    process.exitCode = 1;
+    await pool.end();
+    return;
+  }
+
+  const sharedPassword = process.env.TEST_USER_PASSWORD;
+  if (sharedPassword !== undefined && sharedPassword.length < 12) {
+    console.error('❌ TEST_USER_PASSWORD en az 12 karakter olmalı.');
+    process.exitCode = 1;
+    await pool.end();
+    return;
+  }
+
+  const created: { email: string; password: string }[] = [];
+
   try {
-    console.log('🧪 Test kullanıcıları oluşturuluyor...');
-
-    // Test kullanıcıları
-    const testUsers = [
-      {
-        username: 'yasingulsoy',
-        email: 'yasingulsoy02@gmail.com',
-        password: 'admin123',
-        email_verified: true
-      },
-      {
-        username: 'testuser1',
-        email: 'test1@example.com',
-        password: 'password123',
-        email_verified: true
-      },
-      {
-        username: 'testuser2',
-        email: 'test2@example.com',
-        password: 'password123',
-        email_verified: true
-      },
-      {
-        username: 'trader1',
-        email: 'trader1@example.com',
-        password: 'trader123',
-        email_verified: true
-      },
-      {
-        username: 'investor1',
-        email: 'investor1@example.com',
-        password: 'investor123',
-        email_verified: true
-      }
-    ];
-
-    for (const user of testUsers) {
-      // Kullanıcı zaten var mı kontrol et
-      const existingUser = await pool.query(
-        'SELECT id FROM users WHERE email = $1',
-        [user.email]
-      );
-
-      if (existingUser.rows.length > 0) {
-        console.log(`⚠️  Kullanıcı zaten mevcut: ${user.email}`);
+    for (const user of TEST_USERS) {
+      const existing = await pool.query('SELECT id FROM users WHERE LOWER(email) = $1 OR LOWER(username) = LOWER($2)', [
+        user.email,
+        user.username,
+      ]);
+      if (existing.rows.length > 0) {
+        console.log(`⚠️  Zaten mevcut, atlandı: ${user.email}`);
         continue;
       }
 
-      // Şifreyi hashle
-      const saltRounds = 10;
-      const passwordHash = await bcrypt.hash(user.password, saltRounds);
+      const password = sharedPassword || randomPassword();
+      const passwordHash = await bcrypt.hash(password, 10);
 
-      // Kullanıcıyı oluştur
-      const result = await pool.query(
+      await pool.query(
         `INSERT INTO users (
             username, email, password_hash, email_verified, balance,
             week_baseline_equity, week_baseline_iso_key
           )
          VALUES (
-            $1, $2, $3, $4, $5, $5,
-            (SELECT
-              to_char(
-                (CURRENT_TIMESTAMP AT TIME ZONE 'Europe/Istanbul')::date,
-                'IYYY'
-              ) || '-' || to_char(
-                (CURRENT_TIMESTAMP AT TIME ZONE 'Europe/Istanbul')::date,
-                'IW'
-              )
-            )
-          )
-         RETURNING id, username, email`,
-        [user.username, user.email, passwordHash, user.email_verified, 100000.0]
+            $1, $2, $3, TRUE, 100000.00, 100000.00,
+            to_char((CURRENT_TIMESTAMP AT TIME ZONE 'Europe/Istanbul')::date, 'IYYY')
+              || '-' ||
+            to_char((CURRENT_TIMESTAMP AT TIME ZONE 'Europe/Istanbul')::date, 'IW')
+          )`,
+        [user.username, user.email, passwordHash]
       );
-
-      const newUser = result.rows[0];
-      console.log(`✅ Kullanıcı oluşturuldu: ${newUser.username} (${newUser.email})`);
+      created.push({ email: user.email, password });
     }
 
-    // Örnek portföy verileri ekle
-    await addSamplePortfolioData();
-    
-    console.log('🎉 Tüm test kullanıcıları başarıyla oluşturuldu!');
-    console.log('\n📋 Test Kullanıcıları:');
-    console.log('Email: yasingulsoy02@gmail.com | Şifre: admin123');
-    console.log('Email: test1@example.com | Şifre: password123');
-    console.log('Email: test2@example.com | Şifre: password123');
-    console.log('Email: trader1@example.com | Şifre: trader123');
-    console.log('Email: investor1@example.com | Şifre: investor123');
-
-  } catch (error) {
-    console.error('❌ Hata:', error);
+    if (created.length > 0) {
+      console.log('\n📋 Oluşturulan test kullanıcıları (şifreler bir daha gösterilmeyecek):');
+      for (const c of created) {
+        console.log(`   ${c.email}  |  ${sharedPassword ? '(TEST_USER_PASSWORD)' : c.password}`);
+      }
+    } else {
+      console.log('Yeni kullanıcı oluşturulmadı.');
+    }
+  } catch (error: any) {
+    console.error('❌ Hata:', error?.message || error);
+    process.exitCode = 1;
   } finally {
     await pool.end();
   }
 }
 
-async function addSamplePortfolioData() {
-  try {
-    console.log('📊 Örnek portföy verileri ekleniyor...');
-
-    // Kullanıcıları al
-    const users = await pool.query('SELECT id, username FROM users WHERE email_verified = true');
-    
-    for (const user of users.rows) {
-      // Her kullanıcı için farklı portföy verileri
-      const portfolioItems = [
-        {
-          symbol: 'BTC',
-          name: 'Bitcoin',
-          asset_type: 'crypto',
-          quantity: Math.random() * 2 + 0.1, // 0.1 - 2.1 arası
-          average_price: 40000 + Math.random() * 10000, // 40000 - 50000 arası
-          current_price: 45000 + Math.random() * 5000, // 45000 - 50000 arası
-        },
-        {
-          symbol: 'ETH',
-          name: 'Ethereum',
-          asset_type: 'crypto',
-          quantity: Math.random() * 10 + 1, // 1 - 11 arası
-          average_price: 2500 + Math.random() * 500, // 2500 - 3000 arası
-          current_price: 2800 + Math.random() * 200, // 2800 - 3000 arası
-        },
-        {
-          symbol: 'AAPL',
-          name: 'Apple Inc.',
-          asset_type: 'stock',
-          quantity: Math.random() * 50 + 10, // 10 - 60 arası
-          average_price: 150 + Math.random() * 20, // 150 - 170 arası
-          current_price: 160 + Math.random() * 10, // 160 - 170 arası
-        }
-      ];
-
-      for (const item of portfolioItems) {
-        const totalValue = item.quantity * item.current_price;
-        const profitLoss = (item.current_price - item.average_price) * item.quantity;
-        const profitLossPercent = ((item.current_price - item.average_price) / item.average_price) * 100;
-
-        // Portföy öğesini ekle
-        await pool.query(
-          `INSERT INTO portfolio_items (user_id, symbol, name, asset_type, quantity, average_price, current_price, total_value, profit_loss, profit_loss_percent)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-           ON CONFLICT (user_id, symbol, asset_type) DO NOTHING`,
-          [
-            user.id,
-            item.symbol,
-            item.name,
-            item.asset_type,
-            item.quantity,
-            item.average_price,
-            item.current_price,
-            totalValue,
-            profitLoss,
-            profitLossPercent
-          ]
-        );
-
-        // Örnek işlem geçmişi ekle
-        const transactionType = Math.random() > 0.5 ? 'buy' : 'sell';
-        const totalAmount = item.quantity * item.average_price;
-        const commission = totalAmount * 0.0025; // %0.25 komisyon
-        const netAmount = transactionType === 'buy' ? totalAmount + commission : totalAmount - commission;
-
-        await pool.query(
-          `INSERT INTO transactions (user_id, type, symbol, name, asset_type, quantity, price, total_amount, commission, net_amount)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
-          [
-            user.id,
-            transactionType,
-            item.symbol,
-            item.name,
-            item.asset_type,
-            item.quantity,
-            item.average_price,
-            totalAmount,
-            commission,
-            netAmount
-          ]
-        );
-      }
-
-      console.log(`📈 ${user.username} için portföy verileri eklendi`);
-    }
-
-  } catch (error) {
-    console.error('❌ Portföy verileri eklenirken hata:', error);
-  }
-}
-
-// Script'i çalıştır
 createTestUsers();

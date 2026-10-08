@@ -41,3 +41,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# backend build output & database dumps (never commit user data)
+/backend/dist/
+*.dump
+backend/portfoygo.sql

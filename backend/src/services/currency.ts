@@ -20,14 +20,22 @@ export interface CurrencyRate {
 
 // Öncelikli dövizler (en çok kullanılanlar - kredi tasarrufu için sınırlı)
 const PRIORITY_CODES = ['USD', 'EUR', 'GBP', 'GAU', 'GOLDTRY', 'CHF', 'JPY', 'XAU', 'XAG', 'AED', 'SAR'];
-const MAX_CURRENCIES = 25; // Saatlik ~25 kredi (500 kredi ≈ 20 saat)
+const MAX_CURRENCIES = 25; // Her yenilemede ~25 kredi
+let missingKeyWarned = false;
+function warnMissingKey() {
+  if (!missingKeyWarned) {
+    missingKeyWarned = true;
+    console.warn('[currency] DOVIZ API anahtarı tanımlı değil; döviz kurları sadece veritabanından sunulacak.');
+  }
+}
+let fetchInFlight: Promise<number> | null = null;
 
 export class CurrencyService {
   private static async request<T>(endpoint: string, params?: Record<string, string>): Promise<T | null> {
     try {
       const apiKey = getApiKey();
       if (!apiKey) {
-        console.warn('DOVIZ API key not set');
+        warnMissingKey();
         return null;
       }
 
@@ -47,7 +55,7 @@ export class CurrencyService {
       console.error('NosyAPI currency error:', (data as any).message || (data as any).messageTR);
       return null;
     } catch (err: any) {
-      console.error(`NosyAPI ${endpoint} error:`, err.message);
+      console.error(`[currency] NosyAPI ${endpoint} error:`, err?.response?.status || '', err?.message);
       return null;
     }
   }
@@ -80,11 +88,23 @@ export class CurrencyService {
     };
   }
 
-  /** API'den çekip DB'ye kaydet (kripto gibi saatlik cron ile çağrılır) */
-  static async fetchAndSaveToDb(): Promise<number> {
+  /** API'den çekip DB'ye kaydet (cron ile çağrılır). Eşzamanlı çağrılar birleştirilir. */
+  static fetchAndSaveToDb(): Promise<number> {
+    if (!fetchInFlight) {
+      fetchInFlight = this.doFetchAndSave().finally(() => {
+        fetchInFlight = null;
+      });
+    }
+    return fetchInFlight;
+  }
+
+  private static async doFetchAndSave(): Promise<number> {
+    if (!getApiKey()) {
+      warnMissingKey();
+      return 0;
+    }
     const list = await this.getList();
     if (list.length === 0) {
-      console.warn('Döviz listesi boş');
       return 0;
     }
 
@@ -125,11 +145,9 @@ export class CurrencyService {
         );
       }
       await client.query('COMMIT');
-      console.log(`✅ ${results.length} döviz kuru DB'ye kaydedildi`);
       return results.length;
     } catch (err) {
-      await client.query('ROLLBACK');
-      console.error('Currency save to DB error:', err);
+      await client.query('ROLLBACK').catch(() => undefined);
       throw err;
     } finally {
       client.release();

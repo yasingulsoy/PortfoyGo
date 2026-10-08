@@ -84,18 +84,12 @@ export class LeaderboardService {
     board?: LeaderboardBoard;
     leaderboard?: LeaderboardEntry[];
   }> {
-    try {
-      await this.tryResetWeekBaselinesIfNeeded();
-      await this.updateRanks();
-
-      if (board === 'week') {
-        return this.getWeeklyLeaderboardInner(limit);
-      }
-      return this.getAllTimeLeaderboardInner(limit);
-    } catch (error) {
-      console.error('Get leaderboard error:', error);
-      return { success: false };
+    // Not: Sıralama sorgu anında hesaplanır; users tablosu bu istekte YAZILMAZ.
+    // Hafta başı referansları cron (ve sunucu açılışı) ile güncellenir.
+    if (board === 'week') {
+      return this.getWeeklyLeaderboardInner(limit);
     }
+    return this.getAllTimeLeaderboardInner(limit);
   }
 
   private static async getAllTimeLeaderboardInner(
@@ -122,8 +116,9 @@ export class LeaderboardService {
       WHERE u.email_verified = true
         AND (u.is_banned IS NULL OR u.is_banned = false)
       ORDER BY
-        (u.balance + COALESCE(inv.portfolio_value, 0) - $1) / $1 * 100 DESC,
-        COALESCE(inv.total_profit_loss, 0) DESC
+        (u.balance + COALESCE(inv.portfolio_value, 0) - $1) / $1 * 100 DESC NULLS LAST,
+        COALESCE(inv.total_profit_loss, 0) DESC,
+        u.created_at ASC
       LIMIT $2
     `,
       [INITIAL_ACCOUNT_BALANCE, limit]
@@ -181,8 +176,9 @@ export class LeaderboardService {
           THEN
             (u.balance + COALESCE(inv.portfolio_value, 0) - u.week_baseline_equity)
             / u.week_baseline_equity
-        END DESC,
-        (u.balance + COALESCE(inv.portfolio_value, 0) - u.week_baseline_equity) DESC
+        END DESC NULLS LAST,
+        (u.balance + COALESCE(inv.portfolio_value, 0) - u.week_baseline_equity) DESC NULLS LAST,
+        u.created_at ASC
       LIMIT $1
     `,
       [limit]
@@ -206,13 +202,47 @@ export class LeaderboardService {
     return { success: true, board: 'week', leaderboard };
   }
 
-  // Tüm kullanıcıların rank'lerini güncelle (kümülatif: başlangıç bakiyesine göre büyüme)
+  /**
+   * Tek kullanıcının kümülatif sırası (sorgu anında window function ile; tabloya yazmaz).
+   * Doğrulanmamış / yasaklı kullanıcılar için null.
+   */
+  static async getAllTimeRank(userId: string): Promise<number | null> {
+    const r = await pool.query(
+      `WITH inv AS (
+         SELECT user_id, SUM(profit_loss) AS total_profit_loss, COALESCE(SUM(total_value), 0) AS portfolio_value
+           FROM portfolio_items
+          GROUP BY user_id
+       ),
+       ranked AS (
+         SELECT u.id,
+                ROW_NUMBER() OVER (
+                  ORDER BY
+                    (u.balance + COALESCE(inv.portfolio_value, 0) - $1) / $1 * 100 DESC NULLS LAST,
+                    COALESCE(inv.total_profit_loss, 0) DESC,
+                    u.created_at ASC
+                ) AS rn
+           FROM users u
+           LEFT JOIN inv ON u.id = inv.user_id
+          WHERE u.email_verified = true
+            AND (u.is_banned IS NULL OR u.is_banned = false)
+       )
+       SELECT rn FROM ranked WHERE id = $2`,
+      [INITIAL_ACCOUNT_BALANCE, userId]
+    );
+    return r.rows[0] ? parseInt(r.rows[0].rn, 10) : null;
+  }
+
+  /**
+   * users.rank kolonunu toplu günceller. SADECE periyodik cron'dan çağrılır
+   * (istek yolunda çağrılmamalı; tüm users tablosunu yazar).
+   */
   static async updateRanks(): Promise<void> {
     try {
       await pool.query(`
         UPDATE users
         SET rank = NULL
-        WHERE email_verified = false OR (is_banned IS NOT NULL AND is_banned = true)
+        WHERE (email_verified = false OR (is_banned IS NOT NULL AND is_banned = true))
+          AND rank IS NOT NULL
       `);
 
       await pool.query(
@@ -223,8 +253,9 @@ export class LeaderboardService {
              u2.id,
              ROW_NUMBER() OVER (
                ORDER BY
-                 (u2.balance + COALESCE(inv.portfolio_value, 0) - $1) / $1 * 100 DESC,
-                 COALESCE(inv.total_profit_loss, 0) DESC
+                 (u2.balance + COALESCE(inv.portfolio_value, 0) - $1) / $1 * 100 DESC NULLS LAST,
+                 COALESCE(inv.total_profit_loss, 0) DESC,
+                 u2.created_at ASC
              ) AS rn
            FROM users u2
            LEFT JOIN (
@@ -238,7 +269,8 @@ export class LeaderboardService {
            WHERE u2.email_verified = true
              AND (u2.is_banned IS NULL OR u2.is_banned = false)
          ) ranked
-         WHERE u.id = ranked.id`,
+         WHERE u.id = ranked.id
+           AND u.rank IS DISTINCT FROM ranked.rn`,
         [INITIAL_ACCOUNT_BALANCE]
       );
     } catch (error) {
@@ -254,13 +286,11 @@ export class LeaderboardService {
     rankWeek?: number | null;
   }> {
     try {
-      await this.tryResetWeekBaselinesIfNeeded();
-      await this.updateRanks();
-
-      const rAll = await pool.query('SELECT rank FROM users WHERE id = $1', [userId]);
-      if (rAll.rows.length === 0) {
+      const exists = await pool.query('SELECT 1 FROM users WHERE id = $1', [userId]);
+      if (exists.rows.length === 0) {
         return { success: false };
       }
+      const rank = await this.getAllTimeRank(userId);
 
       const rWeek = await pool.query(
         `
@@ -277,7 +307,7 @@ export class LeaderboardService {
             AND (u2.is_banned IS NULL OR u2.is_banned = false)
         ),
         w AS (
-          SELECT id, RANK() OVER (ORDER BY wret DESC) AS wk
+          SELECT id, RANK() OVER (ORDER BY wret DESC NULLS LAST) AS wk
           FROM ueq
         )
         SELECT w.wk
@@ -289,7 +319,7 @@ export class LeaderboardService {
 
       return {
         success: true,
-        rank: rAll.rows[0].rank,
+        rank,
         rankWeek: rWeek.rows[0] ? parseInt(rWeek.rows[0].wk, 10) : null
       };
     } catch (error) {

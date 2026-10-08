@@ -114,24 +114,15 @@ export class AdminService {
   }
 
   // Kullanıcıyı banla/unban yap
-  static async toggleUserBan(userId: string, ban: boolean): Promise<{ success: boolean; message?: string }> {
-    try {
-      await pool.query(
-        'UPDATE users SET is_banned = $1 WHERE id = $2',
-        [ban, userId]
-      );
-
-      return {
-        success: true,
-        message: ban ? 'Kullanıcı yasaklandı' : 'Kullanıcı yasağı kaldırıldı'
-      };
-    } catch (error) {
-      console.error('Toggle user ban error:', error);
-      return {
-        success: false,
-        message: 'İşlem başarısız'
-      };
+  static async toggleUserBan(userId: string, ban: boolean): Promise<{ success: boolean; message?: string; status?: number }> {
+    const r = await pool.query('UPDATE users SET is_banned = $1 WHERE id = $2 RETURNING id', [ban, userId]);
+    if (r.rowCount === 0) {
+      return { success: false, status: 404, message: 'Kullanıcı bulunamadı' };
     }
+    return {
+      success: true,
+      message: ban ? 'Kullanıcı yasaklandı' : 'Kullanıcı yasağı kaldırıldı'
+    };
   }
 }
 

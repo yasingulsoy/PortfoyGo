@@ -1,237 +1,177 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { EnvelopeIcon, CheckCircleIcon, XCircleIcon } from '@heroicons/react/24/outline';
+import { Suspense, useState, type FormEvent } from 'react';
+import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
+import { CheckCircleIcon, EnvelopeIcon, LockClosedIcon, PaperAirplaneIcon } from '@heroicons/react/20/solid';
 import { useAuth } from '@/context/AuthContext';
-
-function VerifyEmailContent() {
-  const [code, setCode] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState(false);
-  const [email, setEmail] = useState('');
-  const [resendLoading, setResendLoading] = useState(false);
-  const [resendCooldown, setResendCooldown] = useState(0);
-  
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const { user } = useAuth();
-
-  useEffect(() => {
-    const emailParam = searchParams.get('email');
-    if (emailParam) {
-      setEmail(emailParam);
-    } else if (user?.email) {
-      setEmail(user.email);
-    } else {
-      router.push('/login');
-    }
-  }, [searchParams, user, router]);
-
-  // Resend cooldown timer
-  useEffect(() => {
-    if (resendCooldown > 0) {
-      const timer = setTimeout(() => {
-        setResendCooldown(prev => prev - 1);
-      }, 1000);
-      return () => clearTimeout(timer);
-    }
-  }, [resendCooldown]);
-
-  const handleVerify = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!code || code.length !== 6) {
-      setError('6 haneli doğrulama kodunu girin');
-      return;
-    }
-
-    setLoading(true);
-    setError('');
-
-    try {
-      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/api';
-      const response = await fetch(`${API_BASE_URL}/email/verify`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, code }),
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
-        setSuccess(true);
-        setTimeout(() => {
-          router.push('/');
-        }, 2000);
-      } else {
-        setError(data.message || 'Doğrulama başarısız');
-      }
-    } catch (error) {
-      setError('Sunucuya bağlanılamadı');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleResend = async () => {
-    if (resendCooldown > 0) return;
-
-    setResendLoading(true);
-    setError('');
-
-    try {
-      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/api';
-      const response = await fetch(`${API_BASE_URL}/email/send-verification`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-        },
-        body: JSON.stringify({ email }),
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
-        setResendCooldown(60); // 60 saniye cooldown
-        setError('');
-      } else {
-        setError(data.message || 'Kod gönderilemedi');
-      }
-    } catch (error) {
-      setError('Sunucuya bağlanılamadı');
-    } finally {
-      setResendLoading(false);
-    }
-  };
-
-  if (success) {
-    return (
-      <div className="min-h-screen bg-[#181a20] flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-md w-full text-center">
-          <div className="mx-auto h-16 w-16 bg-[#0ecb81]/10 rounded-full flex items-center justify-center mb-4 border-2 border-[#0ecb81]">
-            <CheckCircleIcon className="h-8 w-8 text-[#0ecb81]" />
-          </div>
-          <h2 className="text-3xl font-bold text-white mb-2">
-            Email Doğrulandı!
-          </h2>
-          <p className="text-[#848e9c] mb-6">
-            Hesabınız başarıyla aktifleştirildi. Ana sayfaya yönlendiriliyorsunuz...
-          </p>
-          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#0ecb81] mx-auto"></div>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="min-h-screen bg-[#181a20] flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full">
-        {/* Logo ve Başlık */}
-        <div className="text-center mb-8">
-          <div className="mx-auto h-16 w-16 bg-[#0ecb81]/10 rounded-full flex items-center justify-center mb-4 border-2 border-[#0ecb81]">
-            <EnvelopeIcon className="h-8 w-8 text-[#0ecb81]" />
-          </div>
-          <h2 className="text-3xl font-bold text-white">
-            Email Doğrulama
-          </h2>
-          <p className="mt-2 text-sm text-[#848e9c]">
-            <strong className="text-white">{email}</strong> adresine gönderilen 6 haneli kodu girin
-          </p>
-        </div>
-
-        {/* Doğrulama Formu */}
-        <div className="bg-[#1e2329] rounded-xl border border-[#2b3139] py-8 px-6">
-          <form className="space-y-6" onSubmit={handleVerify}>
-            <div>
-              <label htmlFor="code" className="block text-sm font-semibold text-white mb-3">
-                Doğrulama Kodu
-              </label>
-              <input
-                id="code"
-                name="code"
-                type="text"
-                maxLength={6}
-                required
-                className="w-full px-4 py-3 text-center text-2xl font-mono tracking-widest border border-[#2b3139] rounded-xl focus:ring-2 focus:ring-[#0ecb81] focus:border-[#0ecb81] bg-[#161a1e] text-white transition-colors"
-                placeholder="123456"
-                value={code}
-                onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
-              />
-              <p className="mt-2 text-xs text-[#848e9c] text-center">
-                6 haneli sayısal kod
-              </p>
-            </div>
-
-            {error && (
-              <div className="bg-[#f6465d]/10 border border-[#f6465d]/30 text-[#f6465d] px-4 py-3 rounded-xl text-sm flex items-center">
-                <XCircleIcon className="h-4 w-4 mr-2 flex-shrink-0" />
-                {error}
-              </div>
-            )}
-
-            <button
-              type="submit"
-              disabled={loading || code.length !== 6}
-              className="w-full flex justify-center py-4 px-4 rounded-xl text-base font-semibold text-white bg-[#0ecb81] hover:bg-[#0bb975] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#0ecb81] disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
-            >
-              {loading ? (
-                <div className="flex items-center">
-                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-                  Doğrulanıyor...
-                </div>
-              ) : (
-                'Email Doğrula'
-              )}
-            </button>
-          </form>
-
-          {/* Yeniden Gönder */}
-          <div className="mt-6 pt-6 border-t border-[#2b3139]">
-            <p className="text-sm text-[#848e9c] text-center mb-4">
-              Kodu almadınız mı?
-            </p>
-            <button
-              onClick={handleResend}
-              disabled={resendLoading || resendCooldown > 0}
-              className="w-full flex justify-center py-3 px-4 border border-[#2b3139] rounded-xl text-sm font-semibold text-white bg-[#2b3139] hover:bg-[#3a4149] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#0ecb81] disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
-            >
-              {resendLoading ? (
-                <div className="flex items-center">
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                  Gönderiliyor...
-                </div>
-              ) : resendCooldown > 0 ? (
-                `Yeniden gönder (${resendCooldown}s)`
-              ) : (
-                'Kodu Yeniden Gönder'
-              )}
-            </button>
-          </div>
-        </div>
-
-        {/* Alt Bilgi */}
-        <div className="mt-8 text-center">
-          <p className="text-xs text-[#848e9c]">
-            Doğrulama kodu 15 dakika geçerlidir. Spam klasörünüzü kontrol etmeyi unutmayın.
-          </p>
-        </div>
-      </div>
-    </div>
-  );
-}
+import { emailApi } from '@/lib/api';
+import AuthLayout from '@/components/auth/AuthLayout';
+import CodeInput from '@/components/auth/CodeInput';
+import { CODE_LENGTH, RESEND_COOLDOWN, useCooldown } from '@/components/auth/authUtils';
+import Button, { LinkButton } from '@/components/ui/Button';
+import { Alert } from '@/components/ui/Feedback';
+import { PageLoader } from '@/components/ui/Spinner';
 
 export default function VerifyEmailPage() {
   return (
-    <Suspense fallback={
-      <div className="min-h-screen bg-[#181a20] flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#0ecb81]"></div>
-      </div>
-    }>
-      <VerifyEmailContent />
+    <Suspense fallback={<PageLoader />}>
+      <VerifyEmail />
     </Suspense>
+  );
+}
+
+function VerifyEmail() {
+  const searchParams = useSearchParams();
+  const isNew = searchParams.get('new') === '1';
+  const { user, loading, refreshUser } = useAuth();
+
+  const [code, setCode] = useState('');
+  const [sent, setSent] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [verifying, setVerifying] = useState(false);
+  const [error, setError] = useState('');
+  const [verified, setVerified] = useState(false);
+  const { remaining, start } = useCooldown();
+
+  if (loading) return <PageLoader />;
+
+  if (!user) {
+    return (
+      <AuthLayout title="Önce giriş yapmalısın" description="E-posta doğrulaması hesabına bağlıdır. Giriş yaptıktan sonra bu sayfaya geri döneceksin.">
+        <div className="flex flex-col items-center rounded-2xl border border-line bg-surface p-6 text-center shadow-card">
+          <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-brand-soft text-brand">
+            <LockClosedIcon className="h-6 w-6" aria-hidden="true" />
+          </span>
+          <p className="mt-4 text-sm text-muted">Doğrulama kodunu göndermek ve onaylamak için oturum açık olmalı.</p>
+          <LinkButton href={`/login?redirect=${encodeURIComponent('/verify-email')}`} size="lg" className="mt-5 w-full">
+            Giriş yap
+          </LinkButton>
+          <Link href="/register" className="mt-3 text-sm font-medium text-brand hover:underline">
+            Hesabın yok mu? Kayıt ol
+          </Link>
+        </div>
+      </AuthLayout>
+    );
+  }
+
+  if (verified || user.email_verified) {
+    return (
+      <AuthLayout>
+        <div className="flex flex-col items-center text-center">
+          <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-up-soft text-up">
+            <CheckCircleIcon className="h-7 w-7" aria-hidden="true" />
+          </span>
+          <h1 className="mt-5 text-2xl font-semibold tracking-tight text-fg">
+            {verified ? 'E-postan doğrulandı' : 'E-postan zaten doğrulanmış'}
+          </h1>
+          <p className="mt-2 text-sm leading-relaxed text-muted">
+            <span className="font-medium text-fg">{user.email}</span> adresi onaylı. Artık liderlik tablosunda yer alabilirsin.
+          </p>
+          <LinkButton href="/" size="lg" className="mt-7 w-full">
+            Piyasalara git
+          </LinkButton>
+          <LinkButton href="/leaderboard" variant="ghost" className="mt-2 w-full">
+            Liderlik tablosunu gör
+          </LinkButton>
+        </div>
+      </AuthLayout>
+    );
+  }
+
+  const handleSend = async () => {
+    setSending(true);
+    setError('');
+    try {
+      await emailApi.sendVerification();
+      setSent(true);
+      start(RESEND_COOLDOWN);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Kod gönderilemedi. Lütfen tekrar dene.');
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const verify = async (value: string) => {
+    if (verifying) return;
+    if (value.length !== CODE_LENGTH) {
+      setError(`${CODE_LENGTH} haneli kodu eksiksiz gir.`);
+      return;
+    }
+    setVerifying(true);
+    setError('');
+    try {
+      await emailApi.verify(value);
+      await refreshUser();
+      setVerified(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Doğrulama başarısız. Lütfen tekrar dene.');
+      setVerifying(false);
+    }
+  };
+
+  const handleSubmit = (e: FormEvent) => {
+    e.preventDefault();
+    void verify(code);
+  };
+
+  const sendLabel = remaining > 0 ? `Tekrar gönder (${remaining} sn)` : sent ? 'Tekrar gönder' : 'Kodu gönder';
+
+  return (
+    <AuthLayout
+      title="E-postanı doğrula"
+      description="Hesabını güvenceye almak ve liderlik tablosunda yer almak için e-posta adresini doğrula."
+      footer={
+        <Link href="/" className="font-medium text-muted hover:text-fg">
+          Şimdilik geç, sonra doğrularım
+        </Link>
+      }
+    >
+      <div className="space-y-5">
+        {isNew && !sent && !error && <Alert tone="success">Hesabın oluşturuldu! Son adım: e-posta adresini doğrula.</Alert>}
+        {sent && !error && (
+          <Alert tone="info">Kod gönderildi. 15 dakika geçerlidir; gelen kutunu ve spam klasörünü kontrol et.</Alert>
+        )}
+        {error && <Alert tone="error">{error}</Alert>}
+
+        <div className="flex items-center gap-3 rounded-xl border border-line bg-surface p-3.5 shadow-card">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-brand-soft text-brand">
+            <EnvelopeIcon className="h-5 w-5" aria-hidden="true" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-xs text-muted">Kod gönderilecek adres</p>
+            <p className="truncate text-sm font-medium text-fg" title={user.email}>{user.email}</p>
+          </div>
+          <Button
+            variant={sent ? 'secondary' : 'primary'}
+            size="sm"
+            onClick={handleSend}
+            loading={sending}
+            disabled={remaining > 0}
+            icon={!sending && !sent ? <PaperAirplaneIcon className="h-3.5 w-3.5" /> : undefined}
+            className="num shrink-0"
+          >
+            {sendLabel}
+          </Button>
+        </div>
+
+        <form onSubmit={handleSubmit} noValidate className="space-y-5">
+          <CodeInput
+            value={code}
+            onChange={(v) => {
+              setCode(v);
+              if (error) setError('');
+            }}
+            onComplete={(v) => void verify(v)}
+            disabled={verifying}
+            hint="E-postandaki 6 haneli kodu gir ya da yapıştır."
+          />
+          <Button type="submit" size="lg" className="w-full" loading={verifying} disabled={code.length !== CODE_LENGTH}>
+            {verifying ? 'Doğrulanıyor…' : 'Doğrula'}
+          </Button>
+        </form>
+      </div>
+    </AuthLayout>
   );
 }

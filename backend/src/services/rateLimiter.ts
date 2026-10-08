@@ -25,6 +25,13 @@ export class RateLimiter {
   // Her API key için ayrı takip
   private static apiKeyStatuses: Map<string, ApiKeyStatus> = new Map();
   
+  /** Loglarda anahtarın kendisi yerine kısa, geri döndürülemez bir etiket kullan */
+  static mask(apiKey: string): string {
+    let h = 0;
+    for (let i = 0; i < apiKey.length; i++) h = (h * 31 + apiKey.charCodeAt(i)) | 0;
+    return `key#${(h >>> 0).toString(16).slice(0, 6)}`;
+  }
+
   // Aktif bekleyen çağrı sayısı
   private static pendingCalls = 0;
   
@@ -57,7 +64,7 @@ export class RateLimiter {
       if (timeSince429 < 120000) {
         const waitTime = 120000 - timeSince429 + 5000; // 2 dakika + 5 saniye ekstra
         if (waitTime > 0) {
-          console.log(`⏳ API Key ${apiKey.substring(0, 8)}... için son 429 hatasından sonra ${Math.ceil(waitTime / 1000)} saniye bekleniyor...`);
+          console.log(`⏳ API Key ${RateLimiter.mask(apiKey)} için son 429 hatasından sonra ${Math.ceil(waitTime / 1000)} saniye bekleniyor...`);
           await new Promise(resolve => setTimeout(resolve, waitTime));
           keyStatus.isAvailable = true;
           keyStatus.last429Error = null;
@@ -91,7 +98,7 @@ export class RateLimiter {
         const waitTime = this.WINDOW_MS - timeSinceOldest + 2000; // +2 saniye güvenlik
         
         if (waitTime > 0) {
-          console.log(`⏳ API Key ${apiKey.substring(0, 8)}... için rate limit: ${recentCalls}/${maxAllowed} çağrı kullanıldı, ${Math.ceil(waitTime / 1000)} saniye bekleniyor...`);
+          console.log(`⏳ API Key ${RateLimiter.mask(apiKey)} için rate limit: ${recentCalls}/${maxAllowed} çağrı kullanıldı, ${Math.ceil(waitTime / 1000)} saniye bekleniyor...`);
           await new Promise(resolve => setTimeout(resolve, waitTime));
           
           // Bekleme sonrası tekrar temizle
@@ -102,7 +109,7 @@ export class RateLimiter {
         }
       } else {
         // Eğer en eski çağrı yoksa, 1 dakika bekle
-        console.log(`⏳ API Key ${apiKey.substring(0, 8)}... için rate limit aşıldı, 60 saniye bekleniyor...`);
+        console.log(`⏳ API Key ${RateLimiter.mask(apiKey)} için rate limit aşıldı, 60 saniye bekleniyor...`);
         await new Promise(resolve => setTimeout(resolve, 60000));
         keyStatus.callHistory = [];
       }
@@ -118,7 +125,7 @@ export class RateLimiter {
     keyStatus.isAvailable = false;
     // 429 hatası geldiğinde geçmişi temizle ve daha uzun bekle
     keyStatus.callHistory = [];
-    console.log(`⚠️  API Key ${apiKey.substring(0, 8)}... için 429 hatası alındı! Rate limit geçmişi temizlendi, 2 dakika bekleniyor...`);
+    console.log(`⚠️  API Key ${RateLimiter.mask(apiKey)} için 429 hatası alındı! Rate limit geçmişi temizlendi, 2 dakika bekleniyor...`);
   }
   
   /**
@@ -207,7 +214,7 @@ export class RateLimiter {
 
     for (const [key, _] of this.apiKeyStatuses) {
       const status = this.getStatus(key);
-      keys.push({ key: key.substring(0, 8) + '...', status });
+      keys.push({ key: RateLimiter.mask(key), status });
       totalRecentCalls += status.recentCalls;
       totalMaxAllowed += status.maxAllowed;
     }

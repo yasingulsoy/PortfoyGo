@@ -1,383 +1,199 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useAuth } from '@/context/AuthContext';
-import { badgesApi, activityLogsApi } from '@/services/backendApi';
-import { 
+import { useMemo, type ReactNode } from 'react';
+import Link from 'next/link';
+import useSWR from 'swr';
+import {
+  ArrowsRightLeftIcon,
+  CalendarDaysIcon,
+  CheckBadgeIcon,
+  ExclamationCircleIcon,
+  ScaleIcon,
+  ShieldCheckIcon,
   TrophyIcon,
-  UserIcon,
-  CalendarIcon,
-  CurrencyDollarIcon,
-  ClockIcon,
-  ArrowTrendingUpIcon,
-  ArrowTrendingDownIcon,
-  ShoppingCartIcon,
-  BanknotesIcon,
-  FunnelIcon
-} from '@heroicons/react/24/outline';
-
-interface Badge {
-  id: string;
-  name: string;
-  description: string;
-  icon: string;
-  category: string;
-  earned_at: Date;
-}
-
-interface ActivityLog {
-  id: string;
-  activity_type: string;
-  description: string;
-  metadata?: any;
-  created_at: string;
-}
+  WalletIcon,
+} from '@heroicons/react/20/solid';
+import { useRequireAuth } from '@/hooks/useRequireAuth';
+import { useLivePortfolio } from '@/context/PortfolioContext';
+import { leaderboardApi } from '@/lib/api';
+import { STARTING_BALANCE } from '@/lib/constants';
+import { formatDate, formatNumber, formatPercent, formatTRY } from '@/lib/format';
+import type { User } from '@/types';
+import PageHeader from '@/components/ui/PageHeader';
+import { Card } from '@/components/ui/Card';
+import { Delta, Money } from '@/components/ui/Delta';
+import { Badge, Skeleton } from '@/components/ui/Feedback';
+import { LinkButton } from '@/components/ui/Button';
+import Stat from '@/components/ui/Stat';
+import { PageLoader } from '@/components/ui/Spinner';
+import UserInitial from '@/components/profile/UserInitial';
+import BadgesGrid from '@/components/profile/BadgesGrid';
+import ActivityLog from '@/components/profile/ActivityLog';
+import { computeTradeStats } from '@/components/profile/tradeStats';
+import { MY_RANK_KEY } from '@/components/leaderboard/MyRankCard';
+import { normalizeMyRank } from '@/components/leaderboard/model';
 
 export default function ProfilePage() {
-  const { user, loading: authLoading } = useAuth();
-  const [badges, setBadges] = useState<Badge[]>([]);
-  const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
-  const [activityTypes, setActivityTypes] = useState<string[]>([]);
-  const [selectedType, setSelectedType] = useState<string>('');
-  const [loading, setLoading] = useState(true);
-  const [logsLoading, setLogsLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [page, setPage] = useState(1);
-  const [totalLogs, setTotalLogs] = useState(0);
-  const limit = 20;
-
-  useEffect(() => {
-    if (!authLoading && user) {
-      loadBadges();
-      loadActivityTypes();
-      loadActivityLogs();
-    }
-  }, [user, authLoading, selectedType, page]);
-
-  const loadBadges = async () => {
-    try {
-      const result = await badgesApi.getMyBadges();
-      if (result.success && result.badges) {
-        setBadges(result.badges.map((b: any) => ({
-          ...b.badge,
-          earned_at: new Date(b.earned_at)
-        })));
-        setError('');
-      } else {
-        setError('Rozetler yüklenemedi');
-      }
-    } catch (err: any) {
-      setError(err.message || 'Bir hata oluştu');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loadActivityTypes = async () => {
-    try {
-      const result = await activityLogsApi.getTypes();
-      if (result.success && result.types) {
-        setActivityTypes(result.types);
-      }
-    } catch (err) {
-      console.error('Activity types error:', err);
-    }
-  };
-
-  const loadActivityLogs = async () => {
-    try {
-      setLogsLoading(true);
-      const offset = (page - 1) * limit;
-      const result = await activityLogsApi.getLogs(limit, offset, selectedType || undefined);
-      if (result.success) {
-        setActivityLogs(result.logs);
-        setTotalLogs(result.total);
-      }
-    } catch (err: any) {
-      console.error('Activity logs error:', err);
-    } finally {
-      setLogsLoading(false);
-    }
-  };
-
-  const getActivityIcon = (type: string) => {
-    switch (type) {
-      case 'buy':
-        return <ArrowTrendingUpIcon className="h-5 w-5 text-[#0ecb81]" />;
-      case 'sell':
-        return <ArrowTrendingDownIcon className="h-5 w-5 text-[#f6465d]" />;
-      case 'login':
-        return <UserIcon className="h-5 w-5 text-[#0ecb81]" />;
-      case 'logout':
-        return <UserIcon className="h-5 w-5 text-[#848e9c]" />;
-      default:
-        return <ClockIcon className="h-5 w-5 text-[#848e9c]" />;
-    }
-  };
-
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
-
-    if (diffMins < 1) return 'Az önce';
-    if (diffMins < 60) return `${diffMins} dakika önce`;
-    if (diffHours < 24) return `${diffHours} saat önce`;
-    if (diffDays < 7) return `${diffDays} gün önce`;
-    return date.toLocaleDateString('tr-TR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
-
-  if (authLoading || loading) {
-    return (
-      <div className="min-h-screen bg-[#181a20] flex items-center justify-center">
-        <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-[#0ecb81]"></div>
-          <p className="mt-4 text-[#848e9c]">Yükleniyor...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!user) {
-    return null;
-  }
-
-  const groupedBadges = badges.reduce((acc: { [key: string]: Badge[] }, badge) => {
-    if (!acc[badge.category]) {
-      acc[badge.category] = [];
-    }
-    acc[badge.category].push(badge);
-    return acc;
-  }, {});
-
-  const totalPages = Math.ceil(totalLogs / limit);
+  const { user, ready } = useRequireAuth();
+  if (!ready || !user) return <PageLoader />;
 
   return (
-    <div className="min-h-screen bg-[#181a20]">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Kullanıcı Bilgileri Kartı */}
-        <div className="bg-[#1e2329] rounded-xl border border-[#2b3139] mb-8 overflow-hidden">
-          <div className="bg-[#0ecb81]/10 px-6 py-8 border-b border-[#2b3139]">
-            <div className="flex items-center space-x-6">
-              <div className="h-24 w-24 bg-[#0ecb81]/20 rounded-full flex items-center justify-center border-2 border-[#0ecb81]">
-                <span className="text-4xl font-bold text-[#0ecb81]">
-                  {user.username.charAt(0).toUpperCase()}
-                </span>
-              </div>
-              <div className="flex-1 text-white">
-                <h1 className="text-3xl font-bold mb-2">{user.username}</h1>
-                <p className="text-[#848e9c] mb-4">{user.email}</p>
-                <div className="flex flex-wrap items-center gap-4">
-                  <div className="flex items-center bg-[#2b3139] rounded-lg px-4 py-2">
-                    <TrophyIcon className="h-5 w-5 mr-2 text-[#f0b90b]" />
-                    <span className="font-semibold text-white">Sıra: #{user.rank || '-'}</span>
-                  </div>
-                  <div className="flex items-center bg-[#2b3139] rounded-lg px-4 py-2">
-                    <CurrencyDollarIcon className="h-5 w-5 mr-2 text-[#0ecb81]" />
-                    <span className="font-semibold text-white">₺{user.balance?.toLocaleString('tr-TR') || '0'}</span>
-                  </div>
-                  <div className="flex items-center bg-[#2b3139] rounded-lg px-4 py-2">
-                    <CalendarIcon className="h-5 w-5 mr-2 text-[#848e9c]" />
-                    <span className="text-white">{new Date(user.created_at).toLocaleDateString('tr-TR')}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Sol Kolon - Rozetler */}
-          <div className="lg:col-span-1">
-            <div className="bg-[#1e2329] rounded-xl border border-[#2b3139]">
-              <div className="px-6 py-4 border-b border-[#2b3139] bg-[#161a1e]">
-                <h2 className="text-xl font-bold text-white flex items-center">
-                  <TrophyIcon className="h-6 w-6 mr-2 text-[#f0b90b]" />
-                  Rozetlerim ({badges.length})
-                </h2>
-              </div>
-
-              {error ? (
-                <div className="p-6 text-center">
-                  <p className="text-[#f6465d]">{error}</p>
-                  <button
-                    onClick={loadBadges}
-                    className="mt-4 px-4 py-2 bg-[#0ecb81] hover:bg-[#0bb975] text-white rounded-lg transition-colors font-semibold"
-                  >
-                    Tekrar Dene
-                  </button>
-                </div>
-              ) : badges.length === 0 ? (
-                <div className="p-12 text-center">
-                  <TrophyIcon className="mx-auto h-12 w-12 text-[#848e9c]" />
-                  <h3 className="mt-2 text-sm font-semibold text-white">Henüz rozet yok</h3>
-                  <p className="mt-1 text-sm text-[#848e9c]">
-                    İşlem yaparak rozetler kazanmaya başlayın!
-                  </p>
-                </div>
-              ) : (
-                <div className="p-6">
-                  {Object.entries(groupedBadges).map(([category, categoryBadges]) => (
-                    <div key={category} className="mb-6">
-                      <h3 className="text-xs font-semibold text-[#848e9c] uppercase mb-3">
-                        {category === 'transaction' ? 'İşlem Rozetleri' :
-                         category === 'profit' ? 'Kâr Rozetleri' :
-                         category === 'portfolio' ? 'Portföy Rozetleri' :
-                         category === 'daily' ? 'Günlük Rozetler' :
-                         category === 'risk' ? 'Risk Rozetleri' :
-                         category === 'patience' ? 'Sabır Rozetleri' :
-                         category === 'diversity' ? 'Çeşitlilik Rozetleri' :
-                         category}
-                      </h3>
-                      <div className="grid grid-cols-2 gap-3">
-                        {categoryBadges.map((badge) => (
-                          <div
-                            key={badge.id}
-                            className="bg-[#161a1e] rounded-lg p-4 border border-[#2b3139] hover:border-[#0ecb81]/30 transition-all"
-                          >
-                            <div className="text-3xl text-center mb-2">{badge.icon}</div>
-                            <div className="text-xs font-semibold text-white text-center mb-1">
-                              {badge.name}
-                            </div>
-                            <div className="text-xs text-[#848e9c] text-center">
-                              {badge.earned_at.toLocaleDateString('tr-TR')}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Sağ Kolon - Aktivite Logları */}
-          <div className="lg:col-span-2">
-            <div className="bg-[#1e2329] rounded-xl border border-[#2b3139]">
-              <div className="px-6 py-4 border-b border-[#2b3139] bg-[#161a1e] flex items-center justify-between">
-                <h2 className="text-xl font-bold text-white flex items-center">
-                  <ClockIcon className="h-6 w-6 mr-2 text-[#0ecb81]" />
-                  Aktivite Logları ({totalLogs})
-                </h2>
-                {activityTypes.length > 0 && (
-                  <div className="flex items-center space-x-2">
-                    <FunnelIcon className="h-5 w-5 text-[#848e9c]" />
-                    <select
-                      value={selectedType}
-                      onChange={(e) => {
-                        setSelectedType(e.target.value);
-                        setPage(1);
-                      }}
-                      className="px-3 py-1.5 text-sm border border-[#2b3139] rounded-lg bg-[#1e2329] text-white focus:outline-none focus:ring-2 focus:ring-[#0ecb81] focus:border-[#0ecb81] transition-colors"
-                    >
-                      <option value="">Tümü</option>
-                      {activityTypes.map((type) => (
-                        <option key={type} value={type}>
-                          {type === 'buy' ? 'Alış' :
-                           type === 'sell' ? 'Satış' :
-                           type === 'login' ? 'Giriş' :
-                           type === 'logout' ? 'Çıkış' :
-                           type}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-              </div>
-
-              <div className="p-6">
-                {logsLoading ? (
-                  <div className="text-center py-12">
-                    <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-[#0ecb81]"></div>
-                    <p className="mt-4 text-[#848e9c]">Yükleniyor...</p>
-                  </div>
-                ) : activityLogs.length === 0 ? (
-                  <div className="text-center py-12">
-                    <ClockIcon className="mx-auto h-12 w-12 text-[#848e9c]" />
-                    <h3 className="mt-2 text-sm font-semibold text-white">Henüz aktivite yok</h3>
-                    <p className="mt-1 text-sm text-[#848e9c]">
-                      İşlem yaptıkça aktivite logları burada görünecek.
-                    </p>
-                  </div>
-                ) : (
-                  <>
-                    <div className="space-y-3">
-                      {activityLogs.map((log) => {
-                        const activityColors = {
-                          buy: 'bg-[#0ecb81]/10 border-[#0ecb81]/30 text-[#0ecb81]',
-                          sell: 'bg-[#f6465d]/10 border-[#f6465d]/30 text-[#f6465d]',
-                          login: 'bg-[#0ecb81]/10 border-[#0ecb81]/30 text-[#0ecb81]',
-                          logout: 'bg-[#2b3139] border-[#2b3139] text-[#848e9c]'
-                        };
-                        return (
-                          <div
-                            key={log.id}
-                            className={`flex items-start space-x-4 p-4 rounded-lg border ${activityColors[log.activity_type as keyof typeof activityColors] || 'bg-[#2b3139] border-[#2b3139] text-[#848e9c]'} transition-all hover:bg-[#161a1e]`}
-                          >
-                            <div className="flex-shrink-0 mt-0.5">
-                              {getActivityIcon(log.activity_type)}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-semibold text-white">{log.description}</p>
-                              {log.metadata && (
-                                <div className="mt-1 text-xs text-[#848e9c]">
-                                  {log.metadata.symbol && (
-                                    <span className="mr-2">Sembol: {log.metadata.symbol}</span>
-                                  )}
-                                  {log.metadata.quantity && (
-                                    <span className="mr-2">Miktar: {log.metadata.quantity}</span>
-                                  )}
-                                  {log.metadata.price && (
-                                    <span>Fiyat: ₺{log.metadata.price.toLocaleString('tr-TR')}</span>
-                                  )}
-                                </div>
-                              )}
-                              <p className="text-xs mt-1 text-[#848e9c]">{formatDate(log.created_at)}</p>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-
-                    {/* Pagination */}
-                    {totalPages > 1 && (
-                      <div className="mt-6 flex items-center justify-between">
-                        <button
-                          onClick={() => setPage(p => Math.max(1, p - 1))}
-                          disabled={page === 1}
-                          className="px-4 py-2 text-sm font-semibold text-white bg-[#2b3139] border border-[#2b3139] rounded-lg hover:bg-[#3a4149] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                        >
-                          Önceki
-                        </button>
-                        <span className="text-sm text-[#848e9c]">
-                          Sayfa {page} / {totalPages}
-                        </span>
-                        <button
-                          onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                          disabled={page === totalPages}
-                          className="px-4 py-2 text-sm font-semibold text-white bg-[#2b3139] border border-[#2b3139] rounded-lg hover:bg-[#3a4149] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                        >
-                          Sonraki
-                        </button>
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
+    <div className="space-y-6">
+      <PageHeader eyebrow="Hesap" title="Profil" description="Hesap bilgilerin, performansın, rozetlerin ve son aktivitelerin." />
+      <UserCard user={user} />
+      <StatsCard />
+      <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
+        <BadgesGrid />
+        <ActivityLog />
       </div>
     </div>
   );
+}
+
+/* ------------------------------------------------------------------ */
+
+function UserCard({ user }: { user: User }) {
+  const { data } = useSWR(user.email_verified ? MY_RANK_KEY : null, () => leaderboardApi.myRank(), { refreshInterval: 60_000 });
+  const ranks = normalizeMyRank(data);
+  const rank = ranks.rank ?? user.rank;
+
+  return (
+    <Card className="overflow-hidden">
+      <div className="flex flex-col gap-5 p-5 sm:flex-row sm:items-center sm:p-6">
+        <UserInitial name={user.username} size={72} />
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="truncate text-xl font-semibold tracking-tight">{user.username}</h2>
+            {user.email_verified ? (
+              <Badge tone="up">
+                <CheckBadgeIcon className="h-3.5 w-3.5" aria-hidden="true" /> Doğrulanmış
+              </Badge>
+            ) : (
+              <Badge tone="gold">
+                <ExclamationCircleIcon className="h-3.5 w-3.5" aria-hidden="true" /> Doğrulanmamış
+              </Badge>
+            )}
+            {user.is_admin && (
+              <Badge tone="brand">
+                <ShieldCheckIcon className="h-3.5 w-3.5" aria-hidden="true" /> Yönetici
+              </Badge>
+            )}
+          </div>
+          <p className="mt-1 break-all text-sm text-muted">{user.email}</p>
+          {!user.email_verified && (
+            <p className="mt-2 text-xs text-muted">
+              Liderlik tablosunda görünmek için{' '}
+              <Link href="/verify-email" className="font-semibold text-brand underline underline-offset-2">
+                e-postanı doğrula
+              </Link>
+              .
+            </p>
+          )}
+        </div>
+
+        <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-line bg-line text-sm sm:w-72 sm:shrink-0">
+          <div className="bg-surface p-3">
+            <dt className="flex items-center gap-1.5 text-xs text-muted">
+              <CalendarDaysIcon className="h-3.5 w-3.5" aria-hidden="true" /> Üyelik
+            </dt>
+            <dd className="mt-1 font-medium">{user.created_at ? formatDate(user.created_at) : '—'}</dd>
+          </div>
+          <div className="bg-surface p-3">
+            <dt className="flex items-center gap-1.5 text-xs text-muted">
+              <TrophyIcon className="h-3.5 w-3.5" aria-hidden="true" /> Sıralama
+            </dt>
+            <dd className="num mt-1 font-semibold">
+              {rank ? (
+                <Link href="/leaderboard" className="hover:text-brand">
+                  #{rank}
+                </Link>
+              ) : (
+                <span className="text-subtle">—</span>
+              )}
+            </dd>
+            {ranks.rankWeek && <dd className="num text-xs text-subtle">Bu hafta #{ranks.rankWeek}</dd>}
+          </div>
+        </dl>
+      </div>
+      {!user.email_verified && (
+        <div className="border-t border-line bg-surface-2/60 px-5 py-3 sm:px-6">
+          <LinkButton href="/verify-email" size="sm" variant="primary">
+            E-postamı doğrula
+          </LinkButton>
+        </div>
+      )}
+    </Card>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+
+function StatsCard() {
+  const { totals, transactions, holdings, loaded } = useLivePortfolio();
+  const stats = useMemo(() => computeTradeStats(transactions), [transactions]);
+  const growth = totals.netWorth - STARTING_BALANCE;
+  const closed = stats.wins + stats.losses;
+  const winRate = closed > 0 ? (stats.wins / closed) * 100 : null;
+  // Portföy bağlamı en fazla 100 işlem yükler
+  const capped = transactions.length >= 100;
+
+  return (
+    <Card>
+      <div className="grid grid-cols-2 gap-px overflow-hidden rounded-2xl bg-line lg:grid-cols-4">
+        <StatCell>
+          <Stat
+            icon={<WalletIcon />}
+            label="Toplam varlık"
+            value={loaded ? formatTRY(totals.netWorth) : <Skeleton className="h-7 w-32" />}
+            sub={
+              loaded ? (
+                <span className="flex flex-wrap items-center gap-1.5">
+                  <Delta value={(growth / STARTING_BALANCE) * 100} variant="text" />
+                  <span className="text-subtle">başlangıçtan beri</span>
+                </span>
+              ) : undefined
+            }
+          />
+        </StatCell>
+        <StatCell>
+          <Stat
+            icon={<ArrowsRightLeftIcon />}
+            label="Toplam işlem"
+            value={loaded ? `${formatNumber(stats.total, 0)}${capped ? '+' : ''}` : <Skeleton className="h-7 w-16" />}
+            sub={loaded ? `${formatNumber(stats.buys, 0)} alış · ${formatNumber(stats.sells, 0)} satış` : undefined}
+          />
+        </StatCell>
+        <StatCell>
+          <Stat
+            icon={<ScaleIcon />}
+            label="Kazanan / kaybeden"
+            value={
+              loaded ? (
+                <span>
+                  <span className="text-up">{stats.wins}</span>
+                  <span className="text-subtle"> / </span>
+                  <span className="text-down">{stats.losses}</span>
+                </span>
+              ) : (
+                <Skeleton className="h-7 w-20" />
+              )
+            }
+            sub={loaded ? (winRate == null ? 'Henüz kapanan satış yok' : `Başarı oranı ${formatPercent(winRate, { sign: false })}`) : undefined}
+          />
+        </StatCell>
+        <StatCell>
+          <Stat
+            icon={<TrophyIcon />}
+            label="Gerçekleşen K/Z"
+            value={loaded ? <Money value={stats.realized} signed /> : <Skeleton className="h-7 w-28" />}
+            sub={loaded ? `${holdings.length} açık pozisyon · K/Z ${formatTRY(totals.pl, { sign: true })}` : undefined}
+          />
+        </StatCell>
+      </div>
+    </Card>
+  );
+}
+
+function StatCell({ children }: { children: ReactNode }) {
+  return <div className="min-w-0 bg-surface p-4 sm:p-5">{children}</div>;
 }

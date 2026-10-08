@@ -1,72 +1,175 @@
 @import "tailwindcss";
 
+/*
+ * PortfoyGo tasarım token'ları.
+ * Açık tema :root üzerinde, koyu tema [data-theme="dark"] üzerinde tanımlıdır.
+ * Bileşenler ham hex kullanmaz; her zaman bu token'lardan türeyen utility'leri kullanır
+ * (bg-canvas, bg-surface, text-fg, text-muted, border-line, text-brand, text-up, text-down ...).
+ */
+
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --canvas: #f5f6fa;
+  --surface: #ffffff;
+  --surface-2: #f0f2f7;
+  --surface-3: #e6e9f1;
+  --line: #e2e5ee;
+  --line-strong: #cfd4e0;
+
+  --fg: #0d1120;
+  --muted: #535c72;
+  --subtle: #8a92a7;
+
+  --brand: #5b3df5;
+  --brand-hover: #4a2ee0;
+  --brand-soft: rgb(91 61 245 / 0.1);
+  --brand-fg: #ffffff;
+
+  --up: #078a55;
+  --up-soft: rgb(7 138 85 / 0.1);
+  --down: #d92d42;
+  --down-soft: rgb(217 45 66 / 0.1);
+  --gold: #b7791f;
+  --gold-soft: rgb(183 121 31 / 0.12);
+  --silver: #9aa3b5;
+  --bronze: #b9773f;
+
+  --ring: rgb(91 61 245 / 0.45);
+  --shadow: 0 1px 2px rgb(13 17 32 / 0.04), 0 4px 16px rgb(13 17 32 / 0.04);
+  --overlay: rgb(13 17 32 / 0.45);
+
+  color-scheme: light;
+}
+
+[data-theme="dark"] {
+  --canvas: #0a0d16;
+  --surface: #10141f;
+  --surface-2: #161b28;
+  --surface-3: #1e2433;
+  --line: #222939;
+  --line-strong: #30384b;
+
+  --fg: #e9ebf2;
+  --muted: #9aa2b6;
+  --subtle: #646d84;
+
+  --brand: #8466ff;
+  --brand-hover: #9479ff;
+  --brand-soft: rgb(132 102 255 / 0.14);
+  --brand-fg: #ffffff;
+
+  --up: #2fd389;
+  --up-soft: rgb(47 211 137 / 0.12);
+  --down: #ff5d6e;
+  --down-soft: rgb(255 93 110 / 0.12);
+  --gold: #f2bf4c;
+  --gold-soft: rgb(242 191 76 / 0.12);
+  --silver: #c3cad8;
+  --bronze: #d08f58;
+
+  --ring: rgb(132 102 255 / 0.55);
+  --shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 8px 24px rgb(0 0 0 / 0.25);
+  --overlay: rgb(3 5 10 / 0.7);
+
+  color-scheme: dark;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-fg: var(--fg);
+  --color-muted: var(--muted);
+  --color-subtle: var(--subtle);
+  --color-brand: var(--brand);
+  --color-brand-hover: var(--brand-hover);
+  --color-brand-soft: var(--brand-soft);
+  --color-brand-fg: var(--brand-fg);
+  --color-up: var(--up);
+  --color-up-soft: var(--up-soft);
+  --color-down: var(--down);
+  --color-down-soft: var(--down-soft);
+  --color-gold: var(--gold);
+  --color-gold-soft: var(--gold-soft);
+  --color-silver: var(--silver);
+  --color-bronze: var(--bronze);
+  --color-overlay: var(--overlay);
+
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, monospace;
+
+  --shadow-card: var(--shadow);
 }
 
-/* next-themes ile class tabanlı dark mode */
-.dark :root {
-  --background: #0b1220; /* slate-950'e yakın */
-  --foreground: #e5e7eb; /* zinc-200 */
-}
-
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
-}
-
-/* Fiyat güncelleme animasyonları */
-@keyframes priceFlashUp {
-  0% {
-    background-color: rgba(14, 203, 129, 0.3);
-    transform: scale(1);
+@layer base {
+  html {
+    -webkit-tap-highlight-color: transparent;
   }
-  50% {
-    background-color: rgba(14, 203, 129, 0.6);
-    transform: scale(1.02);
+
+  body {
+    background: var(--canvas);
+    color: var(--fg);
+    font-family: var(--font-sans);
+    font-feature-settings: "ss01", "cv11";
   }
-  100% {
-    background-color: transparent;
-    transform: scale(1);
+
+  ::selection {
+    background: var(--brand-soft);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+
+  dialog::backdrop {
+    background: var(--overlay);
+    backdrop-filter: blur(4px);
   }
 }
 
-@keyframes priceFlashDown {
-  0% {
-    background-color: rgba(246, 70, 93, 0.3);
-    transform: scale(1);
+@layer utilities {
+  /* Fiyat ve tutarlar için eşit genişlikli rakamlar */
+  .num {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
   }
-  50% {
-    background-color: rgba(246, 70, 93, 0.6);
-    transform: scale(1.02);
+
+  .scrollbar-none {
+    scrollbar-width: none;
   }
-  100% {
-    background-color: transparent;
-    transform: scale(1);
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
   }
 }
 
-.price-flash-up {
-  animation: priceFlashUp 0.6s ease-out;
+/* Fiyat değişiminde kısa vurgu */
+@keyframes flash-up {
+  0% { background-color: var(--up-soft); }
+  100% { background-color: transparent; }
+}
+@keyframes flash-down {
+  0% { background-color: var(--down-soft); }
+  100% { background-color: transparent; }
+}
+.flash-up { animation: flash-up 900ms ease-out; }
+.flash-down { animation: flash-down 900ms ease-out; }
+
+@keyframes shimmer {
+  100% { transform: translateX(100%); }
 }
 
-.price-flash-down {
-  animation: priceFlashDown 0.6s ease-out;
-}
-
-.scrollbar-hide {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
-}
-.scrollbar-hide::-webkit-scrollbar {
-  display: none;
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 1ms !important;
+    transition-duration: 1ms !important;
+  }
 }

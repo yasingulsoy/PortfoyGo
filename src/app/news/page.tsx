@@ -1,229 +1,326 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { useAuth } from '@/context/AuthContext';
-import { newsApi } from '@/services/backendApi';
-import { NewspaperIcon, ClockIcon, TagIcon, ArrowTopRightOnSquareIcon, ChartBarSquareIcon } from '@heroicons/react/24/outline';
+import { useMemo, useState, type ReactNode } from 'react';
+import useSWR from 'swr';
+import { ArrowPathIcon, ArrowTopRightOnSquareIcon, MagnifyingGlassIcon, NewspaperIcon } from '@heroicons/react/20/solid';
+import { useRequireAuth } from '@/hooks/useRequireAuth';
+import { newsApi } from '@/lib/api';
+import { cn, formatDateTime, formatRelative } from '@/lib/format';
+import type { NewsItem } from '@/types';
+import PageHeader from '@/components/ui/PageHeader';
+import Button from '@/components/ui/Button';
+import { Card } from '@/components/ui/Card';
+import { Alert, EmptyState, Skeleton } from '@/components/ui/Feedback';
+import { PageLoader } from '@/components/ui/Spinner';
 
-interface NewsItem {
-  title: string;
-  link: string;
-  pubDate: string;
-  creator: string;
-  categories: string[];
-  description: string;
-  image?: string | null;
+const INITIAL_LIMIT = 20;
+const STEP = 10;
+/** Backend üst sınırı (limitSchema(10, 50)) */
+const MAX_LIMIT = 50;
+const MAX_CHIPS = 8;
+const ALL = '__all__';
+
+interface Article extends NewsItem {
+  creator?: string;
 }
 
-function timeAgo(dateStr: string): string {
-  const now = new Date();
-  const date = new Date(dateStr);
-  const diffMs = now.getTime() - date.getTime();
-  const diffMin = Math.floor(diffMs / 60000);
-  const diffHour = Math.floor(diffMin / 60);
-  const diffDay = Math.floor(diffHour / 24);
+/** Yalnızca http(s) bağlantılarına izin ver (javascript: vb. engellenir). */
+function safeUrl(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  try {
+    const u = new URL(value);
+    return u.protocol === 'https:' || u.protocol === 'http:' ? u.toString() : undefined;
+  } catch {
+    return undefined;
+  }
+}
 
-  if (diffMin < 1) return 'Az önce';
-  if (diffMin < 60) return `${diffMin} dakika önce`;
-  if (diffHour < 24) return `${diffHour} saat önce`;
-  if (diffDay < 7) return `${diffDay} gün önce`;
-  return date.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' });
+function normalize(res: any): Article[] {
+  const raw: any[] = Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
+  const seen = new Set<string>();
+  const out: Article[] = [];
+  for (const r of raw) {
+    const link = safeUrl(r?.link);
+    const title = typeof r?.title === 'string' ? r.title.trim() : '';
+    if (!link || !title || seen.has(link)) continue;
+    seen.add(link);
+    out.push({
+      title,
+      link,
+      pubDate: typeof r.pubDate === 'string' ? r.pubDate : '',
+      categories: Array.isArray(r.categories) ? r.categories.filter((c: unknown): c is string => typeof c === 'string' && c.trim() !== '') : [],
+      description: typeof r.description === 'string' ? r.description : '',
+      image: safeUrl(r.image),
+      creator: typeof r.creator === 'string' && r.creator.trim() ? r.creator.trim() : undefined,
+    });
+  }
+  return out;
 }
 
 export default function NewsPage() {
-  const { user, loading } = useAuth();
-  const router = useRouter();
-  const [news, setNews] = useState<NewsItem[]>([]);
-  const [newsLoading, setNewsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { user, ready } = useRequireAuth();
+  const [limit, setLimit] = useState(INITIAL_LIMIT);
+  const [category, setCategory] = useState(ALL);
+  const [query, setQuery] = useState('');
 
-  useEffect(() => {
-    if (!loading && !user) {
-      router.push('/login');
-    }
-  }, [user, loading, router]);
+  const { data, error, isLoading, isValidating, mutate } = useSWR(ready ? `news:list:${limit}` : null, () => newsApi.list(limit), {
+    refreshInterval: 300_000,
+    keepPreviousData: true,
+  });
 
-  useEffect(() => {
-    const fetchNews = async () => {
-      try {
-        setNewsLoading(true);
-        const result = await newsApi.getNews(20);
-        if (result.success) {
-          setNews(result.data);
+  const articles = useMemo(() => normalize(data), [data]);
+
+  const categories = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const a of articles) for (const c of a.categories) counts.set(c, (counts.get(c) ?? 0) + 1);
+    return [...counts.entries()]
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'tr'))
+      .slice(0, MAX_CHIPS)
+      .map(([name, count]) => ({ name, count }));
+  }, [articles]);
+
+  // Seçili kategori yeni veride yoksa "Tümü"ne düş (state'i effect ile sıfırlamak yerine türet)
+  const activeCategory = category !== ALL && categories.some((c) => c.name === category) ? category : ALL;
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLocaleLowerCase('tr');
+    return articles.filter((a) => {
+      if (activeCategory !== ALL && !a.categories.includes(activeCategory)) return false;
+      if (!q) return true;
+      return a.title.toLocaleLowerCase('tr').includes(q) || a.description.toLocaleLowerCase('tr').includes(q);
+    });
+  }, [articles, activeCategory, query]);
+
+  if (!ready || !user) return <PageLoader />;
+
+  const loadingMore = isValidating && articles.length > 0 && articles.length < limit;
+  const canLoadMore = limit < MAX_LIMIT && articles.length >= limit;
+  const [featured, ...others] = filtered;
+
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        eyebrow="Gündem"
+        title="Piyasa haberleri"
+        description="Ekonomi ve finans dünyasından son gelişmeler. Haberler kaynağında yeni sekmede açılır."
+        actions={
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => void mutate()}
+            disabled={isValidating}
+            icon={<ArrowPathIcon className={cn('h-4 w-4', isValidating && 'animate-spin')} aria-hidden="true" />}
+          >
+            Yenile
+          </Button>
         }
-      } catch (err: any) {
-        setError(err.message || 'Haberler yüklenirken bir hata oluştu');
-      } finally {
-        setNewsLoading(false);
-      }
-    };
+      />
 
-    if (user) {
-      fetchNews();
-    }
-  }, [user]);
+      <div className="space-y-3">
+        <label className="relative block sm:max-w-sm">
+          <span className="sr-only">Haberlerde ara</span>
+          <MagnifyingGlassIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-subtle" aria-hidden="true" />
+          <input
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Başlık veya içerikte ara"
+            className="h-10 w-full rounded-lg border border-line bg-surface pl-9 pr-3 text-sm placeholder:text-subtle hover:border-line-strong focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+          />
+        </label>
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-[#0b0e11] flex items-center justify-center">
-        <div className="text-center">
-          <div className="relative">
-            <div className="h-16 w-16 rounded-full border-2 border-[#2b3139] border-t-[#0ecb81] animate-spin" />
-            <div className="absolute inset-0 flex items-center justify-center">
-              <ChartBarSquareIcon className="h-6 w-6 text-[#0ecb81]" />
-            </div>
+        {categories.length > 0 && (
+          <div role="group" aria-label="Kategori filtresi" className="scrollbar-none -mx-4 flex gap-2 overflow-x-auto px-4 sm:mx-0 sm:flex-wrap sm:px-0">
+            <Chip active={activeCategory === ALL} onClick={() => setCategory(ALL)}>
+              Tümü <span className="num text-subtle">{articles.length}</span>
+            </Chip>
+            {categories.map((c) => (
+              <Chip key={c.name} active={activeCategory === c.name} onClick={() => setCategory(c.name)}>
+                {c.name} <span className="num text-subtle">{c.count}</span>
+              </Chip>
+            ))}
           </div>
-          <p className="mt-4 text-[#848e9c] text-sm">Yükleniyor...</p>
+        )}
+      </div>
+
+      {error && articles.length > 0 && <Alert tone="error">Haberler güncellenemedi; son alınan haberler gösteriliyor.</Alert>}
+
+      {isLoading && articles.length === 0 ? (
+        <NewsSkeleton />
+      ) : articles.length === 0 ? (
+        <Card>
+          <EmptyState
+            icon={<NewspaperIcon />}
+            title={error ? 'Haberler yüklenemedi' : 'Şu an haber yok'}
+            description={error ? 'Haber kaynağına şu an ulaşılamıyor.' : 'Yeni haberler geldiğinde burada görünecek.'}
+            action={error ? <Button variant="secondary" size="sm" onClick={() => void mutate()}>Tekrar dene</Button> : undefined}
+          />
+        </Card>
+      ) : filtered.length === 0 ? (
+        <Card>
+          <EmptyState
+            icon={<MagnifyingGlassIcon />}
+            title="Eşleşen haber bulunamadı"
+            description="Farklı bir arama terimi ya da kategori dene."
+            action={
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => {
+                  setQuery('');
+                  setCategory(ALL);
+                }}
+              >
+                Filtreleri temizle
+              </Button>
+            }
+          />
+        </Card>
+      ) : (
+        <>
+          <p className="sr-only" role="status">{filtered.length} haber listeleniyor</p>
+          <FeaturedArticle article={featured} />
+          {others.length > 0 && (
+            <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {others.map((a) => (
+                <li key={a.link} className="min-w-0">
+                  <ArticleCard article={a} />
+                </li>
+              ))}
+            </ul>
+          )}
+        </>
+      )}
+
+      {articles.length > 0 && (
+        <div className="flex flex-col items-center gap-2 pt-2">
+          {canLoadMore ? (
+            <Button variant="secondary" loading={loadingMore} onClick={() => setLimit((l) => Math.min(MAX_LIMIT, l + STEP))}>
+              Daha fazla yükle
+            </Button>
+          ) : (
+            <p className="text-xs text-subtle">Tüm güncel haberleri gördün.</p>
+          )}
         </div>
+      )}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+
+function Chip({ active, onClick, children }: { active: boolean; onClick: () => void; children: ReactNode }) {
+  return (
+    <button
+      type="button"
+      aria-pressed={active}
+      onClick={onClick}
+      className={cn(
+        'inline-flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-3 text-xs font-medium transition-colors',
+        active ? 'border-brand bg-brand-soft text-brand' : 'border-line bg-surface text-muted hover:border-line-strong hover:text-fg',
+      )}
+    >
+      {children}
+    </button>
+  );
+}
+
+function Meta({ article, className }: { article: Article; className?: string }) {
+  const time = article.pubDate ? formatRelative(article.pubDate) : null;
+  return (
+    <p className={cn('flex flex-wrap items-center gap-x-1.5 text-xs text-subtle', className)}>
+      {article.categories[0] && <span className="font-medium text-brand">{article.categories[0]}</span>}
+      {article.categories[0] && time && <span aria-hidden="true">·</span>}
+      {time && (
+        <time dateTime={article.pubDate} title={formatDateTime(article.pubDate)}>
+          {time}
+        </time>
+      )}
+    </p>
+  );
+}
+
+function NewsImage({ src, className }: { src?: string; className?: string }) {
+  const [failed, setFailed] = useState(false);
+  if (!src || failed) {
+    return (
+      <div className={cn('flex items-center justify-center bg-surface-2 text-subtle', className)} aria-hidden="true">
+        <NewspaperIcon className="h-8 w-8" />
       </div>
     );
   }
-
-  if (!user) return null;
-
   return (
-    <div className="min-h-screen bg-[#0b0e11]">
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6">
+    // Harici RSS görselleri: alan adları önceden bilinmediği için next/image yerine düz <img>.
+    // eslint-disable-next-line @next/next/no-img-element
+    <img src={src} alt="" loading="lazy" referrerPolicy="no-referrer" onError={() => setFailed(true)} className={cn('bg-surface-2 object-cover', className)} />
+  );
+}
 
-        {/* Header */}
-        <section className="relative overflow-hidden rounded-2xl border border-[#2b3139]/60 p-6 sm:p-8 bg-gradient-to-br from-[#141720] via-[#1a1e28] to-[#1a1418]">
-          <div className="absolute -top-32 -right-32 w-80 h-80 bg-[#f0b90b]/[0.06] rounded-full blur-[100px] pointer-events-none" />
-          <div className="absolute -bottom-24 -left-24 w-64 h-64 bg-[#0ecb81]/[0.04] rounded-full blur-[80px] pointer-events-none" />
-          <div className="relative z-10">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="h-10 w-10 bg-[#f0b90b]/10 rounded-xl flex items-center justify-center border border-[#f0b90b]/20">
-                <NewspaperIcon className="h-5 w-5 text-[#f0b90b]" />
-              </div>
-              <div>
-                <p className="text-[#848e9c] text-xs uppercase tracking-widest">Ekonomi & Finans</p>
-                <h1 className="text-2xl sm:text-3xl font-bold text-white">Haberler</h1>
-              </div>
-            </div>
-            <p className="text-[#5a6270] text-sm mt-2">
-              BS Ekonomi&apos;den güncel ekonomi, finans ve piyasa haberleri
-            </p>
+function FeaturedArticle({ article }: { article: Article }) {
+  return (
+    <Card className="overflow-hidden">
+      <a
+        href={article.link}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="group grid md:grid-cols-[1.1fr_1fr]"
+      >
+        <NewsImage src={article.image} className="aspect-[16/9] w-full md:aspect-auto md:h-full md:min-h-[280px]" />
+        <div className="flex flex-col p-5 sm:p-6">
+          <Meta article={article} />
+          <h2 className="mt-2 text-xl font-semibold leading-snug tracking-tight group-hover:text-brand sm:text-2xl">{article.title}</h2>
+          {article.description && <p className="mt-3 line-clamp-4 text-sm leading-relaxed text-muted">{article.description}</p>}
+          <div className="mt-auto flex items-center justify-between gap-3 pt-5 text-xs text-subtle">
+            <span className="truncate">{article.creator ?? ''}</span>
+            <span className="inline-flex shrink-0 items-center gap-1 font-medium text-brand">
+              Haberi oku <ArrowTopRightOnSquareIcon className="h-3.5 w-3.5" aria-hidden="true" />
+              <span className="sr-only">(yeni sekmede açılır)</span>
+            </span>
           </div>
-        </section>
-
-        {/* News List */}
-        {newsLoading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {[...Array(6)].map((_, i) => (
-              <div key={i} className="bg-[#1a1d24] rounded-2xl border border-[#2b3139]/60 p-5 animate-pulse">
-                <div className="h-4 bg-[#2b3139] rounded w-3/4 mb-3" />
-                <div className="h-3 bg-[#2b3139] rounded w-full mb-2" />
-                <div className="h-3 bg-[#2b3139] rounded w-2/3 mb-4" />
-                <div className="flex gap-2">
-                  <div className="h-5 bg-[#2b3139] rounded-full w-16" />
-                  <div className="h-5 bg-[#2b3139] rounded-full w-20" />
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : error ? (
-          <div className="bg-[#1a1d24] rounded-2xl border border-[#f6465d]/30 p-8 text-center">
-            <NewspaperIcon className="h-12 w-12 text-[#f6465d] mx-auto mb-3" />
-            <p className="text-[#f6465d] font-semibold mb-1">Haberler Yüklenemedi</p>
-            <p className="text-[#5a6270] text-sm">{error}</p>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {/* Featured (first item) */}
-            {news.length > 0 && (
-              <a
-                href={news[0].link}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="block group"
-              >
-                <div className="bg-[#1a1d24] rounded-2xl border border-[#2b3139]/60 hover:border-[#f0b90b]/40 transition-all p-6 sm:p-8">
-                  <div className="flex items-center gap-2 mb-3">
-                    <span className="px-2.5 py-1 bg-[#f0b90b]/10 text-[#f0b90b] text-[10px] font-bold uppercase tracking-wider rounded-md">
-                      Son Dakika
-                    </span>
-                    <span className="text-[#5a6270] text-xs flex items-center gap-1">
-                      <ClockIcon className="h-3 w-3" />
-                      {timeAgo(news[0].pubDate)}
-                    </span>
-                  </div>
-                  <h2 className="text-xl sm:text-2xl font-bold text-white group-hover:text-[#f0b90b] transition-colors mb-3 leading-tight">
-                    {news[0].title}
-                  </h2>
-                  <p className="text-[#848e9c] text-sm leading-relaxed line-clamp-3 mb-4">
-                    {news[0].description}
-                  </p>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      {news[0].categories.slice(0, 3).map((cat) => (
-                        <span key={cat} className="px-2 py-0.5 bg-[#2b3139] text-[#848e9c] text-[10px] rounded-md font-medium">
-                          {cat}
-                        </span>
-                      ))}
-                    </div>
-                    <div className="flex items-center gap-1.5 text-[#0ecb81] text-xs font-semibold flex-shrink-0">
-                      <span>Devamını Oku</span>
-                      <ArrowTopRightOnSquareIcon className="h-3.5 w-3.5" />
-                    </div>
-                  </div>
-                </div>
-              </a>
-            )}
-
-            {/* Other news */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {news.slice(1).map((item, idx) => (
-                <a
-                  key={idx}
-                  href={item.link}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="block group"
-                >
-                  <div className="bg-[#1a1d24] rounded-2xl border border-[#2b3139]/60 hover:border-[#0ecb81]/30 transition-all p-5 h-full flex flex-col">
-                    <div className="flex items-center gap-2 mb-3">
-                      <span className="text-[#5a6270] text-[11px] flex items-center gap-1">
-                        <ClockIcon className="h-3 w-3" />
-                        {timeAgo(item.pubDate)}
-                      </span>
-                      {item.creator && (
-                        <span className="text-[#5a6270] text-[11px]">• {item.creator}</span>
-                      )}
-                    </div>
-                    <h3 className="text-sm sm:text-base font-bold text-[#eaecef] group-hover:text-[#0ecb81] transition-colors mb-2 leading-snug line-clamp-2 flex-shrink-0">
-                      {item.title}
-                    </h3>
-                    <p className="text-[#5a6270] text-xs leading-relaxed line-clamp-3 mb-4 flex-1">
-                      {item.description}
-                    </p>
-                    <div className="flex items-center justify-between mt-auto">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <TagIcon className="h-3 w-3 text-[#5a6270]" />
-                        {item.categories.slice(0, 2).map((cat) => (
-                          <span key={cat} className="px-1.5 py-0.5 bg-[#2b3139] text-[#848e9c] text-[9px] rounded font-medium">
-                            {cat}
-                          </span>
-                        ))}
-                      </div>
-                      <ArrowTopRightOnSquareIcon className="h-3.5 w-3.5 text-[#5a6270] group-hover:text-[#0ecb81] transition-colors flex-shrink-0" />
-                    </div>
-                  </div>
-                </a>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Source Attribution */}
-        <div className="text-center py-4">
-          <p className="text-[#5a6270] text-xs">
-            Haber kaynağı:{' '}
-            <a href="https://bsekonomi.com" target="_blank" rel="noopener noreferrer" className="text-[#0ecb81] hover:underline">
-              BS Ekonomi
-            </a>
-          </p>
         </div>
-      </main>
+      </a>
+    </Card>
+  );
+}
+
+function ArticleCard({ article }: { article: Article }) {
+  return (
+    <Card className="h-full overflow-hidden transition-colors hover:border-line-strong">
+      <a href={article.link} target="_blank" rel="noopener noreferrer" className="group flex h-full flex-col">
+        {article.image && <NewsImage src={article.image} className="aspect-[16/9] w-full" />}
+        <div className="flex flex-1 flex-col p-4">
+          <Meta article={article} />
+          <h3 className="mt-1.5 line-clamp-3 text-[15px] font-semibold leading-snug tracking-tight group-hover:text-brand">{article.title}</h3>
+          {article.description && <p className="mt-2 line-clamp-3 text-sm leading-relaxed text-muted">{article.description}</p>}
+          <span className="sr-only">(yeni sekmede açılır)</span>
+        </div>
+      </a>
+    </Card>
+  );
+}
+
+function NewsSkeleton() {
+  return (
+    <div className="space-y-4" aria-hidden="true">
+      <Card className="grid overflow-hidden md:grid-cols-[1.1fr_1fr]">
+        <Skeleton className="aspect-[16/9] w-full rounded-none md:aspect-auto md:min-h-[280px]" />
+        <div className="space-y-3 p-6">
+          <Skeleton className="h-3 w-32" />
+          <Skeleton className="h-7 w-full" />
+          <Skeleton className="h-7 w-2/3" />
+          <Skeleton className="h-16 w-full" />
+        </div>
+      </Card>
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <Card key={i} className="space-y-2.5 p-4">
+            <Skeleton className="h-3 w-24" />
+            <Skeleton className="h-5 w-full" />
+            <Skeleton className="h-5 w-3/4" />
+            <Skeleton className="h-12 w-full" />
+          </Card>
+        ))}
+      </div>
     </div>
   );
 }

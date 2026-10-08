@@ -5,10 +5,7 @@ import pool from '../config/database';
  * Test kullanıcısı oluşturma scripti
  * 
  * Kullanım:
- * npm run create-user
- * 
- * Veya:
- * ts-node src/scripts/createUser.ts
+ * npm run create-user <username> <email> <password> [verified] [balance]
  */
 
 interface UserData {
@@ -120,42 +117,30 @@ async function createNewUser(userData: UserData) {
     console.log(`   Email Verified: ${newUser.email_verified}`);
     console.log(`   Balance: ₺${parseFloat(newUser.balance).toLocaleString('tr-TR')}`);
     console.log(`   Created At: ${newUser.created_at}\n`);
-    console.log('🔑 Giriş Bilgileri:');
-    console.log(`   Email: ${userData.email}`);
-    console.log(`   Şifre: ${userData.password}\n`);
-    console.log('💡 SQL Hash (eğer SQL ile eklemek isterseniz):');
-    console.log(`   password_hash: ${passwordHash}\n`);
   } catch (error) {
     console.error('❌ Kullanıcı oluşturma hatası:', error);
     throw error;
   }
 }
 
-// Varsayılan kullanıcı bilgileri
-const defaultUser: UserData = {
-  username: 'trading_platform',
-  email: 'trading@platform.com',
-  password: 'trading123',
-  email_verified: true,
-  balance: 100000.00
-};
-
-// Komut satırından argümanları al
+// Komut satırından argümanları al (varsayılan kullanıcı/şifre YOKTUR)
 const args = process.argv.slice(2);
 
-if (args.length >= 3) {
-  // Özel kullanıcı bilgileri
+if (args.length < 3) {
+  console.error('Kullanım: npm run create-user <username> <email> <password> [verified] [balance]');
+  console.error('Şifre en az 8 karakter olmalıdır.');
+  process.exitCode = 1;
+  pool.end();
+} else if (args[2].length < 8 || args[2].length > 72) {
+  console.error('❌ Şifre 8-72 karakter olmalıdır.');
+  process.exitCode = 1;
+  pool.end();
+} else {
   createUser({
     username: args[0],
-    email: args[1],
+    email: args[1].trim().toLowerCase(),
     password: args[2],
     email_verified: args[3] === 'true' || args[3] === undefined,
     balance: args[4] ? parseFloat(args[4]) : 100000.00
   });
-} else {
-  // Varsayılan kullanıcı
-  console.log('📝 Varsayılan kullanıcı oluşturuluyor...\n');
-  console.log('💡 Özel kullanıcı için: npm run create-user <username> <email> <password> [verified] [balance]\n');
-  createUser(defaultUser);
 }
-

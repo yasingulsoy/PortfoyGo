@@ -5,7 +5,7 @@
 
 -- ⚠️ ÖNEMLİ: Şifreler bcrypt ile hash'lenmiş olmalıdır.
 -- Bu scripti kullanmadan önce Node.js scripti ile hash oluşturun:
--- npm run create-user trading_platform trading@platform.com trading123
+-- npm run create-user <username> <email> <güçlü-şifre>
 -- 
 -- Script çıktısındaki password_hash değerini aşağıdaki INSERT komutuna yapıştırın.
 
@@ -17,8 +17,7 @@ DELETE FROM users WHERE username = 'trading_platform' OR email = 'trading@platfo
 -- ============================================
 -- 2. Test kullanıcısı oluştur
 -- ============================================
--- Şifre: "trading123"
--- Bu hash'i oluşturmak için: npm run create-user trading_platform trading@platform.com trading123
+-- Bu hash'i oluşturmak için bcrypt kullanın (şifreyi bu dosyaya YAZMAYIN)
 -- Script çıktısındaki password_hash değerini aşağıya yapıştırın
 
 INSERT INTO users (
@@ -64,7 +63,6 @@ DO $$
 BEGIN
   RAISE NOTICE '✅ Kullanıcı oluşturuldu: trading_platform';
   RAISE NOTICE '📧 Email: trading@platform.com';
-  RAISE NOTICE '🔑 Şifre: trading123';
   RAISE NOTICE '💰 Bakiye: 100,000 TL';
 END $$;
 

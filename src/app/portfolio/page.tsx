@@ -1,610 +1,264 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useMemo, useState } from 'react';
 import Link from 'next/link';
-import { 
-  CurrencyDollarIcon, 
-  ArrowUpIcon, 
-  ArrowDownIcon,
-  ChartBarIcon,
-  ClockIcon,
-  ArrowTrendingUpIcon,
-  ArrowTrendingDownIcon,
-  ArrowPathIcon
-} from '@heroicons/react/24/outline';
-import { usePortfolio } from '@/context/PortfolioContext';
+import { ArrowPathIcon, ArrowRightIcon, ChartBarIcon, ClockIcon, MagnifyingGlassIcon } from '@heroicons/react/20/solid';
+import { useRequireAuth } from '@/hooks/useRequireAuth';
 import { useAuth } from '@/context/AuthContext';
-import { PortfolioItem, Transaction, Stock } from '@/types';
-import { useStocks, useCryptos, useCurrencies } from '@/hooks/useMarketData';
-import TradeModal from '@/components/TradeModal';
-import StopLossModal from '@/components/StopLossModal';
+import { useLivePortfolio, type LiveHolding } from '@/context/PortfolioContext';
+import { STARTING_BALANCE } from '@/lib/constants';
+import { cn, formatPercent, formatQuantity, formatRelative, formatTRY, trend } from '@/lib/format';
+import { Card, CardHeader } from '@/components/ui/Card';
+import { Delta, Money } from '@/components/ui/Delta';
+import { Alert, EmptyState, Skeleton } from '@/components/ui/Feedback';
+import Button, { LinkButton } from '@/components/ui/Button';
+import PageHeader from '@/components/ui/PageHeader';
+import { PageLoader } from '@/components/ui/Spinner';
+import AssetAvatar from '@/components/ui/AssetAvatar';
+import StopLossModal from '@/components/trade/StopLossModal';
+import AllocationCard from '@/components/portfolio/AllocationCard';
+import HoldingsCard from '@/components/portfolio/HoldingsCard';
+import StopLossOrdersCard from '@/components/portfolio/StopLossOrdersCard';
+import { useStopLossOrders } from '@/components/portfolio/useStopLossOrders';
+import type { Transaction } from '@/types';
 
 export default function PortfolioPage() {
-  const { state, refreshPortfolio } = usePortfolio();
-  const { user, loading } = useAuth();
-  const router = useRouter();
-  const { stocks } = useStocks();
-  const { cryptos } = useCryptos();
-  const { currencies, usdToTry } = useCurrencies();
-  const USD_TO_TRY = usdToTry;
-  const [activeTab, setActiveTab] = useState<'overview' | 'transactions'>('overview');
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [portfolioWithPrices, setPortfolioWithPrices] = useState<PortfolioItem[]>([]);
-  const [selectedStock, setSelectedStock] = useState<Stock | null>(null);
-  const [tradeType, setTradeType] = useState<'buy' | 'sell'>('buy');
-  const [isTradeModalOpen, setIsTradeModalOpen] = useState(false);
-  const [selectedPortfolioItem, setSelectedPortfolioItem] = useState<PortfolioItem | null>(null);
-  const [isStopLossModalOpen, setIsStopLossModalOpen] = useState(false);
+  const { user, ready } = useRequireAuth();
+  if (!ready || !user) return <PageLoader />;
+  return <Portfolio />;
+}
 
-  useEffect(() => {
-    if (user) {
-      refreshPortfolio();
+function Portfolio() {
+  const { refreshUser } = useAuth();
+  const { holdings, totals, balance, transactions, loaded, error, refresh, market } = useLivePortfolio();
+  const stopLoss = useStopLossOrders();
+  const [refreshing, setRefreshing] = useState(false);
+  const [slHolding, setSlHolding] = useState<LiveHolding | null>(null);
+
+  const allTimeChange = totals.netWorth - STARTING_BALANCE;
+  const allTimePct = (allTimeChange / STARTING_BALANCE) * 100;
+  const missingPrices = !market.isLoading && holdings.some((h) => h.dayChangePercent === null);
+
+  const reload = async () => {
+    setRefreshing(true);
+    try {
+      await Promise.all([refresh(), refreshUser(), stopLoss.refresh()]);
+    } finally {
+      setRefreshing(false);
     }
-  }, [user]);
-
-  // Portföy öğelerini güncel fiyatlarla güncelle
-  // Not: Sembol uzunluğuna göre tahmin yapmak yerine gerçekten kriptolarda mı, hisselerde mi olduğuna bakıyoruz.
-  useEffect(() => {
-    if (state.portfolioItems.length > 0 && (stocks.length > 0 || cryptos.length > 0 || currencies.length > 0)) {
-      const updated = state.portfolioItems.map(item => {
-        // Döviz (currency) - fiyat zaten TRY
-        const currency = currencies.find(c => c.code.toUpperCase() === item.symbol.toUpperCase());
-        if (currency) {
-          const currentPriceTRY = currency.selling;
-          const averagePriceTRY = item.averagePrice;
-          const profitLoss = (currentPriceTRY - averagePriceTRY) * item.quantity;
-          const profitLossPercent = averagePriceTRY > 0
-            ? ((currentPriceTRY - averagePriceTRY) / averagePriceTRY) * 100
-            : 0;
-          return {
-            ...item,
-            currentPrice: currentPriceTRY,
-            currentPriceUSD: currentPriceTRY / USD_TO_TRY,
-            totalValue: item.quantity * currentPriceTRY,
-            profitLoss,
-            profitLossPercent,
-          };
-        }
-
-        // Önce kripto listesinde var mı diye bak
-        const crypto = cryptos.find(
-          c => c.symbol.toUpperCase() === item.symbol.toUpperCase()
-        );
-
-        if (crypto) {
-          const currentPriceUSD = crypto.current_price;
-          const currentPriceTRY = currentPriceUSD * USD_TO_TRY;
-          const averagePriceTRY = item.averagePrice;
-          const profitLoss = (currentPriceTRY - averagePriceTRY) * item.quantity;
-          const profitLossPercent =
-            averagePriceTRY > 0
-              ? ((currentPriceTRY - averagePriceTRY) / averagePriceTRY) * 100
-              : 0;
-
-          return {
-            ...item,
-            currentPrice: currentPriceTRY,
-            currentPriceUSD: currentPriceUSD,
-            totalValue: item.quantity * currentPriceTRY,
-            profitLoss,
-            profitLossPercent,
-          };
-        }
-
-        // Aksi halde hisse senedi olarak değerlendir
-        const stock = stocks.find(s => s.symbol.toUpperCase() === item.symbol.toUpperCase());
-        if (stock) {
-          const currentPriceUSD = stock.price;
-          const currentPriceTRY = currentPriceUSD * USD_TO_TRY;
-          const averagePriceTRY = item.averagePrice;
-          const profitLoss = (currentPriceTRY - averagePriceTRY) * item.quantity;
-          const profitLossPercent =
-            averagePriceTRY > 0
-              ? ((currentPriceTRY - averagePriceTRY) / averagePriceTRY) * 100
-              : 0;
-
-          return {
-            ...item,
-            currentPrice: currentPriceTRY,
-            currentPriceUSD: currentPriceUSD,
-            totalValue: item.quantity * currentPriceTRY,
-            profitLoss,
-            profitLossPercent,
-          };
-        }
-
-        // İlgili fiyat bulunamazsa mevcut değeri olduğu gibi bırak
-        return item;
-      });
-
-      setPortfolioWithPrices(updated);
-    } else {
-      setPortfolioWithPrices(state.portfolioItems);
-    }
-  }, [state.portfolioItems, stocks, cryptos]);
-
-  const handleRefresh = async () => {
-    setIsRefreshing(true);
-    await refreshPortfolio();
-    setTimeout(() => setIsRefreshing(false), 1000);
-  };
-
-  const getTotalInvestment = () => {
-    return portfolioWithPrices.reduce((sum, item) => sum + (item.quantity * item.averagePrice), 0);
-  };
-
-  const getTotalCurrentValue = () => {
-    return portfolioWithPrices.reduce((sum, item) => sum + item.totalValue, 0);
-  };
-
-  const getTotalProfitLoss = () => {
-    return portfolioWithPrices.reduce((sum, item) => sum + item.profitLoss, 0);
   };
 
   return (
-    <div className="min-h-screen bg-[#181a20]">
-      {/* Header */}
-      <div className="bg-[#1e2329] border-b border-[#2b3139]">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center">
-              <div className="p-2 bg-[#0ecb81]/10 rounded-lg mr-3">
-                <ChartBarIcon className="h-6 w-6 text-[#0ecb81]" />
-              </div>
-              <h1 className="text-2xl font-bold text-white">Portföyüm</h1>
-            </div>
-            <button
-              onClick={handleRefresh}
-              disabled={isRefreshing}
-              className="flex items-center space-x-2 px-4 py-2 bg-[#0ecb81] hover:bg-[#0bb975] text-white rounded-lg disabled:opacity-50 transition-colors font-semibold"
-            >
-              <ArrowPathIcon className={`h-5 w-5 ${isRefreshing ? 'animate-spin' : ''}`} />
-              <span>Yenile</span>
-            </button>
-          </div>
-        </div>
+    <div className="space-y-6">
+      <PageHeader
+        eyebrow="Portföy"
+        title="Portföyüm"
+        description={
+          loaded ? (
+            <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-1">
+              Net varlığın <span className="num font-semibold text-fg">{formatTRY(totals.netWorth)}</span>
+              <Delta value={allTimePct} />
+              <span className="text-subtle">başlangıçtan bu yana</span>
+            </span>
+          ) : (
+            'Pozisyonların canlı piyasa fiyatlarıyla değerlenir.'
+          )
+        }
+        actions={
+          <>
+            <Button variant="secondary" onClick={reload} loading={refreshing} icon={<ArrowPathIcon className="h-4 w-4" aria-hidden="true" />}>
+              Yenile
+            </Button>
+            <LinkButton href="/transactions" variant="ghost" icon={<ClockIcon className="h-4 w-4" aria-hidden="true" />}>
+              İşlem geçmişi
+            </LinkButton>
+          </>
+        }
+      />
+
+      {error && (
+        <Alert tone="error">
+          Portföy yüklenemedi: {error}{' '}
+          <button type="button" onClick={() => void refresh()} className="font-semibold underline underline-offset-2">
+            Tekrar dene
+          </button>
+        </Alert>
+      )}
+
+      {missingPrices && holdings.length > 0 && (
+        <Alert tone="info">Bazı varlıklar için canlı fiyat alınamadı; bu pozisyonlarda sunucunun son değerlemesi gösteriliyor.</Alert>
+      )}
+
+      <div className="grid gap-6 lg:grid-cols-3">
+        <Card className="flex flex-col overflow-hidden lg:col-span-2">
+          <dl className="grid flex-1 grid-cols-2 gap-px bg-line sm:grid-cols-4 lg:grid-cols-2">
+            <Metric
+              label="Toplam varlık"
+              loading={!loaded}
+              value={formatTRY(totals.netWorth)}
+              sub={<Money value={allTimeChange} signed />}
+            />
+            <Metric
+              label="Nakit"
+              loading={!loaded}
+              value={formatTRY(balance)}
+              sub={totals.netWorth > 0 ? `Varlığın ${formatPercent((balance / totals.netWorth) * 100, { sign: false })}` : undefined}
+            />
+            <Metric
+              label="Yatırım değeri"
+              loading={!loaded}
+              value={formatTRY(totals.value)}
+              sub={`Maliyet ${formatTRY(totals.invested)}`}
+            />
+            <Metric
+              label="Açık pozisyon K/Z"
+              loading={!loaded}
+              value={<span className={cn(trend(totals.pl) === 'up' && 'text-up', trend(totals.pl) === 'down' && 'text-down')}>{formatTRY(totals.pl, { sign: true })}</span>}
+              sub={holdings.length ? <Delta value={totals.plPercent} variant="text" /> : 'Açık pozisyon yok'}
+            />
+          </dl>
+          <BestWorst holdings={holdings} loaded={loaded} />
+        </Card>
+        <AllocationCard holdings={holdings} balance={balance} loaded={loaded} />
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Portfolio Summary */}
-        {user && (
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-            <div className="bg-[#1e2329] rounded-xl p-5 border border-[#2b3139] hover:border-[#0ecb81]/30 transition-all">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-[#848e9c] mb-1">Toplam Değer</p>
-                  <p className="text-2xl font-bold text-white">₺{getTotalCurrentValue().toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-                  <p className="text-xs text-[#848e9c]">${(getTotalCurrentValue() / USD_TO_TRY).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-                </div>
-                <div className="p-3 bg-[#0ecb81]/10 rounded-lg">
-                  <CurrencyDollarIcon className="h-6 w-6 text-[#0ecb81]" />
-                </div>
-              </div>
-            </div>
+      {loaded && holdings.length === 0 ? (
+        <Card>
+          <EmptyState
+            icon={<ChartBarIcon />}
+            title="Henüz pozisyonun yok"
+            description={`${formatTRY(balance)} sanal bakiyenle hisse, kripto, döviz ve emtia alarak portföyünü oluşturmaya başla.`}
+            action={<LinkButton href="/" icon={<MagnifyingGlassIcon className="h-4 w-4" aria-hidden="true" />}>Piyasalara göz at</LinkButton>}
+          />
+        </Card>
+      ) : (
+        <HoldingsCard holdings={holdings} loaded={loaded} activeByItem={stopLoss.activeByItem} onStopLoss={setSlHolding} />
+      )}
 
-            <div className="bg-[#1e2329] rounded-xl p-5 border border-[#2b3139] hover:border-[#0ecb81]/30 transition-all">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-[#848e9c] mb-1">Toplam Kâr/Zarar</p>
-                  <p className={`text-2xl font-bold ${getTotalProfitLoss() >= 0 ? 'text-[#0ecb81]' : 'text-[#f6465d]'}`}>
-                    {getTotalProfitLoss() >= 0 ? '+' : ''}₺{getTotalProfitLoss().toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </p>
-                  <p className={`text-xs ${getTotalProfitLoss() >= 0 ? 'text-[#0ecb81]' : 'text-[#f6465d]'}`}>
-                    {getTotalInvestment() > 0 ? `${((getTotalProfitLoss() / getTotalInvestment()) * 100).toFixed(2)}%` : '0%'}
-                  </p>
-                </div>
-                <div className={`p-3 rounded-lg ${getTotalProfitLoss() >= 0 ? 'bg-[#0ecb81]/10' : 'bg-[#f6465d]/10'}`}>
-                  {getTotalProfitLoss() >= 0 ? (
-                    <ArrowUpIcon className={`h-6 w-6 text-[#0ecb81]`} />
-                  ) : (
-                    <ArrowDownIcon className={`h-6 w-6 text-[#f6465d]`} />
+      <div className="grid gap-6 lg:grid-cols-2">
+        <StopLossOrdersCard
+          active={stopLoss.active}
+          history={stopLoss.history}
+          holdings={holdings}
+          loading={stopLoss.isLoading}
+          error={stopLoss.error}
+          onRetry={() => void stopLoss.refresh()}
+          onChanged={() => stopLoss.refresh()}
+        />
+        <RecentTransactions transactions={transactions} loaded={loaded} />
+      </div>
+
+      <StopLossModal
+        holding={slHolding}
+        activeOrder={slHolding ? stopLoss.activeByItem.get(slHolding.id) : null}
+        onClose={() => setSlHolding(null)}
+        onCreated={() => void stopLoss.refresh()}
+      />
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+
+function Metric({ label, value, sub, loading }: { label: string; value: React.ReactNode; sub?: React.ReactNode; loading?: boolean }) {
+  return (
+    <div className="min-w-0 bg-surface p-4 sm:p-5">
+      <dt className="text-xs text-muted">{label}</dt>
+      {loading ? (
+        <dd>
+          <Skeleton className="mt-2 h-6 w-28" />
+          <Skeleton className="mt-2 h-3.5 w-20" />
+        </dd>
+      ) : (
+        <>
+          <dd className="num mt-1.5 truncate text-lg font-semibold tracking-tight sm:text-xl">{value}</dd>
+          {sub && <dd className="num mt-0.5 truncate text-xs text-subtle">{sub}</dd>}
+        </>
+      )}
+    </div>
+  );
+}
+
+function BestWorst({ holdings, loaded }: { holdings: LiveHolding[]; loaded: boolean }) {
+  const { best, worst } = useMemo(() => {
+    if (holdings.length === 0) return { best: null, worst: null };
+    const sorted = [...holdings].sort((a, b) => b.livePLPercent - a.livePLPercent);
+    return { best: sorted[0], worst: sorted.length > 1 ? sorted[sorted.length - 1] : null };
+  }, [holdings]);
+
+  if (!loaded || !best) return null;
+
+  return (
+    <div className="grid border-t border-line sm:grid-cols-2">
+      <Highlight label="En iyi performans" h={best} />
+      {worst && <Highlight label="En zayıf performans" h={worst} className="border-t border-line sm:border-l sm:border-t-0" />}
+    </div>
+  );
+}
+
+function Highlight({ label, h, className }: { label: string; h: LiveHolding; className?: string }) {
+  return (
+    <div className={cn('flex items-center gap-3 px-4 py-3.5 sm:px-5', className)}>
+      <AssetAvatar symbol={h.symbol} type={h.assetType} image={h.image} size={32} />
+      <div className="min-w-0 flex-1">
+        <p className="text-xs text-muted">{label}</p>
+        <p className="font-mono text-[13px] font-semibold">{h.symbol}</p>
+      </div>
+      <div className="text-right">
+        <Money value={h.livePL} signed className="block text-sm font-medium" />
+        <Delta value={h.livePLPercent} variant="text" className="text-xs" />
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+
+function RecentTransactions({ transactions, loaded }: { transactions: Transaction[]; loaded: boolean }) {
+  const recent = transactions.slice(0, 5);
+  return (
+    <Card className="overflow-hidden">
+      <CardHeader
+        icon={<ClockIcon />}
+        title="Son işlemler"
+        description="En son alım ve satımların"
+        action={transactions.length > 0 && <LinkButton href="/transactions" variant="ghost" size="sm">Tümü <ArrowRightIcon className="h-3.5 w-3.5" /></LinkButton>}
+      />
+      {!loaded ? (
+        <div className="space-y-3 p-5">
+          {[0, 1, 2].map((i) => <Skeleton key={i} className="h-10 w-full" />)}
+        </div>
+      ) : recent.length === 0 ? (
+        <EmptyState icon={<ClockIcon />} title="Henüz işlem yok" description="Yaptığın alım ve satımlar burada listelenir." />
+      ) : (
+        <ul className="divide-y divide-line">
+          {recent.map((t) => (
+            <li key={t.id}>
+              <Link href="/transactions" className="flex items-center gap-3 px-5 py-3 transition-colors hover:bg-surface-2/60">
+                <span
+                  className={cn(
+                    'flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold',
+                    t.type === 'buy' ? 'bg-up-soft text-up' : 'bg-down-soft text-down',
                   )}
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-[#1e2329] rounded-xl p-5 border border-[#2b3139] hover:border-[#0ecb81]/30 transition-all">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-[#848e9c] mb-1">Toplam Yatırım</p>
-                  <p className="text-2xl font-bold text-white">₺{getTotalInvestment().toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-                  <p className="text-xs text-[#848e9c]">${(getTotalInvestment() / USD_TO_TRY).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-                </div>
-                <div className="p-3 bg-[#0ecb81]/10 rounded-lg">
-                  <CurrencyDollarIcon className="h-6 w-6 text-[#0ecb81]" />
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-[#1e2329] rounded-xl p-5 border border-[#2b3139] hover:border-[#0ecb81]/30 transition-all">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-[#848e9c] mb-1">Nakit Bakiye</p>
-                  <p className="text-2xl font-bold text-white">₺{state.balance.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-                  <p className="text-xs text-[#848e9c]">${(state.balance / USD_TO_TRY).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-                </div>
-                <div className="p-3 bg-[#0ecb81]/10 rounded-lg">
-                  <CurrencyDollarIcon className="h-6 w-6 text-[#0ecb81]" />
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Tabs */}
-        <div className="bg-[#1e2329] rounded-xl border border-[#2b3139] mb-8">
-          <div className="border-b border-[#2b3139]">
-            <nav className="flex space-x-8 px-6">
-              <button
-                onClick={() => setActiveTab('overview')}
-                className={`py-4 px-1 border-b-2 font-semibold text-sm transition-colors ${
-                  activeTab === 'overview'
-                    ? 'border-[#0ecb81] text-[#0ecb81]'
-                    : 'border-transparent text-[#848e9c] hover:text-white'
-                }`}
-              >
-                Portföy Genel Bakış
-              </button>
-              <button
-                onClick={() => setActiveTab('transactions')}
-                className={`py-4 px-1 border-b-2 font-semibold text-sm transition-colors ${
-                  activeTab === 'transactions'
-                    ? 'border-[#0ecb81] text-[#0ecb81]'
-                    : 'border-transparent text-[#848e9c] hover:text-white'
-                }`}
-              >
-                İşlem Geçmişi
-              </button>
-            </nav>
-          </div>
-
-          <div className="p-6">
-            {activeTab === 'overview' ? (
-              <PortfolioOverview 
-                portfolioItems={portfolioWithPrices} 
-                stocks={stocks}
-                cryptos={cryptos}
-                usdToTry={USD_TO_TRY}
-                onTrade={(item, type) => {
-                  const currency = currencies.find(c => c.code.toUpperCase() === item.symbol.toUpperCase());
-                  if (currency) {
-                    const stockLike: Stock = {
-                      id: currency.code,
-                      symbol: item.symbol,
-                      name: item.name,
-                      price: currency.selling,
-                      change: 0,
-                      changePercent: currency.change_rate,
-                      volume: 0,
-                      marketCap: 0,
-                      previousClose: currency.selling,
-                      open: currency.selling,
-                      high: currency.selling,
-                      low: currency.selling,
-                      assetType: 'currency',
-                    };
-                    setSelectedStock(stockLike);
-                    setTradeType(type);
-                    setIsTradeModalOpen(true);
-                    return;
-                  }
-                  const cryptoAsset = cryptos.find(c => c.symbol.toUpperCase() === item.symbol.toUpperCase());
-                  const stockAsset = stocks.find(s => s.symbol.toUpperCase() === item.symbol.toUpperCase());
-                  const asset = stockAsset || cryptoAsset;
-                  if (asset) {
-                    const isCrypto = !!cryptoAsset && !stockAsset;
-                    const resolvedType = item.assetType || (isCrypto ? 'crypto' : 'stock');
-                    const stockLike: Stock = {
-                      id: asset.id || item.symbol,
-                      symbol: item.symbol,
-                      name: item.name,
-                      price: isCrypto ? (asset as any).current_price : (asset as any).price,
-                      change: 0,
-                      changePercent: 0,
-                      volume: isCrypto ? (asset as any).total_volume || 0 : (asset as any).volume || 0,
-                      marketCap: isCrypto ? (asset as any).market_cap || 0 : (asset as any).marketCap || 0,
-                      previousClose: item.currentPrice / USD_TO_TRY,
-                      open: item.currentPrice / USD_TO_TRY,
-                      high: item.currentPrice / USD_TO_TRY,
-                      low: item.currentPrice / USD_TO_TRY,
-                      assetType: resolvedType,
-                    };
-                    setSelectedStock(stockLike);
-                    setTradeType(type);
-                    setIsTradeModalOpen(true);
-                  }
-                }}
-                onStopLoss={(item) => {
-                  setSelectedPortfolioItem(item);
-                  setIsStopLossModalOpen(true);
-                }}
-              />
-            ) : (
-              <TransactionHistory transactions={state.transactions} usdToTry={USD_TO_TRY} />
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Trade Modal */}
-      {selectedStock && (
-        <TradeModal
-          isOpen={isTradeModalOpen}
-          onClose={() => {
-            setIsTradeModalOpen(false);
-            setSelectedStock(null);
-          }}
-          stock={selectedStock}
-          type={tradeType}
-          usdToTry={usdToTry}
-        />
-      )}
-
-      {/* Stop-Loss Modal */}
-      {selectedPortfolioItem && (
-        <StopLossModal
-          isOpen={isStopLossModalOpen}
-          onClose={() => {
-            setIsStopLossModalOpen(false);
-            setSelectedPortfolioItem(null);
-            refreshPortfolio();
-          }}
-          portfolioItem={selectedPortfolioItem}
-          currentPrice={selectedPortfolioItem.currentPrice}
-        />
-      )}
-    </div>
-  );
-}
-
-interface ExtendedPortfolioItem extends PortfolioItem {
-  currentPriceUSD?: number;
-}
-
-function PortfolioOverview({ 
-  portfolioItems, 
-  stocks, 
-  cryptos,
-  usdToTry,
-  onTrade,
-  onStopLoss
-}: { 
-  portfolioItems: ExtendedPortfolioItem[];
-  stocks: Stock[];
-  cryptos: any[];
-  usdToTry: number;
-  onTrade: (item: ExtendedPortfolioItem, type: 'buy' | 'sell') => void;
-  onStopLoss: (item: ExtendedPortfolioItem) => void;
-}) {
-  const USD_TO_TRY = usdToTry;
-  if (portfolioItems.length === 0) {
-    return (
-      <div className="text-center py-12">
-        <ChartBarIcon className="mx-auto h-12 w-12 text-[#848e9c]" />
-        <h3 className="mt-2 text-sm font-semibold text-white">Henüz portföy yok</h3>
-        <p className="mt-1 text-sm text-[#848e9c]">İlk hisse alımınızı yaptığınızda burada görünecek.</p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="overflow-x-auto">
-      <table className="min-w-full divide-y divide-[#2b3139]">
-        <thead className="bg-[#161a1e]">
-          <tr>
-            <th className="px-6 py-3 text-left text-xs font-semibold text-[#848e9c] uppercase tracking-wider">
-              Varlık
-            </th>
-            <th className="px-6 py-3 text-right text-xs font-semibold text-[#848e9c] uppercase tracking-wider">
-              Miktar
-            </th>
-            <th className="px-6 py-3 text-right text-xs font-semibold text-[#848e9c] uppercase tracking-wider">
-              Alış Fiyatı
-            </th>
-            <th className="px-6 py-3 text-right text-xs font-semibold text-[#848e9c] uppercase tracking-wider">
-              Güncel Fiyat
-            </th>
-            <th className="px-6 py-3 text-right text-xs font-semibold text-[#848e9c] uppercase tracking-wider">
-              Toplam Değer
-            </th>
-            <th className="px-6 py-3 text-right text-xs font-semibold text-[#848e9c] uppercase tracking-wider">
-              Kâr/Zarar
-            </th>
-            <th className="px-6 py-3 text-right text-xs font-semibold text-[#848e9c] uppercase tracking-wider">
-              Değişim %
-            </th>
-            <th className="px-6 py-3 text-center text-xs font-semibold text-[#848e9c] uppercase tracking-wider">
-              İşlemler
-            </th>
-          </tr>
-        </thead>
-        <tbody className="bg-[#1e2329] divide-y divide-[#2b3139]">
-          {portfolioItems.map((item) => {
-            const isProfit = item.profitLoss >= 0;
-            const priceChange = item.averagePrice > 0 ? ((item.currentPrice - item.averagePrice) / item.averagePrice) * 100 : 0;
-            
-            return (
-              <tr key={item.symbol} className="hover:bg-[#161a1e] transition-colors">
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 bg-[#0ecb81]/10 rounded-lg flex items-center justify-center">
-                      <span className="text-sm font-bold text-[#0ecb81]">{item.symbol.slice(0,1)}</span>
-                    </div>
-                    <div>
-                      <Link 
-                        href={`/asset/${item.symbol}?type=${item.assetType || 'stock'}`}
-                        className="text-sm font-semibold text-white hover:text-[#0ecb81] transition-colors"
-                      >
-                        {item.name}
-                      </Link>
-                      <div className="text-xs text-[#848e9c]">{item.symbol}</div>
-                    </div>
-                  </div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-semibold text-white">
-                  {item.quantity.toLocaleString('tr-TR', { maximumFractionDigits: 8 })}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-white">
-                  <div>₺{item.averagePrice.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-                  <div className="text-xs text-[#848e9c]">${(item.averagePrice / USD_TO_TRY).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-white">
-                  <div className="font-semibold">₺{item.currentPrice.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-                  <div className="text-xs text-[#848e9c]">
-                    ${item.currentPriceUSD ? item.currentPriceUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : (item.currentPrice / USD_TO_TRY).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-semibold text-white">
-                  <div>₺{item.totalValue.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-                  <div className="text-xs text-[#848e9c]">${(item.totalValue / USD_TO_TRY).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-right">
-                  <div className={`flex items-center justify-end ${isProfit ? 'text-[#0ecb81]' : 'text-[#f6465d]'}`}>
-                    {isProfit ? (
-                      <ArrowTrendingUpIcon className="h-4 w-4 mr-1" />
-                    ) : (
-                      <ArrowTrendingDownIcon className="h-4 w-4 mr-1" />
-                    )}
-                    <span className="text-sm font-semibold">
-                      {isProfit ? '+' : ''}₺{item.profitLoss.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </span>
-                  </div>
-                  <div className={`text-xs ${isProfit ? 'text-[#0ecb81]' : 'text-[#f6465d]'}`}>
-                    {isProfit ? '+' : ''}${(item.profitLoss / USD_TO_TRY).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-right">
-                  <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${
-                    isProfit 
-                      ? 'bg-[#0ecb81]/10 text-[#0ecb81]' 
-                      : 'bg-[#f6465d]/10 text-[#f6465d]'
-                  }`}>
-                    {isProfit ? <ArrowUpIcon className="h-3 w-3 mr-1" /> : <ArrowDownIcon className="h-3 w-3 mr-1" />}
-                    {isProfit ? '+' : ''}{priceChange.toFixed(2)}%
-                  </span>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-center">
-                  <div className="flex items-center justify-center gap-2">
-                    <button
-                      onClick={() => onTrade(item, 'buy')}
-                      className="px-3 py-1.5 bg-[#0ecb81] hover:bg-[#0bb975] text-white text-xs font-semibold rounded-lg transition-colors"
-                    >
-                      Al
-                    </button>
-                    <button
-                      onClick={() => onTrade(item, 'sell')}
-                      className="px-3 py-1.5 bg-[#f6465d] hover:bg-[#e03e54] text-white text-xs font-semibold rounded-lg transition-colors"
-                    >
-                      Sat
-                    </button>
-                    <button
-                      onClick={() => onStopLoss(item)}
-                      className="px-3 py-1.5 bg-[#f6465d]/20 hover:bg-[#f6465d]/30 text-[#f6465d] text-xs font-semibold rounded-lg transition-colors border border-[#f6465d]/30"
-                      title="Stop-Loss Emri Oluştur"
-                    >
-                      SL
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-function TransactionHistory({ transactions, usdToTry }: { transactions: Transaction[]; usdToTry: number }) {
-  const USD_TO_TRY = usdToTry;
-  const formatDate = (date: Date) => {
-    return new Intl.DateTimeFormat('tr-TR', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    }).format(date);
-  };
-
-  if (transactions.length === 0) {
-    return (
-      <div className="text-center py-12">
-        <ClockIcon className="mx-auto h-12 w-12 text-[#848e9c]" />
-        <h3 className="mt-2 text-sm font-semibold text-white">Henüz işlem yok</h3>
-        <p className="mt-1 text-sm text-[#848e9c]">İlk alım veya satım işleminizi yaptığınızda burada görünecek.</p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="overflow-x-auto">
-      <table className="min-w-full divide-y divide-[#2b3139]">
-        <thead className="bg-[#161a1e]">
-          <tr>
-            <th className="px-6 py-3 text-left text-xs font-semibold text-[#848e9c] uppercase tracking-wider">
-              Tarih
-            </th>
-            <th className="px-6 py-3 text-left text-xs font-semibold text-[#848e9c] uppercase tracking-wider">
-              İşlem
-            </th>
-            <th className="px-6 py-3 text-left text-xs font-semibold text-[#848e9c] uppercase tracking-wider">
-              Varlık
-            </th>
-            <th className="px-6 py-3 text-right text-xs font-semibold text-[#848e9c] uppercase tracking-wider">
-              Miktar
-            </th>
-            <th className="px-6 py-3 text-right text-xs font-semibold text-[#848e9c] uppercase tracking-wider">
-              Fiyat
-            </th>
-            <th className="px-6 py-3 text-right text-xs font-semibold text-[#848e9c] uppercase tracking-wider">
-              Toplam
-            </th>
-            <th className="px-6 py-3 text-right text-xs font-semibold text-[#848e9c] uppercase tracking-wider">
-              Komisyon
-            </th>
-          </tr>
-        </thead>
-        <tbody className="bg-[#1e2329] divide-y divide-[#2b3139]">
-          {transactions.map((transaction) => (
-            <tr key={transaction.id} className="hover:bg-[#161a1e] transition-colors">
-              <td className="px-6 py-4 whitespace-nowrap text-sm text-white">
-                {formatDate(transaction.timestamp)}
-              </td>
-              <td className="px-6 py-4 whitespace-nowrap">
-                <span className={`inline-flex px-3 py-1 text-xs font-semibold rounded-full ${
-                  transaction.type === 'buy' 
-                    ? 'bg-[#0ecb81]/10 text-[#0ecb81]' 
-                    : 'bg-[#f6465d]/10 text-[#f6465d]'
-                }`}>
-                  {transaction.type === 'buy' ? 'Alım' : 'Satım'}
+                  aria-hidden="true"
+                >
+                  {t.type === 'buy' ? 'AL' : 'SAT'}
                 </span>
-              </td>
-              <td className="px-6 py-4 whitespace-nowrap">
-                <div>
-                  <div className="text-sm font-semibold text-white">{transaction.name}</div>
-                  <div className="text-sm text-[#848e9c]">{transaction.symbol}</div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm">
+                    <span className="font-mono text-[13px] font-semibold">{t.symbol}</span>{' '}
+                    <span className={t.type === 'buy' ? 'text-up' : 'text-down'}>{t.type === 'buy' ? 'Alış' : 'Satış'}</span>
+                  </p>
+                  <p className="num truncate text-xs text-muted">
+                    {formatQuantity(t.quantity)} × {formatTRY(t.price, { precise: true })} · {formatRelative(t.createdAt)}
+                  </p>
                 </div>
-              </td>
-              <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-semibold text-white">
-                {transaction.quantity.toLocaleString('tr-TR', { maximumFractionDigits: 8 })}
-              </td>
-              <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-white">
-                <div>₺{transaction.price.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-                <div className="text-xs text-[#848e9c]">${(transaction.price / USD_TO_TRY).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-              </td>
-              <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-semibold text-white">
-                <div>₺{transaction.totalAmount.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-                <div className="text-xs text-[#848e9c]">${(transaction.totalAmount / USD_TO_TRY).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-              </td>
-              <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-[#848e9c]">
-                ₺{transaction.commission.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </td>
-            </tr>
+                <span className="num text-sm font-medium">{formatTRY(t.netAmount)}</span>
+              </Link>
+            </li>
           ))}
-        </tbody>
-      </table>
-    </div>
+        </ul>
+      )}
+    </Card>
   );
 }

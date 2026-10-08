@@ -1,434 +1,362 @@
+import { PoolClient } from 'pg';
 import pool from '../config/database';
-import { PortfolioItem, Transaction } from '../types';
+import { AssetType, PortfolioItem, Transaction, mapPortfolioRow, mapTransactionRow, toNumber } from '../types';
+import { AppError } from '../utils/errors';
+import { ExecutionPrice, PricingService } from './pricing';
 
-const COMMISSION_RATE = 0.0025; // %0.25 komisyon
+export const COMMISSION_RATE = 0.0025; // %0.25 komisyon
+/** Bu miktarın altındaki kalan pozisyon "sıfır" kabul edilir (NUMERIC(20,8) çözünürlüğü) */
+const QUANTITY_EPSILON = 1e-8;
+/** En küçük işlem tutarı (TL) */
+const MIN_TRADE_TRY = 0.01;
 
 export interface BuyRequest {
   symbol: string;
-  name: string;
-  asset_type: 'crypto' | 'stock' | 'commodity' | 'currency';
+  asset_type: AssetType;
   quantity: number;
-  price: number;
 }
 
 export interface SellRequest {
   symbol: string;
+  /** Opsiyonel (geriye dönük uyumluluk): yoksa sembolle eşleşen TEK varlık kullanılır */
+  asset_type?: AssetType;
   quantity: number;
 }
 
-export class TransactionService {
-  // Alış işlemi
-  static async buy(userId: string, data: BuyRequest): Promise<{ success: boolean; message?: string; transaction?: Transaction; portfolioItem?: PortfolioItem }> {
-    const client = await pool.connect();
-    
-    try {
-      await client.query('BEGIN');
+export interface TradeResult {
+  success: true;
+  message: string;
+  transaction: Transaction;
+  portfolioItem?: PortfolioItem;
+  executedPrice: number;
+  /**
+   * opts.client ile çağrıldığında aktivite logu/rozet kontrolü otomatik yapılmaz;
+   * çağıran COMMIT'ten sonra bunu çağırmalıdır.
+   */
+  postCommit?: () => void;
+}
 
-      // Kullanıcı bilgilerini al
-      const userResult = await client.query(
-        'SELECT balance FROM users WHERE id = $1',
-        [userId]
-      );
+export interface SellOptions {
+  /** Var olan bir transaction içinde çalış (BEGIN/COMMIT çağıran sorumludur) */
+  client?: PoolClient;
+  /** Önceden hesaplanmış işlem fiyatı (örn. stop-loss) */
+  quote?: ExecutionPrice;
+  /** İstenen miktar eldekinden fazlaysa eldeki miktara indir */
+  capToHolding?: boolean;
+  /** Aktivite logu açıklaması için kaynak */
+  source?: 'user' | 'stop_loss';
+}
 
-      if (userResult.rows.length === 0) {
-        await client.query('ROLLBACK');
-        return { success: false, message: 'Kullanıcı bulunamadı' };
-      }
+const round2 = (n: number) => Math.round(n * 100) / 100;
+const ceil2 = (n: number) => Math.ceil(n * 100 - 1e-7) / 100;
+const floor2 = (n: number) => Math.floor(n * 100 + 1e-7) / 100;
+/** Miktarı 8 ondalığa (DB hassasiyeti) aşağı yuvarla */
+const floorQty = (n: number) => Math.floor(n * 1e8 + 1e-6) / 1e8;
 
-      const user = userResult.rows[0];
-      const totalAmount = data.quantity * data.price;
-      const commission = totalAmount * COMMISSION_RATE;
-      const netAmount = totalAmount + commission;
+const insufficient = (msg: string) => new AppError(400, msg, 'TRADE_REJECTED');
 
-      // Bakiye kontrolü
-      if (parseFloat(user.balance) < netAmount) {
-        await client.query('ROLLBACK');
-        return { success: false, message: 'Yetersiz bakiye' };
-      }
-
-      // İşlemi kaydet
-      console.log('📝 Transaction kaydediliyor:', {
-        userId,
-        symbol: data.symbol,
-        name: data.name,
-        asset_type: data.asset_type,
-        quantity: data.quantity,
-        price: data.price,
-        totalAmount,
-        commission,
-        netAmount
-      });
-
-      const transactionResult = await client.query(
-        `INSERT INTO transactions (user_id, type, symbol, name, asset_type, quantity, price, total_amount, commission, net_amount)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-         RETURNING *`,
-        [
-          userId,
-          'buy',
-          data.symbol,
-          data.name,
-          data.asset_type,
-          data.quantity,
-          data.price,
-          totalAmount,
-          commission,
-          netAmount
-        ]
-      );
-
-      const transaction = transactionResult.rows[0];
-      console.log('✅ Transaction başarıyla kaydedildi:', transaction.id);
-
-      // Bakiyeyi güncelle
-      await client.query(
-        'UPDATE users SET balance = balance - $1 WHERE id = $2',
-        [netAmount, userId]
-      );
-
-      // Portföy öğesini güncelle veya oluştur
-      const portfolioResult = await client.query(
-        `SELECT * FROM portfolio_items WHERE user_id = $1 AND symbol = $2 AND asset_type = $3`,
-        [userId, data.symbol, data.asset_type]
-      );
-
-      if (portfolioResult.rows.length > 0) {
-        // Mevcut portföy öğesini güncelle
-        const existingItem = portfolioResult.rows[0];
-        const totalQuantity = parseFloat(existingItem.quantity) + data.quantity;
-        const totalCost = (parseFloat(existingItem.average_price) * parseFloat(existingItem.quantity)) + totalAmount;
-        const newAveragePrice = totalCost / totalQuantity;
-
-        await client.query(
-          `UPDATE portfolio_items 
-           SET quantity = $1, average_price = $2, current_price = $3, updated_at = CURRENT_TIMESTAMP
-           WHERE user_id = $4 AND symbol = $5 AND asset_type = $6`,
-          [totalQuantity, newAveragePrice, data.price, userId, data.symbol, data.asset_type]
-        );
-      } else {
-        // Yeni portföy öğesi oluştur
-        await client.query(
-          `INSERT INTO portfolio_items (user_id, symbol, name, asset_type, quantity, average_price, current_price)
-           VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-          [userId, data.symbol, data.name, data.asset_type, data.quantity, data.price, data.price]
-        );
-      }
-
-      // Portföy değerlerini güncelle
-      await this.updatePortfolioValue(userId, client);
-
-      console.log('💾 Alış transaction commit ediliyor...');
-      await client.query('COMMIT');
-      console.log('✅ Alış transaction başarıyla commit edildi');
-
-      // Activity log kaydı (asenkron, hata olsa bile devam et)
-      setImmediate(async () => {
-        try {
-          const { ActivityLogService } = await import('./activityLog');
-          await ActivityLogService.createLog({
-            user_id: userId,
-            activity_type: 'buy',
-            description: `${data.quantity} adet ${data.name} (${data.symbol}) alındı`,
-            metadata: {
-              symbol: data.symbol,
-              name: data.name,
-              asset_type: data.asset_type,
-              quantity: data.quantity,
-              price: data.price,
-              total_amount: totalAmount,
-              commission,
-              net_amount: netAmount,
-              transaction_id: transaction.id
-            }
-          });
-        } catch (error) {
-          console.error('Activity log error:', error);
-        }
-      });
-
-      // Rozet kontrolü (asenkron, hata olsa bile devam et)
-      setImmediate(async () => {
-        try {
-          const { BadgeService } = await import('./badges');
-          await BadgeService.checkAndAwardBadges(userId);
-        } catch (error) {
-          console.error('Badge check error:', error);
-        }
-      });
-
-      // Güncellenmiş portföy öğesini al
-      const updatedPortfolioResult = await client.query(
-        `SELECT * FROM portfolio_items WHERE user_id = $1 AND symbol = $2 AND asset_type = $3`,
-        [userId, data.symbol, data.asset_type]
-      );
-
-      return {
-        success: true,
-        transaction: {
-          id: transaction.id,
-          user_id: transaction.user_id,
-          type: transaction.type,
-          symbol: transaction.symbol,
-          name: transaction.name,
-          asset_type: transaction.asset_type,
-          quantity: parseFloat(transaction.quantity),
-          price: parseFloat(transaction.price),
-          total_amount: parseFloat(transaction.total_amount),
-          commission: parseFloat(transaction.commission),
-          net_amount: parseFloat(transaction.net_amount),
-          created_at: transaction.created_at
-        },
-        portfolioItem: updatedPortfolioResult.rows[0] ? {
-          id: updatedPortfolioResult.rows[0].id,
-          user_id: updatedPortfolioResult.rows[0].user_id,
-          symbol: updatedPortfolioResult.rows[0].symbol,
-          name: updatedPortfolioResult.rows[0].name,
-          asset_type: updatedPortfolioResult.rows[0].asset_type,
-          quantity: parseFloat(updatedPortfolioResult.rows[0].quantity),
-          average_price: parseFloat(updatedPortfolioResult.rows[0].average_price),
-          current_price: parseFloat(updatedPortfolioResult.rows[0].current_price),
-          total_value: parseFloat(updatedPortfolioResult.rows[0].total_value || 0),
-          profit_loss: parseFloat(updatedPortfolioResult.rows[0].profit_loss || 0),
-          profit_loss_percent: parseFloat(updatedPortfolioResult.rows[0].profit_loss_percent || 0),
-          created_at: updatedPortfolioResult.rows[0].created_at,
-          updated_at: updatedPortfolioResult.rows[0].updated_at
-        } : undefined
-      };
-    } catch (error: any) {
-      await client.query('ROLLBACK');
-      console.error('❌ Buy transaction error:', error);
-      console.error('Error details:', {
-        code: error.code,
-        message: error.message,
-        detail: error.detail,
-        stack: error.stack
-      });
-      return { 
-        success: false, 
-        message: error.message || 'İşlem sırasında bir hata oluştu' 
-      };
-    } finally {
-      client.release();
-    }
+async function withTransaction<T>(existing: PoolClient | undefined, fn: (client: PoolClient) => Promise<T>): Promise<T> {
+  if (existing) {
+    return fn(existing);
   }
-
-  // Satış işlemi
-  static async sell(userId: string, data: SellRequest): Promise<{ success: boolean; message?: string; transaction?: Transaction; portfolioItem?: PortfolioItem }> {
-    const client = await pool.connect();
-    
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const result = await fn(client);
+    await client.query('COMMIT');
+    return result;
+  } catch (err) {
     try {
-      await client.query('BEGIN');
-
-      // Portföy öğesini kontrol et
-      const portfolioResult = await client.query(
-        `SELECT * FROM portfolio_items WHERE user_id = $1 AND symbol = $2`,
-        [userId, data.symbol]
-      );
-
-      if (portfolioResult.rows.length === 0) {
-        await client.query('ROLLBACK');
-        return { success: false, message: 'Portföyde bu varlık bulunamadı' };
-      }
-
-      const portfolioItem = portfolioResult.rows[0];
-
-      // Miktar kontrolü
-      if (parseFloat(portfolioItem.quantity) < data.quantity) {
-        await client.query('ROLLBACK');
-        return { success: false, message: 'Yetersiz miktar' };
-      }
-
-      // Güncel fiyatı al (portföy öğesindeki current_price kullanılır)
-      const currentPrice = parseFloat(portfolioItem.current_price);
-      const totalAmount = data.quantity * currentPrice;
-      const commission = totalAmount * COMMISSION_RATE;
-      const netAmount = totalAmount - commission;
-
-      // İşlemi kaydet
-      console.log('📝 Satış transaction kaydediliyor:', {
-        userId,
-        symbol: portfolioItem.symbol,
-        name: portfolioItem.name,
-        asset_type: portfolioItem.asset_type,
-        quantity: data.quantity,
-        price: currentPrice,
-        totalAmount,
-        commission,
-        netAmount
-      });
-
-      const transactionResult = await client.query(
-        `INSERT INTO transactions (user_id, type, symbol, name, asset_type, quantity, price, total_amount, commission, net_amount)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-         RETURNING *`,
-        [
-          userId,
-          'sell',
-          portfolioItem.symbol,
-          portfolioItem.name,
-          portfolioItem.asset_type,
-          data.quantity,
-          currentPrice,
-          totalAmount,
-          commission,
-          netAmount
-        ]
-      );
-
-      const transaction = transactionResult.rows[0];
-      console.log('✅ Satış transaction başarıyla kaydedildi:', transaction.id);
-
-      // Bakiyeyi güncelle
-      await client.query(
-        'UPDATE users SET balance = balance + $1 WHERE id = $2',
-        [netAmount, userId]
-      );
-
-      // Portföy öğesini güncelle
-      const newQuantity = parseFloat(portfolioItem.quantity) - data.quantity;
-
-      if (newQuantity <= 0) {
-        // Tüm varlık satıldıysa portföy öğesini sil
-        await client.query(
-          'DELETE FROM portfolio_items WHERE user_id = $1 AND symbol = $2 AND asset_type = $3',
-          [userId, data.symbol, portfolioItem.asset_type]
-        );
-      } else {
-        // Kısmi satış - miktarı güncelle
-        await client.query(
-          `UPDATE portfolio_items 
-           SET quantity = $1, updated_at = CURRENT_TIMESTAMP
-           WHERE user_id = $2 AND symbol = $3 AND asset_type = $4`,
-          [newQuantity, userId, data.symbol, portfolioItem.asset_type]
-        );
-      }
-
-      // Portföy değerlerini güncelle
-      await this.updatePortfolioValue(userId, client);
-
-      console.log('💾 Satış transaction commit ediliyor...');
-      await client.query('COMMIT');
-      console.log('✅ Satış transaction başarıyla commit edildi');
-
-      // Activity log kaydı (asenkron, hata olsa bile devam et)
-      setImmediate(async () => {
-        try {
-          const { ActivityLogService } = await import('./activityLog');
-          await ActivityLogService.createLog({
-            user_id: userId,
-            activity_type: 'sell',
-            description: `${data.quantity} adet ${portfolioItem.name} (${portfolioItem.symbol}) satıldı`,
-            metadata: {
-              symbol: portfolioItem.symbol,
-              name: portfolioItem.name,
-              asset_type: portfolioItem.asset_type,
-              quantity: data.quantity,
-              price: currentPrice,
-              total_amount: totalAmount,
-              commission,
-              net_amount: netAmount,
-              transaction_id: transaction.id
-            }
-          });
-        } catch (error) {
-          console.error('Activity log error:', error);
-        }
-      });
-
-      // Rozet kontrolü (asenkron, hata olsa bile devam et)
-      setImmediate(async () => {
-        try {
-          const { BadgeService } = await import('./badges');
-          await BadgeService.checkAndAwardBadges(userId);
-        } catch (error) {
-          console.error('Badge check error:', error);
-        }
-      });
-
-      return {
-        success: true,
-        transaction: {
-          id: transaction.id,
-          user_id: transaction.user_id,
-          type: transaction.type,
-          symbol: transaction.symbol,
-          name: transaction.name,
-          asset_type: transaction.asset_type,
-          quantity: parseFloat(transaction.quantity),
-          price: parseFloat(transaction.price),
-          total_amount: parseFloat(transaction.total_amount),
-          commission: parseFloat(transaction.commission),
-          net_amount: parseFloat(transaction.net_amount),
-          created_at: transaction.created_at
-        }
-      };
-    } catch (error: any) {
       await client.query('ROLLBACK');
-      console.error('❌ Sell transaction error:', error);
-      console.error('Error details:', {
-        code: error.code,
-        message: error.message,
-        detail: error.detail,
-        stack: error.stack
-      });
-      return { 
-        success: false, 
-        message: error.message || 'İşlem sırasında bir hata oluştu' 
-      };
-    } finally {
-      client.release();
+    } catch {
+      /* yut */
     }
-  }
-
-  // Portföy değerlerini güncelle
-  private static async updatePortfolioValue(userId: string, client: any): Promise<void> {
-    // Portföy öğelerini al ve değerleri hesapla
-    const portfolioResult = await client.query(
-      `SELECT quantity, current_price, average_price, symbol, asset_type 
-       FROM portfolio_items 
-       WHERE user_id = $1`,
-      [userId]
-    );
-
-    let totalPortfolioValue = 0;
-    let totalProfitLoss = 0;
-
-    for (const item of portfolioResult.rows) {
-      const quantity = parseFloat(item.quantity);
-      const currentPrice = parseFloat(item.current_price);
-      const averagePrice = parseFloat(item.average_price);
-      const symbol = item.symbol;
-      const assetType = item.asset_type;
-      
-      const value = quantity * currentPrice;
-      const profitLoss = (currentPrice - averagePrice) * quantity;
-
-      totalPortfolioValue += value;
-      totalProfitLoss += profitLoss;
-
-      // Portföy öğesinin değerlerini güncelle
-      await client.query(
-        `UPDATE portfolio_items 
-         SET total_value = $1, profit_loss = $2, profit_loss_percent = $3, updated_at = CURRENT_TIMESTAMP
-         WHERE user_id = $4 AND symbol = $5 AND asset_type = $6`,
-        [
-          value,
-          profitLoss,
-          averagePrice > 0 ? ((currentPrice - averagePrice) / averagePrice) * 100 : 0,
-          userId,
-          symbol,
-          assetType
-        ]
-      );
-    }
-
-    // Kullanıcının portföy değerini güncelle
-    await client.query(
-      `UPDATE users 
-       SET portfolio_value = $1, total_profit_loss = $2 
-       WHERE id = $3`,
-      [totalPortfolioValue, totalProfitLoss, userId]
-    );
+    throw err;
+  } finally {
+    client.release();
   }
 }
 
+function afterCommit(userId: string, log: { activity_type: 'buy' | 'sell'; description: string; metadata: Record<string, unknown> }) {
+  setImmediate(async () => {
+    try {
+      const { ActivityLogService } = await import('./activityLog');
+      await ActivityLogService.createLog({ user_id: userId, ...log });
+    } catch (error: any) {
+      console.error('[trade] Activity log error:', error?.message);
+    }
+    try {
+      const { BadgeService } = await import('./badges');
+      await BadgeService.checkAndAwardBadges(userId);
+    } catch (error: any) {
+      console.error('[trade] Badge check error:', error?.message);
+    }
+  });
+}
+
+export class TransactionService {
+  /**
+   * Alış. Fiyat SUNUCU tarafından belirlenir (istemcinin gönderdiği fiyat/isim yok sayılır).
+   * Kullanıcı satırı ve portföy satırı FOR UPDATE ile kilitlenir; tek transaction.
+   */
+  static async buy(userId: string, data: BuyRequest): Promise<TradeResult> {
+    const symbol = data.symbol.trim().toUpperCase();
+    const quantity = floorQty(data.quantity);
+    if (!(quantity > 0)) {
+      throw insufficient('Miktar çok küçük');
+    }
+
+    // Fiyatı transaction dışında al (ağ çağrısı olabilir); kilitleri kısa tut
+    const quote = await PricingService.getExecutionPriceTRY(symbol, data.asset_type);
+    const price = quote.priceTRY;
+
+    const totalAmount = ceil2(quantity * price);
+    if (totalAmount < MIN_TRADE_TRY) {
+      throw insufficient('İşlem tutarı çok küçük');
+    }
+    const commission = ceil2(totalAmount * COMMISSION_RATE);
+    const netAmount = round2(totalAmount + commission);
+
+    const { transaction, portfolioItem } = await withTransaction(undefined, async (client) => {
+      const userRes = await client.query('SELECT id, balance FROM users WHERE id = $1 FOR UPDATE', [userId]);
+      if (userRes.rows.length === 0) {
+        throw new AppError(404, 'Kullanıcı bulunamadı', 'USER_NOT_FOUND');
+      }
+      if (toNumber(userRes.rows[0].balance) < netAmount) {
+        throw insufficient('Yetersiz bakiye');
+      }
+
+      // Mevcut pozisyonu kilitle (varsa)
+      await client.query(
+        `SELECT id FROM portfolio_items WHERE user_id = $1 AND UPPER(symbol) = $2 AND asset_type = $3 FOR UPDATE`,
+        [userId, symbol, data.asset_type]
+      );
+
+      const txRes = await client.query(
+        `INSERT INTO transactions (user_id, type, symbol, name, asset_type, quantity, price, total_amount, commission, net_amount)
+         VALUES ($1, 'buy', $2, $3, $4, $5, $6, $7, $8, $9)
+         RETURNING *`,
+        [userId, symbol, quote.name, data.asset_type, quantity, price, totalAmount, commission, netAmount]
+      );
+
+      const balRes = await client.query(
+        'UPDATE users SET balance = balance - $1 WHERE id = $2 AND balance >= $1 RETURNING balance',
+        [netAmount, userId]
+      );
+      if (balRes.rowCount === 0) {
+        throw insufficient('Yetersiz bakiye');
+      }
+
+      // Pozisyonu oluştur veya göreli güncelle (ortalama maliyet = toplam maliyet / toplam miktar)
+      const itemRes = await client.query(
+        `INSERT INTO portfolio_items (user_id, symbol, name, asset_type, quantity, average_price, current_price)
+         VALUES ($1, $2, $3, $4, $5, $6, $6)
+         ON CONFLICT (user_id, symbol, asset_type) DO UPDATE SET
+           average_price = (portfolio_items.average_price * portfolio_items.quantity + $7)
+                           / (portfolio_items.quantity + EXCLUDED.quantity),
+           quantity      = portfolio_items.quantity + EXCLUDED.quantity,
+           current_price = EXCLUDED.current_price,
+           name          = EXCLUDED.name,
+           updated_at    = CURRENT_TIMESTAMP
+         RETURNING id`,
+        [userId, symbol, quote.name, data.asset_type, quantity, price, totalAmount]
+      );
+
+      await this.recalculateUserPortfolio(userId, client);
+
+      const fresh = await client.query('SELECT * FROM portfolio_items WHERE id = $1', [itemRes.rows[0].id]);
+      return {
+        transaction: mapTransactionRow(txRes.rows[0]),
+        portfolioItem: fresh.rows[0] ? mapPortfolioRow(fresh.rows[0]) : undefined,
+      };
+    });
+
+    afterCommit(userId, {
+      activity_type: 'buy',
+      description: `${quantity} adet ${quote.name} (${symbol}) alındı`,
+      metadata: {
+        symbol,
+        name: quote.name,
+        asset_type: data.asset_type,
+        quantity,
+        price,
+        total_amount: totalAmount,
+        commission,
+        net_amount: netAmount,
+        transaction_id: transaction.id,
+      },
+    });
+
+    return {
+      success: true,
+      message: 'Alış işlemi başarılı',
+      transaction,
+      portfolioItem,
+      executedPrice: transaction.price,
+    };
+  }
+
+  /**
+   * Satış. Fiyat SUNUCU tarafından belirlenir.
+   * opts.client verilirse çağıranın transaction'ı içinde çalışır (stop-loss).
+   */
+  static async sell(userId: string, data: SellRequest, opts: SellOptions = {}): Promise<TradeResult> {
+    const symbol = data.symbol.trim().toUpperCase();
+    let requestedQty = floorQty(data.quantity);
+    if (!(requestedQty > 0)) {
+      throw insufficient('Miktar çok küçük');
+    }
+
+    // asset_type verilmemişse (eski istemciler) sembolle eşleşen tek varlığı bul
+    let assetType = data.asset_type;
+    if (!assetType) {
+      const q = opts.client ?? pool;
+      const matches = await q.query(
+        'SELECT DISTINCT asset_type FROM portfolio_items WHERE user_id = $1 AND UPPER(symbol) = $2',
+        [userId, symbol]
+      );
+      if (matches.rows.length === 0) {
+        throw insufficient('Portföyde bu varlık bulunamadı');
+      }
+      if (matches.rows.length > 1) {
+        throw new AppError(400, 'Bu sembol için birden fazla varlık var; asset_type belirtin', 'ASSET_TYPE_REQUIRED');
+      }
+      assetType = matches.rows[0].asset_type as AssetType;
+    }
+    const resolvedType: AssetType = assetType;
+
+    const quote = opts.quote ?? (await PricingService.getExecutionPriceTRY(symbol, resolvedType));
+    const price = quote.priceTRY;
+
+    const result = await withTransaction(opts.client, async (client) => {
+      const userRes = await client.query('SELECT id FROM users WHERE id = $1 FOR UPDATE', [userId]);
+      if (userRes.rows.length === 0) {
+        throw new AppError(404, 'Kullanıcı bulunamadı', 'USER_NOT_FOUND');
+      }
+
+      const itemRes = await client.query(
+        `SELECT * FROM portfolio_items
+          WHERE user_id = $1 AND UPPER(symbol) = $2 AND asset_type = $3
+          FOR UPDATE`,
+        [userId, symbol, resolvedType]
+      );
+      if (itemRes.rows.length === 0) {
+        throw insufficient('Portföyde bu varlık bulunamadı');
+      }
+      const item = itemRes.rows[0];
+      const held = toNumber(item.quantity);
+
+      if (requestedQty > held + QUANTITY_EPSILON / 2) {
+        if (opts.capToHolding) {
+          requestedQty = held;
+        } else {
+          throw insufficient('Yetersiz miktar');
+        }
+      }
+      const quantity = Math.min(requestedQty, held);
+      if (!(quantity > 0)) {
+        throw insufficient('Yetersiz miktar');
+      }
+
+      const totalAmount = floor2(quantity * price);
+      if (totalAmount < MIN_TRADE_TRY) {
+        throw insufficient('İşlem tutarı çok küçük');
+      }
+      const commission = ceil2(totalAmount * COMMISSION_RATE);
+      const netAmount = round2(totalAmount - commission);
+
+      const txRes = await client.query(
+        `INSERT INTO transactions (user_id, type, symbol, name, asset_type, quantity, price, total_amount, commission, net_amount)
+         VALUES ($1, 'sell', $2, $3, $4, $5, $6, $7, $8, $9)
+         RETURNING *`,
+        [userId, item.symbol, item.name, item.asset_type, quantity, price, totalAmount, commission, netAmount]
+      );
+
+      await client.query('UPDATE users SET balance = balance + $1 WHERE id = $2', [netAmount, userId]);
+
+      let portfolioItem: PortfolioItem | undefined;
+      if (held - quantity < QUANTITY_EPSILON) {
+        // Pozisyon kapandı (stop_loss_orders FK ON DELETE CASCADE ile ilgili emirler de silinir)
+        await client.query('DELETE FROM portfolio_items WHERE id = $1', [item.id]);
+      } else {
+        const upd = await client.query(
+          `UPDATE portfolio_items
+              SET quantity = quantity - $1, current_price = $2, updated_at = CURRENT_TIMESTAMP
+            WHERE id = $3
+            RETURNING *`,
+          [quantity, price, item.id]
+        );
+        portfolioItem = upd.rows[0] ? mapPortfolioRow(upd.rows[0]) : undefined;
+      }
+
+      await this.recalculateUserPortfolio(userId, client);
+
+      if (portfolioItem) {
+        const fresh = await client.query('SELECT * FROM portfolio_items WHERE id = $1', [portfolioItem.id]);
+        portfolioItem = fresh.rows[0] ? mapPortfolioRow(fresh.rows[0]) : portfolioItem;
+      }
+
+      return { transaction: mapTransactionRow(txRes.rows[0]), portfolioItem, item, quantity, totalAmount, commission, netAmount };
+    });
+
+    const { transaction, portfolioItem, item, quantity, totalAmount, commission, netAmount } = result;
+    const logEntry = {
+      activity_type: 'sell' as const,
+      description:
+        opts.source === 'stop_loss'
+          ? `Stop-loss tetiklendi: ${quantity} adet ${item.name} (${item.symbol}) satıldı`
+          : `${quantity} adet ${item.name} (${item.symbol}) satıldı`,
+      metadata: {
+        symbol: item.symbol,
+        name: item.name,
+        asset_type: item.asset_type,
+        quantity,
+        price,
+        total_amount: totalAmount,
+        commission,
+        net_amount: netAmount,
+        transaction_id: transaction.id,
+        ...(opts.source === 'stop_loss' ? { source: 'stop_loss' } : {}),
+      },
+    };
+
+    const response: TradeResult = {
+      success: true,
+      message: 'Satış işlemi başarılı',
+      transaction,
+      portfolioItem,
+      executedPrice: transaction.price,
+    };
+
+    if (opts.client) {
+      // Çağıranın transaction'ı henüz commit edilmedi
+      response.postCommit = () => afterCommit(userId, logEntry);
+    } else {
+      afterCommit(userId, logEntry);
+    }
+    return response;
+  }
+
+  /** Kullanıcının tüm pozisyonlarının değer/K-Z alanlarını ve users özet alanlarını yeniden hesaplar. */
+  static async recalculateUserPortfolio(userId: string, client: PoolClient): Promise<void> {
+    await client.query(
+      `UPDATE portfolio_items
+          SET total_value = quantity * current_price,
+              profit_loss = (current_price - average_price) * quantity,
+              profit_loss_percent = CASE WHEN average_price > 0
+                                         THEN ((current_price - average_price) / average_price) * 100
+                                         ELSE 0 END
+        WHERE user_id = $1`,
+      [userId]
+    );
+    await client.query(
+      `UPDATE users u
+          SET portfolio_value   = COALESCE(s.tv, 0),
+              total_profit_loss = COALESCE(s.pl, 0)
+         FROM (SELECT SUM(total_value) AS tv, SUM(profit_loss) AS pl
+                 FROM portfolio_items WHERE user_id = $1) s
+        WHERE u.id = $1`,
+      [userId]
+    );
+  }
+}

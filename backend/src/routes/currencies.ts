@@ -1,90 +1,65 @@
 import express from 'express';
-import { CurrencyService } from '../services/currency';
+import { CurrencyService, CurrencyRate } from '../services/currency';
+import { authenticateToken } from '../middleware/auth';
+import { isAdmin } from '../middleware/admin';
+import { asyncHandler, badRequest } from '../utils/errors';
 
 const router = express.Router();
 
+/** Döviz fiyatları TL / birim cinsindendir; `price` = satış kuru */
+const toCurrencyDto = (p: CurrencyRate) => ({
+  code: p.code,
+  name: p.name,
+  buying: p.buying,
+  selling: p.selling,
+  price: p.selling,
+  change_rate: p.changeRate,
+  datetime: p.datetime,
+});
+
 /** Tüm döviz kurları (DB'den) */
-router.get('/', async (req, res) => {
-  try {
+router.get(
+  '/',
+  asyncHandler(async (_req, res) => {
     const rates = await CurrencyService.getFromDb();
-    res.json({
-      success: true,
-      data: rates.map(p => ({
-        code: p.code,
-        name: p.name,
-        buying: p.buying,
-        selling: p.selling,
-        price: p.selling,
-        change_rate: p.changeRate,
-        datetime: p.datetime,
-      })),
-    });
-  } catch (error) {
-    console.error('Currencies route error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Döviz verileri alinamadi',
-      error: error instanceof Error ? error.message : 'Bilinmeyen hata',
-    });
-  }
-});
+    res.json({ success: true, data: rates.map(toCurrencyDto) });
+  })
+);
 
-/** Döviz listesi (API'den - 0 kredi) */
-router.get('/list', async (req, res) => {
-  try {
-    const list = await CurrencyService.getList();
-    res.json({ success: true, data: list });
-  } catch (error) {
-    console.error('Currencies list error:', error);
-    res.status(500).json({ success: false, message: 'Döviz listesi alinamadi' });
-  }
-});
+/** Döviz listesi: DB'deki kodlar (API'ye gitmez) */
+router.get(
+  '/list',
+  asyncHandler(async (_req, res) => {
+    const rates = await CurrencyService.getFromDb();
+    res.json({ success: true, data: rates.map((r) => ({ code: r.code, name: r.name })) });
+  })
+);
 
-/** Tek döviz (DB'den) */
-router.get('/:code', async (req, res) => {
-  try {
-    const { code } = req.params;
-    const rate = await CurrencyService.getFromDbByCode(code);
-
-    if (!rate) {
-      return res.status(404).json({ success: false, message: 'Döviz bulunamadi' });
-    }
-
-    res.json({
-      success: true,
-      data: {
-        code: rate.code,
-        name: rate.name,
-        buying: rate.buying,
-        selling: rate.selling,
-        price: rate.selling,
-        change_rate: rate.changeRate,
-        datetime: rate.datetime,
-      },
-    });
-  } catch (error) {
-    console.error('Currency route error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Döviz verisi alinamadi',
-      error: error instanceof Error ? error.message : 'Bilinmeyen hata',
-    });
-  }
-});
-
-/** Manuel refresh (API'den çekip DB'ye kaydet) */
-router.post('/refresh', async (req, res) => {
-  try {
+/** Manuel yenileme (API kotası harcar) — sadece admin. /:code'dan ÖNCE tanımlı. */
+router.post(
+  '/refresh',
+  authenticateToken,
+  isAdmin,
+  asyncHandler(async (_req, res) => {
     const count = await CurrencyService.fetchAndSaveToDb();
     res.json({ success: true, message: `${count} döviz güncellendi` });
-  } catch (error) {
-    console.error('Currency refresh error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Döviz güncellemesi basarisiz',
-      error: error instanceof Error ? error.message : 'Bilinmeyen hata',
-    });
-  }
-});
+  })
+);
+
+/** Tek döviz (DB'den) */
+router.get(
+  '/:code',
+  asyncHandler(async (req, res) => {
+    const code = String(req.params.code || '').toUpperCase();
+    if (!/^[A-Z0-9_\-]{1,20}$/.test(code)) {
+      throw badRequest('Geçersiz döviz kodu');
+    }
+    const rate = await CurrencyService.getFromDbByCode(code);
+    if (!rate) {
+      return res.status(404).json({ success: false, message: 'Döviz bulunamadı' });
+    }
+    res.json({ success: true, data: toCurrencyDto(rate) });
+  })
+);
 
 export default router;

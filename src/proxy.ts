@@ -1,65 +1,25 @@
-import { NextResponse } from 'next/server';
-import type { NextRequest } from 'next/server';
+import { NextResponse, type NextRequest } from 'next/server';
 
-// Korumalı sayfalar (giriş gerektiren)
-const protectedRoutes = [
-  '/',
-  '/portfolio',
-  '/transactions',
-  '/leaderboard',
-  '/profile',
-  '/admin'
-];
+// Oturum gerektiren sayfalar. Burada yalnızca çerezin varlığına bakılır;
+// gerçek yetki kontrolü her istekte backend tarafından yapılır.
+const PROTECTED = ['/', '/portfolio', '/transactions', '/leaderboard', '/news', '/profile', '/admin'];
 
-// Genel sayfalar (giriş gerektirmeyen)
-const publicRoutes = [
-  '/login',
-  '/register',
-  '/verify-email'
-];
+function isProtected(pathname: string) {
+  return PROTECTED.some((p) => (p === '/' ? pathname === '/' : pathname === p || pathname.startsWith(`${p}/`))) || pathname.startsWith('/asset/');
+}
 
-export function middleware(request: NextRequest) {
-  const { pathname } = request.nextUrl;
-  
-  // API route'ları için kontrol yapma
-  if (pathname.startsWith('/api/')) {
-    return NextResponse.next();
+export function proxy(request: NextRequest) {
+  const { pathname, search } = request.nextUrl;
+  if (!isProtected(pathname)) return NextResponse.next();
+
+  if (!request.cookies.get('token')?.value) {
+    const url = new URL('/login', request.url);
+    url.searchParams.set('redirect', pathname + search);
+    return NextResponse.redirect(url);
   }
-  
-  // Public route'lar için kontrol yapma
-  if (publicRoutes.includes(pathname)) {
-    // Eğer zaten giriş yapmışsa ana sayfaya yönlendir
-    const token = request.cookies.get('token')?.value;
-    if (token) {
-      return NextResponse.redirect(new URL('/', request.url));
-    }
-    return NextResponse.next();
-  }
-  
-  // Korumalı route'lar için token kontrolü
-  if (protectedRoutes.includes(pathname)) {
-    const token = request.cookies.get('token')?.value;
-    
-    if (!token) {
-      // Token yoksa login sayfasına yönlendir
-      const loginUrl = new URL('/login', request.url);
-      loginUrl.searchParams.set('redirect', pathname);
-      return NextResponse.redirect(loginUrl);
-    }
-  }
-  
   return NextResponse.next();
 }
 
 export const config = {
-  matcher: [
-    /*
-     * Match all request paths except for the ones starting with:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * - public folder
-     */
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
-  ],
+  matcher: ['/((?!api|_next/static|_next/image|favicon.ico|fav.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)'],
 };

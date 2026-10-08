@@ -1,26 +1,22 @@
 import express from 'express';
 import { NewsService } from '../services/news';
+import { asyncHandler } from '../utils/errors';
+import { parseOrThrow, limitSchema } from '../utils/validation';
 
 const router = express.Router();
 
-router.get('/', async (req, res) => {
-  try {
-    const limit = parseInt(req.query.limit as string) || 10;
-    const news = await NewsService.getNews(limit);
-
-    res.json({
-      success: true,
-      data: news,
-      count: news.length,
-    });
-  } catch (error) {
-    console.error('News route error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Haberler alınamadı',
-      error: error instanceof Error ? error.message : 'Bilinmeyen hata',
-    });
-  }
-});
+router.get(
+  '/',
+  asyncHandler(async (req, res) => {
+    const { limit } = parseOrThrow(limitSchema(10, 50), req.query);
+    try {
+      const news = await NewsService.getNews(limit);
+      res.json({ success: true, data: news, count: news.length });
+    } catch (error: any) {
+      console.error('[news] RSS alınamadı:', error?.message);
+      res.status(502).json({ success: false, message: 'Haberler alınamadı' });
+    }
+  })
+);
 
 export default router;

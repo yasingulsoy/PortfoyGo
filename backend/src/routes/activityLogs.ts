@@ -1,55 +1,36 @@
 import express from 'express';
 import { ActivityLogService } from '../services/activityLog';
-import { authenticateToken } from '../middleware/auth';
+import { authenticateToken, requireUser } from '../middleware/auth';
+import { asyncHandler } from '../utils/errors';
+import { parseOrThrow, activityLogsQuerySchema } from '../utils/validation';
 
 const router = express.Router();
 
-// Kullanıcının aktivite loglarını getir
-router.get('/', authenticateToken, async (req: any, res) => {
-  try {
-    const limit = parseInt(req.query.limit as string) || 50;
-    const offset = parseInt(req.query.offset as string) || 0;
-    const activityType = req.query.type as string;
-
-    const result = await ActivityLogService.getUserLogs(
-      req.user.id,
-      limit,
-      offset,
-      activityType
-    );
-
+// Kullanıcının aktivite logları — ?limit=1..100&offset>=0&type=
+router.get(
+  '/',
+  authenticateToken,
+  asyncHandler(async (req, res) => {
+    const { limit, offset, type } = parseOrThrow(activityLogsQuerySchema, req.query);
+    const result = await ActivityLogService.getUserLogs(requireUser(req).id, limit, offset, type);
     res.json({
       success: true,
       logs: result.logs,
       total: result.total,
       limit,
-      offset
+      offset,
     });
-  } catch (error: any) {
-    console.error('Get activity logs error:', error);
-    res.status(500).json({
-      success: false,
-      message: error.message || 'Aktivite logları alınamadı'
-    });
-  }
-});
+  })
+);
 
-// Aktivite tiplerini getir
-router.get('/types', authenticateToken, async (req: any, res) => {
-  try {
-    const types = await ActivityLogService.getActivityTypes(req.user.id);
-    res.json({
-      success: true,
-      types
-    });
-  } catch (error: any) {
-    console.error('Get activity types error:', error);
-    res.status(500).json({
-      success: false,
-      message: error.message || 'Aktivite tipleri alınamadı'
-    });
-  }
-});
+// Aktivite tipleri
+router.get(
+  '/types',
+  authenticateToken,
+  asyncHandler(async (req, res) => {
+    const types = await ActivityLogService.getActivityTypes(requireUser(req).id);
+    res.json({ success: true, types });
+  })
+);
 
 export default router;
-

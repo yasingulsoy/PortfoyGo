@@ -1,29 +1,33 @@
-'use client';
+import type { Metadata } from 'next';
+import { BriefcaseIcon, HomeIcon } from '@heroicons/react/20/solid';
+import { LinkButton } from '@/components/ui/Button';
 
-import Link from 'next/link';
-import { HomeIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
+export const metadata: Metadata = {
+  title: 'Sayfa bulunamadı',
+};
 
 export default function NotFound() {
   return (
-    <div className="min-h-screen bg-[#181a20] flex items-center justify-center px-4">
-      <div className="text-center">
-        <div className="mx-auto h-24 w-24 bg-[#f6465d]/10 rounded-full flex items-center justify-center mb-6 border-2 border-[#f6465d]">
-          <ExclamationTriangleIcon className="h-12 w-12 text-[#f6465d]" />
-        </div>
-        <h1 className="text-6xl font-bold text-white mb-4">404</h1>
-        <h2 className="text-2xl font-semibold text-white mb-2">Sayfa Bulunamadı</h2>
-        <p className="text-[#848e9c] mb-8 max-w-md mx-auto">
-          Aradığınız sayfa mevcut değil veya taşınmış olabilir.
-        </p>
-        <Link
-          href="/"
-          className="inline-flex items-center gap-2 bg-[#0ecb81] hover:bg-[#0bb975] text-white px-6 py-3 rounded-xl font-semibold transition-all"
-        >
-          <HomeIcon className="h-5 w-5" />
-          Ana Sayfaya Dön
-        </Link>
+    <div className="flex min-h-[60vh] flex-col items-center justify-center py-12 text-center">
+      <p
+        className="num bg-clip-text font-mono text-[96px] font-semibold leading-none tracking-tighter text-transparent sm:text-[128px]"
+        style={{ backgroundImage: 'linear-gradient(180deg, var(--fg), var(--subtle))' }}
+        aria-hidden="true"
+      >
+        404
+      </p>
+      <h1 className="mt-6 text-2xl font-semibold tracking-tight text-fg">Bu sayfa piyasada işlem görmüyor</h1>
+      <p className="mt-2 max-w-md text-sm leading-relaxed text-muted">
+        Aradığın sayfa taşınmış, kaldırılmış ya da hiç var olmamış olabilir. Adresi kontrol et veya aşağıdan devam et.
+      </p>
+      <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+        <LinkButton href="/" icon={<HomeIcon className="h-4 w-4" />}>
+          Ana sayfaya dön
+        </LinkButton>
+        <LinkButton href="/portfolio" variant="secondary" icon={<BriefcaseIcon className="h-4 w-4" />}>
+          Portföyüm
+        </LinkButton>
       </div>
     </div>
   );
 }
-

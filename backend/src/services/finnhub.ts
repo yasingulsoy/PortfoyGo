@@ -54,23 +54,45 @@ export interface StockSymbol {
 
 const FINNHUB_BASE = 'https://finnhub.io/api/v1';
 
-// Çoklu API key desteği
-// FINNHUB_API_KEY veya FINNHUB_API_KEYS (virgülle ayrılmış) kullanılabilir
+// Çoklu API key desteği — anahtarlar SADECE ortam değişkenlerinden okunur.
+// FINNHUB_API_KEYS (virgülle ayrılmış) veya FINNHUB_API_KEY
 function getApiKeys(): string[] {
   const keysEnv = process.env.FINNHUB_API_KEYS;
-  const singleKey = process.env.FINNHUB_API_KEY || 'd3br09pr01qqg7bvqai0d3br09pr01qqg7bvqaig';
-  
-  if (keysEnv) {
-    // Virgülle ayrılmış key'leri al ve temizle
+  if (keysEnv && keysEnv.trim()) {
     return keysEnv.split(',').map(k => k.trim()).filter(k => k.length > 0);
   }
-  
-  return [singleKey];
+  const single = process.env.FINNHUB_API_KEY?.trim();
+  return single ? [single] : [];
+}
+
+/** Finnhub anahtarı yokken fırlatılır; çağıranlar cache'ten servis etmelidir. */
+export class FinnhubNotConfiguredError extends Error {
+  constructor() {
+    super('Finnhub API key is not configured');
+  }
+}
+
+let missingKeyWarned = false;
+
+/** Hata nesnesinden sadece güvenli alanları (URL/token içermeyen) çıkarır. */
+export function describeHttpError(error: any): string {
+  const status = error?.response?.status ?? error?.status;
+  const msg = error?.message || 'unknown error';
+  // axios hata mesajları URL içermez; yine de token parametresini maskele
+  return `${status ? `HTTP ${status} - ` : ''}${String(msg).replace(/token=[^&\s]+/gi, 'token=***')}`;
 }
 
 export class FinnhubService {
   private static apiKeys: string[] = getApiKeys();
   private static currentKeyIndex = 0;
+
+  static isConfigured(): boolean {
+    if (this.apiKeys.length === 0 && !missingKeyWarned) {
+      missingKeyWarned = true;
+      console.warn('[finnhub] FINNHUB_API_KEY(S) tanımlı değil; hisse verileri sadece mevcut cache içeriğinden sunulacak.');
+    }
+    return this.apiKeys.length > 0;
+  }
   
   /**
    * Kullanılabilir bir API key seç (round-robin, rate limit'e göre)
@@ -105,6 +127,9 @@ export class FinnhubService {
   }
 
   private static async makeRequest<T>(endpoint: string, params: Record<string, any> = {}): Promise<T> {
+    if (!this.isConfigured()) {
+      throw new FinnhubNotConfiguredError();
+    }
     const apiKey = this.getAvailableApiKey();
     
     try {
@@ -141,7 +166,7 @@ export class FinnhubService {
         // Diğer hatalarda çağrıyı kaydet
         RateLimiter.recordCall(apiKey, 1);
       }
-      console.error(`Finnhub API error (key: ${apiKey.substring(0, 8)}...):`, error);
+      console.error(`[finnhub] ${endpoint} error: ${describeHttpError(error)}`);
       throw error;
     }
   }
@@ -174,12 +199,15 @@ export class FinnhubService {
         low: quote.l,
         open: quote.o,
         previousClose: quote.pc,
-        marketCap: profile.marketCapitalization || 0,
+        // Finnhub marketCapitalization MİLYON USD cinsindendir → USD'ye çevir
+        marketCap: (Number(profile.marketCapitalization) || 0) * 1_000_000,
         logo: profile.logo || '',
         industry: profile.finnhubIndustry || ''
       };
     } catch (error) {
-      console.error(`Error fetching stock data for ${symbol}:`, error);
+      if (!(error instanceof FinnhubNotConfiguredError)) {
+        console.error(`[finnhub] ${symbol} verisi alınamadı: ${describeHttpError(error)}`);
+      }
       throw error;
     }
   }
@@ -272,7 +300,7 @@ export class FinnhubService {
             }
             return null;
           } catch (error) {
-            console.error(`Error fetching ${symbol.symbol}:`, (error as Error).message);
+            console.error(`[finnhub] ${symbol.symbol}: ${describeHttpError(error)}`);
             return null;
           }
         }
@@ -322,6 +350,7 @@ export class FinnhubService {
       // 4. Market cap'e göre filtrele ve sırala
       let filteredStocks = stocks;
       if (minMarketCap > 0) {
+        // marketCap getStockData'da USD'ye çevrildi; minMarketCap de USD
         filteredStocks = stocks.filter(stock => stock.marketCap >= minMarketCap);
       }
       
@@ -332,45 +361,41 @@ export class FinnhubService {
       
       return filteredStocks;
     } catch (error) {
-      console.error('Error fetching active stocks:', error);
+      console.error(`[finnhub] Aktif hisseler alınamadı: ${describeHttpError(error)}`);
       throw error;
     }
   }
 
-  // Popüler hisse senetleri listesi (eski metod - geriye dönük uyumluluk için)
+  /**
+   * Takip edilen hisse listesi. STOCK_SYMBOLS env (virgülle ayrılmış) ile değiştirilebilir.
+   * (Eskiden önce tüm borsa sembolleri çekilip filtreleniyordu; market cap birim hatası
+   * yüzünden bu yol hiçbir zaman sonuç vermiyor ve her seferinde bu listeye düşüyordu.)
+   */
+  static getTrackedSymbols(): string[] {
+    const fromEnv = (process.env.STOCK_SYMBOLS || '')
+      .split(',')
+      .map((s) => s.trim().toUpperCase())
+      .filter((s) => /^[A-Z0-9.\-]{1,20}$/.test(s));
+    return fromEnv.length > 0
+      ? fromEnv.slice(0, 50)
+      : ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'META', 'NVDA', 'NFLX', 'AMD', 'INTC'];
+  }
+
+  // Takip edilen (popüler) hisse senetlerinin güncel verisi
   static async getPopularStocks(): Promise<StockData[]> {
-    // Önce aktif hisse senetlerini çekmeyi dene
-    try {
-      // Şu anlık sadece 10 hisseye odaklanıyoruz
-      const activeStocks = await this.getActiveStocks('US', 10, 500000000); // 500 milyon $ üzeri, 10 hisse
-      if (activeStocks.length > 0) {
-        // En popüler 10 tanesini döndür
-        return activeStocks.slice(0, 10);
+    if (!this.isConfigured()) {
+      return [];
+    }
+    const symbols = this.getTrackedSymbols();
+    const stocks = await this.processWithConcurrencyLimit(symbols, 5, async (symbol) => {
+      try {
+        const data = await this.getStockData(symbol);
+        return data && data.price > 0 ? data : null;
+      } catch {
+        return null;
       }
-    } catch (error) {
-      console.warn('Active stocks fetch failed, falling back to hardcoded list:', error);
-    }
-    
-    // Fallback: Hardcoded liste (en popüler 10 hisse senedi)
-    const popularSymbols = [
-      'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'META', 'NVDA', 'NFLX', 'AMD', 'INTC'
-    ];
-    
-    try {
-      const stockPromises = popularSymbols.map(symbol => 
-        this.getStockData(symbol).catch(error => {
-          console.error(`Error fetching ${symbol}:`, error);
-          return null;
-        })
-      );
-      
-      const stocks = await Promise.all(stockPromises);
-      // Sadece ilk 10 tanesini döndür
-      return stocks.filter(stock => stock !== null).slice(0, 10) as StockData[];
-    } catch (error) {
-      console.error('Error fetching popular stocks:', error);
-      throw error;
-    }
+    });
+    return stocks.filter((s): s is StockData => s !== null);
   }
 
   // Borsadaki tüm sembolleri al
@@ -380,32 +405,25 @@ export class FinnhubService {
 
   // Borsadaki toplam hisse senedi sayısını al
   static async getStockCount(exchange: string = 'US'): Promise<number> {
-    try {
-      const symbols = await this.getStockSymbols(exchange);
-      return symbols.length;
-    } catch (error) {
-      console.error(`Error getting stock count for ${exchange}:`, error);
-      throw error;
-    }
+    const symbols = await this.getStockSymbols(exchange);
+    return symbols.length;
   }
 
-  // Tüm borsaları ve her birindeki hisse senedi sayısını al
+  // Tüm borsaları ve her birindeki hisse senedi sayısını al (admin)
   static async getExchangeStockCounts(): Promise<{ exchange: string; count: number }[]> {
     const exchanges = ['US', 'NASDAQ', 'NYSE', 'AMEX', 'LSE', 'XETR', 'XPAR', 'XAMS', 'XBRU', 'XMIL', 'XSTO', 'XHEL', 'XCOP', 'XOSL', 'XWAR', 'XIST'];
     const results: { exchange: string; count: number }[] = [];
-    
+
     for (const exchange of exchanges) {
       try {
         const count = await this.getStockCount(exchange);
         results.push({ exchange, count });
-        // Rate limiting için kısa bir bekleme
-        await new Promise(resolve => setTimeout(resolve, 200));
-      } catch (error) {
-        console.error(`Error getting count for ${exchange}:`, error);
+        await new Promise((resolve) => setTimeout(resolve, 200));
+      } catch {
         results.push({ exchange, count: 0 });
       }
     }
-    
+
     return results;
   }
 
@@ -414,18 +432,13 @@ export class FinnhubService {
     try {
       await this.getQuote('AAPL');
       return true;
-    } catch (error) {
-      console.error('API Key test failed:', error);
+    } catch {
       return false;
     }
   }
 }
 
 // Kolay kullanım için export edilen fonksiyonlar
-export const getStockQuote = (symbol: string) => FinnhubService.getQuote(symbol);
-export const getStockProfile = (symbol: string) => FinnhubService.getProfile(symbol);
-export const getStockData = (symbol: string) => FinnhubService.getStockData(symbol);
-export const getPopularStocks = () => FinnhubService.getPopularStocks();
 export const getActiveStocks = (exchange?: string, maxStocks?: number, minMarketCap?: number) => 
   FinnhubService.getActiveStocks(exchange, maxStocks, minMarketCap);
 export const getStockSymbols = (exchange?: string) => FinnhubService.getStockSymbols(exchange);

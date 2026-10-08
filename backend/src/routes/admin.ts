@@ -1,88 +1,56 @@
 import express from 'express';
 import { AdminService } from '../services/admin';
-import { authenticateToken } from '../middleware/auth';
+import { authenticateToken, requireUser } from '../middleware/auth';
 import { isAdmin } from '../middleware/admin';
+import { asyncHandler } from '../utils/errors';
+import { parseOrThrow, paginationSchema, banSchema, userIdParamSchema } from '../utils/validation';
 
 const router = express.Router();
 
+router.use(authenticateToken, isAdmin);
+
 // Admin istatistikleri
-router.get('/stats', authenticateToken, isAdmin, async (req, res) => {
-  try {
+router.get(
+  '/stats',
+  asyncHandler(async (_req, res) => {
     const result = await AdminService.getStats();
-    
-    if (result.success) {
-      res.json(result);
-    } else {
-      res.status(500).json({
-        success: false,
-        message: 'İstatistikler alınamadı'
-      });
+    if (!result.success) {
+      return res.status(500).json({ success: false, message: 'İstatistikler alınamadı' });
     }
-  } catch (error) {
-    console.error('Admin stats route error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Sunucu hatası'
-    });
-  }
-});
+    res.json(result);
+  })
+);
 
-// Tüm kullanıcıları getir
-router.get('/users', authenticateToken, isAdmin, async (req, res) => {
-  try {
-    const limit = parseInt(req.query.limit as string) || 50;
-    const offset = parseInt(req.query.offset as string) || 0;
-    
+// Tüm kullanıcılar — ?limit=1..100&offset>=0
+router.get(
+  '/users',
+  asyncHandler(async (req, res) => {
+    const { limit, offset } = parseOrThrow(paginationSchema, req.query);
     const result = await AdminService.getAllUsers(limit, offset);
-    
-    if (result.success) {
-      res.json(result);
-    } else {
-      res.status(500).json({
-        success: false,
-        message: 'Kullanıcılar alınamadı'
-      });
+    if (!result.success) {
+      return res.status(500).json({ success: false, message: 'Kullanıcılar alınamadı' });
     }
-  } catch (error) {
-    console.error('Admin users route error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Sunucu hatası'
-    });
-  }
-});
+    res.json(result);
+  })
+);
 
-// Kullanıcıyı banla/unban yap
-router.post('/users/:userId/ban', authenticateToken, isAdmin, async (req, res) => {
-  try {
-    const { userId } = req.params;
-    const { ban } = req.body; // true = ban, false = unban
+// Kullanıcıyı banla / yasağı kaldır — body: { ban: boolean }
+router.post(
+  '/users/:userId/ban',
+  asyncHandler(async (req, res) => {
+    const { userId } = parseOrThrow(userIdParamSchema, req.params);
+    const { ban } = parseOrThrow(banSchema, req.body);
 
-    if (typeof ban !== 'boolean') {
-      return res.status(400).json({
-        success: false,
-        message: 'Ban değeri boolean olmalı'
-      });
+    if (ban && userId === requireUser(req).id) {
+      return res.status(400).json({ success: false, message: 'Kendi hesabınızı yasaklayamazsınız' });
     }
 
     const result = await AdminService.toggleUserBan(userId, ban);
-    
-    if (result.success) {
-      res.json(result);
-    } else {
-      res.status(500).json({
-        success: false,
-        message: result.message || 'İşlem başarısız'
-      });
+    if (!result.success) {
+      return res.status(result.status ?? 400).json({ success: false, message: result.message || 'İşlem başarısız' });
     }
-  } catch (error) {
-    console.error('Admin ban route error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Sunucu hatası'
-    });
-  }
-});
+    res.json(result);
+  })
+);
 
 export default router;
-
