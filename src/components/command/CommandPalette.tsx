@@ -505,7 +505,7 @@ export function SearchTrigger() {
         onClick={openCommandPalette}
         aria-label="Ara"
         aria-keyshortcuts="Control+K Meta+K /"
-        className="hidden h-9 w-52 items-center gap-2 rounded-lg border border-line bg-surface-2 pl-3 pr-1.5 text-sm text-subtle transition-colors hover:border-line-strong hover:text-muted md:flex xl:w-64"
+        className="hidden h-9 w-60 items-center gap-2 rounded-lg border border-line bg-surface-2 pl-3 pr-1.5 text-sm text-subtle transition-colors hover:border-line-strong hover:text-muted xl:flex"
       >
         <MagnifyingGlassIcon className="h-4 w-4 shrink-0" aria-hidden="true" />
         <span className="flex-1 text-left">Ara…</span>
@@ -515,7 +515,8 @@ export function SearchTrigger() {
         type="button"
         onClick={openCommandPalette}
         aria-label="Ara"
-        className="flex h-9 w-9 items-center justify-center rounded-lg text-muted transition-colors hover:bg-surface-2 hover:text-fg md:hidden"
+        title={isMac ? 'Ara (⌘K)' : 'Ara (Ctrl+K)'}
+        className="flex h-9 w-9 items-center justify-center rounded-lg text-muted transition-colors hover:bg-surface-2 hover:text-fg xl:hidden"
       >
         <MagnifyingGlassIcon className="h-[18px] w-[18px]" aria-hidden="true" />
       </button>

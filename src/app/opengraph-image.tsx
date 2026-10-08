@@ -38,7 +38,7 @@ export default function OpengraphImage() {
         }}
       >
         {/* Grafik motifi */}
-        <svg width="800" height="300" viewBox="0 0 800 300" style={{ position: 'absolute', right: 0, bottom: 0, opacity: 0.9 }}>
+        <svg width="560" height="260" viewBox="0 0 800 300" preserveAspectRatio="none" style={{ position: 'absolute', right: 0, bottom: 0, opacity: 0.9 }}>
           <defs>
             <linearGradient id="g" x1="0" x2="0" y1="0" y2="1">
               <stop offset="0%" stopColor={C.brand} stopOpacity="0.35" />
@@ -57,10 +57,8 @@ export default function OpengraphImage() {
             <path d="M7.5 16.5 13 12l4 3 7.5-6.5" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
             <path d="M20.5 8.5h4v4" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
-          <div style={{ display: 'flex', fontSize: 44, letterSpacing: -1 }}>
-            <span>Portfoy</span>
-            <span style={{ color: C.brand }}>Go</span>
-          </div>
+          {/* Satori, yan yana iki metin parçası arasına boşluk koyduğundan ad tek parça çizilir */}
+          <div style={{ display: 'flex', fontSize: 44 }}>PortfoyGo</div>
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', maxWidth: 820 }}>
@@ -69,8 +67,8 @@ export default function OpengraphImage() {
             <span style={{ color: C.brand }}>Sanal para.</span>
             <span>Gerçek rekabet.</span>
           </div>
-          <div style={{ display: 'flex', marginTop: 28, fontSize: 28, color: C.muted }}>
-            100.000 ₺ sanal bakiyeyle hisse, kripto, döviz ve emtia al-sat.
+          <div style={{ display: 'flex', marginTop: 28, maxWidth: 600, fontSize: 28, lineHeight: 1.35, color: C.muted }}>
+            100.000 TL sanal bakiyeyle hisse, kripto, döviz ve emtia al-sat.
           </div>
         </div>
 

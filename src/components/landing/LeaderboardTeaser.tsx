@@ -4,17 +4,22 @@ import { useMemo, useState } from 'react';
 import useSWR from 'swr';
 import { ArrowRightIcon, TrophyIcon } from '@heroicons/react/20/solid';
 import { leaderboardApi } from '@/lib/api';
-import { BOARD_COPY, normalizeLeaders, type Board } from '@/components/leaderboard/model';
+import { normalizeLeaders, type Board } from '@/components/leaderboard/model';
 import { LinkButton } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Delta } from '@/components/ui/Delta';
 import { EmptyState, Skeleton } from '@/components/ui/Feedback';
 import Tabs from '@/components/ui/Tabs';
-import { cn, formatTRY } from '@/lib/format';
+import { STARTING_BALANCE } from '@/lib/constants';
+import { cn, formatNumber, formatTRY } from '@/lib/format';
 import SectionHeading from './SectionHeading';
 
 const LIMIT = 5;
 const MEDALS = ['bg-gold text-black', 'bg-silver text-black', 'bg-bronze text-black'];
+const COPY: Record<Board, string> = {
+  week: 'Her Pazartesi herkes aynı çizgiden yarışa başlar. Yeni ya da eski oyuncu fark etmez; haftanın en yüksek getirisini yakalayan zirveye çıkar.',
+  alltime: `Herkes aynı ${formatNumber(STARTING_BALANCE, 0)} ₺ ile başlar. Hesabını en çok büyüten oyuncular tüm zamanlar listesinin başında.`,
+};
 const BOARDS: { value: Board; label: string }[] = [
   { value: 'week', label: 'Bu hafta' },
   { value: 'alltime', label: 'Tüm zamanlar' },
@@ -36,7 +41,7 @@ export default function LeaderboardTeaser() {
           id="landing-leaders-title"
           eyebrow="Liderlik tablosu"
           title="Zirvede kimler var?"
-          description={BOARD_COPY[board].description}
+          description={COPY[board]}
         />
         <div className="mt-7 flex flex-wrap gap-3">
           <LinkButton href="/register" size="lg" className="px-6">

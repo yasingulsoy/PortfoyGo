@@ -79,7 +79,7 @@ function containsError(chunks: Uint8Array[]): boolean {
 class Conn {
   static nextId = 1;
   readonly id = Conn.nextId++;
-  buf = Buffer.alloc(0);
+  buf: Buffer = Buffer.alloc(0);
   startupDone = false;
   closed = false;
   /** Bu bağlantının şu an PGlite üzerinde çalışan bir grubu var mı? */
@@ -217,7 +217,7 @@ export async function startPgliteServer(opts: PgliteServerOptions): Promise<Pgli
         const out: Uint8Array[] = [];
         try {
           await rawSimple('SAVEPOINT __pglite_server_piggyback');
-          await execMessages(conn, msgs, (d) => out.push(d));
+          await execMessages(conn, msgs, (d) => out.push(Buffer.from(d))); // kopyala: d wasm belleğine bir görünüm
           await rawSimple(
             containsError(out)
               ? 'ROLLBACK TO SAVEPOINT __pglite_server_piggyback'

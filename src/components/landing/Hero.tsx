@@ -30,7 +30,7 @@ export default function Hero() {
         }}
       />
 
-      <div className="grid items-center gap-12 lg:grid-cols-[1.05fr_1fr] lg:gap-14">
+      <div className="grid grid-cols-1 items-center gap-12 lg:grid-cols-[1.05fr_1fr] lg:gap-14">
         <div>
           <p className="inline-flex items-center gap-2 rounded-full border border-line bg-surface/80 px-3 py-1 text-xs font-medium text-muted backdrop-blur">
             <span className="relative flex h-2 w-2" aria-hidden="true">
@@ -122,7 +122,7 @@ function HeroVisual() {
               <span className="text-subtle">başlangıçtan bu yana</span>
             </div>
           </div>
-          <div className="flex gap-1 rounded-lg bg-surface-2 p-1 text-[11px] font-medium text-subtle">
+          <div className="flex gap-1 rounded-lg bg-surface-2 p-1 text-[11px] font-medium text-subtle max-sm:hidden">
             {['1H', '1A', '3A', 'Tümü'].map((r) => (
               <span key={r} className={r === '1A' ? 'rounded-md bg-surface px-2 py-1 text-fg shadow-card' : 'px-2 py-1'}>
                 {r}
@@ -131,7 +131,7 @@ function HeroVisual() {
           </div>
         </div>
 
-        <svg viewBox={`0 0 ${W} ${H}`} className="mt-5 h-40 w-full overflow-visible sm:h-48">
+        <svg viewBox={`0 0 ${W} ${H}`} className="mt-5 h-auto w-full overflow-visible">
           <defs>
             <linearGradient id="landing-hero-fill" x1="0" x2="0" y1="0" y2="1">
               <stop offset="0%" stopColor="var(--brand)" stopOpacity="0.3" />

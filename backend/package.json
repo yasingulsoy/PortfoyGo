@@ -11,12 +11,16 @@
     "dev:clean": "npm run kill-port && npm run dev",
     "create-tables": "ts-node src/scripts/createTables.ts",
     "migrate": "ts-node src/scripts/migrate.ts",
+    "migrate:dry-run": "ts-node src/scripts/migrate.ts --dry-run",
+    "db:local": "ts-node --transpile-only src/dev/localDb.ts",
+    "dev:local": "ts-node --transpile-only src/dev/devLocal.ts",
     "create-users": "ts-node src/scripts/createTestUsers.ts",
     "create-user": "ts-node src/scripts/createUser.ts",
     "add-admin-columns": "ts-node src/scripts/addAdminColumns.ts",
     "add-leaderboard-week-columns": "ts-node src/scripts/addLeaderboardWeekColumns.ts",
     "create-admin": "ts-node src/scripts/createAdminUser.ts",
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "typecheck": "tsc --noEmit"
   },
   "keywords": [

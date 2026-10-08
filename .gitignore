@@ -46,3 +46,6 @@ next-env.d.ts
 /backend/dist/
 *.dump
 backend/portfoygo.sql
+
+# local embedded dev database (npm run db:local / dev:local)
+/backend/.localdb/

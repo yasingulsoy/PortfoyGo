@@ -32,7 +32,9 @@ export default function MarketPulse() {
     };
   }, [stock, crypto]);
 
-  const loading = market.isLoading && ticker.length === 0;
+  // SWR hata sonrası yeniden denerken isLoading tekrar true olur; hata varken iskelet göstermeyiz
+  const failed = !!market.errors.stock && !!market.errors.crypto;
+  const loading = !failed && market.isLoading && ticker.length === 0;
   const unavailable = !loading && ticker.length === 0;
 
   return (

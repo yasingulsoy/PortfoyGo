@@ -10,6 +10,5 @@ export default function robots(): MetadataRoute.Robots {
       disallow: ['/portfolio', '/transactions', '/leaderboard', '/news', '/profile', '/admin', '/asset/', '/verify-email', '/forgot-password', '/api/'],
     },
     sitemap: `${SITE_URL}/sitemap.xml`,
-    host: SITE_URL,
   };
 }

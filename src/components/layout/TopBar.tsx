@@ -50,7 +50,7 @@ export default function TopBar() {
           <ThemeToggle />
           {!loading && !user && (
             <>
-              <LinkButton href="/login" variant="ghost" size="sm">Giriş yap</LinkButton>
+              <LinkButton href="/login" variant="ghost" size="sm" className="max-sm:hidden">Giriş yap</LinkButton>
               <LinkButton href="/register" size="sm">Hesap oluştur</LinkButton>
             </>
           )}
