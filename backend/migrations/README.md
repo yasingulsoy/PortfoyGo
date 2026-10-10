@@ -146,3 +146,49 @@ npm run migrate
 **Yeni backend kodunu yayına almadan önce çalıştırın**; aksi halde kimlik doğrulama gerektiren tüm
 uçlar hata verir. Not: geçişten sonra eski (localStorage'daki) token'lar `tv` içermediği için
 geçersizdir; kullanıcıların bir kez yeniden giriş yapması gerekir.
+
+## 006_seasons_leagues.sql
+
+Aylık sezonlar ve özel ligler (bakiyeler sıfırlanmaz; getiri katılım anındaki toplam varlığa göre):
+
+- `seasons` (slug `YYYY-MM`, ayın 1'i 00:00 Europe/Istanbul → sonraki ayın 1'i, `active`/`finished`),
+  `season_participants` (referans varlık + kapanışta dondurulan değerler/sıra/işlem sayısı),
+  `season_awards` (1: Sezon Şampiyonu, 2–3: Sezon Podyumu, 4–10: Sezonun İlk 10'u).
+- `leagues` (8 karakterlik benzersiz davet kodu, en fazla 50 üye, isteğe bağlı bitiş) ve
+  `league_members` (`owner`/`member`, katılım anındaki referans varlık).
+
+Sezonlar backend cron'u (5 dk'da bir + ayın 1'i 00:00) ile oluşturulur/sonlandırılır; ek veri
+taşıma gerekmez. Yeni backend kodunu yayına almadan önce çalıştırın (`npm run migrate`).
+
+## 007_price_history.sql
+
+Varlık fiyat geçmişi (`price_history`): hisse/kripto (USD), döviz (TL) ve emtia (`quoteCurrency`)
+için 15 dakikalık (`m15`, 3 gün), saatlik (`hour`, 15 gün) ve günlük (`day`, İstanbul takvim günü,
+kalıcı) kovalar. Birincil anahtar `(asset_type, symbol, granularity, bucket_start)`.
+
+Backend cron'u her 15 dakikada bir (xx:14, :29, :44, :59) yalnızca zaten çekilmiş fiyatları
+(`market_data_cache`, `currency_rates`, önbellekli emtia listesi) okuyup UPSERT eder; dış API çağrısı
+yapmaz. Geçmiş, migration'dan itibaren birikir (geriye dönük veri taşıma yok). Uçlar:
+`GET /api/market/history`, `/api/market/performance`, `/api/market/sparklines`.
+Yerel PGlite'ta (`npm run dev:local`) sentetik ~400 günlük geçmiş otomatik tohumlanır.
+
+## 008_admin_audit.sql
+
+Yönetici denetim kaydı (`admin_audit_log`): yasaklama, yetki değişikliği, emir iptali, lig silme, önbellek yenileme, iş çalıştırma ve duyurular kim tarafından, ne zaman yapıldı.
+
+## 009_notifications.sql
+
+Bildirim merkezi: `notifications` (kullanıcı başına en fazla 200, okundu bilgisiyle), `announcements` (yönetici duyuruları) ve `users.notification_prefs` (Emirler / Rekabet kategorilerini kapatma tercihi).
+
+## 010_leagues_v2.sql
+
+Zamanlı ve herkese açık ligler: `leagues.visibility`, `starts_at`, `started_at`, `finalized_at`; üyelerde `baseline_set_at` ve dondurulmuş sonuçlar (`final_rank`, `final_equity`, `final_return_pct`). Mevcut ligler "başlamış" sayılır; üyelerin başlangıç değerleri katılım anından korunur.
+
+
+## 011_arena.sql
+
+Arena (hızlı al-sat oyun modu): `arena_challenges` (yöneticinin planladığı canlı meydan okumalar), `arena_rounds` (bireysel/ortak turlar; oynatılan gerçek geçmiş fiyat penceresi `"window"` sütununda saklanır), `arena_entries` (katılımcı bakiyeleri ve sonuçlar), `arena_positions` (uzun/kısa pozisyonlar, zarar kes/kâr al). Ayrıca "Arena çaylağı" ve "Arena ustası" rozetlerini ekler.
+
+## 012_advisor.sql
+
+Portföy Sihirbazı: `risk_profiles` (anket cevapları, puan ve profil) ve `portfolio_plans` (önerilen dağılım, metrikler, Monte Carlo simülasyonu, uygulama sonucu).

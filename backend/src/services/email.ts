@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import nodemailer, { type Transporter } from 'nodemailer';
 import pool from '../config/database';
 import { AuthService } from './auth';
+import { NotificationService } from './notifications';
 
 /**
  * Not: email_verifications tablosunda `purpose` ('verify' | 'reset') ve `attempts`
@@ -189,6 +190,14 @@ ${String(mail.data.text ?? String(mail.data.html ?? '').replace(/<[^>]+>/g, ' ')
       if (upd.rowCount === 0) {
         return { success: false, status: 400, message: 'Geçerli bir doğrulama kodu yok. Lütfen yeni kod isteyin.' };
       }
+      // Bildirim (kategori 'account'); notify hata fırlatmaz
+      await NotificationService.notify(userId, {
+        type: 'account.email_verified',
+        category: 'account',
+        title: 'E-posta adresin doğrulandı',
+        body: 'E-posta adresin başarıyla doğrulandı. Artık sezon sıralamalarına ve ödüllere katılabilirsin.',
+        link: '/profile',
+      });
       return { success: true, message: 'Email başarıyla doğrulandı' };
     } catch (error) {
       await client.query('ROLLBACK').catch(() => undefined);

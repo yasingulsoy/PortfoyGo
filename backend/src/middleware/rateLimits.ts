@@ -37,3 +37,6 @@ export const leagueCodeLimiter = make(
   20,
   'Çok fazla davet kodu denemesi. Lütfen 15 dakika sonra tekrar deneyin.'
 );
+
+/** Fiyat geçmişi / performans / sparkline (herkese açık, önbellekli): IP başına dakikada 120. */
+export const marketDataLimiter = make(MINUTE, 120, 'Çok fazla piyasa verisi isteği. Lütfen biraz sonra tekrar deneyin.');

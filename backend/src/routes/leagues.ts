@@ -1,20 +1,46 @@
 import express from 'express';
-import { authenticateToken, requireUser } from '../middleware/auth';
+import rateLimit from 'express-rate-limit';
+import { authenticateToken, optionalAuth, optionalUserId, requireUser } from '../middleware/auth';
 import { leagueCodeLimiter } from '../middleware/rateLimits';
 import { asyncHandler } from '../utils/errors';
 import {
   createLeagueSchema,
   joinLeagueSchema,
+  leagueFeedQuerySchema,
   leagueIdParamSchema,
   leagueMemberParamsSchema,
   parseOrThrow,
   previewLeagueQuerySchema,
+  publicLeaguesQuerySchema,
+  updateLeagueSchema,
 } from '../utils/validation';
 import { LeagueService } from '../services/leagues';
 
 const router = express.Router();
 
-// Tüm lig uçları oturum gerektirir
+/** Herkese açık lig listesi: IP başına dakikada 60 */
+const publicLeaguesLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 60,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: { success: false, message: 'Çok fazla istek gönderildi. Lütfen biraz sonra tekrar deneyin.' },
+});
+
+// Herkese açık ligler (oturum gerekmez; oturum varsa is_member dolu).
+// ?search=&status=upcoming|active|finished|open (varsayılan open = upcoming + active)&limit=&offset=
+router.get(
+  '/public',
+  publicLeaguesLimiter,
+  optionalAuth,
+  asyncHandler(async (req, res) => {
+    const q = parseOrThrow(publicLeaguesQuerySchema, req.query);
+    const data = await LeagueService.listPublic({ ...q, userId: optionalUserId(req) });
+    res.json({ success: true, data });
+  })
+);
+
+// Diğer tüm lig uçları oturum gerektirir
 router.use(authenticateToken);
 
 // Liglerim
@@ -26,7 +52,7 @@ router.get(
   })
 );
 
-// Lig oluştur
+// Lig oluştur: {name, description?, visibility?, starts_at?, duration?, ends_at? (eski; duration öncelikli)}
 router.post(
   '/',
   asyncHandler(async (req, res) => {
@@ -64,6 +90,39 @@ router.get(
   asyncHandler(async (req, res) => {
     const { id } = parseOrThrow(leagueIdParamSchema, req.params);
     const data = await LeagueService.getDetail(id, requireUser(req).id);
+    res.json({ success: true, data });
+  })
+);
+
+// Lig güncelle (sadece sahip): {name?, description?, visibility?, starts_at?, duration?}
+// starts_at / duration sadece lig başlamadan değiştirilebilir
+router.patch(
+  '/:id',
+  asyncHandler(async (req, res) => {
+    const { id } = parseOrThrow(leagueIdParamSchema, req.params);
+    const input = parseOrThrow(updateLeagueSchema, req.body);
+    const data = await LeagueService.update(id, requireUser(req).id, input);
+    res.json({ success: true, data });
+  })
+);
+
+// Lig akışı: üyelerin lig başlangıcından (veya katılımdan) bu yana alım/satımları (tutarsız). Sadece üyeler.
+router.get(
+  '/:id/feed',
+  asyncHandler(async (req, res) => {
+    const { id } = parseOrThrow(leagueIdParamSchema, req.params);
+    const { limit } = parseOrThrow(leagueFeedQuerySchema, req.query);
+    const data = await LeagueService.getFeed(id, requireUser(req).id, limit);
+    res.json({ success: true, data });
+  })
+);
+
+// Herkese açık lige katıl (davet kodu gerekmez; özel lig → 404)
+router.post(
+  '/:id/join-public',
+  asyncHandler(async (req, res) => {
+    const { id } = parseOrThrow(leagueIdParamSchema, req.params);
+    const data = await LeagueService.joinPublic(requireUser(req).id, id);
     res.json({ success: true, data });
   })
 );

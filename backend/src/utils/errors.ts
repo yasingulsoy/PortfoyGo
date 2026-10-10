@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction, RequestHandler } from 'express';
+import { logger } from './logger';
 
 /**
  * İstemciye güvenle gösterilebilecek mesaj taşıyan hata.
@@ -39,9 +40,13 @@ export function errorHandler(err: any, req: Request, res: Response, _next: NextF
     return;
   }
 
+  // pino-http'nin isteğe bağlı child logger'ı (req.id taşır); yoksa kök logger
+  const log = req.log ?? logger;
+  const path = req.originalUrl.split('?')[0];
+
   if (err instanceof AppError) {
     if (err.status >= 500) {
-      console.error(`[error] ${req.method} ${req.originalUrl} -> ${err.status} ${err.code || ''}: ${err.message}`);
+      log.error({ reqId: req.id, status: err.status, code: err.code }, `[error] ${req.method} ${path} -> ${err.status} ${err.code || ''}: ${err.message}`);
     }
     res.status(err.status).json({ success: false, message: err.publicMessage, ...(err.code ? { code: err.code } : {}) });
     return;
@@ -57,6 +62,6 @@ export function errorHandler(err: any, req: Request, res: Response, _next: NextF
     return;
   }
 
-  console.error(`[error] ${req.method} ${req.originalUrl}:`, err?.stack || err?.message || err);
+  log.error({ reqId: req.id, err }, `[error] ${req.method} ${path}: ${err?.message || err}`);
   res.status(500).json({ success: false, message: 'Sunucu hatası' });
 }

@@ -31,6 +31,8 @@ async function main() {
   const env: NodeJS.ProcessEnv = {
     ...process.env,
     NODE_ENV: 'development',
+    // concurrently altında stdout bir TTY değildir; okunabilir (pino-pretty) loglar için
+    LOG_PRETTY: process.env.LOG_PRETTY || '1',
     // Genel PORT değişkeni (ör. frontend araçlarının ayarladığı 3000) devralınmasın diye ayrı değişken
     PORT: process.env.API_PORT || '5001',
     // --- Veritabanı: SADECE yerel PGlite ---
@@ -42,7 +44,8 @@ async function main() {
     JWT_SECRET: process.env.LOCAL_JWT_SECRET || 'dev-only-local-jwt-secret-do-not-use-in-production-000000',
     COOKIE_SECURE: 'false',
     COOKIE_DOMAIN: '',
-    ALLOWED_ORIGINS: 'http://localhost:3000,http://127.0.0.1:3000,http://localhost:3001,http://127.0.0.1:3001',
+    // 3002: 3000 portu başka bir uygulamaca kullanılıyorsa site geçici olarak 3002'de çalıştırılabilir
+    ALLOWED_ORIGINS: 'http://localhost:3000,http://127.0.0.1:3000,http://localhost:3001,http://127.0.0.1:3001,http://localhost:3002,http://127.0.0.1:3002',
     // --- Dış servisler kapalı: piyasa verisi tohumlanmış cache'ten gelir ---
     DISABLE_MARKET_REFRESH: '1',
     // SMTP yok: doğrulama/sıfırlama kodları konsola yazılır

@@ -1,4 +1,5 @@
 import pool from '../config/database';
+import { NotificationService } from './notifications';
 
 export interface Badge {
   id: string;
@@ -139,7 +140,7 @@ export class BadgeService {
         }
 
         if (shouldAward) {
-          await this.awardBadge(userId, badge.id);
+          await this.awardBadge(userId, badge);
         }
       }
     } catch (error) {
@@ -147,16 +148,52 @@ export class BadgeService {
     }
   }
 
-  // Rozet ver
-  private static async awardBadge(userId: string, badgeId: string): Promise<void> {
+  /**
+   * Koşul tipine göre rozet ver (ör. Arena: 'arena_rounds_finished', 'arena_return_pct'): value ≥ condition_value
+   * olan ve henüz kazanılmamış rozetler verilir. Hata fırlatmaz.
+   */
+  static async awardByCondition(userId: string, conditionType: string, value: number): Promise<void> {
     try {
-      await pool.query(
+      if (!Number.isFinite(value)) return;
+      const result = await pool.query(
+        `SELECT b.id, b.name, b.description, b.icon
+           FROM badges b
+          WHERE b.condition_type = $1 AND b.condition_value <= $2
+            AND NOT EXISTS (SELECT 1 FROM user_badges ub WHERE ub.user_id = $3 AND ub.badge_id = b.id)`,
+        [conditionType, value, userId]
+      );
+      for (const badge of result.rows) {
+        await this.awardBadge(userId, badge);
+      }
+    } catch (error) {
+      console.error('Award badge by condition error:', error);
+    }
+  }
+
+  // Rozet ver
+  private static async awardBadge(userId: string, badge: { id: string; name?: string | null; description?: string | null; icon?: string | null }): Promise<void> {
+    const badgeId = badge.id;
+    try {
+      const ins = await pool.query(
         `INSERT INTO user_badges (user_id, badge_id)
          VALUES ($1, $2)
-         ON CONFLICT (user_id, badge_id) DO NOTHING`,
+         ON CONFLICT (user_id, badge_id) DO NOTHING
+         RETURNING id`,
         [userId, badgeId]
       );
       console.log(`✅ Rozet verildi: User ${userId}, Badge ${badgeId}`);
+      if (ins.rows.length > 0) {
+        // Bildirim (kategori 'competition'); notify hata fırlatmaz
+        const name = badge.name || 'Rozet';
+        await NotificationService.notify(userId, {
+          type: 'badge.earned',
+          category: 'competition',
+          title: `Yeni rozet: ${name}`,
+          body: badge.description ? `Tebrikler! "${name}" rozetini kazandın — ${badge.description}` : `Tebrikler! "${name}" rozetini kazandın.`,
+          link: '/profile',
+          data: { badge_id: badgeId, name, icon: badge.icon ?? null },
+        });
+      }
     } catch (error) {
       console.error('Award badge error:', error);
     }

@@ -1,5 +1,6 @@
 import pool from '../config/database';
 import { AppError } from '../utils/errors';
+import { NotificationService } from './notifications';
 import {
   AWARD_TITLE_SQL,
   EQUITY_SQL,
@@ -172,7 +173,7 @@ export class SeasonService {
     try {
       await client.query('BEGIN');
       const locked = await client.query(
-        `SELECT id, status, ends_at FROM seasons WHERE id = $1 FOR UPDATE`,
+        `SELECT id, slug, name, status, ends_at FROM seasons WHERE id = $1 FOR UPDATE`,
         [seasonId]
       );
       const season = locked.rows[0];
@@ -218,7 +219,7 @@ export class SeasonService {
       );
 
       // 3) Ödüller: ≥1 işlem yapmış uygun katılımcılar arasında ilk 10
-      await client.query(
+      const awards = await client.query(
         `INSERT INTO season_awards (season_id, user_id, rank, title, return_pct, awarded_at)
          SELECT $1::uuid, x.user_id, x.rn, ${AWARD_TITLE_SQL}, x.final_return_pct, $2::timestamptz
            FROM (
@@ -232,9 +233,29 @@ export class SeasonService {
               WHERE sp.season_id = $1 AND sp.trades_count >= 1 AND ${ELIGIBLE_USER_SQL}
            ) x
           WHERE x.rn <= 10
-         ON CONFLICT (season_id, user_id) DO NOTHING`,
+         ON CONFLICT (season_id, user_id) DO NOTHING
+         RETURNING user_id, rank, title, return_pct`,
         [seasonId, now.toISOString()]
       );
+
+      // Ödül bildirimleri (aynı transaction; canlı yayın COMMIT sonrası). notify hata fırlatmaz.
+      const seasonName = season.name || seasonNameFor(season.slug);
+      for (const a of awards.rows) {
+        const rank = parseInt(a.rank, 10);
+        const pct = num(a.return_pct);
+        await NotificationService.notify(
+          a.user_id,
+          {
+            type: 'season.award',
+            category: 'competition',
+            title: `Sezon ödülü: ${a.title}`,
+            body: `${seasonName} sezonunu ${rank}. bitirdin — ${a.title}. Sezon getirin: %${pct.toLocaleString('tr-TR', { maximumFractionDigits: 2 })}`,
+            link: '/profile',
+            data: { season_id: seasonId, season_slug: season.slug, season_name: seasonName, rank, title: a.title, return_pct: pct },
+          },
+          client
+        );
+      }
 
       await client.query(
         `UPDATE seasons SET status = 'finished', finalized_at = $2::timestamptz WHERE id = $1`,

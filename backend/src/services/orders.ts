@@ -4,6 +4,7 @@ import { AppError } from '../utils/errors';
 import { AssetType, toNumber } from '../types';
 import { MIN_TRADE_TRY, OrderContext, TransactionService, computeBuyCost, normalizeQuantity } from './transaction';
 import { ExecutionPrice, PricingService, PriceUnavailableError, priceKey } from './pricing';
+import { NotificationService, formatTry } from './notifications';
 
 // ---------------------------------------------------------------------------
 // Tipler
@@ -165,6 +166,64 @@ async function closeWithRefund(
   return refund;
 }
 
+/**
+ * Emir bildirimleri (kategori 'orders'). Çağıranın transaction client'ı ile yazılır: transaction geri
+ * alınırsa bildirim de geri alınır; canlı yayın COMMIT sonrasında yapılır. Hata fırlatmaz.
+ */
+async function notifyOrder(
+  client: PoolClient,
+  kind: 'filled' | 'expired' | 'failed' | 'cancelled_admin',
+  row: any,
+  extra: { price?: number; quantity?: number; refund?: number; reason?: string } = {}
+): Promise<void> {
+  const order = mapOrderRow(row);
+  const label = orderLabel(order.side, order.type).toLocaleLowerCase('tr-TR');
+  const refundText = extra.refund && extra.refund > 0 ? ` ${formatTry(extra.refund)} bakiyenize iade edildi.` : '';
+  const reason = extra.reason?.trim();
+  let title: string;
+  let body: string;
+  switch (kind) {
+    case 'filled':
+      title = 'Emriniz gerçekleşti';
+      body = `${order.symbol} ${label} emriniz ${formatTry(extra.price ?? order.trigger_price)} fiyattan gerçekleşti.`;
+      break;
+    case 'expired':
+      title = 'Emrinizin süresi doldu';
+      body = `${order.symbol} ${label} emrinizin süresi doldu.${refundText}`;
+      break;
+    case 'failed':
+      title = 'Emriniz gerçekleştirilemedi';
+      body = `${order.symbol} ${label} emriniz gerçekleştirilemedi${reason ? `: ${reason}` : '.'}${refundText}`;
+      break;
+    case 'cancelled_admin':
+      title = 'Emriniz iptal edildi';
+      body = `${order.symbol} ${label} emriniz yönetici tarafından iptal edildi${reason ? ` (${reason})` : ''}.${refundText}`;
+      break;
+  }
+  await NotificationService.notify(
+    order.user_id,
+    {
+      type: `order.${kind}`,
+      category: 'orders',
+      title,
+      body,
+      link: '/portfolio',
+      data: {
+        order_id: order.id,
+        symbol: order.symbol,
+        asset_type: order.asset_type,
+        side: order.side,
+        order_type: order.type,
+        ...(extra.price !== undefined ? { price: extra.price } : {}),
+        ...(extra.quantity !== undefined ? { quantity: extra.quantity } : {}),
+        ...(extra.refund ? { refunded: extra.refund } : {}),
+        ...(reason ? { reason } : {}),
+      },
+    },
+    client
+  );
+}
+
 function logActivity(userId: string, activity_type: string, description: string, metadata: Record<string, unknown>) {
   setImmediate(async () => {
     try {
@@ -303,7 +362,7 @@ export class OrderService {
   static async cancelOrder(
     userId: string,
     orderId: string,
-    opts: { type?: OrderType } = {}
+    opts: { type?: OrderType; reason?: string; byAdmin?: boolean; adminReason?: string } = {}
   ): Promise<{ success: true; message: string; order: Order; refunded: number }> {
     return inTransaction(async (client) => {
       await client.query('SELECT id FROM users WHERE id = $1 FOR UPDATE', [userId]);
@@ -318,9 +377,32 @@ export class OrderService {
       if (row.status !== 'active') {
         throw new AppError(409, 'Emir zaten aktif değil', 'ORDER_NOT_ACTIVE');
       }
-      const refunded = await closeWithRefund(client, row, 'cancelled', 'Kullanıcı tarafından iptal edildi');
+      const refunded = await closeWithRefund(client, row, 'cancelled', opts.reason ?? 'Kullanıcı tarafından iptal edildi');
+      if (opts.byAdmin) {
+        await notifyOrder(client, 'cancelled_admin', row, { refund: refunded, reason: opts.adminReason });
+      }
       const fresh = await client.query('SELECT * FROM orders WHERE id = $1', [orderId]);
       return { success: true as const, message: 'Emir iptal edildi', order: mapOrderRow(fresh.rows[0]), refunded };
+    });
+  }
+
+  /**
+   * Yönetici iptali: kullanıcı iptaliyle aynı kilitleme + rezerv iadesi (users → orders).
+   * fail_reason: 'Yönetici tarafından iptal: <neden>' (neden yoksa 'Yönetici tarafından iptal edildi').
+   */
+  static async cancelOrderAsAdmin(
+    orderId: string,
+    reason?: string | null
+  ): Promise<{ success: true; message: string; order: Order; refunded: number }> {
+    const peek = await pool.query('SELECT user_id FROM orders WHERE id = $1', [orderId]);
+    if (!peek.rows[0]) {
+      throw new AppError(404, 'Emir bulunamadı', 'NOT_FOUND');
+    }
+    const text = reason?.trim();
+    return this.cancelOrder(peek.rows[0].user_id, orderId, {
+      reason: text ? `Yönetici tarafından iptal: ${text}` : 'Yönetici tarafından iptal edildi',
+      byAdmin: true,
+      adminReason: text || undefined,
     });
   }
 
@@ -415,7 +497,8 @@ export class OrderService {
         [orderId, userId]
       );
       if (!res.rows[0]) return false;
-      await closeWithRefund(client, res.rows[0], 'expired', 'Emrin süresi doldu');
+      const refund = await closeWithRefund(client, res.rows[0], 'expired', 'Emrin süresi doldu');
+      await notifyOrder(client, 'expired', res.rows[0], { refund });
       return true;
     });
   }
@@ -463,7 +546,8 @@ export class OrderService {
       }
 
       if (row.is_expired) {
-        await closeWithRefund(client, row, 'expired', 'Emrin süresi doldu');
+        const refund = await closeWithRefund(client, row, 'expired', 'Emrin süresi doldu');
+        await notifyOrder(client, 'expired', row, { refund });
         await client.query('COMMIT');
         return 'expired';
       }
@@ -516,6 +600,10 @@ export class OrderService {
           WHERE id = $1`,
         [orderId, result.transaction.price, result.transaction.quantity, result.transaction.id]
       );
+      await notifyOrder(client, 'filled', row, {
+        price: toNumber(result.transaction.price),
+        quantity: toNumber(result.transaction.quantity),
+      });
 
       await client.query('COMMIT');
       outcome = 'filled';
@@ -557,7 +645,8 @@ export class OrderService {
         [orderId, userId]
       );
       if (!res.rows[0]) return false;
-      await closeWithRefund(client, res.rows[0], 'failed', reason);
+      const refund = await closeWithRefund(client, res.rows[0], 'failed', reason);
+      await notifyOrder(client, 'failed', res.rows[0], { refund, reason });
       return true;
     });
   }

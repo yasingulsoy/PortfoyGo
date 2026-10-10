@@ -21,11 +21,17 @@ import stopLossRoutes from './routes/stopLoss';
 import ordersRoutes from './routes/orders';
 import newsRoutes from './routes/news';
 import marketRoutes from './routes/market';
+import priceHistoryRoutes from './routes/priceHistory';
 import watchlistRoutes from './routes/watchlist';
 import seasonsRoutes from './routes/seasons';
 import leaguesRoutes from './routes/leagues';
+import notificationsRoutes from './routes/notifications';
+import arenaRoutes from './routes/arena';
+import advisorRoutes from './routes/advisor';
+import healthRoutes from './routes/health';
 import { globalApiLimiter } from './middleware/rateLimits';
 import { errorHandler, notFoundHandler } from './utils/errors';
+import { httpLogger, logger } from './utils/logger';
 
 /**
  * Express uygulamasını kurar (middleware + route'lar). Sunucuyu BAŞLATMAZ, cron kurmaz.
@@ -40,10 +46,11 @@ export function getAllowedOrigins(): string[] {
   return (envList('ALLOWED_ORIGINS').length > 0 ? envList('ALLOWED_ORIGINS') : ['http://localhost:3000']).filter(
     (origin) => {
       if (!/^https?:\/\//.test(origin)) {
-        console.warn(`[cors] Geçersiz origin formatı yok sayıldı: ${origin}`);
+        logger.warn(`[cors] Geçersiz origin formatı yok sayıldı: ${origin}`);
         return false;
       }
-      if (isProduction() && /localhost|127\.0\.0\.1|0\.0\.0\.0/.test(origin)) {
+      // CORS_ALLOW_LOCALHOST=1: production derlemesini yerelde çalıştırırken (docker compose) localhost'a izin ver
+      if (isProduction() && process.env.CORS_ALLOW_LOCALHOST !== '1' && /localhost|127\.0\.0\.1|0\.0\.0\.0/.test(origin)) {
         return false;
       }
       return true;
@@ -60,6 +67,9 @@ export function createApp(): express.Express {
   }
   app.disable('x-powered-by');
 
+  // İstek kimliği (X-Request-Id) + yapılandırılmış istek logu (pino-http). Bkz. utils/logger.ts
+  app.use(httpLogger);
+
   // ---------------------------------------------------------------------------
   // CORS
   // ---------------------------------------------------------------------------
@@ -75,8 +85,8 @@ export function createApp(): express.Express {
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
-    exposedHeaders: ['Content-Length', 'Content-Type', 'RateLimit', 'RateLimit-Policy', 'Retry-After'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'X-Request-Id'],
+    exposedHeaders: ['Content-Length', 'Content-Type', 'RateLimit', 'RateLimit-Policy', 'Retry-After', 'X-Request-Id'],
     maxAge: 86400,
     optionsSuccessStatus: 204,
   };
@@ -89,17 +99,6 @@ export function createApp(): express.Express {
   );
   app.use(cors(corsOptions));
   app.options('*', cors(corsOptions));
-
-  // Kısa istek logu (sadece production/test dışı)
-  if (!isProduction() && process.env.NODE_ENV !== 'test') {
-    app.use((req, res, next) => {
-      const start = Date.now();
-      res.on('finish', () => {
-        console.log(`${req.method} ${req.originalUrl.split('?')[0]} ${res.statusCode} ${Date.now() - start}ms`);
-      });
-      next();
-    });
-  }
 
   app.use(express.json({ limit: '50kb' }));
   app.use(express.urlencoded({ extended: false, limit: '50kb' }));
@@ -125,6 +124,9 @@ export function createApp(): express.Express {
     res.json({ success: true, message: 'Trading Platform API çalışıyor', timestamp: new Date().toISOString() });
   });
 
+  // Sağlık uçları: /healthz (canlılık), /readyz (DB hazır mı) — rate limit dışında
+  app.use(healthRoutes);
+
   app.use('/api', globalApiLimiter);
   // Yalnızca yerel geliştirme veritabanında etkin (bkz. routes/devLogin.ts); aksi halde 404
   app.use('/api/auth/dev-login', devLoginRoutes);
@@ -144,9 +146,17 @@ export function createApp(): express.Express {
   app.use('/api/orders', ordersRoutes);
   app.use('/api/news', newsRoutes);
   app.use('/api/market', marketRoutes);
+  // Fiyat geçmişi / performans / sparkline (herkese açık)
+  app.use('/api/market', priceHistoryRoutes);
   app.use('/api/watchlist', watchlistRoutes);
   app.use('/api/seasons', seasonsRoutes);
   app.use('/api/leagues', leaguesRoutes);
+  // Bildirimler (+ SSE akışı: /api/notifications/stream)
+  app.use('/api/notifications', notificationsRoutes);
+  // Arena: hızlı al/sat oyun modu (+ SSE: /api/arena/rounds/:id/stream)
+  app.use('/api/arena', arenaRoutes);
+  // Portföy danışmanı: risk profili anketi + önerilen dağılım (MPT + Monte Carlo)
+  app.use('/api/advisor', advisorRoutes);
 
   // Proxy /api önekini siliyorsa: /currencies, /commodities, /news için geriye dönük uyumluluk
   app.use(['/commodities', '/currencies', '/news'], globalApiLimiter);

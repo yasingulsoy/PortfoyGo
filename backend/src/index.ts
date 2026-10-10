@@ -1,9 +1,8 @@
-import { validateServerEnv, isProduction } from './config/env';
+import { validateServerEnv } from './config/env';
 
 // Zorunlu ortam değişkenleri yoksa (ör. JWT_SECRET) burada açık bir mesajla çıkılır
 validateServerEnv();
 
-import cron from 'node-cron';
 // NOT: Route ve middleware kayıtları src/app.ts içindeki createApp()'e taşındı.
 // Yeni route eklerken app.ts'i düzenleyin; bu dosyada sadece sunucu başlatma + cron işleri var.
 import { createApp, getAllowedOrigins } from './app';
@@ -14,6 +13,10 @@ import { PortfolioService } from './services/portfolio';
 import { LeaderboardService } from './services/leaderboard';
 import { HistoryService } from './services/history';
 import { SeasonService } from './services/seasons';
+import { LeagueService } from './services/leagues';
+import { PriceHistoryService } from './services/priceHistory';
+import { jobs } from './services/jobs';
+import { ArenaService } from './services/arena/service';
 
 const app = createApp();
 const PORT = parseInt(process.env.PORT || '5001', 10);
@@ -26,79 +29,103 @@ const PORT = parseInt(process.env.PORT || '5001', 10);
 const marketRefreshDisabled = ['1', 'true', 'yes'].includes((process.env.DISABLE_MARKET_REFRESH || '').trim().toLowerCase());
 
 // ---------------------------------------------------------------------------
-// Zamanlanmış işler — her iş için çakışma koruması (bir önceki çalışma bitmeden yenisi başlamaz)
+// Zamanlanmış işler — services/jobs.ts kaydı üzerinden. Her işin kendi çakışma koruması vardır
+// (bir önceki çalışma bitmeden yenisi başlamaz); son çalışma durumu admin paneline
+// (GET /api/admin/health) yansır ve POST /api/admin/jobs/:name/run ile elle tetiklenebilir.
+// İş adları kararlıdır (bkz. JOB_NAMES).
 // ---------------------------------------------------------------------------
 const CRON_TZ = 'Europe/Istanbul';
-const running = new Set<string>();
-
-async function runGuarded(name: string, fn: () => Promise<unknown>): Promise<void> {
-  if (running.has(name)) {
-    if (!isProduction()) console.warn(`[cron] ${name} hâlâ çalışıyor; bu tur atlandı`);
-    return;
-  }
-  running.add(name);
-  try {
-    await fn();
-  } catch (error: any) {
-    console.error(`[cron] ${name} hatası:`, error?.message || error);
-  } finally {
-    running.delete(name);
-  }
-}
-
-const schedule = (expr: string, name: string, fn: () => Promise<unknown>) =>
-  cron.schedule(expr, () => void runGuarded(name, fn), { timezone: CRON_TZ });
 
 // Piyasa cache'i (hisse + kripto): 2 dakikada bir
 if (marketRefreshDisabled) {
-  console.warn('[server] DISABLE_MARKET_REFRESH etkin: piyasa cache\'i dış API\'lerden yenilenmeyecek.');
-} else {
-  schedule('*/2 * * * *', 'market-cache', () => MarketCacheService.refreshCache());
+  console.warn("[server] DISABLE_MARKET_REFRESH etkin: piyasa cache'i dış API'lerden yenilenmeyecek.");
 }
+jobs.register('market-cache', '*/2 * * * *', () => MarketCacheService.refreshCache(), {
+  enabled: !marketRefreshDisabled,
+  disabledReason: 'DISABLE_MARKET_REFRESH',
+  description: "Hisse + kripto piyasa cache'i",
+});
 
 // Portföy fiyatları: 2 dakikada bir (cache yenilemesinden 1 dk sonra)
 // (node-cron 3 "a-b/n" adımını yanlış çevirdiği için tek dakikalar açıkça listelenir)
 const ODD_MINUTES = Array.from({ length: 30 }, (_, i) => i * 2 + 1).join(',');
-schedule(`${ODD_MINUTES} * * * *`, 'portfolio-prices', () => PortfolioService.updateAllPortfolioPrices());
+jobs.register('portfolio-reprice', `${ODD_MINUTES} * * * *`, () => PortfolioService.updateAllPortfolioPrices(), {
+  description: 'Portföy fiyatları',
+});
 
 // Bekleyen emirler (limit / zarar durdur / kâr al + süre dolumu): her dakika
-schedule('* * * * *', 'orders', () => OrderService.processOrders());
+jobs.register('orders', '* * * * *', () => OrderService.processOrders(), { description: 'Bekleyen emirler' });
 
 // Döviz kurları: 12 saatte bir
-schedule('0 */12 * * *', 'currency-rates', () => providers.fx.refreshRates());
+jobs.register('currency-rates', '0 */12 * * *', () => providers.fx.refreshRates(), { description: 'Döviz kurları' });
 
 // Kümülatif sıralama (users.rank): 5 dakikada bir
-schedule('*/5 * * * *', 'ranks', () => LeaderboardService.updateRanks());
+jobs.register('leaderboard-ranks', '*/5 * * * *', () => LeaderboardService.updateRanks(), {
+  description: 'Kümülatif sıralama',
+});
 
 // Haftalık liderlik referansı: Pazartesi 00:05 (İstanbul) + saatlik güvenlik kontrolü
-schedule('5 0 * * 1', 'week-baseline', () => LeaderboardService.tryResetWeekBaselinesIfNeeded());
-schedule('17 * * * *', 'week-baseline-check', () => LeaderboardService.tryResetWeekBaselinesIfNeeded());
+jobs.register('week-baseline', ['5 0 * * 1', '17 * * * *'], () => LeaderboardService.tryResetWeekBaselinesIfNeeded(), {
+  description: 'Haftalık liderlik referansı',
+});
 
 // Portföy geçmişi: saatlik nokta (xx:02 — xx:01 portföy yeniden fiyatlamasından sonra) + günlük kapanış 23:55 (İstanbul)
-schedule('2 * * * *', 'history-hourly', () => HistoryService.snapshotHourly());
-schedule('55 23 * * *', 'history-daily', () => HistoryService.snapshotDaily());
+jobs.register('portfolio-snapshots-hourly', '2 * * * *', () => HistoryService.snapshotHourly(), {
+  description: 'Portföy geçmişi (saatlik)',
+});
+jobs.register('portfolio-snapshots-daily', '55 23 * * *', () => HistoryService.snapshotDaily(), {
+  description: 'Portföy geçmişi (günlük)',
+});
+
+// Varlık fiyat geçmişi (grafikler/performans/sparkline): 15 dakikada bir, kovanın sonuna yakın
+// (xx:14, :29, :44, :59) → her kovadaki değer kapanış fiyatıdır. Sadece DB/önbellekteki fiyatları
+// okur (dış API çağırmaz); bu yüzden DISABLE_MARKET_REFRESH=1 iken de çalışır.
+jobs.register('price-history', '14,29,44,59 * * * *', () => PriceHistoryService.snapshotJob(), {
+  description: 'Varlık fiyat geçmişi',
+});
 
 // Aylık sezonlar: süresi dolanı sonlandır + güncel sezonu oluştur + yeni uygun kullanıcıları ekle.
 // 5 dakikada bir + ayın 1'i 00:00 (İstanbul) anında kapanış. Sonlandırma idempotenttir ve
 // eşzamanlı çalıştırmaya karşı güvenlidir (sezon satırı FOR UPDATE + status kontrolü).
-const seasonTick = async () => {
-  await SeasonService.ensureCurrentSeason();
-  await SeasonService.enrollEligible();
-};
-schedule('*/5 * * * *', 'seasons', seasonTick);
-schedule('0 0 1 * *', 'season-rollover', seasonTick);
+jobs.register(
+  'seasons',
+  ['*/5 * * * *', '0 0 1 * *'],
+  async () => {
+    await SeasonService.ensureCurrentSeason();
+    await SeasonService.enrollEligible();
+  },
+  { description: 'Aylık sezonlar' }
+);
 
-// Açılışta ilk doldurma
-void runGuarded('startup-currency', () => providers.fx.refreshRates());
-void runGuarded('market-cache', async () => {
-  if (!marketRefreshDisabled) {
-    await MarketCacheService.refreshCache();
-  }
-  await runGuarded('portfolio-prices', () => PortfolioService.updateAllPortfolioPrices());
+// Ligler: zamanı gelenleri başlat (üyelerin referansı yazılır) + süresi dolanları kapat (sonuçlar
+// dondurulur). Her dakika; ikisi de idempotent ve eşzamanlı çalıştırmaya karşı güvenli (lig satırı FOR UPDATE).
+jobs.register('leagues-start', '* * * * *', () => LeagueService.startDue(), { description: 'Lig başlangıçları' });
+jobs.register('leagues-finalize', '* * * * *', () => LeagueService.finalizeDue(), { description: 'Lig kapanışları' });
+
+// Arena (saniye alanlı cron): açık pozisyonların SL/TP/tasfiye kontrolü 2 sn'de bir (bellekte tarar,
+// yalnızca tetiklenince yazar); süresi dolan turların kapanışı ve zamanı gelen meydan okumaların
+// başlatılması 5 sn'de bir. Üçü de idempotent (tur / katılımcı satırı FOR UPDATE + durum kontrolü).
+jobs.register('arena-tick', '*/2 * * * * *', () => ArenaService.tickJob(), { description: 'Arena SL/TP kontrolü' });
+jobs.register('arena-finalize', '*/5 * * * * *', () => ArenaService.finalizeJob(), { description: 'Arena tur kapanışları' });
+jobs.register('arena-challenges', '*/5 * * * * *', () => ArenaService.challengesJob(), {
+  description: 'Arena meydan okuma başlangıçları',
 });
-void runGuarded('week-baseline', () => LeaderboardService.tryResetWeekBaselinesIfNeeded());
-void runGuarded('ranks', () => LeaderboardService.updateRanks());
-void runGuarded('seasons', seasonTick);
+
+jobs.start(CRON_TZ);
+
+// Açılışta ilk doldurma (run() hata fırlatmaz; sonuçlar iş kaydına yazılır)
+void jobs.run('currency-rates');
+void (async () => {
+  if (!marketRefreshDisabled) {
+    await jobs.run('market-cache');
+  }
+  await jobs.run('portfolio-reprice');
+  await jobs.run('price-history');
+})();
+void jobs.run('week-baseline');
+void jobs.run('leaderboard-ranks');
+void jobs.run('seasons');
+void jobs.run('leagues-start').then(() => jobs.run('leagues-finalize'));
 
 app.listen(PORT, () => {
   console.log(`[server] API ${PORT} portunda çalışıyor (NODE_ENV=${process.env.NODE_ENV || 'development'})`);

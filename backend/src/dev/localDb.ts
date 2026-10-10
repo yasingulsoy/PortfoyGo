@@ -4,7 +4,7 @@ import { PGlite } from '@electric-sql/pglite';
 import { Pool } from 'pg';
 import { startPgliteServer } from './pgliteServer';
 import { runMigrations } from '../db/migrator';
-import { DEMO_EMAIL, DEMO_USERNAME, seedMarketData, seedUsers, tickMarket } from './seed';
+import { DEMO_EMAIL, DEMO_USERNAME, seedArena, seedCompetitions, seedMarketData, seedPriceHistory, seedUsers, tickMarket } from './seed';
 
 /**
  * Yerel geliştirme veritabanı: gömülü PostgreSQL (PGlite, WASM) + wire protokol soketi.
@@ -95,6 +95,29 @@ export async function startLocalDb(opts: StartLocalDbOptions = {}): Promise<Loca
       }
     } else {
       log(`Demo hesabı mevcut: ${DEMO_EMAIL} (şifre: .localdb/demo-credentials.txt veya LOCAL_DEMO_PASSWORD)`);
+    }
+
+    const comp = await seedCompetitions(pool);
+    if (comp) {
+      log(
+        `Sezon/lig örnek verisi: güncel sezon ${comp.currentSeason}` +
+          (comp.previousSeason ? `, biten sezon ${comp.previousSeason} (ödüllerle)` : '') +
+          (comp.leagueCreated ? ', "Ofis Ligi" oluşturuldu' : '')
+      );
+    }
+
+    const ph = await seedPriceHistory(pool);
+    if (ph.seeded.length > 0) {
+      log(`Fiyat geçmişi örnek verisi: ${ph.seeded.length} varlık, ${ph.rows} satır (${ph.skipped} varlık zaten hazırdı)`);
+    }
+
+    const arena = await seedArena(pool);
+    if (arena.commodities.length > 0 || arena.upcomingCreated || arena.finishedCreated) {
+      log(
+        `Arena örnek verisi: emtia geçmişi [${arena.commodities.join(', ') || '-'}]` +
+          (arena.upcomingCreated ? ', yaklaşan meydan okuma' : '') +
+          (arena.finishedCreated ? ', bitmiş meydan okuma (sonuçlarla)' : '')
+      );
     }
   } catch (err) {
     await pool.end().catch(() => undefined);

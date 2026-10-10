@@ -177,12 +177,12 @@ describe('SeasonService (PGlite)', () => {
 
   it('canlı sıralama: getiri %, eşitlikte önce katılan; getCurrent `me` ve tembel katılım', async () => {
     const slug = comp.seasonSlugFor(new Date());
-    // Önceki testlerin katılımcılarını sıralamadan çıkar (bu test kendi kullanıcılarına bakar)
-    await q(`DELETE FROM season_participants`);
     const a = await newUser({ balance: 110_000 });
     const b = await newUser({ balance: 105_000 });
     const c = await newUser({ balance: 105_000 });
     await svc.enrollEligible();
+    // Önceki testlerin katılımcılarını sıralamadan çıkar (bu test kendi kullanıcılarına bakar)
+    await q(`DELETE FROM season_participants WHERE user_id NOT IN ($1, $2, $3)`, [a, b, c]);
     const t0 = new Date(Date.now() - 3_600_000);
     await setBaseline(slug, a, 100_000, t0); // +10%
     await setBaseline(slug, b, 100_000, new Date(t0.getTime() + 1000)); // +5%, önce katıldı

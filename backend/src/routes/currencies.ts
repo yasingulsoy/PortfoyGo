@@ -4,6 +4,7 @@ import type { FxRate as CurrencyRate } from '../providers/types';
 import { authenticateToken } from '../middleware/auth';
 import { isAdmin } from '../middleware/admin';
 import { asyncHandler, badRequest } from '../utils/errors';
+import { AuditService } from '../services/audit';
 
 const router = express.Router();
 
@@ -41,8 +42,15 @@ router.post(
   '/refresh',
   authenticateToken,
   isAdmin,
-  asyncHandler(async (_req, res) => {
+  asyncHandler(async (req, res) => {
     const count = await providers.fx.refreshRates();
+    await AuditService.log(req, {
+      action: 'cache.refresh_currencies',
+      targetType: 'cache',
+      targetId: 'fx',
+      targetLabel: 'Döviz kurları',
+      metadata: { count },
+    });
     res.json({ success: true, message: `${count} döviz güncellendi` });
   })
 );

@@ -209,19 +209,59 @@ export const seasonLeaderboardQuerySchema = z.object({
 
 /** Lig bitişi: gelecekte ve en fazla 1 yıl sonra (ISO 8601) */
 const MAX_LEAGUE_DURATION_MS = 366 * 24 * 60 * 60 * 1000;
+/** Lig başlangıcı: en erken 1 dk önce (saat farkı toleransı), en geç 30 gün sonra */
+const LEAGUE_START_PAST_TOLERANCE_MS = 60 * 1000;
+const LEAGUE_START_MAX_AHEAD_MS = 30 * 24 * 60 * 60 * 1000;
+
+/** Lig süreleri (ends_at = starts_at + süre) */
+export const LEAGUE_DURATIONS = ['1d', '3d', '1w', '2w', '1m', '3m'] as const;
+export type LeagueDuration = (typeof LEAGUE_DURATIONS)[number];
+export const LEAGUE_VISIBILITIES = ['private', 'public'] as const;
+export const LEAGUE_STATUS_FILTERS = ['upcoming', 'active', 'finished', 'open'] as const;
+
+const leagueNameField = z
+  .string({ message: 'Lig adı gerekli' })
+  .trim()
+  .min(3, 'Lig adı en az 3 karakter olmalı')
+  .max(40, 'Lig adı en fazla 40 karakter olabilir');
+
+const leagueDescriptionText = z
+  .string({ message: 'Açıklama metin olmalı' })
+  .trim()
+  .max(200, 'Açıklama en fazla 200 karakter olabilir');
+
+const leagueVisibilityField = z.enum(LEAGUE_VISIBILITIES, { message: 'Görünürlük "private" veya "public" olmalı' });
+const leagueDurationField = z.enum(LEAGUE_DURATIONS, { message: 'Geçersiz lig süresi' });
+
+const leagueStartsAtField = z
+  .string({ message: 'Başlangıç tarihi geçerli bir tarih olmalı' })
+  .trim()
+  .transform((v, ctx) => {
+    const d = new Date(v);
+    if (!v || Number.isNaN(d.getTime())) {
+      ctx.addIssue({ code: 'custom', message: 'Başlangıç tarihi geçerli bir tarih olmalı' });
+      return z.NEVER;
+    }
+    if (d.getTime() < Date.now() - LEAGUE_START_PAST_TOLERANCE_MS) {
+      ctx.addIssue({ code: 'custom', message: 'Başlangıç tarihi geçmişte olamaz' });
+      return z.NEVER;
+    }
+    if (d.getTime() > Date.now() + LEAGUE_START_MAX_AHEAD_MS) {
+      ctx.addIssue({ code: 'custom', message: 'Başlangıç tarihi en fazla 30 gün sonrası olabilir' });
+      return z.NEVER;
+    }
+    return d;
+  });
 
 export const createLeagueSchema = z.object({
-  name: z
-    .string({ message: 'Lig adı gerekli' })
-    .trim()
-    .min(3, 'Lig adı en az 3 karakter olmalı')
-    .max(40, 'Lig adı en fazla 40 karakter olabilir'),
-  description: z
-    .string({ message: 'Açıklama metin olmalı' })
-    .trim()
-    .max(200, 'Açıklama en fazla 200 karakter olabilir')
-    .nullish()
-    .transform((d) => (d ? d : null)),
+  name: leagueNameField,
+  description: leagueDescriptionText.nullish().transform((d) => (d ? d : null)),
+  visibility: leagueVisibilityField.optional().transform((v) => v ?? 'private'),
+  /** Yoksa hemen başlar */
+  starts_at: leagueStartsAtField.nullish().transform((d) => d ?? null),
+  /** Verilirse ends_at'ten önceliklidir */
+  duration: leagueDurationField.nullish().transform((d) => d ?? null),
+  /** Eski istemciler: mutlak bitiş tarihi (duration yoksa kullanılır; ikisi de yoksa süresiz lig) */
   ends_at: z
     .string({ message: 'Bitiş tarihi geçerli bir tarih olmalı' })
     .trim()
@@ -244,6 +284,48 @@ export const createLeagueSchema = z.object({
       return d;
     }),
 });
+
+/** PATCH /api/leagues/:id — tarih alanları (starts_at, duration) sadece lig başlamadan değiştirilebilir */
+export const updateLeagueSchema = z
+  .object({
+    name: leagueNameField.optional(),
+    /** null veya '' → açıklamayı kaldırır */
+    description: leagueDescriptionText
+      .nullable()
+      .optional()
+      .transform((d) => (d === undefined ? undefined : d ? d : null)),
+    visibility: leagueVisibilityField.optional(),
+    starts_at: leagueStartsAtField.optional(),
+    duration: leagueDurationField.optional(),
+  })
+  .refine(
+    (v) => v.name !== undefined || v.description !== undefined || v.visibility !== undefined || v.starts_at !== undefined || v.duration !== undefined,
+    { message: 'Güncellenecek bir alan gönderin' }
+  );
+
+export const publicLeaguesQuerySchema = z.object({
+  search: z
+    .string()
+    .trim()
+    .max(40, 'Arama en fazla 40 karakter olabilir')
+    .optional()
+    .transform((s) => (s ? s : undefined)),
+  status: z
+    .string()
+    .optional()
+    .transform((s, ctx) => {
+      if (!s) return 'open' as const;
+      if (!(LEAGUE_STATUS_FILTERS as readonly string[]).includes(s)) {
+        ctx.addIssue({ code: 'custom', message: 'Geçersiz lig durumu' });
+        return z.NEVER;
+      }
+      return s as (typeof LEAGUE_STATUS_FILTERS)[number];
+    }),
+  limit: clampedInt(20, 1, 50),
+  offset: clampedInt(0, 0, 100_000),
+});
+
+export const leagueFeedQuerySchema = z.object({ limit: clampedInt(30, 1, 100) });
 
 const inviteCodeField = z
   .string({ message: 'Davet kodu gerekli' })

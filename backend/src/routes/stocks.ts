@@ -6,6 +6,7 @@ import { authenticateToken } from '../middleware/auth';
 import { isAdmin } from '../middleware/admin';
 import { AppError, asyncHandler, badRequest } from '../utils/errors';
 import { maybeBackgroundRefresh } from './marketRefresh';
+import { AuditService } from '../services/audit';
 
 const router = express.Router();
 
@@ -77,9 +78,16 @@ router.get(
 router.post(
   '/refresh-cache',
   ...adminOnly,
-  asyncHandler(async (_req, res) => {
+  asyncHandler(async (req, res) => {
     await MarketCacheService.refreshCache();
     const stocks = await MarketCacheService.getFromCache('stock');
+    await AuditService.log(req, {
+      action: 'cache.refresh_stocks',
+      targetType: 'cache',
+      targetId: 'stock',
+      targetLabel: 'Piyasa cache (hisse + kripto)',
+      metadata: { count: stocks.length },
+    });
     res.json({
       success: true,
       message: `Cache başarıyla yenilendi. ${stocks.length} adet hisse senedi cache'de.`,

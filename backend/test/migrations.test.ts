@@ -26,10 +26,13 @@ describe('migration runner', () => {
   });
 
   it('re-running 000_base.sql on the migrated schema is a no-op', async () => {
+    const before = await pool.query('SELECT COUNT(*)::int AS n FROM badges');
     const res = await runMigrations(pool, { ...quiet, only: '000_base.sql' });
     expect(res.applied).toEqual(['000_base.sql']);
     const badges = await pool.query('SELECT COUNT(*)::int AS n FROM badges');
-    expect(badges.rows[0].n).toBe(12);
+    // 000 başlangıç rozetleri (12) + sonraki migration'ların ekledikleri (011: 2 Arena rozeti); tekrar çalıştırma ekleme yapmaz
+    expect(badges.rows[0].n).toBe(before.rows[0].n);
+    expect(badges.rows[0].n).toBe(14);
   });
 
   it('dry-run lists new files, then a real run applies them; changed files are reported', async () => {
