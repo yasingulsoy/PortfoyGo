@@ -13,7 +13,7 @@ interface FieldProps extends InputHTMLAttributes<HTMLInputElement> {
 }
 
 const inputBase =
-  'h-11 w-full rounded-lg border bg-surface px-3.5 text-sm text-fg placeholder:text-subtle transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--ring)] disabled:opacity-60';
+  'h-11 w-full rounded-lg border bg-transparent px-4 text-sm text-fg placeholder:text-subtle shadow-card transition-[border-color,box-shadow] focus:border-brand/50 focus:outline-none focus:ring-[3px] focus:ring-brand/10 disabled:opacity-60';
 
 export const Field = forwardRef<HTMLInputElement, FieldProps>(function Field({ label, hint, error, suffix, className, id, type, 'aria-describedby': describedBy, ...rest }, ref) {
   const autoId = useId();
@@ -23,7 +23,7 @@ export const Field = forwardRef<HTMLInputElement, FieldProps>(function Field({ l
 
   return (
     <div className={className}>
-      <label htmlFor={inputId} className="mb-1.5 block text-xs font-medium text-muted">
+      <label htmlFor={inputId} className="mb-1.5 block text-sm font-medium text-fg/80">
         {label}
       </label>
       <div className="relative">

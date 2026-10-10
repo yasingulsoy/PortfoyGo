@@ -6,16 +6,20 @@ import { useTheme } from 'next-themes';
 import {
   ArrowRightEndOnRectangleIcon,
   ArrowsRightLeftIcon,
+  BoltIcon,
   BriefcaseIcon,
   ClockIcon,
   CommandLineIcon,
+  KeyIcon,
   MagnifyingGlassIcon,
   NewspaperIcon,
   ShieldCheckIcon,
+  SparklesIcon,
   Squares2X2Icon,
   SwatchIcon,
   TrophyIcon,
   UserCircleIcon,
+  UserGroupIcon,
   UserPlusIcon,
 } from '@heroicons/react/20/solid';
 import { useAuth } from '@/context/AuthContext';
@@ -203,7 +207,11 @@ function PaletteBody({ onClose }: { onClose: () => void }) {
       nav('nav-markets', 'Piyasalar', '/', Squares2X2Icon, 'ana sayfa dashboard hisse kripto doviz emtia', 'G M'),
       nav('nav-portfolio', 'Portföy', '/portfolio', BriefcaseIcon, 'portfoy pozisyon varlik', 'G P'),
       nav('nav-transactions', 'İşlemler', '/transactions', ArrowsRightLeftIcon, 'islem gecmis alim satim', 'G I'),
-      nav('nav-leaderboard', 'Liderlik', '/leaderboard', TrophyIcon, 'liderlik siralama yarisma', 'G L'),
+      nav('nav-advisor', 'Portföy Sihirbazı', '/advisor', SparklesIcon, 'portfoy sihirbazi risk profili anket oneri dagilim robo danisman monte carlo'),
+      nav('nav-leaderboard', 'Liderlik', '/leaderboard', TrophyIcon, 'liderlik siralama yarisma sezon unvan', 'G L'),
+      nav('cmd-arena', 'Arena / Hızlı tur', '/arena', BoltIcon, 'arena hizli tur oyun al sat meydan okuma challenge'),
+      nav('nav-leagues', 'Ligler', '/leagues', UserGroupIcon, 'lig ozel arkadas davet kod'),
+      nav('cmd-join-league', 'Lige katıl', '/leagues?join=1', KeyIcon, 'lig katil ozel arkadas davet kod'),
       nav('nav-news', 'Haberler', '/news', NewspaperIcon, 'haber gundem', 'G H'),
       nav('nav-profile', 'Profil', '/profile', UserCircleIcon, 'profil hesap rozet ayar', 'G O'),
     ];

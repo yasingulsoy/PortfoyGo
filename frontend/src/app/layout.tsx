@@ -1,11 +1,13 @@
 import type { Metadata, Viewport } from 'next';
-import { Geist, Geist_Mono } from 'next/font/google';
+import { Geist, Geist_Mono, Outfit } from 'next/font/google';
 import './globals.css';
 import Providers from '@/components/Providers';
 import AppShell from '@/components/layout/AppShell';
 
 const geistSans = Geist({ variable: '--font-geist-sans', subsets: ['latin', 'latin-ext'] });
 const geistMono = Geist_Mono({ variable: '--font-geist-mono', subsets: ['latin', 'latin-ext'] });
+// TailAdmin'in yazı tipi
+const outfit = Outfit({ variable: '--font-outfit', subsets: ['latin', 'latin-ext'] });
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'),
@@ -27,15 +29,15 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: [
-    { media: '(prefers-color-scheme: light)', color: '#f5f6fa' },
-    { media: '(prefers-color-scheme: dark)', color: '#0a0d16' },
+    { media: '(prefers-color-scheme: light)', color: '#f9fafb' },
+    { media: '(prefers-color-scheme: dark)', color: '#101828' },
   ],
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="tr" suppressHydrationWarning>
-      <body className={`${geistSans.variable} ${geistMono.variable} min-h-dvh bg-canvas text-fg antialiased`}>
+      <body className={`${outfit.variable} ${geistSans.variable} ${geistMono.variable} min-h-dvh bg-canvas text-fg antialiased`}>
         <Providers>
           <AppShell>{children}</AppShell>
         </Providers>

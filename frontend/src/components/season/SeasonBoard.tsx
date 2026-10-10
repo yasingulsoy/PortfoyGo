@@ -2,13 +2,14 @@
 
 import { useMemo, useState } from 'react';
 import useSWR from 'swr';
-import { CalendarDaysIcon, ListBulletIcon, TrophyIcon } from '@heroicons/react/20/solid';
+import { CalendarDaysIcon, ChevronDownIcon, TrophyIcon } from '@heroicons/react/20/solid';
 import Button from '@portfoygo/shared/ui/Button';
 import { Card, CardHeader } from '@portfoygo/shared/ui/Card';
 import { Alert, EmptyState } from '@portfoygo/shared/ui/Feedback';
 import Podium, { PodiumSkeleton } from '@/components/leaderboard/Podium';
 import RankList, { RankListSkeleton } from '@/components/leaderboard/RankList';
 import { toLeaders } from '@/components/leaderboard/model';
+import { ToolbarButton } from '@/components/common/controls';
 import { seasonsApi } from '@/lib/api';
 import type { User } from '@/types';
 import SeasonHeaderCard, { SeasonHeaderSkeleton } from './SeasonHeaderCard';
@@ -92,11 +93,11 @@ export default function SeasonBoard({ user }: { user: User }) {
   })();
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 md:space-y-6">
       {loadingSeason ? <SeasonHeaderSkeleton /> : season ? <SeasonHeaderCard season={season} participants={participants} /> : null}
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
-        <div className="min-w-0 space-y-6">
+      <div className="grid grid-cols-1 gap-4 md:gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
+        <div className="min-w-0 space-y-4 md:space-y-6">
           {first.error && leaders.length > 0 && <Alert tone="error">Sezon tablosu güncellenemedi; son alınan sıralama gösteriliyor.</Alert>}
 
           {board}
@@ -104,8 +105,7 @@ export default function SeasonBoard({ user }: { user: User }) {
           {(loadingBoard || rest.length > 0) && season && (
             <Card className="overflow-hidden">
               <CardHeader
-                icon={<ListBulletIcon />}
-                title="Sezon getirisi"
+                title="Sezon sıralaması"
                 description={loadingBoard ? 'Yükleniyor' : `${total > 0 ? `${total} oyuncu · ` : ''}sezona girişten bu yana`}
               />
               {loadingBoard ? (
@@ -117,26 +117,28 @@ export default function SeasonBoard({ user }: { user: User }) {
                     Array.from({ length: pages - 1 }, (_, i) => (
                       <SeasonPage key={i} slug={slug} offset={(i + 1) * PAGE} username={user.username} />
                     ))}
-                  {pages * PAGE < total && (
-                    <div className="border-t border-line p-3 text-center">
-                      <Button variant="ghost" size="sm" onClick={() => setPages((p) => p + 1)}>
+                  {pages * PAGE < total ? (
+                    <div className="border-t border-line px-5 py-4 text-center sm:px-6">
+                      <ToolbarButton onClick={() => setPages((p) => p + 1)} icon={<ChevronDownIcon className="h-4 w-4" aria-hidden="true" />}>
                         Daha fazla göster
-                      </Button>
+                      </ToolbarButton>
                     </div>
+                  ) : (
+                    <div className="h-2" aria-hidden="true" />
                   )}
                 </>
               )}
             </Card>
           )}
 
-          <LeaguesPromo className="lg:hidden" />
+          <LeaguesPromo className="xl:hidden" />
           <PastSeasons />
         </div>
 
-        <aside className="order-first lg:order-none">
-          <div className="space-y-6 lg:sticky lg:top-24">
+        <aside className="order-first xl:order-none">
+          <div className="space-y-4 md:space-y-6 xl:sticky xl:top-24">
             <MySeasonCard me={current.data?.me ?? null} verified={user.email_verified} loading={loadingSeason} participants={participants} />
-            <LeaguesPromo className="hidden lg:block" />
+            <LeaguesPromo className="hidden xl:block" />
           </div>
         </aside>
       </div>
@@ -152,11 +154,11 @@ function SeasonPage({ slug, offset, username }: { slug: string; offset: number; 
   const leaders = useMemo(() => toLeaders(data?.entries ?? []), [data]);
 
   return (
-    <div className="border-t border-line">
+    <div className="mx-5 border-t border-line sm:mx-6 [&>*]:-mx-5 sm:[&>*]:-mx-6">
       {isLoading && !data ? (
         <RankListSkeleton rows={4} />
       ) : error && !data ? (
-        <div className="p-4">
+        <div className="px-5 py-4 sm:px-6">
           <Alert tone="error">
             Sonraki sıralar yüklenemedi.{' '}
             <button type="button" className="font-semibold underline underline-offset-2" onClick={() => void mutate()}>

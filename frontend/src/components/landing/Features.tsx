@@ -51,8 +51,8 @@ const FEATURES: Feature[] = [
   },
   {
     icon: CalendarDaysIcon,
-    title: 'Haftalık yarışma',
-    text: 'Her Pazartesi herkes aynı çizgiden başlar. Yeni ya da eski oyuncu fark etmez; haftanın en iyi getirisi kazanır.',
+    title: 'Aylık sezonlar ve özel ligler',
+    text: 'Her ay yeni sezon: herkes sezona girdiği andan itibaren getirisiyle yarışır, ilk 10 unvan kazanır. Arkadaşlarınla özel lig kurup kendi aranızda da yarışın.',
     visual: <WeekVisual />,
   },
   {

@@ -1,11 +1,12 @@
 'use client';
 
 import { useState } from 'react';
-import { ArrowPathIcon, ClipboardDocumentIcon, LinkIcon, TicketIcon } from '@heroicons/react/20/solid';
+import { ArrowPathIcon, ClipboardDocumentIcon, LinkIcon } from '@heroicons/react/20/solid';
 import Button from '@portfoygo/shared/ui/Button';
 import { Card, CardBody, CardHeader } from '@portfoygo/shared/ui/Card';
 import { useToast } from '@portfoygo/shared/ui/Toast';
 import { leaguesApi } from '@/lib/api';
+import { ToolbarButton } from '@/components/common/controls';
 import ConfirmModal from './ConfirmModal';
 import { inviteLink, useCopy } from './shared';
 
@@ -15,46 +16,47 @@ interface Props {
   isOwner: boolean;
   full: boolean;
   ended: boolean;
+  /** Lig başlamadan önce davet kartı öne çıkarılır */
+  prominent?: boolean;
   onCodeChanged: (code: string) => void;
 }
 
 /** Davet kodu, kopyalama / paylaşım bağlantısı ve (kurucu için) kodu yenileme. */
-export default function InviteCard({ leagueId, code, isOwner, full, ended, onCodeChanged }: Props) {
+export default function InviteCard({ leagueId, code, isOwner, full, ended, prominent, onCodeChanged }: Props) {
   const copy = useCopy();
   const toast = useToast();
   const [confirmOpen, setConfirmOpen] = useState(false);
   const link = inviteLink(code);
 
   return (
-    <Card>
-      <CardHeader icon={<TicketIcon />} title="Davet" description="Kodu ya da bağlantıyı arkadaşlarınla paylaş" />
-      <CardBody className="space-y-4">
-        <div className="rounded-xl border border-dashed border-line-strong bg-surface-2/60 px-4 py-4 text-center">
-          <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-subtle">Davet kodu</p>
+    <Card featured={prominent}>
+      <CardHeader
+        title={prominent ? 'Rakiplerini çağır' : 'Davet'}
+        description={prominent ? 'Başlamadan katılan herkes eşit başlar' : 'Kodu ya da bağlantıyı arkadaşlarınla paylaş'}
+      />
+      <CardBody className="space-y-4 border-t border-line">
+        <div className="rounded-xl border border-dashed border-line-strong bg-surface-2 px-4 py-5 text-center">
+          <p className="text-sm text-muted">Davet kodu</p>
           <p className="mt-1 select-all break-all font-mono text-2xl font-semibold tracking-[0.2em] text-fg sm:text-3xl">
             {code || '—'}
           </p>
         </div>
 
-        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
-          <Button
-            variant="secondary"
-            size="sm"
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+          <ToolbarButton
             disabled={!code}
             onClick={() => void copy(code, 'Davet kodu kopyalandı')}
             icon={<ClipboardDocumentIcon className="h-4 w-4" aria-hidden="true" />}
           >
             Kodu kopyala
-          </Button>
-          <Button
-            variant="secondary"
-            size="sm"
+          </ToolbarButton>
+          <ToolbarButton
             disabled={!code}
             onClick={() => void copy(link, 'Davet bağlantısı kopyalandı')}
             icon={<LinkIcon className="h-4 w-4" aria-hidden="true" />}
           >
             Bağlantıyı kopyala
-          </Button>
+          </ToolbarButton>
         </div>
         <p className="break-all font-mono text-[11px] leading-relaxed text-subtle">{link}</p>
 

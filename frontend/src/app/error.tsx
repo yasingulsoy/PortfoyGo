@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import { ArrowPathIcon, HomeIcon } from '@heroicons/react/20/solid';
+import { ArrowPathIcon, ExclamationTriangleIcon, HomeIcon } from '@heroicons/react/20/solid';
 import Button, { LinkButton } from '@portfoygo/shared/ui/Button';
 import { Card } from '@portfoygo/shared/ui/Card';
 import { Alert } from '@portfoygo/shared/ui/Feedback';
@@ -15,7 +15,10 @@ export default function RouteError({ error, retry }: { error: Error & { digest?:
   return (
     <div className="flex min-h-[60vh] items-center justify-center py-10">
       <Card className="w-full max-w-md p-6 sm:p-8">
-        <h1 className="text-xl font-semibold tracking-tight text-fg">Bir şeyler ters gitti</h1>
+        <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-down-soft text-down">
+          <ExclamationTriangleIcon className="h-6 w-6" aria-hidden="true" />
+        </span>
+        <h1 className="mt-5 text-xl font-semibold text-fg">Bir şeyler ters gitti</h1>
         <p className="mt-1.5 text-sm leading-relaxed text-muted">
           Bu sayfa yüklenirken beklenmeyen bir hata oluştu. Portföyün ve bakiyen güvende; tekrar denemek çoğu zaman sorunu çözer.
         </p>

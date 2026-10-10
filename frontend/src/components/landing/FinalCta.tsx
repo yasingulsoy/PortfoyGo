@@ -5,7 +5,7 @@ import { formatNumber } from '@portfoygo/shared/format';
 
 export default function FinalCta() {
   return (
-    <section aria-labelledby="landing-cta-title" className="relative isolate overflow-hidden rounded-3xl bg-brand px-6 py-14 text-brand-fg sm:px-12 sm:py-20">
+    <section aria-labelledby="landing-cta-title" className="relative isolate overflow-hidden rounded-2xl bg-brand px-6 py-14 text-brand-fg sm:px-12 sm:py-20">
       {/* Yükselen grafik motifi */}
       <svg aria-hidden="true" viewBox="0 0 800 300" preserveAspectRatio="none" className="pointer-events-none absolute inset-0 -z-10 h-full w-full">
         <defs>
@@ -50,7 +50,7 @@ export default function FinalCta() {
 
 export function Disclaimer() {
   return (
-    <aside aria-label="Yasal uyarı" className="flex gap-3 rounded-2xl border border-line bg-surface-2/50 p-5 text-xs leading-relaxed text-muted">
+    <aside aria-label="Yasal uyarı" className="flex gap-3 rounded-2xl border border-line bg-surface p-5 text-xs leading-relaxed text-muted">
       <InformationCircleIcon className="mt-0.5 h-4 w-4 shrink-0 text-subtle" aria-hidden="true" />
       <p>
         PortfoyGo eğitim ve eğlence amaçlı bir yatırım simülasyonudur. Tüm işlemler sanal parayla yapılır; gerçek para yatırılamaz veya

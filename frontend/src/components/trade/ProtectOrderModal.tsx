@@ -173,7 +173,7 @@ function ProtectForm({
 
   return (
     <form onSubmit={submit} noValidate>
-      <div className="flex items-center gap-3 rounded-xl bg-surface-2 p-3">
+      <div className="flex items-center gap-3 rounded-xl border border-line bg-surface-2 p-3.5">
         <AssetAvatar symbol={holding.symbol} type={holding.assetType} image={holding.image} size={40} />
         <div className="min-w-0 flex-1">
           <p className="font-mono text-sm font-semibold">{holding.symbol}</p>
@@ -259,8 +259,8 @@ function ProtectForm({
               onClick={() => setFraction(f)}
               aria-pressed={selected}
               className={cn(
-                'h-8 rounded-lg border text-xs font-medium transition-colors disabled:opacity-40',
-                selected ? 'border-brand bg-brand-soft text-brand' : 'border-line text-muted hover:border-line-strong hover:text-fg',
+                'h-9 rounded-lg border text-xs font-medium transition-colors disabled:opacity-40',
+                selected ? 'border-brand bg-brand-soft text-brand' : 'border-line text-muted hover:bg-surface-2 hover:text-fg',
               )}
             >
               {f === 1 ? 'Tümü' : `%${f * 100}`}
@@ -270,7 +270,7 @@ function ProtectForm({
       </div>
 
       <div className="mt-4 flex items-center justify-between gap-3">
-        <span className="text-xs font-medium text-muted">Geçerlilik</span>
+        <span className="text-sm font-medium text-fg/80">Geçerlilik</span>
         <Tabs
           label="Emir geçerlilik süresi"
           value={expiry}
@@ -280,7 +280,7 @@ function ProtectForm({
         />
       </div>
 
-      <dl className="mt-5 space-y-2.5 rounded-xl bg-surface-2 p-4 text-sm">
+      <dl className="mt-5 space-y-2.5 rounded-xl border border-line bg-surface-2 p-4 text-sm">
         <Row label="Satış tutarı (tahmini)" value={valid ? formatTRY(gross) : '—'} />
         <Row label={`Komisyon (%${(COMMISSION_RATE * 100).toLocaleString('tr-TR')})`} value={valid ? formatTRY(commission) : '—'} />
         <div className="border-t border-line pt-2.5">

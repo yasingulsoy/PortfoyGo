@@ -46,7 +46,7 @@ export default function ConfirmModal({ open, onClose, title, children, confirmLa
       size="sm"
       title={title}
       footer={
-        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+        <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
           <Button variant="secondary" onClick={close} disabled={pending} data-autofocus>
             Vazgeç
           </Button>

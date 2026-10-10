@@ -1,11 +1,11 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { QueueListIcon } from '@heroicons/react/20/solid';
+import Link from 'next/link';
 import { useLivePortfolio } from '@/context/PortfolioContext';
 import { useAuth } from '@/context/AuthContext';
 import { Card, CardHeader } from '@portfoygo/shared/ui/Card';
-import { LinkButton } from '@portfoygo/shared/ui/Button';
+import { toolbarButtonClass } from '@/components/common/controls';
 import { CancelOrderDialog, OrderListRow } from '@/components/portfolio/OrdersCard';
 import { useOrders, type OrderRow } from '@/components/portfolio/useOrders';
 import type { AssetType } from '@/types';
@@ -23,12 +23,15 @@ export default function SymbolOrdersCard({ type, symbol, livePrice }: { type: As
   return (
     <Card className="overflow-hidden">
       <CardHeader
-        icon={<QueueListIcon />}
         title="Bekleyen emirlerin"
         description={`${symbol} için ${rows.length} aktif emir`}
-        action={<LinkButton href="/portfolio#bekleyen-emirler" variant="ghost" size="sm">Tümü</LinkButton>}
+        action={
+          <Link href="/portfolio#bekleyen-emirler" className={toolbarButtonClass}>
+            Tümü
+          </Link>
+        }
       />
-      <ul className="divide-y divide-line">
+      <ul className="divide-y divide-line border-t border-line">
         {rows.map((o) => (
           <OrderListRow key={o.id} order={o} livePrice={livePrice} showAvatar={false} onCancel={() => setPending(o)} />
         ))}

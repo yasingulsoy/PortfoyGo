@@ -12,27 +12,23 @@ export default function Hero() {
   return (
     <section
       aria-labelledby="landing-hero-title"
-      className="relative isolate overflow-hidden rounded-3xl border border-line bg-surface px-5 py-12 sm:px-10 sm:py-16 lg:px-14 lg:py-20"
-      style={{
-        backgroundImage:
-          'radial-gradient(60% 70% at 0% 0%, var(--brand-soft), transparent 70%), radial-gradient(50% 60% at 100% 100%, var(--brand-soft), transparent 70%)',
-      }}
+      className="relative isolate overflow-hidden rounded-2xl border border-line bg-surface px-5 py-12 sm:px-10 sm:py-16 lg:px-14 lg:py-20"
     >
-      {/* Izgara dokusu */}
+      {/* Sağ üst köşede silikleşen ince ızgara (TailAdmin dokusu) */}
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute inset-0 -z-10 opacity-70"
+        className="pointer-events-none absolute right-0 top-0 -z-10 h-2/3 w-2/3"
         style={{
           backgroundImage: 'linear-gradient(var(--line) 1px, transparent 1px), linear-gradient(90deg, var(--line) 1px, transparent 1px)',
-          backgroundSize: '44px 44px',
-          maskImage: 'radial-gradient(70% 70% at 30% 40%, black, transparent 80%)',
-          WebkitMaskImage: 'radial-gradient(70% 70% at 30% 40%, black, transparent 80%)',
+          backgroundSize: '48px 48px',
+          maskImage: 'radial-gradient(100% 100% at 100% 0%, black, transparent 70%)',
+          WebkitMaskImage: 'radial-gradient(100% 100% at 100% 0%, black, transparent 70%)',
         }}
       />
 
       <div className="grid grid-cols-1 items-center gap-12 lg:grid-cols-[1.05fr_1fr] lg:gap-14">
         <div>
-          <p className="inline-flex items-center gap-2 rounded-full border border-line bg-surface/80 px-3 py-1 text-xs font-medium text-muted backdrop-blur">
+          <p className="inline-flex items-center gap-2 rounded-full bg-brand-soft px-3 py-1 text-xs font-medium text-brand">
             <span className="relative flex h-2 w-2" aria-hidden="true">
               <span className="absolute inline-flex h-full w-full rounded-full bg-up opacity-60 motion-safe:animate-ping" />
               <span className="relative inline-flex h-2 w-2 rounded-full bg-up" />
@@ -59,7 +55,7 @@ export default function Hero() {
           </p>
 
           <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-            <LinkButton href="/register" size="lg" className="px-6 shadow-card">
+            <LinkButton href="/register" size="lg" className="px-6">
               Ücretsiz başla
               <ArrowRightIcon className="h-4 w-4" aria-hidden="true" />
             </LinkButton>
@@ -112,7 +108,7 @@ const HOLDINGS: { symbol: string; name: string; type: AssetType; change: number 
 function HeroVisual() {
   return (
     <div aria-hidden="true" className="relative mx-auto w-full max-w-lg select-none lg:max-w-none">
-      <div className="relative rounded-2xl border border-line bg-surface/90 p-5 shadow-card backdrop-blur sm:p-6">
+      <div className="relative rounded-2xl border border-line bg-surface p-5 shadow-card sm:p-6">
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-subtle">Örnek portföy</p>
@@ -156,7 +152,7 @@ function HeroVisual() {
 
         <ul className="mt-4 grid grid-cols-3 gap-2">
           {HOLDINGS.map((h) => (
-            <li key={h.symbol} className="flex min-w-0 items-center gap-2 rounded-xl border border-line bg-surface-2/60 p-2 sm:p-2.5">
+            <li key={h.symbol} className="flex min-w-0 items-center gap-2 rounded-xl border border-line bg-surface-2 p-2 sm:p-2.5">
               <AssetAvatar symbol={h.symbol} type={h.type} size={28} className="max-sm:hidden" />
               <div className="min-w-0">
                 <p className="truncate font-mono text-[12px] font-semibold text-fg">{h.symbol}</p>
@@ -168,7 +164,7 @@ function HeroVisual() {
       </div>
 
       {/* Yüzen bildirimler */}
-      <div className="absolute -left-6 bottom-24 hidden items-center gap-2.5 rounded-xl border border-line bg-surface px-3 py-2.5 shadow-xl sm:flex lg:-left-10">
+      <div className="absolute -left-6 bottom-24 hidden items-center gap-2.5 rounded-xl border border-line bg-surface px-3 py-2.5 shadow-pop sm:flex lg:-left-10">
         <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-up-soft text-up">
           <ShieldCheckIcon className="h-4 w-4" />
         </span>
@@ -177,7 +173,7 @@ function HeroVisual() {
           <p className="num mt-0.5 text-[11px] text-muted">5 AAPL · sunucu fiyatıyla</p>
         </div>
       </div>
-      <div className="absolute -right-4 -top-5 hidden items-center gap-2.5 rounded-xl border border-line bg-surface px-3 py-2.5 shadow-xl sm:flex lg:-right-6">
+      <div className="absolute -right-4 -top-5 hidden items-center gap-2.5 rounded-xl border border-line bg-surface px-3 py-2.5 shadow-pop sm:flex lg:-right-6">
         <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gold-soft text-gold">
           <TrophyIcon className="h-4 w-4" />
         </span>

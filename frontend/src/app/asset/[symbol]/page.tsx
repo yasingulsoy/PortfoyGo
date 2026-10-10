@@ -1,40 +1,33 @@
 'use client';
 
-import { Suspense, use, useState, type ReactNode } from 'react';
-import Link from 'next/link';
+import { Suspense, use, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { ArrowLeftIcon, ChartBarIcon, InformationCircleIcon, MagnifyingGlassIcon, ShoppingCartIcon } from '@heroicons/react/20/solid';
+import { InformationCircleIcon, ShoppingCartIcon } from '@heroicons/react/24/outline';
+import { MagnifyingGlassIcon } from '@heroicons/react/20/solid';
 import { useRequireAuth } from '@/hooks/useRequireAuth';
 import { useLivePortfolio } from '@/context/PortfolioContext';
 import { useTrade } from '@/components/trade/TradeProvider';
 import { COMMISSION_RATE } from '@/lib/constants';
-import { formatPercent, formatTRY, formatUSD } from '@portfoygo/shared/format';
+import { formatPercent } from '@portfoygo/shared/format';
 import { ASSET_TYPE_LABELS, type AssetType, type MarketAsset } from '@/types';
-import PageHeader from '@portfoygo/shared/ui/PageHeader';
 import Button, { LinkButton } from '@portfoygo/shared/ui/Button';
-import { Card, CardBody, CardHeader } from '@portfoygo/shared/ui/Card';
-import { Delta } from '@portfoygo/shared/ui/Delta';
-import { Alert, Badge, EmptyState, Skeleton } from '@portfoygo/shared/ui/Feedback';
+import { Card } from '@portfoygo/shared/ui/Card';
+import { Alert, EmptyState, Skeleton } from '@portfoygo/shared/ui/Feedback';
 import { PageLoader } from '@portfoygo/shared/ui/Spinner';
 import Tabs from '@portfoygo/shared/ui/Tabs';
-import AssetAvatar from '@portfoygo/shared/ui/AssetAvatar';
-import PriceTick from '@/components/market/PriceTick';
-import WatchStar from '@/components/market/WatchStar';
-import PriceChart from '@/components/PriceChart';
+import { Breadcrumb } from '@/components/dashboard/PageTitle';
+import AssetChart from '@/components/asset/AssetChart';
+import AssetHeaderCard from '@/components/asset/AssetHeaderCard';
+import AssetSummaryCard from '@/components/asset/AssetSummaryCard';
+import AssetNews from '@/components/asset/AssetNews';
 import KeyStats from '@/components/asset/KeyStats';
 import PositionCard from '@/components/asset/PositionCard';
+import WatchlistPanel from '@/components/market/WatchlistPanel';
 import SymbolOrdersCard from '@/components/trade/SymbolOrdersCard';
 
 const TYPES: AssetType[] = ['stock', 'crypto', 'currency', 'commodity'];
 
-type Range = '1' | '7' | '30' | '90' | '365';
-const RANGES: { value: Range; label: string }[] = [
-  { value: '1', label: '1G' },
-  { value: '7', label: '1H' },
-  { value: '30', label: '1A' },
-  { value: '90', label: '3A' },
-  { value: '365', label: '1Y' },
-];
+type DetailTab = 'overview' | 'news' | 'position';
 
 function safeDecode(value: string) {
   try {
@@ -64,7 +57,7 @@ function AssetDetail({ params }: { params: Promise<{ symbol: string }> }) {
   const { user, ready } = useRequireAuth();
   const { holdings, loaded, market } = useLivePortfolio();
   const { openTrade } = useTrade();
-  const [range, setRange] = useState<Range>('30');
+  const [tab, setTab] = useState<DetailTab>('overview');
 
   if (!ready || !user) return <PageLoader />;
 
@@ -88,18 +81,14 @@ function AssetDetail({ params }: { params: Promise<{ symbol: string }> }) {
         }
       : undefined);
 
-  const backLink = (
-    <Link href="/" className="inline-flex items-center gap-1.5 text-sm text-muted transition-colors hover:text-fg">
-      <ArrowLeftIcon className="h-4 w-4" aria-hidden="true" /> Piyasalar
-    </Link>
-  );
+  const crumbs = <Breadcrumb crumbs={[{ label: 'Piyasalar', href: '/markets' }, { label: symbol }]} />;
 
   if (!asset) {
-    if (market.isLoading || !loaded) return <AssetSkeleton back={backLink} />;
+    if (market.isLoading || !loaded) return <AssetSkeleton top={crumbs} />;
     const failed = !!market.errors[type];
     return (
-      <div className="space-y-6">
-        {backLink}
+      <div className="space-y-4 md:space-y-6">
+        {crumbs}
         <Card>
           <EmptyState
             icon={<MagnifyingGlassIcon />}
@@ -109,7 +98,11 @@ function AssetDetail({ params }: { params: Promise<{ symbol: string }> }) {
                 ? 'Veri sağlayıcısına şu an ulaşılamıyor. Birazdan tekrar dene.'
                 : `${ASSET_TYPE_LABELS[type]} piyasasında "${symbol}" sembolü bulunamadı.`
             }
-            action={<LinkButton href="/" variant="secondary" size="sm">Piyasalara dön</LinkButton>}
+            action={
+              <LinkButton href="/markets" variant="secondary" size="sm">
+                Piyasalara dön
+              </LinkButton>
+            }
           />
         </Card>
       </div>
@@ -117,160 +110,113 @@ function AssetDetail({ params }: { params: Promise<{ symbol: string }> }) {
   }
 
   const target = { type, symbol, name: asset.name, image: asset.image };
-  const chartable = type === 'stock' || type === 'crypto';
   const coinId = asset.coinId ?? coinIdParam;
   const usdTry = market.usdTry;
+  const buy = () => openTrade(target, 'buy');
+  const sell = () => openTrade(target, 'sell');
 
   return (
-    <div className="space-y-6">
-      {backLink}
+    <div className="space-y-4 md:space-y-6">
+      {crumbs}
 
-      <PageHeader
-        eyebrow={ASSET_TYPE_LABELS[type]}
-        title={
-          <span className="flex min-w-0 items-center gap-3">
-            <AssetAvatar symbol={symbol} type={type} image={asset.image} size={40} />
-            <span className="font-mono">{symbol}</span>
-            <WatchStar type={type} symbol={symbol} size="md" />
-          </span>
-        }
-        description={asset.name !== symbol ? asset.name : undefined}
-        actions={
-          <div className="grid w-full grid-cols-2 gap-2 sm:w-auto">
-            <Button variant="buy" onClick={() => openTrade(target, 'buy')} className="sm:min-w-24">
-              Al
-            </Button>
-            <Button
-              variant="sell"
-              onClick={() => openTrade(target, 'sell')}
-              disabled={!holding}
-              title={holding ? undefined : 'Satmak için önce bu varlıktan almalısın'}
-              className="sm:min-w-24"
-            >
-              Sat
-            </Button>
-          </div>
-        }
-      />
+      <AssetHeaderCard asset={asset} stale={!live} canSell={!!holding} onBuy={buy} onSell={sell} />
 
       {!live && <Alert tone="info">Bu varlık için canlı fiyat şu an alınamıyor; pozisyonunun son değerlemesi gösteriliyor.</Alert>}
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start">
-        <div className="min-w-0 space-y-6">
-          <Card className="overflow-hidden">
-            <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-end sm:justify-between sm:p-6">
-              <div className="min-w-0">
-                <p className="text-xs font-medium uppercase tracking-[0.12em] text-subtle">Güncel fiyat</p>
-                <p className="mt-2 truncate text-3xl font-semibold tracking-tight sm:text-4xl">
-                  <PriceTick value={asset.priceTRY ?? asset.priceUSD}>
-                    {asset.priceTRY != null ? formatTRY(asset.priceTRY, { precise: true }) : asset.priceUSD != null ? formatUSD(asset.priceUSD, { precise: true }) : '—'}
-                  </PriceTick>
-                </p>
-                <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
-                  <Delta value={asset.changePercent} />
-                  <span className="text-subtle">{type === 'stock' ? 'günlük' : 'son 24 saat'}</span>
-                  {asset.priceUSD != null && asset.priceTRY != null && (
-                    <span className="num text-muted">· {formatUSD(asset.priceUSD, { precise: true })}</span>
-                  )}
-                </div>
-              </div>
-              {chartable && <Tabs label="Grafik aralığı" items={RANGES} value={range} onChange={setRange} className="self-start sm:self-auto" />}
-            </div>
+      <div className="grid grid-cols-1 gap-4 md:gap-6 xl:grid-cols-[minmax(0,1fr)_360px] xl:items-start">
+        <div className="min-w-0 space-y-4 md:space-y-6">
+          <AssetChart type={type} symbol={symbol} coinId={coinId} usdTry={usdTry} title={`${symbol} · ${asset.name}`} />
 
-            {chartable ? (
-              <div className="px-2 pb-4 sm:px-4">
-                <PriceChart type={type} symbol={symbol} coinId={coinId} days={Number(range)} multiplier={usdTry} height={300} />
-                <p className="px-3 pt-2 text-xs text-subtle">
-                  {usdTry
-                    ? 'Geçmiş fiyatlar güncel USD/TRY kuruyla TL’ye çevrilerek gösterilir.'
-                    : 'Kur bilgisi alınamadığı için grafik USD cinsindendir.'}
-                </p>
-              </div>
-            ) : (
-              <div className="border-t border-line p-5 sm:px-6">
-                <div className="flex items-start gap-3 rounded-xl bg-surface-2 p-4">
-                  <ChartBarIcon className="mt-0.5 h-5 w-5 shrink-0 text-subtle" aria-hidden="true" />
-                  <div className="text-sm">
-                    <p className="font-medium">Grafik bu varlık türü için mevcut değil</p>
-                    <p className="mt-1 text-muted">
-                      {ASSET_TYPE_LABELS[type]} fiyatları anlık kur olarak alınıyor; veri sağlayıcımız bu varlıklar için geçmiş fiyat serisi sunmuyor.
-                      Güncel fiyat ve günlük değişim yukarıda gösteriliyor.
+          <Card className="min-w-0">
+            <div className="px-5 pt-2 sm:px-6">
+              <Tabs
+                variant="underline"
+                label="Varlık ayrıntıları"
+                value={tab}
+                onChange={setTab}
+                items={[
+                  { value: 'overview', label: 'Genel bakış' },
+                  { value: 'news', label: 'Haberler' },
+                  { value: 'position', label: 'Pozisyonum' },
+                ]}
+              />
+            </div>
+            <div className="p-5 sm:p-6" role="tabpanel" aria-label={tab === 'overview' ? 'Genel bakış' : tab === 'news' ? 'Haberler' : 'Pozisyonum'}>
+              {tab === 'overview' && (
+                <>
+                  <h2 className="text-lg font-semibold text-fg">Önemli veriler</h2>
+                  <p className="mt-1 text-sm text-muted">{type === 'stock' ? 'Son işlem günü' : 'Son 24 saat'}</p>
+                  <KeyStats asset={asset} usdTry={usdTry} className="mt-4" />
+                  <div className="mt-5 flex items-start gap-2.5 rounded-xl bg-surface-2 p-4 text-sm">
+                    <InformationCircleIcon className="mt-0.5 h-4 w-4 shrink-0 text-muted" aria-hidden="true" />
+                    <p className="text-muted">
+                      Her alım ve satımda <span className="num font-medium text-fg">{formatPercent(COMMISSION_RATE * 100, { sign: false })}</span> komisyon
+                      uygulanır. Fiyatlar TL bazında hesaplanır; veriler gecikmeli olabilir ve yatırım tavsiyesi değildir.
                     </p>
                   </div>
-                </div>
-              </div>
-            )}
+                </>
+              )}
+              {tab === 'news' && <AssetNews asset={asset} />}
+              {tab === 'position' &&
+                (!loaded ? (
+                  <div className="space-y-3" aria-hidden="true">
+                    <Skeleton className="h-8 w-40" />
+                    <Skeleton className="h-20 w-full" />
+                  </div>
+                ) : holding ? (
+                  <PositionCard holding={holding} onBuy={buy} onSell={sell} bare />
+                ) : (
+                  <EmptyState
+                    className="py-8"
+                    icon={<ShoppingCartIcon />}
+                    title="Pozisyonun yok"
+                    description={`${symbol} henüz portföyünde değil. Sanal bakiyenle alım yaparak pozisyon açabilirsin.`}
+                    action={<Button onClick={buy}>{symbol} al</Button>}
+                  />
+                ))}
+            </div>
           </Card>
-
-          <KeyStats asset={asset} usdTry={usdTry} />
-        </div>
-
-        <aside className="space-y-6">
-          {!loaded ? (
-            <Card className="space-y-3 p-5" aria-hidden="true">
-              <Skeleton className="h-4 w-28" />
-              <Skeleton className="h-8 w-40" />
-              <Skeleton className="h-24 w-full" />
-            </Card>
-          ) : holding ? (
-            <PositionCard holding={holding} onBuy={() => openTrade(target, 'buy')} onSell={() => openTrade(target, 'sell')} />
-          ) : (
-            <Card>
-              <CardHeader icon={<ShoppingCartIcon />} title="Pozisyonun yok" description={`${symbol} henüz portföyünde değil`} />
-              <CardBody className="space-y-4">
-                <p className="text-sm text-muted">Sanal bakiyenle bu varlıktan alım yaparak pozisyon açabilirsin.</p>
-                <Button variant="buy" className="w-full" onClick={() => openTrade(target, 'buy')}>
-                  {symbol} al
-                </Button>
-              </CardBody>
-            </Card>
-          )}
 
           <SymbolOrdersCard type={type} symbol={symbol} livePrice={asset.priceTRY ?? null} />
+        </div>
 
-          <Card>
-            <CardBody className="flex items-start gap-3 text-sm">
-              <InformationCircleIcon className="mt-0.5 h-4 w-4 shrink-0 text-subtle" aria-hidden="true" />
-              <p className="text-muted">
-                Her alım ve satımda <span className="num font-medium text-fg">{formatPercent(COMMISSION_RATE * 100, { sign: false })}</span> komisyon uygulanır.
-                Fiyatlar TL bazında hesaplanır.
-              </p>
-            </CardBody>
-          </Card>
-
-          <p className="flex flex-wrap items-center gap-2 text-xs text-subtle">
-            <Badge>{ASSET_TYPE_LABELS[type]}</Badge>
-            <span>Veriler gecikmeli olabilir; yatırım tavsiyesi değildir.</span>
-          </p>
+        <aside className="min-w-0 space-y-4 md:space-y-6 xl:sticky xl:top-24" aria-label="Varlık özeti ve izleme listesi">
+          <AssetSummaryCard asset={asset} usdTry={usdTry} />
+          <WatchlistPanel highlight={{ type, symbol }} compact />
         </aside>
       </div>
     </div>
   );
 }
 
-function AssetSkeleton({ back }: { back: ReactNode }) {
+function AssetSkeleton({ top }: { top: React.ReactNode }) {
   return (
-    <div className="space-y-6" aria-busy="true">
-      {back}
-      <div className="flex items-center gap-3">
-        <Skeleton className="h-10 w-10 rounded-full" />
-        <div className="space-y-2">
-          <Skeleton className="h-6 w-28" />
-          <Skeleton className="h-4 w-40" />
+    <div className="space-y-4 md:space-y-6" aria-busy="true">
+      {top}
+      <Card className="p-5 sm:p-6">
+        <div className="flex items-center gap-4">
+          <Skeleton className="h-16 w-16 rounded-full" />
+          <div className="space-y-2">
+            <Skeleton className="h-7 w-48" />
+            <Skeleton className="h-4 w-32" />
+          </div>
         </div>
-      </div>
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+        <Skeleton className="mt-6 h-12 w-56" />
+        <Skeleton className="mt-2 h-5 w-64" />
+      </Card>
+      <div className="grid grid-cols-1 gap-4 md:gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
         <Card className="space-y-4 p-6">
-          <Skeleton className="h-10 w-56" />
-          <Skeleton className="h-5 w-32" />
+          <Skeleton className="h-6 w-40" />
           <Skeleton className="h-[300px] w-full rounded-xl" />
         </Card>
-        <Card className="space-y-3 p-5">
-          <Skeleton className="h-4 w-28" />
-          <Skeleton className="h-24 w-full" />
+        <Card className="space-y-3 p-6">
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-28 w-full" />
         </Card>
       </div>
-      <span className="sr-only" role="status">Varlık yükleniyor…</span>
+      <span className="sr-only" role="status">
+        Varlık yükleniyor…
+      </span>
     </div>
   );
 }

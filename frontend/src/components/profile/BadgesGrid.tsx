@@ -75,11 +75,10 @@ export default function BadgesGrid() {
   return (
     <Card>
       <CardHeader
-        icon={<SparklesIcon />}
         title="Rozetler"
         description={loading ? 'Yükleniyor' : badges.length ? `${earnedCount} / ${badges.length} kazanıldı` : undefined}
       />
-      <div className="p-5">
+      <div className="border-t border-line p-5 sm:p-6">
         {(all.error || mine.error) && !failed && (
           <Alert tone="error" className="mb-4">
             {mine.error ? 'Kazandığın rozetler alınamadı; tüm rozetler kilitli görünebilir.' : 'Rozet kataloğu alınamadı; yalnızca kazandıkların gösteriliyor.'}
@@ -98,7 +97,7 @@ export default function BadgesGrid() {
           <EmptyState icon={<SparklesIcon />} title="Henüz rozet yok" description="İşlem yaptıkça rozetler kazanacaksın." className="py-8" />
         ) : (
           <>
-            <div className="mb-4 h-1.5 overflow-hidden rounded-full bg-surface-2" role="progressbar" aria-label="Rozet ilerlemesi" aria-valuemin={0} aria-valuemax={badges.length} aria-valuenow={earnedCount}>
+            <div className="mb-5 h-2 overflow-hidden rounded-full bg-surface-3" role="progressbar" aria-label="Rozet ilerlemesi" aria-valuemin={0} aria-valuemax={badges.length} aria-valuenow={earnedCount}>
               <div className="h-full rounded-full bg-brand transition-[width]" style={{ width: `${(earnedCount / badges.length) * 100}%` }} />
             </div>
             <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3">
@@ -118,8 +117,8 @@ function BadgeTile({ badge }: { badge: Badge }) {
   return (
     <li
       className={cn(
-        'relative flex flex-col rounded-xl border p-3.5',
-        earned ? 'border-brand/30 bg-brand-soft' : 'border-line bg-surface-2/60',
+        'relative flex flex-col rounded-xl border p-4',
+        earned ? 'border-brand/30 bg-brand-soft' : 'border-line bg-surface-2',
       )}
     >
       <span className="sr-only">{earned ? 'Kazanıldı: ' : 'Kilitli: '}</span>
@@ -127,7 +126,7 @@ function BadgeTile({ badge }: { badge: Badge }) {
         <span
           aria-hidden="true"
           className={cn(
-            'flex h-10 w-10 items-center justify-center rounded-lg text-xl',
+            'flex h-11 w-11 items-center justify-center rounded-xl text-xl',
             earned ? 'bg-surface shadow-card' : 'bg-surface-3 opacity-50 grayscale',
           )}
         >
@@ -135,7 +134,7 @@ function BadgeTile({ badge }: { badge: Badge }) {
         </span>
         {!earned && <LockClosedIcon className="h-3.5 w-3.5 text-subtle" aria-hidden="true" />}
       </div>
-      <p className={cn('mt-2.5 text-sm font-semibold leading-tight', !earned && 'text-muted')}>{badge.name}</p>
+      <p className={cn('mt-3 text-sm font-semibold leading-tight', earned ? 'text-fg' : 'text-muted')}>{badge.name}</p>
       {badge.description && <p className="mt-1 text-xs leading-snug text-muted">{badge.description}</p>}
       <p className="mt-auto pt-2 text-[11px] text-subtle">
         {earned

@@ -2,18 +2,11 @@
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
-import {
-  ArrowDownLeftIcon,
-  ArrowDownTrayIcon,
-  ArrowPathIcon,
-  ArrowUpRightIcon,
-  ChevronDownIcon,
-  ClockIcon,
-  MagnifyingGlassIcon,
-} from '@heroicons/react/20/solid';
+import { ArrowDownTrayIcon, ArrowPathIcon, ArrowsUpDownIcon, MagnifyingGlassIcon } from '@heroicons/react/20/solid';
+import { ArrowsRightLeftIcon, ArrowTrendingDownIcon, ArrowTrendingUpIcon, ClockIcon, ReceiptPercentIcon } from '@heroicons/react/24/outline';
 import { useRequireAuth } from '@/hooks/useRequireAuth';
 import { usePortfolio } from '@/context/PortfolioContext';
-import { cn, formatQuantity, formatTRY } from '@portfoygo/shared/format';
+import { cn, formatNumber, formatQuantity, formatTRY } from '@portfoygo/shared/format';
 import { ASSET_TYPE_LABELS, type AssetType, type Transaction } from '@/types';
 import { Card } from '@portfoygo/shared/ui/Card';
 import { Badge, EmptyState, Skeleton } from '@portfoygo/shared/ui/Feedback';
@@ -21,22 +14,25 @@ import Button, { LinkButton } from '@portfoygo/shared/ui/Button';
 import PageHeader from '@portfoygo/shared/ui/PageHeader';
 import { PageLoader } from '@portfoygo/shared/ui/Spinner';
 import Tabs from '@portfoygo/shared/ui/Tabs';
+import AssetAvatar from '@portfoygo/shared/ui/AssetAvatar';
+import Breadcrumb from '@/components/common/Breadcrumb';
+import MetricCard, { MetricGrid } from '@/components/common/MetricCard';
+import Pagination from '@/components/common/Pagination';
+import { SearchInput, Select, ToolbarButton } from '@/components/common/controls';
+import { DataTable, TBody, THead, Td, Th, Tr } from '@/components/common/Table';
 import { assetHref } from '@/components/market/MarketTable';
 
 type TypeFilter = 'all' | 'buy' | 'sell';
 type AssetFilter = 'all' | AssetType;
 type SortKey = 'newest' | 'oldest' | 'amount';
 
-const PAGE_SIZE = 25;
+const PAGE_SIZE = 20;
 
 const SORTS: { value: SortKey; label: string }[] = [
   { value: 'newest', label: 'En yeni' },
   { value: 'oldest', label: 'En eski' },
   { value: 'amount', label: 'Tutar (yüksekten düşüğe)' },
 ];
-
-const selectClass =
-  'h-9 w-full appearance-none rounded-lg border border-line bg-surface-2 pl-3 pr-8 text-sm text-fg focus:outline-none focus:ring-2 focus:ring-[var(--ring)]';
 
 export default function TransactionsPage() {
   const { user, ready } = useRequireAuth();
@@ -50,13 +46,13 @@ function Transactions() {
   const [asset, setAsset] = useState<AssetFilter>('all');
   const [sort, setSort] = useState<SortKey>('newest');
   const [query, setQuery] = useState('');
-  const [visible, setVisible] = useState(PAGE_SIZE);
+  const [page, setPage] = useState(1);
   const [refreshing, setRefreshing] = useState(false);
 
   // Filtre değiştiğinde sayfalama başa döner (effect yerine olay işleyicilerinde)
   const withReset = <T,>(set: (v: T) => void) => (v: T) => {
     set(v);
-    setVisible(PAGE_SIZE);
+    setPage(1);
   };
 
   const stats = useMemo(() => {
@@ -95,15 +91,19 @@ function Transactions() {
     return list;
   }, [transactions, type, asset, query, sort]);
 
-  const shown = useMemo(() => filtered.slice(0, visible), [filtered, visible]);
-  const groups = useMemo(() => (sort === 'amount' ? null : groupByDay(shown)), [shown, sort]);
+  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  // Veri azalırsa (yenileme) geçerli sayfayı sınırla — state'i effect ile düzeltmek yerine türet
+  const current = Math.min(page, pageCount);
+  const shown = useMemo(() => filtered.slice((current - 1) * PAGE_SIZE, current * PAGE_SIZE), [filtered, current]);
   const hasFilters = type !== 'all' || asset !== 'all' || query.trim() !== '';
+  const from = filtered.length === 0 ? 0 : (current - 1) * PAGE_SIZE + 1;
+  const to = (current - 1) * PAGE_SIZE + shown.length;
 
   const resetFilters = () => {
     setType('all');
     setAsset('all');
     setQuery('');
-    setVisible(PAGE_SIZE);
+    setPage(1);
   };
 
   const reload = async () => {
@@ -115,41 +115,51 @@ function Transactions() {
     }
   };
 
+  const assetOptions: { value: AssetFilter; label: string }[] = [
+    { value: 'all', label: 'Tüm varlıklar' },
+    ...assetTypes.map((k) => ({ value: k, label: ASSET_TYPE_LABELS[k] })),
+  ];
+
   return (
-    <div className="space-y-6">
-      <PageHeader
-        eyebrow="Hesap"
-        title="İşlem geçmişi"
-        description="Tüm alım ve satımların; komisyon ve net tutarlarıyla birlikte."
-        actions={
-          <>
-            <Button variant="ghost" onClick={reload} loading={refreshing} icon={<ArrowPathIcon className="h-4 w-4" aria-hidden="true" />}>
-              Yenile
-            </Button>
-            <Button
-              variant="secondary"
+    <div className="space-y-4 md:space-y-6">
+      <PageHeader title="İşlem geçmişi" description="Tüm alım ve satımların; komisyon ve net tutarlarıyla birlikte." actions={<Breadcrumb items="İşlemler" />} />
+
+      <MetricGrid>
+        <MetricCard
+          icon={<ArrowsRightLeftIcon />}
+          label="Toplam işlem"
+          loading={!loaded}
+          value={formatNumber(transactions.length, 0)}
+          sub={`${formatNumber(stats.buyCount, 0)} alış · ${formatNumber(stats.sellCount, 0)} satış`}
+        />
+        <MetricCard icon={<ArrowTrendingUpIcon />} tone="up" label="Toplam alım hacmi" loading={!loaded} value={formatTRY(stats.buy)} sub="Komisyon hariç" />
+        <MetricCard icon={<ArrowTrendingDownIcon />} tone="down" label="Toplam satım hacmi" loading={!loaded} value={formatTRY(stats.sell)} sub="Komisyon hariç" />
+        <MetricCard icon={<ReceiptPercentIcon />} label="Ödenen komisyon" loading={!loaded} value={formatTRY(stats.commission)} sub="Tüm işlemlerde" />
+      </MetricGrid>
+
+      <Card className="overflow-hidden">
+        <div className="flex flex-col gap-4 px-5 pt-5 sm:flex-row sm:items-center sm:justify-between sm:px-6 sm:pt-6">
+          <div className="min-w-0">
+            <h2 className="text-lg font-semibold text-fg">Tüm işlemler</h2>
+            <p className="mt-1 text-sm text-muted">
+              {loaded ? (hasFilters ? `${formatNumber(filtered.length, 0)} / ${formatNumber(transactions.length, 0)} işlem eşleşti` : `${formatNumber(transactions.length, 0)} işlem`) : 'Yükleniyor'}
+            </p>
+          </div>
+          <div className="flex gap-3">
+            <ToolbarButton iconOnly onClick={() => void reload()} loading={refreshing} aria-label="İşlemleri yenile" title="Yenile" icon={<ArrowPathIcon className="h-4 w-4" aria-hidden="true" />} />
+            <ToolbarButton
               onClick={() => exportCsv(filtered)}
               disabled={filtered.length === 0}
               icon={<ArrowDownTrayIcon className="h-4 w-4" aria-hidden="true" />}
               aria-label={`${filtered.length} işlemi CSV olarak indir`}
+              className="flex-1 sm:flex-none"
             >
               CSV indir
-            </Button>
-          </>
-        }
-      />
+            </ToolbarButton>
+          </div>
+        </div>
 
-      <Card className="overflow-hidden">
-        <dl className="grid grid-cols-2 gap-px bg-line lg:grid-cols-4">
-          <Metric label="Toplam işlem" loading={!loaded} value={transactions.length.toLocaleString('tr-TR')} sub={`${stats.buyCount} alış · ${stats.sellCount} satış`} />
-          <Metric label="Toplam alım hacmi" loading={!loaded} value={formatTRY(stats.buy)} tone="up" />
-          <Metric label="Toplam satım hacmi" loading={!loaded} value={formatTRY(stats.sell)} tone="down" />
-          <Metric label="Ödenen komisyon" loading={!loaded} value={formatTRY(stats.commission)} />
-        </dl>
-      </Card>
-
-      <Card className="overflow-hidden">
-        <div className="flex flex-col gap-3 border-b border-line px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex flex-col gap-3 px-5 py-4 sm:px-6 xl:flex-row xl:items-center xl:justify-between">
           <Tabs<TypeFilter>
             label="İşlem türü"
             value={type}
@@ -159,46 +169,19 @@ function Transactions() {
               { value: 'buy', label: 'Alış', count: stats.buyCount },
               { value: 'sell', label: 'Satış', count: stats.sellCount },
             ]}
-            className="self-start"
+            className="max-w-full self-start"
           />
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-[minmax(0,1fr)_10rem_10rem] lg:w-[34rem]">
-            <label className="relative col-span-2 block sm:col-span-1">
-              <span className="sr-only">Sembol veya isim ara</span>
-              <MagnifyingGlassIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-subtle" aria-hidden="true" />
-              <input
-                type="search"
-                value={query}
-                onChange={(e) => withReset(setQuery)(e.target.value)}
-                placeholder="Sembol veya isim ara"
-                className="h-9 w-full rounded-lg border border-line bg-surface-2 pl-9 pr-3 text-sm placeholder:text-subtle focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
-              />
-            </label>
-            <label className="relative block">
-              <span className="sr-only">Varlık türü</span>
-              <select value={asset} onChange={(e) => withReset(setAsset)(e.target.value as AssetFilter)} className={selectClass}>
-                <option value="all">Tüm varlıklar</option>
-                {assetTypes.map((k) => (
-                  <option key={k} value={k}>{ASSET_TYPE_LABELS[k]}</option>
-                ))}
-              </select>
-              <ChevronDownIcon className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-subtle" aria-hidden="true" />
-            </label>
-            <label className="relative block">
-              <span className="sr-only">Sıralama</span>
-              <select value={sort} onChange={(e) => withReset(setSort)(e.target.value as SortKey)} className={selectClass}>
-                {SORTS.map((s) => (
-                  <option key={s.value} value={s.value}>{s.label}</option>
-                ))}
-              </select>
-              <ChevronDownIcon className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-subtle" aria-hidden="true" />
-            </label>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-[minmax(0,1fr)_11rem_11rem] xl:w-[38rem]">
+            <SearchInput label="Sembol veya isim ara" placeholder="Sembol veya isim ara" value={query} onChange={withReset(setQuery)} className="col-span-2 sm:col-span-1" />
+            <Select label="Varlık türü" value={asset} onChange={withReset(setAsset)} options={assetOptions} />
+            <Select label="Sıralama" value={sort} onChange={withReset(setSort)} options={SORTS} icon={<ArrowsUpDownIcon />} />
           </div>
         </div>
 
         {!loaded ? (
-          <div className="divide-y divide-line">
+          <div className="divide-y divide-line border-t border-line px-5 sm:px-6">
             {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="flex items-center gap-3 px-5 py-3.5">
+              <div key={i} className="flex items-center gap-3 py-3.5">
                 <Skeleton className="h-9 w-9 rounded-full" />
                 <div className="flex-1 space-y-1.5">
                   <Skeleton className="h-3.5 w-24" />
@@ -210,50 +193,69 @@ function Transactions() {
           </div>
         ) : transactions.length === 0 ? (
           <EmptyState
+            className="border-t border-line"
             icon={<ClockIcon />}
             title="Henüz işlem yapmadın"
             description="İlk alımını yaptığında tüm işlemlerin burada tarih sırasıyla listelenir."
-            action={<LinkButton href="/" icon={<MagnifyingGlassIcon className="h-4 w-4" aria-hidden="true" />}>Piyasalara göz at</LinkButton>}
+            action={
+              <LinkButton href="/" icon={<MagnifyingGlassIcon className="h-4 w-4" aria-hidden="true" />}>
+                Piyasalara göz at
+              </LinkButton>
+            }
           />
         ) : filtered.length === 0 ? (
           <EmptyState
+            className="border-t border-line"
             icon={<MagnifyingGlassIcon />}
             title="Eşleşen işlem bulunamadı"
             description={query.trim() ? `“${query.trim()}” için seçili filtrelerde sonuç yok.` : 'Seçili filtrelerde işlem yok.'}
-            action={hasFilters && <Button variant="secondary" size="sm" onClick={resetFilters}>Filtreleri temizle</Button>}
+            action={
+              hasFilters && (
+                <Button variant="secondary" size="sm" onClick={resetFilters}>
+                  Filtreleri temizle
+                </Button>
+              )
+            }
           />
         ) : (
           <>
-            {groups ? (
-              groups.map((g) => (
-                <section key={g.key} aria-labelledby={`day-${g.key}`}>
-                  <h3
-                    id={`day-${g.key}`}
-                    className="flex items-center justify-between border-b border-line bg-surface-2/60 px-5 py-2 text-xs font-medium text-muted"
-                  >
-                    <span>{g.label}</span>
-                    <span className="num text-subtle">{g.items.length} işlem</span>
-                  </h3>
-                  <ul className="divide-y divide-line border-b border-line">
-                    {g.items.map((t) => <TxRow key={t.id} t={t} />)}
-                  </ul>
-                </section>
-              ))
-            ) : (
-              <ul className="divide-y divide-line border-b border-line">
-                {shown.map((t) => <TxRow key={t.id} t={t} showDate />)}
-              </ul>
-            )}
+            {/* Küçük ekranlar: yığılmış satırlar */}
+            <ul className="divide-y divide-line border-y border-line md:hidden">
+              {shown.map((t) => (
+                <TxListRow key={t.id} t={t} />
+              ))}
+            </ul>
 
-            <div className="flex flex-col items-center gap-3 px-5 py-4 text-xs text-muted sm:flex-row sm:justify-between">
-              <span className="num">
-                {filtered.length} işlemden {shown.length} tanesi gösteriliyor
-              </span>
-              {shown.length < filtered.length && (
-                <Button variant="secondary" size="sm" onClick={() => setVisible((v) => v + PAGE_SIZE)}>
-                  Daha fazla göster
-                </Button>
-              )}
+            {/* md ve üzeri: tablo */}
+            <DataTable label="İşlem geçmişi" className="hidden md:block">
+              <THead>
+                <Th>Tarih</Th>
+                <Th>Varlık</Th>
+                <Th>İşlem</Th>
+                <Th align="right">Miktar</Th>
+                <Th align="right" className="hidden lg:table-cell">
+                  Birim fiyat
+                </Th>
+                <Th align="right" className="hidden xl:table-cell">
+                  Komisyon
+                </Th>
+                <Th align="right">Net tutar</Th>
+              </THead>
+              <TBody className="border-b border-line">
+                {shown.map((t) => (
+                  <TxTableRow key={t.id} t={t} />
+                ))}
+              </TBody>
+            </DataTable>
+
+            <div className="space-y-3 px-5 py-4 sm:px-6">
+              <Pagination page={current} pageCount={pageCount} onChange={setPage} label="İşlem sayfaları" />
+              <p className="num text-center text-xs text-muted">
+                <span className="font-medium text-fg">
+                  {formatNumber(from, 0)}–{formatNumber(to, 0)}
+                </span>{' '}
+                / {formatNumber(filtered.length, 0)} işlem gösteriliyor
+              </p>
             </div>
           </>
         )}
@@ -264,71 +266,92 @@ function Transactions() {
 
 /* ------------------------------------------------------------------ */
 
-function Metric({ label, value, sub, tone, loading }: { label: string; value: string; sub?: string; tone?: 'up' | 'down'; loading?: boolean }) {
+function txTime(t: Transaction) {
+  const d = new Date(t.createdAt);
+  if (Number.isNaN(d.getTime())) return { date: 'Tarih yok', time: '—' };
+  return {
+    date: d.toLocaleDateString('tr-TR', { day: '2-digit', month: 'short', year: 'numeric' }),
+    time: d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }),
+  };
+}
+
+function TypeBadge({ buy }: { buy: boolean }) {
+  return <Badge tone={buy ? 'up' : 'down'}>{buy ? 'Alış' : 'Satış'}</Badge>;
+}
+
+function NetAmount({ t, className }: { t: Transaction; className?: string }) {
+  const buy = t.type === 'buy';
   return (
-    <div className="min-w-0 bg-surface p-4 sm:p-5">
-      <dt className="flex items-center gap-1.5 text-xs text-muted">
-        {tone && <span className={cn('h-1.5 w-1.5 rounded-full', tone === 'up' ? 'bg-up' : 'bg-down')} aria-hidden="true" />}
-        {label}
-      </dt>
-      {loading ? (
-        <dd>
-          <Skeleton className="mt-2 h-6 w-28" />
-        </dd>
-      ) : (
-        <>
-          <dd className="num mt-1.5 truncate text-lg font-semibold tracking-tight sm:text-xl">{value}</dd>
-          {sub && <dd className="num mt-0.5 text-xs text-subtle">{sub}</dd>}
-        </>
-      )}
-    </div>
+    <span className={cn('num whitespace-nowrap font-semibold', buy ? 'text-fg' : 'text-up', className)}>
+      <span className="sr-only">{buy ? 'Ödenen' : 'Hesaba geçen'}: </span>
+      {buy ? '−' : '+'}
+      {formatTRY(t.netAmount)}
+    </span>
   );
 }
 
-function TxRow({ t, showDate }: { t: Transaction; showDate?: boolean }) {
+function TxTableRow({ t }: { t: Transaction }) {
   const buy = t.type === 'buy';
-  const Icon = buy ? ArrowDownLeftIcon : ArrowUpRightIcon;
-  const d = new Date(t.createdAt);
-  const valid = !Number.isNaN(d.getTime());
-  const time = valid ? d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }) : '—';
-  const date = valid ? d.toLocaleDateString('tr-TR', { day: '2-digit', month: 'short', year: 'numeric' }) : '';
-
+  const { date, time } = txTime(t);
   return (
-    <li className="flex items-center gap-3 px-5 py-3.5 transition-colors hover:bg-surface-2/60">
-      <span
-        className={cn('flex h-9 w-9 shrink-0 items-center justify-center rounded-full', buy ? 'bg-up-soft text-up' : 'bg-down-soft text-down')}
-        aria-hidden="true"
-      >
-        <Icon className="h-4 w-4" />
-      </span>
+    <Tr className="hover:bg-surface-2">
+      <Td className="whitespace-nowrap">
+        <p className="num text-fg">{date}</p>
+        <p className="num mt-0.5 text-xs text-muted">{time}</p>
+      </Td>
+      <Td>
+        <Link href={assetHref({ type: t.assetType, symbol: t.symbol })} className="group flex min-w-0 items-center gap-3">
+          <AssetAvatar symbol={t.symbol} type={t.assetType} size={36} />
+          <span className="min-w-0">
+            <span className="block font-medium text-fg group-hover:text-brand">{t.symbol}</span>
+            <span className="mt-0.5 block max-w-[12rem] truncate text-xs text-muted xl:max-w-[16rem]">
+              {t.name} · {ASSET_TYPE_LABELS[t.assetType]}
+            </span>
+          </span>
+        </Link>
+      </Td>
+      <Td>
+        <TypeBadge buy={buy} />
+      </Td>
+      <Td align="right" className="num whitespace-nowrap text-fg">
+        {formatQuantity(t.quantity)}
+        <p className="mt-0.5 text-xs text-muted lg:hidden">× {formatTRY(t.price, { precise: true })}</p>
+      </Td>
+      <Td align="right" className="num hidden whitespace-nowrap text-fg lg:table-cell">
+        {formatTRY(t.price, { precise: true })}
+      </Td>
+      <Td align="right" className="num hidden whitespace-nowrap text-muted xl:table-cell">
+        {formatTRY(t.commission)}
+      </Td>
+      <Td align="right">
+        <NetAmount t={t} />
+      </Td>
+    </Tr>
+  );
+}
 
-      <div className="min-w-0 flex-1 sm:flex sm:items-center sm:gap-4">
-        <div className="min-w-0 sm:w-56 sm:shrink-0">
-          <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
-            <Link href={assetHref({ type: t.assetType, symbol: t.symbol })} className="font-mono text-[13px] font-semibold text-fg hover:text-brand">
-              {t.symbol}
-            </Link>
-            <Badge tone={buy ? 'up' : 'down'}>{buy ? 'Alış' : 'Satış'}</Badge>
-            <Badge className="max-sm:hidden">{ASSET_TYPE_LABELS[t.assetType]}</Badge>
-          </p>
-          <p className="mt-0.5 truncate text-xs text-muted">{t.name}</p>
-        </div>
-        <p className="num mt-0.5 truncate text-xs text-muted sm:mt-0 sm:flex-1 sm:text-sm sm:text-fg">
-          {formatQuantity(t.quantity)} <span className="text-subtle">×</span> {formatTRY(t.price, { precise: true })}
+function TxListRow({ t }: { t: Transaction }) {
+  const buy = t.type === 'buy';
+  const { date, time } = txTime(t);
+  return (
+    <li className="flex items-center gap-3 px-5 py-3.5">
+      <AssetAvatar symbol={t.symbol} type={t.assetType} size={36} />
+      <div className="min-w-0 flex-1">
+        <p className="flex flex-wrap items-center gap-1.5">
+          <Link href={assetHref({ type: t.assetType, symbol: t.symbol })} className="text-sm font-medium text-fg hover:text-brand">
+            {t.symbol}
+          </Link>
+          <TypeBadge buy={buy} />
         </p>
-        <p className="num hidden w-28 shrink-0 text-right text-xs text-subtle md:block">
-          <span className="sr-only">Komisyon: </span>
-          {formatTRY(t.commission)} kom.
+        <p className="num mt-0.5 truncate text-xs text-muted">
+          {formatQuantity(t.quantity)} × {formatTRY(t.price, { precise: true })}
         </p>
       </div>
-
       <div className="shrink-0 text-right">
-        <p className={cn('num text-sm font-semibold', buy ? 'text-fg' : 'text-up')}>
-          <span className="sr-only">{buy ? 'Ödenen' : 'Hesaba geçen'}: </span>
-          {buy ? '−' : '+'}
-          {formatTRY(t.netAmount)}
+        <NetAmount t={t} className="text-sm" />
+        <p className="num mt-0.5 text-xs text-muted">
+          {date} {time}
         </p>
-        <p className="num mt-0.5 text-xs text-subtle">{showDate ? `${date} ${time}` : time}</p>
       </div>
     </li>
   );
@@ -342,40 +365,6 @@ function pad(n: number) {
 
 function localDayKey(d: Date) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-}
-
-/** İşlemleri yerel takvim gününe göre gruplar; sıra korunur. */
-function groupByDay(list: Transaction[]) {
-  const now = new Date();
-  const today = localDayKey(now);
-  const yesterday = localDayKey(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1));
-  const groups: { key: string; label: string; items: Transaction[] }[] = [];
-  const index = new Map<string, number>();
-
-  for (const t of list) {
-    const d = new Date(t.createdAt);
-    const valid = !Number.isNaN(d.getTime());
-    const key = valid ? localDayKey(d) : 'unknown';
-    let i = index.get(key);
-    if (i === undefined) {
-      const label = !valid
-        ? 'Tarihi bilinmeyen'
-        : key === today
-          ? 'Bugün'
-          : key === yesterday
-            ? 'Dün'
-            : d.toLocaleDateString('tr-TR', {
-                weekday: 'long',
-                day: 'numeric',
-                month: 'long',
-                ...(d.getFullYear() !== now.getFullYear() && { year: 'numeric' }),
-              });
-      i = groups.push({ key, label, items: [] }) - 1;
-      index.set(key, i);
-    }
-    groups[i].items.push(t);
-  }
-  return groups;
 }
 
 /* ---------- CSV dışa aktarma ---------- */

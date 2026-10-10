@@ -8,19 +8,22 @@ import { TradeProvider } from '@/components/trade/TradeProvider';
 import { ToastProvider } from '@portfoygo/shared/ui/Toast';
 import CommandPalette from '@/components/command/CommandPalette';
 import Shortcuts from '@/components/command/Shortcuts';
+import NotificationsProvider from '@/components/notifications/NotificationsProvider';
 
 export default function Providers({ children }: { children: ReactNode }) {
   return (
-    <ThemeProvider attribute="data-theme" defaultTheme="dark" enableSystem disableTransitionOnChange>
+    <ThemeProvider attribute="data-theme" defaultTheme="light" enableSystem disableTransitionOnChange>
       <ToastProvider>
         <AuthProvider>
-          <PortfolioProvider>
-            <TradeProvider>
-              {children}
-              <CommandPalette />
-              <Shortcuts />
-            </TradeProvider>
-          </PortfolioProvider>
+          <NotificationsProvider>
+            <PortfolioProvider>
+              <TradeProvider>
+                {children}
+                <CommandPalette />
+                <Shortcuts />
+              </TradeProvider>
+            </PortfolioProvider>
+          </NotificationsProvider>
         </AuthProvider>
       </ToastProvider>
     </ThemeProvider>

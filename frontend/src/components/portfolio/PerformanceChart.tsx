@@ -105,7 +105,7 @@ export default function PerformanceChart({ compact = false, className }: Props) 
       chart = lc.createChart(el, {
         height,
         autoSize: true,
-        layout: { background: { color: 'transparent' }, textColor: cssVar('--subtle'), fontFamily: 'var(--font-geist-sans)', attributionLogo: false },
+        layout: { background: { color: 'transparent' }, textColor: cssVar('--muted'), fontFamily: getComputedStyle(document.body).fontFamily, attributionLogo: false },
         grid: { vertLines: { visible: false }, horzLines: { visible: !compact, color: cssVar('--line') } },
         rightPriceScale: { visible: !compact, borderVisible: false },
         timeScale: { visible: !compact, borderVisible: false, timeVisible: true, secondsVisible: false },
@@ -156,11 +156,11 @@ export default function PerformanceChart({ compact = false, className }: Props) 
 
   let body: React.ReactNode;
   if (!data && (isLoading || !user)) {
-    body = <Skeleton className="h-full w-full rounded-xl" />;
+    body = <Skeleton className="h-full w-full flex-1 rounded-xl" />;
   } else if (error && !data) {
     body = (
       <EmptyState
-        className="h-full py-6"
+        className="h-full flex-1 py-6"
         icon={compact ? undefined : <ChartBarIcon />}
         title="Performans verisi yüklenemedi"
         description={compact ? undefined : 'Birazdan otomatik olarak yeniden denenecek.'}
@@ -169,14 +169,14 @@ export default function PerformanceChart({ compact = false, className }: Props) 
   } else if (!hasData) {
     body = (
       <EmptyState
-        className="h-full py-6"
+        className="h-full flex-1 py-6"
         icon={compact ? undefined : <ClockIcon />}
         title="Geçmiş veri birikiyor — ilk anlık görüntü bir saat içinde alınır"
         description={compact ? undefined : 'Portföy değerin her saat kaydedilir; grafik noktalar biriktikçe dolar.'}
       />
     );
   } else {
-    body = <div ref={containerRef} className="h-full w-full" />;
+    body = <div ref={containerRef} className="h-full min-h-0 w-full flex-1" />;
   }
 
   const summary = data && hasData && (
@@ -192,7 +192,7 @@ export default function PerformanceChart({ compact = false, className }: Props) 
       <section className={cn('min-w-0', className)} aria-label="Portföy performansı">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
-            <h3 className="text-xs font-medium uppercase tracking-[0.12em] text-subtle">Performans</h3>
+            <h3 className="text-sm font-medium text-muted">Performans</h3>
             {hover && <span className="num text-sm font-semibold">{formatTRY(hover.value)}</span>}
             {summary}
           </div>
@@ -206,25 +206,29 @@ export default function PerformanceChart({ compact = false, className }: Props) 
   }
 
   return (
-    <Card className={cn('overflow-hidden', className)}>
-      <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-start sm:justify-between sm:p-6">
+    <Card className={cn('flex flex-col overflow-hidden', className)}>
+      <div className="flex flex-col gap-4 px-5 pt-5 sm:flex-row sm:items-start sm:justify-between sm:px-6 sm:pt-6">
         <div className="min-w-0">
-          <p className="text-xs font-medium uppercase tracking-[0.12em] text-subtle">Portföy performansı</p>
-          {data ? (
-            <>
-              <p className="num mt-2 truncate text-3xl font-semibold tracking-tight">{formatTRY(shownValue)}</p>
-              <div className="mt-2">{summary}</div>
-            </>
-          ) : (
-            <>
-              <Skeleton className="mt-3 h-9 w-48" />
-              <Skeleton className="mt-2 h-5 w-40" />
-            </>
-          )}
+          <h2 className="text-lg font-semibold text-fg">Portföy performansı</h2>
+          <p className="mt-1 text-sm text-muted">Toplam varlığının zaman içindeki seyri</p>
         </div>
         {tabs}
       </div>
-      <div className="px-2 pb-4 sm:px-4" style={{ height: height + 16 }}>
+      <div className="px-5 pt-4 sm:px-6">
+        {data ? (
+          <div className="flex flex-wrap items-end gap-x-3 gap-y-2">
+            <p className="num truncate text-3xl font-semibold text-fg">{formatTRY(shownValue)}</p>
+            <div className="pb-1">{summary}</div>
+          </div>
+        ) : (
+          <div className="flex flex-wrap items-end gap-3">
+            <Skeleton className="h-9 w-48" />
+            <Skeleton className="h-5 w-40" />
+          </div>
+        )}
+      </div>
+      {/* Kart yan sütunla aynı boya uzarsa grafik de büyür */}
+      <div className="flex flex-1 flex-col px-2 pb-4 pt-2 sm:px-4" style={{ minHeight: height + 16 }}>
         {body}
       </div>
     </Card>

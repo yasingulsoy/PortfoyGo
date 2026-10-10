@@ -21,7 +21,7 @@ export function Delta({ value, variant = 'pill', className }: { value: number | 
     <span
       className={cn(
         'num inline-flex items-center gap-0.5 font-medium',
-        variant === 'pill' ? cn('rounded-md px-1.5 py-0.5 text-xs', pill[t]) : tone[t],
+        variant === 'pill' ? cn('rounded-full px-2 py-0.5 text-xs', pill[t]) : tone[t],
         className,
       )}
     >

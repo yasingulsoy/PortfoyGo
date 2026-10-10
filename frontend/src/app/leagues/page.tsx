@@ -4,21 +4,26 @@ import { Suspense, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import useSWR, { useSWRConfig } from 'swr';
-import { KeyIcon, PlusIcon, UserGroupIcon } from '@heroicons/react/20/solid';
+import { GlobeAltIcon, KeyIcon, PlusIcon, UserGroupIcon } from '@heroicons/react/20/solid';
 import { useRequireAuth } from '@/hooks/useRequireAuth';
 import { useNow } from '@/hooks/useNow';
 import { leaguesApi } from '@/lib/api';
 import PageHeader from '@portfoygo/shared/ui/PageHeader';
+import Breadcrumb from '@/components/common/Breadcrumb';
 import Button from '@portfoygo/shared/ui/Button';
 import { Card } from '@portfoygo/shared/ui/Card';
 import { Alert, EmptyState } from '@portfoygo/shared/ui/Feedback';
 import { PageLoader } from '@portfoygo/shared/ui/Spinner';
+import Tabs from '@portfoygo/shared/ui/Tabs';
 import { useToast } from '@portfoygo/shared/ui/Toast';
 import LeagueCard, { LeagueCardSkeleton } from '@/components/leagues/LeagueCard';
 import CreateLeagueModal from '@/components/leagues/CreateLeagueModal';
 import { JoinLeagueModal } from '@/components/leagues/JoinLeague';
+import DiscoverLeagues from '@/components/leagues/DiscoverLeagues';
 import { LEAGUES_KEY, LIMITS, leagueKey } from '@/components/leagues/shared';
 import type { League, User } from '@/types';
+
+type Tab = 'mine' | 'kesfet';
 
 export default function LeaguesPage() {
   // useSearchParams askıya alınabilir; sınır burada.
@@ -48,6 +53,9 @@ function Leagues({ user }: { user: User }) {
   // Komut paletindeki "Lige katıl" /leagues?join=1 adresine gider
   const joinRequested = search.get('join') === '1';
   const showJoin = joinOpen || joinRequested;
+  // Sekme adreste tutulur: /leagues?tab=kesfet paylaşılabilir ve geri tuşuyla korunur
+  const tab: Tab = search.get('tab') === 'kesfet' ? 'kesfet' : 'mine';
+  const setTab = (next: Tab) => router.replace(next === 'kesfet' ? '/leagues?tab=kesfet' : '/leagues', { scroll: false });
 
   const verified = user.email_verified;
   const leagues = data ?? [];
@@ -59,7 +67,7 @@ function Leagues({ user }: { user: User }) {
 
   const closeJoin = () => {
     setJoinOpen(false);
-    if (joinRequested) router.replace('/leagues', { scroll: false });
+    if (joinRequested) router.replace(tab === 'kesfet' ? '/leagues?tab=kesfet' : '/leagues', { scroll: false });
   };
 
   const openLeague = (league: League, message: string) => {
@@ -69,28 +77,42 @@ function Leagues({ user }: { user: User }) {
     router.push(`/leagues/${league.id}`);
   };
 
+  const actions = (
+    <div className="flex flex-col-reverse gap-3 sm:flex-row">
+      <Button variant="secondary" onClick={() => setJoinOpen(true)} disabled={!canJoin} icon={<KeyIcon className="h-4 w-4" aria-hidden="true" />}>
+        Koda göre katıl
+      </Button>
+      <Button onClick={() => setCreateOpen(true)} disabled={!canCreate} icon={<PlusIcon className="h-4 w-4" aria-hidden="true" />}>
+        Lig oluştur
+      </Button>
+    </div>
+  );
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 md:space-y-6">
       <PageHeader
-        eyebrow="Rekabet"
-        title="Özel ligler"
-        description="Arkadaşlarınla kendi ligini kur, davet koduyla katıl ve kendi aranızda getiri yarışı yapın."
-        actions={
-          <>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => setJoinOpen(true)}
-              disabled={!canJoin}
-              icon={<KeyIcon className="h-4 w-4" aria-hidden="true" />}
-            >
-              Koda göre katıl
-            </Button>
-            <Button size="sm" onClick={() => setCreateOpen(true)} disabled={!canCreate} icon={<PlusIcon className="h-4 w-4" aria-hidden="true" />}>
-              Lig oluştur
-            </Button>
-          </>
-        }
+        title="Ligler"
+        description="Kısa periyotlu ligler, canlı meydan okumalar: arkadaşlarınla özel lig kur ya da herkese açık bir lige katıl."
+        actions={<Breadcrumb items="Ligler" />}
+      />
+
+      <Tabs
+        variant="underline"
+        label="Lig görünümü"
+        value={tab}
+        onChange={setTab}
+        items={[
+          { value: 'mine', label: 'Liglerim', count: data ? leagues.length : undefined },
+          {
+            value: 'kesfet',
+            label: (
+              <>
+                <GlobeAltIcon className="h-4 w-4" aria-hidden="true" />
+                Keşfet
+              </>
+            ),
+          },
+        ]}
       />
 
       {!verified && (
@@ -106,8 +128,34 @@ function Leagues({ user }: { user: User }) {
         <Alert tone="info">En fazla {LIMITS.owned} lig kurabilirsin. Yeni lig kurmak için kurduğun liglerden birini sil.</Alert>
       )}
 
+      {tab === 'kesfet' ? (
+        <div role="tabpanel" aria-label="Keşfet">
+          <DiscoverLeagues now={now} verified={verified} canJoin={!atJoinLimit} onJoined={(league) => openLeague(league, 'Lige katıldın')} />
+        </div>
+      ) : (
+        <div role="tabpanel" aria-label="Liglerim" className="space-y-4 md:space-y-6">
+          {!(data && leagues.length === 0) && (
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-sm text-muted">
+                {data ? (
+                  <>
+                    <span className="num font-medium text-fg">
+                      {leagues.length}/{LIMITS.joined}
+                    </span>{' '}
+                    lig · kurduğun{' '}
+                    <span className="num font-medium text-fg">
+                      {owned}/{LIMITS.owned}
+                    </span>{' '}
+                    · lig başına en fazla {LIMITS.members} oyuncu
+                  </>
+                ) : null}
+              </p>
+              {actions}
+        </div>
+      )}
+
       {isLoading && !data ? (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2 md:gap-6 xl:grid-cols-3">
           {[0, 1, 2].map((i) => (
             <LeagueCardSkeleton key={i} />
           ))}
@@ -132,42 +180,30 @@ function Leagues({ user }: { user: User }) {
             title="Henüz bir ligde değilsin"
             description={
               <>
-                Özel liglerde yalnızca davet ettiğin arkadaşlarınla yarışırsın. Herkesin getirisi lige katıldığı andaki varlığına göre ölçülür; yani
-                geç katılan da eşit şartlarda başlar. Bir lig kur ve davet kodunu paylaş ya da arkadaşının kodunu gir.
+                1 günlük hızlı liglerden 3 aylık maratonlara kadar kendi ligini kur ya da Keşfet’ten herkese açık bir lige katıl. Başlamadan önce
+                katılan herkes başlangıç anındaki varlığından ölçülür; yani herkes eşit şartlarda yarışır.
               </>
             }
             action={
-              <div className="flex flex-col gap-2 sm:flex-row">
-                <Button onClick={() => setCreateOpen(true)} disabled={!canCreate} icon={<PlusIcon className="h-4 w-4" aria-hidden="true" />}>
-                  Lig oluştur
-                </Button>
-                <Button variant="secondary" onClick={() => setJoinOpen(true)} disabled={!canJoin} icon={<KeyIcon className="h-4 w-4" aria-hidden="true" />}>
-                  Koda göre katıl
-                </Button>
+              <div className="flex flex-col items-center gap-3">
+                {actions}
+                <button type="button" onClick={() => setTab('kesfet')} className="text-sm font-medium text-brand hover:underline">
+                  Herkese açık ligleri keşfet
+                </button>
               </div>
             }
           />
         </Card>
       ) : (
-        <>
-          <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {leagues.map((l) => (
-              <li key={l.id}>
-                <LeagueCard league={l} now={now} />
-              </li>
-            ))}
-          </ul>
-          <p className="text-xs text-muted">
-            <span className="num">
-              {leagues.length}/{LIMITS.joined}
-            </span>{' '}
-            lig · kurduğun{' '}
-            <span className="num">
-              {owned}/{LIMITS.owned}
-            </span>{' '}
-            · lig başına en fazla {LIMITS.members} oyuncu
-          </p>
-        </>
+        <ul className="grid gap-4 sm:grid-cols-2 md:gap-6 xl:grid-cols-3">
+          {leagues.map((l) => (
+            <li key={l.id}>
+              <LeagueCard league={l} now={now} />
+            </li>
+          ))}
+        </ul>
+      )}
+        </div>
       )}
 
       <CreateLeagueModal

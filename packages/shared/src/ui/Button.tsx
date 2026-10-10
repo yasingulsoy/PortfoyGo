@@ -7,23 +7,23 @@ type Variant = 'primary' | 'secondary' | 'ghost' | 'up' | 'down' | 'buy' | 'sell
 type Size = 'sm' | 'md' | 'lg';
 
 const base =
-  'inline-flex items-center justify-center gap-2 rounded-lg font-medium transition-colors duration-150 select-none whitespace-nowrap disabled:opacity-50 disabled:pointer-events-none';
+  'inline-flex items-center justify-center gap-2 rounded-lg font-medium select-none whitespace-nowrap transition-colors duration-150 disabled:opacity-50 disabled:pointer-events-none';
 
 const variants: Record<Variant, string> = {
-  primary: 'bg-brand text-brand-fg hover:bg-brand-hover',
-  secondary: 'bg-surface-2 text-fg border border-line hover:bg-surface-3 hover:border-line-strong',
-  ghost: 'text-muted hover:text-fg hover:bg-surface-2',
+  primary: 'bg-brand text-brand-fg shadow-card hover:bg-brand-hover',
+  secondary: 'bg-surface text-fg ring-1 ring-inset ring-line-strong shadow-card hover:bg-surface-2',
+  ghost: 'text-muted hover:text-fg hover:bg-surface-3',
   up: 'bg-up-soft text-up hover:bg-up hover:text-white',
   down: 'bg-down-soft text-down hover:bg-down hover:text-white',
-  buy: 'bg-up text-white hover:brightness-110',
-  sell: 'bg-down text-white hover:brightness-110',
-  danger: 'bg-down text-white hover:brightness-110',
+  buy: 'bg-up text-white shadow-card hover:brightness-95',
+  sell: 'bg-down text-white shadow-card hover:brightness-95',
+  danger: 'bg-down text-white shadow-card hover:brightness-95',
 };
 
 const sizes: Record<Size, string> = {
-  sm: 'h-8 px-3 text-xs',
-  md: 'h-10 px-4 text-sm',
-  lg: 'h-12 px-5 text-[15px]',
+  sm: 'h-8 rounded-lg px-3 text-xs',
+  md: 'h-11 px-4 text-sm',
+  lg: 'h-12 px-5 text-sm',
 };
 
 export function buttonClasses(variant: Variant = 'primary', size: Size = 'md', className?: string) {

@@ -2,7 +2,15 @@
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
-import { ArrowTrendingUpIcon, BriefcaseIcon, ChevronDownIcon, FunnelIcon, ShieldExclamationIcon } from '@heroicons/react/20/solid';
+import {
+  ArrowDownRightIcon,
+  ArrowPathIcon,
+  ArrowTrendingUpIcon,
+  ArrowsUpDownIcon,
+  ArrowUpRightIcon,
+  BriefcaseIcon,
+  ShieldExclamationIcon,
+} from '@heroicons/react/20/solid';
 import type { LiveHolding } from '@/context/PortfolioContext';
 import { useTrade } from '@/components/trade/TradeProvider';
 import { assetHref } from '@/components/market/MarketTable';
@@ -14,6 +22,9 @@ import AssetAvatar from '@portfoygo/shared/ui/AssetAvatar';
 import Tabs from '@portfoygo/shared/ui/Tabs';
 import { Delta, Money } from '@portfoygo/shared/ui/Delta';
 import { Badge, EmptyState, Skeleton } from '@portfoygo/shared/ui/Feedback';
+import { Select, ToolbarButton } from '@/components/common/controls';
+import { DataTable, TBody, THead, Td, Th, Tr } from '@/components/common/Table';
+import RowMenu from '@/components/common/RowMenu';
 import { holdingKey, orderLabel, type OrderRow } from './useOrders';
 
 type Filter = 'all' | AssetType;
@@ -63,11 +74,14 @@ interface Props {
   loaded: boolean;
   /** holdingKey(assetType, symbol) → pozisyondaki aktif satış emirleri */
   ordersByHolding: Map<string, OrderRow[]>;
-  /** "Emir" düğmesi: zarar durdur / kâr al penceresini açar */
+  /** "Emir" eylemi: zarar durdur / kâr al penceresini açar */
   onOrders: (h: LiveHolding) => void;
+  /** Başlıktaki "Yenile" düğmesi (verilmezse gösterilmez) */
+  onRefresh?: () => void;
+  refreshing?: boolean;
 }
 
-export default function HoldingsCard({ holdings, loaded, ordersByHolding, onOrders }: Props) {
+export default function HoldingsCard({ holdings, loaded, ordersByHolding, onOrders, onRefresh, refreshing }: Props) {
   const [filter, setFilter] = useState<Filter>('all');
   const [sort, setSort] = useState<SortKey>('value');
 
@@ -86,47 +100,40 @@ export default function HoldingsCard({ holdings, loaded, ordersByHolding, onOrde
 
   return (
     <Card className="overflow-hidden">
-      <div className="flex flex-col gap-3 border-b border-line px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-3">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-soft text-brand">
-            <BriefcaseIcon className="h-[18px] w-[18px]" aria-hidden="true" />
-          </span>
-          <div>
-            <h2 className="text-[15px] font-semibold tracking-tight">Pozisyonlar</h2>
-            <p className="mt-0.5 text-xs text-muted">{loaded ? `${holdings.length} açık pozisyon · canlı fiyatlarla` : 'Yükleniyor'}</p>
+      <div className="flex flex-col gap-4 px-5 pb-4 pt-5 sm:px-6 sm:pt-6 xl:flex-row xl:items-center xl:justify-between">
+        <div className="min-w-0">
+          <h2 className="text-lg font-semibold text-fg">Pozisyonlar</h2>
+          <p className="mt-1 text-sm text-muted">{loaded ? `${holdings.length} açık pozisyon · canlı fiyatlarla` : 'Yükleniyor'}</p>
+        </div>
+        <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center">
+          <Tabs
+            label="Varlık türü filtresi"
+            value={filter}
+            onChange={setFilter}
+            items={FILTERS.map((f) => ({ ...f, count: counts[f.value] }))}
+            className="max-w-full min-w-0 self-start sm:self-auto"
+          />
+          <div className="flex gap-3">
+            <Select label="Sıralama" value={sort} onChange={setSort} options={SORTS} icon={<ArrowsUpDownIcon />} className="min-w-0 flex-1 sm:w-56 sm:flex-none" />
+            {onRefresh && (
+              <ToolbarButton
+                iconOnly
+                onClick={onRefresh}
+                loading={refreshing}
+                aria-label="Portföyü yenile"
+                title="Yenile"
+                icon={<ArrowPathIcon className="h-4 w-4" aria-hidden="true" />}
+              />
+            )}
           </div>
         </div>
-        <label className="relative block sm:w-60">
-          <span className="sr-only">Sıralama</span>
-          <FunnelIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-subtle" aria-hidden="true" />
-          <select
-            value={sort}
-            onChange={(e) => setSort(e.target.value as SortKey)}
-            className="h-9 w-full appearance-none rounded-lg border border-line bg-surface-2 pl-9 pr-8 text-sm text-fg focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
-          >
-            {SORTS.map((s) => (
-              <option key={s.value} value={s.value}>{s.label}</option>
-            ))}
-          </select>
-          <ChevronDownIcon className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-subtle" aria-hidden="true" />
-        </label>
-      </div>
-
-      <div className="px-5 pt-3">
-        <Tabs
-          variant="underline"
-          label="Varlık türü filtresi"
-          value={filter}
-          onChange={setFilter}
-          items={FILTERS.map((f) => ({ ...f, count: counts[f.value] }))}
-        />
       </div>
 
       {!loaded ? (
-        <div className="divide-y divide-line">
+        <div className="divide-y divide-line border-t border-line px-5 sm:px-6">
           {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="flex items-center gap-3 px-5 py-4">
-              <Skeleton className="h-9 w-9 rounded-full" />
+            <div key={i} className="flex items-center gap-3 py-4">
+              <Skeleton className="h-10 w-10 rounded-full" />
               <div className="flex-1 space-y-1.5">
                 <Skeleton className="h-3.5 w-20" />
                 <Skeleton className="h-3 w-32" />
@@ -137,43 +144,55 @@ export default function HoldingsCard({ holdings, loaded, ordersByHolding, onOrde
         </div>
       ) : rows.length === 0 ? (
         <EmptyState
+          className="border-t border-line"
           icon={<BriefcaseIcon />}
           title={filter === 'all' ? 'Pozisyon bulunamadı' : `${ASSET_TYPE_LABELS[filter]} türünde pozisyonun yok`}
           description="Bu türde açık pozisyon bulunmuyor. Diğer sekmelere göz atabilirsin."
-          action={<Button variant="secondary" size="sm" onClick={() => setFilter('all')}>Tümünü göster</Button>}
+          action={
+            <Button variant="secondary" size="sm" onClick={() => setFilter('all')}>
+              Tümünü göster
+            </Button>
+          }
         />
       ) : (
         <>
           {/* Küçük ekranlar: yığılmış satırlar */}
-          <ul className="divide-y divide-line md:hidden">
+          <ul className="divide-y divide-line border-t border-line md:hidden">
             {rows.map((h) => (
               <MobileRow key={h.id} h={h} orders={ordersByHolding.get(holdingKey(h.assetType, h.symbol))} onOrders={onOrders} />
             ))}
           </ul>
 
           {/* md ve üzeri: tablo */}
-          <table className="hidden w-full text-sm md:table">
-            <caption className="sr-only">Açık pozisyonlar</caption>
-            <thead>
-              <tr className="border-b border-line text-left text-xs font-medium text-subtle">
-                <th scope="col" className="py-2.5 pl-5 font-medium">Varlık</th>
-                <th scope="col" className="hidden py-2.5 pr-4 text-right font-medium lg:table-cell">Miktar</th>
-                <th scope="col" className="hidden py-2.5 pr-4 text-right font-medium xl:table-cell">Ort. maliyet</th>
-                <th scope="col" className="py-2.5 pr-4 text-right font-medium">Fiyat</th>
-                <th scope="col" aria-sort={ariaSort('value')} className="py-2.5 pr-4 text-right font-medium">Değer</th>
-                <th scope="col" aria-sort={ariaSort('pl') ?? ariaSort('plPercent')} className="py-2.5 pr-4 text-right font-medium">K/Z</th>
-                <th scope="col" aria-sort={ariaSort('day')} className="hidden py-2.5 pr-4 text-right font-medium lg:table-cell">Günlük</th>
-                <th scope="col" className="py-2.5 pr-5 text-right font-medium">
-                  <span className="sr-only">İşlemler</span>
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-line">
+          <DataTable label="Açık pozisyonlar" className="hidden pb-2 md:block">
+            <THead>
+              <Th>Varlık</Th>
+              <Th align="right" className="hidden lg:table-cell">
+                Miktar
+              </Th>
+              <Th align="right" className="hidden xl:table-cell">
+                Ort. maliyet
+              </Th>
+              <Th align="right">Fiyat</Th>
+              <Th align="right" aria-sort={ariaSort('value')}>
+                Değer
+              </Th>
+              <Th align="right" aria-sort={ariaSort('pl') ?? ariaSort('plPercent')}>
+                K/Z
+              </Th>
+              <Th align="right" aria-sort={ariaSort('day')} className="hidden lg:table-cell">
+                Günlük
+              </Th>
+              <Th align="right" className="w-12">
+                <span className="sr-only">İşlemler</span>
+              </Th>
+            </THead>
+            <TBody>
               {rows.map((h) => (
                 <TableRow key={h.id} h={h} orders={ordersByHolding.get(holdingKey(h.assetType, h.symbol))} onOrders={onOrders} />
               ))}
-            </tbody>
-          </table>
+            </TBody>
+          </DataTable>
         </>
       )}
     </Card>
@@ -197,10 +216,10 @@ function AssetCell({ h, orders }: { h: LiveHolding; orders?: OrderRow[] }) {
   const { stop, upper } = nearestOrders(orders);
   return (
     <Link href={assetHref({ type: h.assetType, symbol: h.symbol })} className="group flex min-w-0 items-center gap-3">
-      <AssetAvatar symbol={h.symbol} type={h.assetType} image={h.image} />
+      <AssetAvatar symbol={h.symbol} type={h.assetType} image={h.image} size={40} />
       <span className="min-w-0">
         <span className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
-          <span className="font-mono text-[13px] font-semibold text-fg group-hover:text-brand">{h.symbol}</span>
+          <span className="font-medium text-fg group-hover:text-brand">{h.symbol}</span>
           <Badge tone={TYPE_TONE[h.assetType]}>{ASSET_TYPE_LABELS[h.assetType]}</Badge>
           {stop && (
             <Badge tone="down" className="num">
@@ -221,29 +240,16 @@ function AssetCell({ h, orders }: { h: LiveHolding; orders?: OrderRow[] }) {
   );
 }
 
-function Actions({ h, orders, onOrders, className }: { h: LiveHolding; orders?: OrderRow[]; onOrders: (h: LiveHolding) => void; className?: string }) {
-  const count = orders?.length ?? 0;
+function useHoldingActions(h: LiveHolding, orders: OrderRow[] | undefined, onOrders: (h: LiveHolding) => void) {
   const { openTrade } = useTrade();
   const target = { type: h.assetType, symbol: h.symbol, name: h.name, image: h.image };
-  return (
-    <div className={cn('flex justify-end gap-1.5', className)}>
-      <Button size="sm" variant="up" onClick={() => openTrade(target, 'buy')} aria-label={`${h.symbol} al`}>
-        Al
-      </Button>
-      <Button size="sm" variant="down" onClick={() => openTrade(target, 'sell')} aria-label={`${h.symbol} sat`}>
-        Sat
-      </Button>
-      <Button
-        size="sm"
-        variant="secondary"
-        onClick={() => onOrders(h)}
-        aria-label={count ? `${h.symbol} için zarar durdur / kâr al emri oluştur (${count} aktif emir)` : `${h.symbol} için zarar durdur / kâr al emri oluştur`}
-        icon={<ShieldExclamationIcon className={cn('h-3.5 w-3.5', count ? 'text-brand' : 'text-subtle')} aria-hidden="true" />}
-      >
-        Emir
-      </Button>
-    </div>
-  );
+  const count = orders?.length ?? 0;
+  return {
+    count,
+    buy: () => openTrade(target, 'buy'),
+    sell: () => openTrade(target, 'sell'),
+    orders: () => onOrders(h),
+  };
 }
 
 function plTone(v: number) {
@@ -252,33 +258,53 @@ function plTone(v: number) {
 }
 
 function TableRow({ h, orders, onOrders }: { h: LiveHolding; orders?: OrderRow[]; onOrders: (h: LiveHolding) => void }) {
+  const act = useHoldingActions(h, orders, onOrders);
   return (
-    <tr className="transition-colors hover:bg-surface-2/60">
-      <td className="py-3 pl-5 pr-3">
+    <Tr className="hover:bg-surface-2">
+      <Td>
         <AssetCell h={h} orders={orders} />
-      </td>
-      <td className="num hidden py-3 pr-4 text-right lg:table-cell">{formatQuantity(h.quantity)}</td>
-      <td className="num hidden py-3 pr-4 text-right text-muted xl:table-cell">{formatTRY(h.averagePrice, { precise: true })}</td>
-      <td className="num py-3 pr-4 text-right">
+      </Td>
+      <Td align="right" className="num hidden text-fg lg:table-cell">
+        {formatQuantity(h.quantity)}
+      </Td>
+      <Td align="right" className="num hidden text-muted xl:table-cell">
+        {formatTRY(h.averagePrice, { precise: true })}
+      </Td>
+      <Td align="right" className="num whitespace-nowrap text-fg">
         {formatTRY(h.livePrice, { precise: true })}
-        <div className="mt-0.5 text-xs text-subtle lg:hidden">{formatQuantity(h.quantity)} adet</div>
-      </td>
-      <td className="num py-3 pr-4 text-right font-semibold">{formatTRY(h.liveValue)}</td>
-      <td className="py-3 pr-4 text-right">
+        <div className="mt-0.5 text-xs text-muted lg:hidden">{formatQuantity(h.quantity)} adet</div>
+      </Td>
+      <Td align="right" className="num whitespace-nowrap font-semibold text-fg">
+        {formatTRY(h.liveValue)}
+      </Td>
+      <Td align="right" className="whitespace-nowrap">
         <Money value={h.livePL} signed className="block font-medium" />
         <Delta value={h.livePLPercent} variant="text" className="text-xs" />
-      </td>
-      <td className="hidden py-3 pr-4 text-right lg:table-cell">
+      </Td>
+      <Td align="right" className="hidden lg:table-cell">
         {h.dayChangePercent != null ? <Delta value={h.dayChangePercent} /> : <span className="text-subtle">—</span>}
-      </td>
-      <td className="py-3 pr-5">
-        <Actions h={h} orders={orders} onOrders={onOrders} />
-      </td>
-    </tr>
+      </Td>
+      <Td align="right">
+        <RowMenu
+          label={`${h.symbol} işlemleri`}
+          className="ml-auto"
+          items={[
+            { label: 'Al', icon: <ArrowUpRightIcon />, tone: 'up', onSelect: act.buy },
+            { label: 'Sat', icon: <ArrowDownRightIcon />, tone: 'down', onSelect: act.sell },
+            {
+              label: act.count ? `Emir (${act.count} aktif)` : 'Zarar durdur / kâr al',
+              icon: <ShieldExclamationIcon />,
+              onSelect: act.orders,
+            },
+          ]}
+        />
+      </Td>
+    </Tr>
   );
 }
 
 function MobileRow({ h, orders, onOrders }: { h: LiveHolding; orders?: OrderRow[]; onOrders: (h: LiveHolding) => void }) {
+  const act = useHoldingActions(h, orders, onOrders);
   return (
     <li className="px-5 py-4">
       <div className="flex items-start justify-between gap-3">
@@ -289,13 +315,29 @@ function MobileRow({ h, orders, onOrders }: { h: LiveHolding; orders?: OrderRow[
           <Delta value={h.livePLPercent} variant="text" className="text-xs" />
         </div>
       </div>
-      <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2.5 rounded-xl bg-surface-2 px-3.5 py-3">
+      <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2.5 rounded-xl border border-line bg-surface-2 px-3.5 py-3">
         <MiniStat label="Miktar" value={formatQuantity(h.quantity)} />
         <MiniStat label="Ort. maliyet" value={formatTRY(h.averagePrice, { precise: true })} />
         <MiniStat label="Güncel fiyat" value={formatTRY(h.livePrice, { precise: true })} />
         <MiniStat label="Günlük" value={h.dayChangePercent != null ? <Delta value={h.dayChangePercent} variant="text" /> : '—'} />
       </dl>
-      <Actions h={h} orders={orders} onOrders={onOrders} className="mt-3 [&>button]:flex-1" />
+      <div className="mt-3 grid grid-cols-3 gap-2">
+        <Button size="sm" variant="up" onClick={act.buy} aria-label={`${h.symbol} al`}>
+          Al
+        </Button>
+        <Button size="sm" variant="down" onClick={act.sell} aria-label={`${h.symbol} sat`}>
+          Sat
+        </Button>
+        <Button
+          size="sm"
+          variant="secondary"
+          onClick={act.orders}
+          aria-label={act.count ? `${h.symbol} için zarar durdur / kâr al emri oluştur (${act.count} aktif emir)` : `${h.symbol} için zarar durdur / kâr al emri oluştur`}
+          icon={<ShieldExclamationIcon className={cn('h-3.5 w-3.5', act.count ? 'text-brand' : 'text-subtle')} aria-hidden="true" />}
+        >
+          Emir
+        </Button>
+      </div>
     </li>
   );
 }

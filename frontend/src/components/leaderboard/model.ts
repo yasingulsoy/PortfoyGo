@@ -1,5 +1,5 @@
 import { STARTING_BALANCE } from '@/lib/constants';
-import type { LeagueMember, SeasonEntry } from '@/types';
+import type { SeasonEntry } from '@/types';
 
 export type Board = 'alltime' | 'week';
 
@@ -63,9 +63,9 @@ export const BOARD_COPY: Record<Board, { title: string; description: string }> =
 
 /**
  * Sezon / lig satırlarını mevcut kürsü ve liste bileşenlerinin beklediği biçime çevirir:
- * toplam varlık = güncel varlık, K/Z = sezona (lige) girişten bu yana TL, yüzde = getiri.
+ * toplam varlık = güncel varlık, K/Z = sezona girişten bu yana TL, yüzde = getiri.
  */
-export function toLeaders(entries: Array<Pick<SeasonEntry | LeagueMember, 'rank' | 'username' | 'equity' | 'profit_tl' | 'return_pct'>>): Leader[] {
+export function toLeaders(entries: Array<Pick<SeasonEntry, 'rank' | 'username' | 'equity' | 'profit_tl' | 'return_pct'>>): Leader[] {
   return entries.map((e) => ({
     rank: e.rank,
     username: e.username,

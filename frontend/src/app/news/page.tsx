@@ -1,8 +1,8 @@
 'use client';
 
-import { useMemo, useState, type ReactNode } from 'react';
+import { useMemo, useState } from 'react';
 import useSWR from 'swr';
-import { ArrowPathIcon, ArrowTopRightOnSquareIcon, MagnifyingGlassIcon, NewspaperIcon } from '@heroicons/react/20/solid';
+import { ArrowPathIcon, ArrowTopRightOnSquareIcon, ClockIcon, MagnifyingGlassIcon, NewspaperIcon } from '@heroicons/react/20/solid';
 import { useRequireAuth } from '@/hooks/useRequireAuth';
 import { newsApi } from '@/lib/api';
 import { cn, formatDateTime, formatRelative } from '@portfoygo/shared/format';
@@ -10,8 +10,11 @@ import type { NewsItem } from '@/types';
 import PageHeader from '@portfoygo/shared/ui/PageHeader';
 import Button from '@portfoygo/shared/ui/Button';
 import { Card } from '@portfoygo/shared/ui/Card';
-import { Alert, EmptyState, Skeleton } from '@portfoygo/shared/ui/Feedback';
+import { Alert, Badge, EmptyState, Skeleton } from '@portfoygo/shared/ui/Feedback';
 import { PageLoader } from '@portfoygo/shared/ui/Spinner';
+import Tabs from '@portfoygo/shared/ui/Tabs';
+import Breadcrumb from '@/components/common/Breadcrumb';
+import { SearchInput, ToolbarButton } from '@/components/common/controls';
 
 const INITIAL_LIMIT = 20;
 const STEP = 10;
@@ -97,50 +100,39 @@ export default function NewsPage() {
   const canLoadMore = limit < MAX_LIMIT && articles.length >= limit;
   const [featured, ...others] = filtered;
 
+  const categoryTabs = [{ value: ALL, label: 'Tümü', count: articles.length }, ...categories.map((c) => ({ value: c.name, label: c.name, count: c.count }))];
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 md:space-y-6">
       <PageHeader
-        eyebrow="Gündem"
         title="Piyasa haberleri"
         description="Ekonomi ve finans dünyasından son gelişmeler. Haberler kaynağında yeni sekmede açılır."
-        actions={
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => void mutate()}
-            disabled={isValidating}
-            icon={<ArrowPathIcon className={cn('h-4 w-4', isValidating && 'animate-spin')} aria-hidden="true" />}
-          >
-            Yenile
-          </Button>
-        }
+        actions={<Breadcrumb items="Haberler" />}
       />
 
-      <div className="space-y-3">
-        <label className="relative block sm:max-w-sm">
-          <span className="sr-only">Haberlerde ara</span>
-          <MagnifyingGlassIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-subtle" aria-hidden="true" />
-          <input
-            type="search"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Başlık veya içerikte ara"
-            className="h-10 w-full rounded-lg border border-line bg-surface pl-9 pr-3 text-sm placeholder:text-subtle hover:border-line-strong focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
-          />
-        </label>
-
-        {categories.length > 0 && (
-          <div role="group" aria-label="Kategori filtresi" className="scrollbar-none -mx-4 flex gap-2 overflow-x-auto px-4 sm:mx-0 sm:flex-wrap sm:px-0">
-            <Chip active={activeCategory === ALL} onClick={() => setCategory(ALL)}>
-              Tümü <span className="num text-subtle">{articles.length}</span>
-            </Chip>
-            {categories.map((c) => (
-              <Chip key={c.name} active={activeCategory === c.name} onClick={() => setCategory(c.name)}>
-                {c.name} <span className="num text-subtle">{c.count}</span>
-              </Chip>
-            ))}
-          </div>
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        {categories.length > 0 ? (
+          <Tabs label="Kategori filtresi" items={categoryTabs} value={activeCategory} onChange={setCategory} className="min-w-0 max-w-full self-start lg:max-w-[62%]" />
+        ) : (
+          <span aria-hidden="true" />
         )}
+        <div className="flex gap-3">
+          <SearchInput
+            label="Haberlerde ara"
+            placeholder="Başlık veya içerikte ara"
+            value={query}
+            onChange={setQuery}
+            className="min-w-0 flex-1 lg:w-72 lg:flex-none"
+          />
+          <ToolbarButton
+            iconOnly
+            onClick={() => void mutate()}
+            disabled={isValidating}
+            aria-label="Haberleri yenile"
+            title="Yenile"
+            icon={<ArrowPathIcon className={cn('h-4 w-4', isValidating && 'animate-spin')} aria-hidden="true" />}
+          />
+        </div>
       </div>
 
       {error && articles.length > 0 && <Alert tone="error">Haberler güncellenemedi; son alınan haberler gösteriliyor.</Alert>}
@@ -153,7 +145,13 @@ export default function NewsPage() {
             icon={<NewspaperIcon />}
             title={error ? 'Haberler yüklenemedi' : 'Şu an haber yok'}
             description={error ? 'Haber kaynağına şu an ulaşılamıyor.' : 'Yeni haberler geldiğinde burada görünecek.'}
-            action={error ? <Button variant="secondary" size="sm" onClick={() => void mutate()}>Tekrar dene</Button> : undefined}
+            action={
+              error ? (
+                <Button variant="secondary" size="sm" onClick={() => void mutate()}>
+                  Tekrar dene
+                </Button>
+              ) : undefined
+            }
           />
         </Card>
       ) : filtered.length === 0 ? (
@@ -178,10 +176,12 @@ export default function NewsPage() {
         </Card>
       ) : (
         <>
-          <p className="sr-only" role="status">{filtered.length} haber listeleniyor</p>
+          <p className="sr-only" role="status">
+            {filtered.length} haber listeleniyor
+          </p>
           <FeaturedArticle article={featured} />
           {others.length > 0 && (
-            <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <ul className="grid gap-4 sm:grid-cols-2 md:gap-6 xl:grid-cols-3">
               {others.map((a) => (
                 <li key={a.link} className="min-w-0">
                   <ArticleCard article={a} />
@@ -195,11 +195,11 @@ export default function NewsPage() {
       {articles.length > 0 && (
         <div className="flex flex-col items-center gap-2 pt-2">
           {canLoadMore ? (
-            <Button variant="secondary" loading={loadingMore} onClick={() => setLimit((l) => Math.min(MAX_LIMIT, l + STEP))}>
+            <ToolbarButton loading={loadingMore} onClick={() => setLimit((l) => Math.min(MAX_LIMIT, l + STEP))}>
               Daha fazla yükle
-            </Button>
+            </ToolbarButton>
           ) : (
-            <p className="text-xs text-subtle">Tüm güncel haberleri gördün.</p>
+            <p className="text-sm text-muted">Tüm güncel haberleri gördün.</p>
           )}
         </div>
       )}
@@ -209,34 +209,18 @@ export default function NewsPage() {
 
 /* ------------------------------------------------------------------ */
 
-function Chip({ active, onClick, children }: { active: boolean; onClick: () => void; children: ReactNode }) {
-  return (
-    <button
-      type="button"
-      aria-pressed={active}
-      onClick={onClick}
-      className={cn(
-        'inline-flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-3 text-xs font-medium transition-colors',
-        active ? 'border-brand bg-brand-soft text-brand' : 'border-line bg-surface text-muted hover:border-line-strong hover:text-fg',
-      )}
-    >
-      {children}
-    </button>
-  );
-}
-
 function Meta({ article, className }: { article: Article; className?: string }) {
   const time = article.pubDate ? formatRelative(article.pubDate) : null;
   return (
-    <p className={cn('flex flex-wrap items-center gap-x-1.5 text-xs text-subtle', className)}>
-      {article.categories[0] && <span className="font-medium text-brand">{article.categories[0]}</span>}
-      {article.categories[0] && time && <span aria-hidden="true">·</span>}
+    <div className={cn('flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted', className)}>
+      {article.categories[0] && <Badge tone="brand">{article.categories[0]}</Badge>}
       {time && (
-        <time dateTime={article.pubDate} title={formatDateTime(article.pubDate)}>
+        <time dateTime={article.pubDate} title={formatDateTime(article.pubDate)} className="inline-flex items-center gap-1">
+          <ClockIcon className="h-3.5 w-3.5" aria-hidden="true" />
           {time}
         </time>
       )}
-    </p>
+    </div>
   );
 }
 
@@ -244,7 +228,7 @@ function NewsImage({ src, className }: { src?: string; className?: string }) {
   const [failed, setFailed] = useState(false);
   if (!src || failed) {
     return (
-      <div className={cn('flex items-center justify-center bg-surface-2 text-subtle', className)} aria-hidden="true">
+      <div className={cn('flex items-center justify-center bg-surface-3 text-subtle', className)} aria-hidden="true">
         <NewspaperIcon className="h-8 w-8" />
       </div>
     );
@@ -252,28 +236,26 @@ function NewsImage({ src, className }: { src?: string; className?: string }) {
   return (
     // Harici RSS görselleri: alan adları önceden bilinmediği için next/image yerine düz <img>.
     // eslint-disable-next-line @next/next/no-img-element
-    <img src={src} alt="" loading="lazy" referrerPolicy="no-referrer" onError={() => setFailed(true)} className={cn('bg-surface-2 object-cover', className)} />
+    <img src={src} alt="" loading="lazy" referrerPolicy="no-referrer" onError={() => setFailed(true)} className={cn('bg-surface-3 object-cover', className)} />
   );
 }
 
 function FeaturedArticle({ article }: { article: Article }) {
   return (
-    <Card className="overflow-hidden">
-      <a
-        href={article.link}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="group grid md:grid-cols-[1.1fr_1fr]"
-      >
-        <NewsImage src={article.image} className="aspect-[16/9] w-full md:aspect-auto md:h-full md:min-h-[280px]" />
-        <div className="flex flex-col p-5 sm:p-6">
-          <Meta article={article} />
-          <h2 className="mt-2 text-xl font-semibold leading-snug tracking-tight group-hover:text-brand sm:text-2xl">{article.title}</h2>
+    <Card className="p-4 sm:p-5">
+      <a href={article.link} target="_blank" rel="noopener noreferrer" className="group grid gap-5 md:grid-cols-[1.1fr_1fr] md:gap-6">
+        <NewsImage src={article.image} className="aspect-[16/9] w-full rounded-xl md:aspect-auto md:h-full md:min-h-[280px]" />
+        <div className="flex min-w-0 flex-col px-1 pb-1 md:py-2 md:pr-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge tone="gold">Öne çıkan</Badge>
+            <Meta article={article} />
+          </div>
+          <h2 className="mt-3 text-xl font-semibold leading-snug text-fg group-hover:text-brand sm:text-2xl">{article.title}</h2>
           {article.description && <p className="mt-3 line-clamp-4 text-sm leading-relaxed text-muted">{article.description}</p>}
-          <div className="mt-auto flex items-center justify-between gap-3 pt-5 text-xs text-subtle">
-            <span className="truncate">{article.creator ?? ''}</span>
+          <div className="mt-auto flex items-center justify-between gap-3 border-t border-line pt-4 text-sm max-md:mt-5">
+            <span className="truncate text-muted">{article.creator ?? ''}</span>
             <span className="inline-flex shrink-0 items-center gap-1 font-medium text-brand">
-              Haberi oku <ArrowTopRightOnSquareIcon className="h-3.5 w-3.5" aria-hidden="true" />
+              Haberi oku <ArrowTopRightOnSquareIcon className="h-4 w-4" aria-hidden="true" />
               <span className="sr-only">(yeni sekmede açılır)</span>
             </span>
           </div>
@@ -285,15 +267,16 @@ function FeaturedArticle({ article }: { article: Article }) {
 
 function ArticleCard({ article }: { article: Article }) {
   return (
-    <Card className="h-full overflow-hidden transition-colors hover:border-line-strong">
+    <Card className="h-full p-4 transition-colors hover:border-line-strong sm:p-5">
       <a href={article.link} target="_blank" rel="noopener noreferrer" className="group flex h-full flex-col">
-        {article.image && <NewsImage src={article.image} className="aspect-[16/9] w-full" />}
-        <div className="flex flex-1 flex-col p-4">
-          <Meta article={article} />
-          <h3 className="mt-1.5 line-clamp-3 text-[15px] font-semibold leading-snug tracking-tight group-hover:text-brand">{article.title}</h3>
-          {article.description && <p className="mt-2 line-clamp-3 text-sm leading-relaxed text-muted">{article.description}</p>}
+        {article.image && <NewsImage src={article.image} className="mb-4 aspect-[16/9] w-full rounded-xl" />}
+        <Meta article={article} />
+        <h3 className="mt-2.5 line-clamp-3 text-base font-semibold leading-snug text-fg group-hover:text-brand">{article.title}</h3>
+        {article.description && <p className="mt-2 line-clamp-3 text-sm leading-relaxed text-muted">{article.description}</p>}
+        <span className="mt-auto inline-flex items-center gap-1 pt-4 text-sm font-medium text-brand">
+          Haberi oku <ArrowTopRightOnSquareIcon className="h-4 w-4" aria-hidden="true" />
           <span className="sr-only">(yeni sekmede açılır)</span>
-        </div>
+        </span>
       </a>
     </Card>
   );
@@ -301,23 +284,23 @@ function ArticleCard({ article }: { article: Article }) {
 
 function NewsSkeleton() {
   return (
-    <div className="space-y-4" aria-hidden="true">
-      <Card className="grid overflow-hidden md:grid-cols-[1.1fr_1fr]">
-        <Skeleton className="aspect-[16/9] w-full rounded-none md:aspect-auto md:min-h-[280px]" />
-        <div className="space-y-3 p-6">
+    <div className="space-y-4 md:space-y-6" aria-hidden="true">
+      <Card className="grid gap-5 p-4 sm:p-5 md:grid-cols-[1.1fr_1fr] md:gap-6">
+        <Skeleton className="aspect-[16/9] w-full rounded-xl md:aspect-auto md:min-h-[280px]" />
+        <div className="space-y-3 md:py-2">
           <Skeleton className="h-3 w-32" />
           <Skeleton className="h-7 w-full" />
           <Skeleton className="h-7 w-2/3" />
           <Skeleton className="h-16 w-full" />
         </div>
       </Card>
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 md:gap-6 xl:grid-cols-3">
         {Array.from({ length: 6 }).map((_, i) => (
-          <Card key={i} className="space-y-2.5 p-4">
+          <Card key={i} className="space-y-2.5 p-4 sm:p-5">
+            <Skeleton className="aspect-[16/9] w-full rounded-xl" />
             <Skeleton className="h-3 w-24" />
             <Skeleton className="h-5 w-full" />
             <Skeleton className="h-5 w-3/4" />
-            <Skeleton className="h-12 w-full" />
           </Card>
         ))}
       </div>

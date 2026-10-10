@@ -1,13 +1,15 @@
 // Frontend'e özgü API uçları. Çekirdek istemci (apiFetch, oturum, CSRF) ortak pakettedir.
 
-import type { AssetType, CreateLeagueRequest } from '@/types';
-import { apiFetch, post } from '@portfoygo/shared/api';
+import type { AssetType, CreateLeagueRequest, PublicLeagueFilter, UpdateLeagueRequest } from '@/types';
+import { ApiError, apiFetch, post, swrFetcher } from '@portfoygo/shared/api';
 import {
   toCurrentSeason,
   toLeague,
   toLeagueDetail,
+  toLeagueFeed,
   toLeaguePreview,
   toLeagues,
+  toPublicLeaguePage,
   toSeasonAwards,
   toSeasonLeaderboard,
   toSeasonSummaries,
@@ -153,4 +155,326 @@ export const leaguesApi = {
   removeMember: (id: string, userId: string) =>
     apiFetch(`/leagues/${encodeURIComponent(id)}/members/${encodeURIComponent(userId)}`, { method: 'DELETE' }),
   remove: (id: string) => apiFetch(`/leagues/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  /** Kurucu: ad/açıklama/görünürlük; tarihler yalnızca lig başlamadan. */
+  update: (id: string, data: UpdateLeagueRequest) =>
+    apiFetch(`/leagues/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(data) }).then((r) => toLeague(unwrap(r))),
+  /** Herkese açık ligler (Keşfet). */
+  discover: (q: { search?: string; status?: PublicLeagueFilter; limit?: number; offset?: number } = {}) => {
+    const params = new URLSearchParams();
+    if (q.search) params.set('search', q.search);
+    if (q.status) params.set('status', q.status);
+    params.set('limit', String(q.limit ?? 12));
+    params.set('offset', String(q.offset ?? 0));
+    return apiFetch(`/leagues/public?${params}`).then((r) => toPublicLeaguePage(unwrap(r)));
+  },
+  joinPublic: (id: string) => apiFetch(`/leagues/${encodeURIComponent(id)}/join-public`, post({})).then((r) => toLeague(unwrap(r))),
+  /** Üyelerin son alım/satımları (yalnızca üyeler). */
+  feed: (id: string, limit = 30) => apiFetch(`/leagues/${encodeURIComponent(id)}/feed?limit=${limit}`).then((r) => toLeagueFeed(unwrap(r))),
+};
+
+// ---------------------------------------------------------------------------
+// Piyasa fiyat geçmişi (grafik), performans ve mini grafikler (herkese açık uçlar)
+// ---------------------------------------------------------------------------
+
+/** Grafik aralıkları (backend sözleşmesi). */
+export type MarketRange = '1D' | '1W' | '1M' | '3M' | '6M' | 'YTD' | '1Y' | 'ALL';
+
+export interface MarketHistoryPoint {
+  /** Unix saniye */
+  t: number;
+  /** Varlığın kendi kotasyon para birimindeki fiyat */
+  v: number;
+}
+
+export interface MarketHistory {
+  symbol: string;
+  type: AssetType;
+  /** `points` değerlerinin para birimi (varlığın kendi kotasyonu) */
+  currency: 'USD' | 'TRY';
+  points: MarketHistoryPoint[];
+  first: number | null;
+  last: number | null;
+  change: number | null;
+  changePercent: number | null;
+}
+
+export type PerformancePeriod = '1W' | '1M' | '3M' | '6M' | 'YTD' | '1Y';
+/** Dönemsel getiri (yüzde); veri yoksa null. */
+export type MarketPerformance = Record<PerformancePeriod, number | null>;
+/** `${type}:${SYMBOL}` → kapanış serisi (son 7 gün) */
+export type Sparklines = Record<string, number[]>;
+
+/** Sparkline isteği başına en fazla öğe (backend sınırı). */
+export const SPARKLINE_BATCH = 60;
+
+const marketQuery = (type: AssetType, symbol: string) =>
+  `type=${encodeURIComponent(type)}&symbol=${encodeURIComponent(symbol.toUpperCase())}`;
+
+/** 404 (uç henüz yok / varlık desteklenmiyor) hata değil, "veri yok" sayılır. */
+async function orNullOn404<T>(endpoint: string): Promise<T | null> {
+  try {
+    return await swrFetcher<T>(endpoint);
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 404) return null;
+    throw err;
+  }
+}
+
+export const marketHistoryApi = {
+  historyKey: (type: AssetType, symbol: string, range: MarketRange) => `/market/history?${marketQuery(type, symbol)}&range=${range}`,
+  history: (type: AssetType, symbol: string, range: MarketRange) =>
+    orNullOn404<MarketHistory>(marketHistoryApi.historyKey(type, symbol, range)),
+  performanceKey: (type: AssetType, symbol: string) => `/market/performance?${marketQuery(type, symbol)}`,
+  performance: (type: AssetType, symbol: string) => orNullOn404<MarketPerformance>(marketHistoryApi.performanceKey(type, symbol)),
+  /** items: `${type}:${SYMBOL}` (en fazla SPARKLINE_BATCH) */
+  sparklinesKey: (items: string[]) =>
+    `/market/sparklines?items=${items
+      .map((i) => {
+        const [type, symbol = ''] = i.split(':');
+        return `${encodeURIComponent(type)}:${encodeURIComponent(symbol)}`;
+      })
+      .join(',')}`,
+  sparklines: (items: string[]) => orNullOn404<Sparklines>(marketHistoryApi.sparklinesKey(items)),
+};
+
+/* ------------------------------------------------------------------ */
+/* Bildirimler                                                         */
+/* ------------------------------------------------------------------ */
+
+export type NotificationCategory = 'orders' | 'competition' | 'account' | 'system';
+
+export interface AppNotification {
+  id: string;
+  /** ör. 'order.filled', 'badge.earned', 'system.announcement' */
+  type: string;
+  category: NotificationCategory;
+  title: string;
+  body: string;
+  /** Uygulama içi yol (ör. '/portfolio') veya null */
+  link: string | null;
+  data: Record<string, unknown> | null;
+  read_at: string | null;
+  created_at: string;
+}
+
+export interface NotificationPage {
+  items: AppNotification[];
+  /** Sonraki sayfa imleci (ISO); yoksa null */
+  next_before: string | null;
+  unread_count: number;
+}
+
+export interface NotificationPrefs {
+  orders: boolean;
+  competition: boolean;
+  /** Her zaman açık (kapatılamaz) */
+  account: boolean;
+  system: boolean;
+}
+
+export interface NotificationListParams {
+  limit?: number;
+  before?: string | null;
+  unread?: boolean;
+  category?: NotificationCategory | null;
+}
+
+const NOTIFICATION_CATEGORIES: readonly NotificationCategory[] = ['orders', 'competition', 'account', 'system'];
+
+/** Backend'den gelen bildirim öğesini güvenle okur. */
+export function toNotification(raw: any): AppNotification {
+  const category = NOTIFICATION_CATEGORIES.includes(raw?.category) ? (raw.category as NotificationCategory) : 'system';
+  return {
+    id: String(raw?.id ?? ''),
+    type: String(raw?.type ?? ''),
+    category,
+    title: String(raw?.title ?? ''),
+    body: String(raw?.body ?? ''),
+    link: typeof raw?.link === 'string' && raw.link ? raw.link : null,
+    data: raw?.data && typeof raw.data === 'object' ? (raw.data as Record<string, unknown>) : null,
+    read_at: raw?.read_at ? String(raw.read_at) : null,
+    created_at: String(raw?.created_at ?? new Date().toISOString()),
+  };
+}
+
+function toNotificationPage(raw: any): NotificationPage {
+  const items = Array.isArray(raw?.items) ? raw.items.map(toNotification) : [];
+  return {
+    items,
+    next_before: typeof raw?.next_before === 'string' && raw.next_before ? raw.next_before : null,
+    unread_count: Number(raw?.unread_count ?? 0) || 0,
+  };
+}
+
+export const notificationsApi = {
+  /** Liste uç noktası (aynı zamanda SWR anahtarının ilk öğesi). */
+  listPath: ({ limit = 20, before, unread, category }: NotificationListParams = {}) => {
+    const qs = new URLSearchParams({ limit: String(limit) });
+    if (before) qs.set('before', before);
+    if (unread) qs.set('unread', '1');
+    if (category) qs.set('category', category);
+    return `/notifications?${qs}`;
+  },
+  list: async (path: string) => toNotificationPage(await swrFetcher<unknown>(path)),
+  unreadCountPath: '/notifications/unread-count',
+  unreadCount: async () => Number((await swrFetcher<{ count?: number }>('/notifications/unread-count'))?.count ?? 0) || 0,
+  markRead: (id: string) => apiFetch(`/notifications/${encodeURIComponent(id)}/read`, post({})),
+  markAllRead: (category?: NotificationCategory | null) => apiFetch('/notifications/read-all', post(category ? { category } : {})),
+  remove: (id: string) => apiFetch(`/notifications/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  prefsPath: '/notifications/prefs',
+  prefs: async (): Promise<NotificationPrefs> => {
+    const raw = await swrFetcher<Partial<NotificationPrefs> | null>('/notifications/prefs');
+    return { orders: raw?.orders !== false, competition: raw?.competition !== false, account: true, system: true };
+  },
+  updatePrefs: (prefs: Partial<Pick<NotificationPrefs, 'orders' | 'competition'>>) =>
+    apiFetch('/notifications/prefs', { method: 'PUT', body: JSON.stringify(prefs) }),
+  /** SSE akışının yolu (API_BASE_URL'e eklenir) */
+  streamPath: '/notifications/stream',
+};
+
+/* ------------------------------------------------------------------ */
+/* Arena: hızlı al-sat turları ve canlı meydan okumalar                 */
+/* ------------------------------------------------------------------ */
+
+import { API_BASE_URL as ARENA_API_BASE } from '@portfoygo/shared/api';
+import type { ArenaLeaderPeriod, ArenaSide, ArenaChallengeStatus } from '@/types';
+import {
+  toArenaInstruments,
+  toChallenges,
+  toHistoryPage,
+  toLeaderboardRows,
+  toLeadersPage,
+  toMe,
+  toPosition,
+  toRoundState,
+} from '@/components/arena/model';
+
+/** Arena hatası: sözleşmedeki `code` (ör. ARENA_LIMIT) ve ek veriyle. */
+export class ArenaApiError extends ApiError {
+  constructor(
+    message: string,
+    status: number,
+    public code: string | null,
+    public data: any,
+    /** 429 için saniye */
+    public retryAfter: number | null,
+  ) {
+    super(message, status);
+    this.name = 'ArenaApiError';
+  }
+}
+
+/**
+ * Tur başlatma gibi hata gövdesinin de okunması gereken istekler için (`apiFetch` yalnızca mesajı taşır).
+ * Aynı çerez / CSRF başlığı kurallarıyla çalışır.
+ */
+async function arenaRequest(endpoint: string, init: RequestInit): Promise<any> {
+  let res: Response;
+  try {
+    res = await fetch(`${ARENA_API_BASE}${endpoint}`, {
+      ...init,
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'PortfoyGo' },
+    });
+  } catch {
+    throw new ArenaApiError('Sunucuya ulaşılamadı. Bağlantınızı kontrol edip tekrar deneyin.', 0, null, null, null);
+  }
+  const body = await res.json().catch(() => null);
+  if (!res.ok) {
+    const retryHeader = Number(res.headers.get('Retry-After'));
+    const retry = Number(body?.retry_after ?? body?.data?.retry_after);
+    throw new ArenaApiError(
+      (body && (body.message || body.error)) || 'Beklenmeyen bir hata oluştu.',
+      res.status,
+      typeof body?.code === 'string' ? body.code : typeof body?.error === 'string' && /^[A-Z_]+$/.test(body.error) ? body.error : null,
+      body?.data ?? body,
+      Number.isFinite(retry) && retry > 0 ? retry : Number.isFinite(retryHeader) && retryHeader > 0 ? retryHeader : null,
+    );
+  }
+  return unwrap(body);
+}
+
+const rid = (id: string) => encodeURIComponent(id);
+
+export interface ArenaOpenRequest {
+  instrument: string;
+  side: ArenaSide;
+  amount: number;
+  stop_loss?: number;
+  take_profit?: number;
+}
+
+export const arenaApi = {
+  instrumentsKey: '/arena/instruments',
+  instruments: async () => toArenaInstruments(await swrFetcher<unknown>('/arena/instruments')),
+  /** 201 RoundState · 429 ARENA_LIMIT · 409 ARENA_ROUND_ACTIVE (ArenaApiError) */
+  startRound: async (duration_s: number, instruments?: string[]) =>
+    toRoundState(await arenaRequest('/arena/rounds', { method: 'POST', body: JSON.stringify(instruments?.length ? { duration_s, instruments } : { duration_s }) })),
+  activeKey: '/arena/rounds/active',
+  active: async () => {
+    const raw = await swrFetcher<any>('/arena/rounds/active');
+    return raw && typeof raw === 'object' && raw.round ? toRoundState(raw) : null;
+  },
+  round: async (id: string) => toRoundState(await swrFetcher<unknown>(`/arena/rounds/${rid(id)}`)),
+  openPosition: async (id: string, body: ArenaOpenRequest) => {
+    const raw = unwrap<any>(await apiFetch(`/arena/rounds/${rid(id)}/positions`, post(body)));
+    return { position: toPosition(raw?.position), me: raw?.me ? toMe(raw.me) : null };
+  },
+  closePosition: async (id: string, pid: string) => {
+    const raw = unwrap<any>(await apiFetch(`/arena/rounds/${rid(id)}/positions/${rid(pid)}/close`, post({})));
+    return { position: toPosition(raw?.position), me: raw?.me ? toMe(raw.me) : null };
+  },
+  updateStops: async (id: string, pid: string, body: { stop_loss?: number | null; take_profit?: number | null }) => {
+    const raw = unwrap<any>(await apiFetch(`/arena/rounds/${rid(id)}/positions/${rid(pid)}`, { method: 'PATCH', body: JSON.stringify(body) }));
+    return toPosition(raw?.position ?? raw);
+  },
+  closeAll: async (id: string) => {
+    const raw = unwrap<any>(await apiFetch(`/arena/rounds/${rid(id)}/close-all`, post({})));
+    const closed = Array.isArray(raw?.closed) ? raw.closed.map(toPosition) : [];
+    return { closed, me: raw?.me ? toMe(raw.me) : null };
+  },
+  streamUrl: (id: string) => `${ARENA_API_BASE}/arena/rounds/${rid(id)}/stream`,
+  historyKey: (limit: number, offset: number) => `/arena/me/history?limit=${limit}&offset=${offset}`,
+  history: async (limit = 10, offset = 0) => toHistoryPage(await swrFetcher<unknown>(arenaApi.historyKey(limit, offset))),
+  leadersKey: (period: ArenaLeaderPeriod) => `/arena/leaderboard?period=${period}`,
+  leaders: async (period: ArenaLeaderPeriod) => toLeadersPage(await swrFetcher<unknown>(arenaApi.leadersKey(period))),
+  challengesKey: (status: ArenaChallengeStatus) => `/arena/challenges?status=${status}`,
+  challenges: async (status: ArenaChallengeStatus) => toChallenges(await swrFetcher<unknown>(arenaApi.challengesKey(status))),
+  joinChallenge: async (id: string) => {
+    const raw = unwrap<any>(await apiFetch(`/arena/challenges/${rid(id)}/join`, post({})));
+    return { round_id: String(raw?.round_id ?? '') };
+  },
+  challengeLeaderboardKey: (id: string) => `/arena/challenges/${rid(id)}/leaderboard`,
+  challengeLeaderboard: async (id: string) => {
+    const raw = await swrFetcher<any>(arenaApi.challengeLeaderboardKey(id));
+    return { items: toLeaderboardRows(raw?.items ?? raw), status: typeof raw?.status === 'string' ? raw.status : null };
+  },
+};
+
+/* ------------------------------------------------------------------ */
+/* Portföy Sihirbazı: risk profili anketi ve kişisel dağılım önerisi     */
+/* ------------------------------------------------------------------ */
+
+import type { AdvisorPlanRequest } from '@/types';
+import { toApplyResult, toPlan, toPlanSummaries, toProfileResult, toQuestionnaire } from '@/components/advisor/model';
+
+export const advisorApi = {
+  questionnaireKey: '/advisor/questionnaire',
+  questionnaire: async () => toQuestionnaire(await swrFetcher<unknown>('/advisor/questionnaire')),
+  profileKey: '/advisor/profile',
+  /** En son risk profili; hiç anket doldurulmadıysa null. */
+  profile: async () => toProfileResult(await swrFetcher<unknown>('/advisor/profile')),
+  submitProfile: async (answers: Record<string, string>) => {
+    const res = toProfileResult(unwrap(await apiFetch('/advisor/profile', post({ answers }))));
+    if (!res) throw new ApiError('Risk profili hesaplanamadı.', 500);
+    return res;
+  },
+  createPlan: async (body: AdvisorPlanRequest) => toPlan(unwrap(await apiFetch('/advisor/plans', post(body)))),
+  plansKey: (limit = 10) => `/advisor/plans?limit=${limit}`,
+  plans: async (limit = 10) => toPlanSummaries(await swrFetcher<unknown>(advisorApi.plansKey(limit))),
+  planKey: (id: string) => `/advisor/plans/${encodeURIComponent(id)}`,
+  plan: async (id: string) => toPlan(await swrFetcher<unknown>(advisorApi.planKey(id))),
+  /** Yalnızca alım yapar; mevcut pozisyonlara dokunulmaz. */
+  apply: async (id: string, amount_try: number) =>
+    toApplyResult(unwrap(await apiFetch(`/advisor/plans/${encodeURIComponent(id)}/apply`, post({ amount_try, mode: 'buy_only' })))),
 };

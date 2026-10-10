@@ -2,7 +2,8 @@
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
-import { ArrowPathIcon, ArrowRightIcon, ChartBarIcon, ClockIcon, MagnifyingGlassIcon } from '@heroicons/react/20/solid';
+import { ArrowRightIcon, ChartBarIcon, MagnifyingGlassIcon } from '@heroicons/react/20/solid';
+import { ArrowTrendingUpIcon, BanknotesIcon, BriefcaseIcon, ClockIcon, WalletIcon } from '@heroicons/react/24/outline';
 import { useRequireAuth } from '@/hooks/useRequireAuth';
 import { useAuth } from '@/context/AuthContext';
 import { useLivePortfolio, type LiveHolding } from '@/context/PortfolioContext';
@@ -10,16 +11,22 @@ import { STARTING_BALANCE } from '@/lib/constants';
 import { cn, formatPercent, formatQuantity, formatRelative, formatTRY, trend } from '@portfoygo/shared/format';
 import { Card, CardHeader } from '@portfoygo/shared/ui/Card';
 import { Delta, Money } from '@portfoygo/shared/ui/Delta';
-import { Alert, EmptyState, Skeleton } from '@portfoygo/shared/ui/Feedback';
-import Button, { LinkButton } from '@portfoygo/shared/ui/Button';
+import { Alert, Badge, EmptyState, Skeleton } from '@portfoygo/shared/ui/Feedback';
+import { LinkButton } from '@portfoygo/shared/ui/Button';
 import PageHeader from '@portfoygo/shared/ui/PageHeader';
 import { PageLoader } from '@portfoygo/shared/ui/Spinner';
 import AssetAvatar from '@portfoygo/shared/ui/AssetAvatar';
+import Breadcrumb from '@/components/common/Breadcrumb';
+import MetricCard, { MetricGrid } from '@/components/common/MetricCard';
+import { toolbarButtonClass } from '@/components/common/controls';
+import { DataTable, TBody, THead, Td, Th, Tr } from '@/components/common/Table';
+import { assetHref } from '@/components/market/MarketTable';
 import ProtectOrderModal from '@/components/trade/ProtectOrderModal';
 import AllocationCard from '@/components/portfolio/AllocationCard';
 import HoldingsCard from '@/components/portfolio/HoldingsCard';
 import OrdersCard from '@/components/portfolio/OrdersCard';
 import PerformanceChart from '@/components/portfolio/PerformanceChart';
+import AdvisorTeaser from '@/components/advisor/AdvisorTeaser';
 import { holdingKey, useOrders } from '@/components/portfolio/useOrders';
 import type { Transaction } from '@/types';
 
@@ -39,6 +46,7 @@ function Portfolio() {
   const allTimeChange = totals.netWorth - STARTING_BALANCE;
   const allTimePct = (allTimeChange / STARTING_BALANCE) * 100;
   const missingPrices = !market.isLoading && holdings.some((h) => h.dayChangePercent === null);
+  const plTrend = trend(totals.pl);
 
   const reload = async () => {
     setRefreshing(true);
@@ -50,31 +58,11 @@ function Portfolio() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 md:space-y-6">
       <PageHeader
-        eyebrow="Portföy"
         title="Portföyüm"
-        description={
-          loaded ? (
-            <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-1">
-              Net varlığın <span className="num font-semibold text-fg">{formatTRY(totals.netWorth)}</span>
-              <Delta value={allTimePct} />
-              <span className="text-subtle">başlangıçtan bu yana</span>
-            </span>
-          ) : (
-            'Pozisyonların canlı piyasa fiyatlarıyla değerlenir.'
-          )
-        }
-        actions={
-          <>
-            <Button variant="secondary" onClick={reload} loading={refreshing} icon={<ArrowPathIcon className="h-4 w-4" aria-hidden="true" />}>
-              Yenile
-            </Button>
-            <LinkButton href="/transactions" variant="ghost" icon={<ClockIcon className="h-4 w-4" aria-hidden="true" />}>
-              İşlem geçmişi
-            </LinkButton>
-          </>
-        }
+        description="Pozisyonların canlı piyasa fiyatlarıyla değerlenir."
+        actions={<Breadcrumb items="Portföy" />}
       />
 
       {error && (
@@ -90,39 +78,57 @@ function Portfolio() {
         <Alert tone="info">Bazı varlıklar için canlı fiyat alınamadı; bu pozisyonlarda sunucunun son değerlemesi gösteriliyor.</Alert>
       )}
 
-      <PerformanceChart />
+      <MetricGrid>
+        <MetricCard
+          icon={<WalletIcon />}
+          label="Toplam varlık"
+          loading={!loaded}
+          value={formatTRY(totals.netWorth)}
+          sub={
+            <>
+              <Money value={allTimeChange} signed /> başlangıçtan beri
+            </>
+          }
+          aside={<Delta value={allTimePct} />}
+        />
+        <MetricCard
+          icon={<BanknotesIcon />}
+          label="Nakit"
+          loading={!loaded}
+          value={formatTRY(balance)}
+          sub={
+            reservedCash > 0
+              ? `${formatTRY(reservedCash)} emirlerde ayrıldı`
+              : totals.netWorth > 0
+                ? `Varlığın ${formatPercent((balance / totals.netWorth) * 100, { sign: false })}`
+                : undefined
+          }
+        />
+        <MetricCard
+          icon={<BriefcaseIcon />}
+          label="Yatırım değeri"
+          loading={!loaded}
+          value={formatTRY(totals.value)}
+          sub={`Maliyet ${formatTRY(totals.invested)}`}
+          aside={holdings.length > 0 ? <Badge>{holdings.length} pozisyon</Badge> : undefined}
+        />
+        <MetricCard
+          icon={<ArrowTrendingUpIcon />}
+          label="Açık pozisyon K/Z"
+          loading={!loaded}
+          value={<span className={cn(plTrend === 'up' && 'text-up', plTrend === 'down' && 'text-down')}>{formatTRY(totals.pl, { sign: true })}</span>}
+          sub={holdings.length ? 'Maliyete göre gerçekleşmemiş' : 'Açık pozisyon yok'}
+          aside={holdings.length ? <Delta value={totals.plPercent} /> : undefined}
+        />
+      </MetricGrid>
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        <Card className="flex flex-col overflow-hidden lg:col-span-2">
-          <dl className="grid flex-1 grid-cols-2 gap-px bg-line sm:grid-cols-4 lg:grid-cols-2">
-            <Metric
-              label="Toplam varlık"
-              loading={!loaded}
-              value={formatTRY(totals.netWorth)}
-              sub={<Money value={allTimeChange} signed />}
-            />
-            <Metric
-              label="Nakit"
-              loading={!loaded}
-              value={formatTRY(balance)}
-              sub={totals.netWorth > 0 ? `Varlığın ${formatPercent((balance / totals.netWorth) * 100, { sign: false })}` : undefined}
-            />
-            <Metric
-              label="Yatırım değeri"
-              loading={!loaded}
-              value={formatTRY(totals.value)}
-              sub={`Maliyet ${formatTRY(totals.invested)}`}
-            />
-            <Metric
-              label="Açık pozisyon K/Z"
-              loading={!loaded}
-              value={<span className={cn(trend(totals.pl) === 'up' && 'text-up', trend(totals.pl) === 'down' && 'text-down')}>{formatTRY(totals.pl, { sign: true })}</span>}
-              sub={holdings.length ? <Delta value={totals.plPercent} variant="text" /> : 'Açık pozisyon yok'}
-            />
-          </dl>
-          <BestWorst holdings={holdings} loaded={loaded} />
-        </Card>
-        <AllocationCard holdings={holdings} balance={balance + reservedCash} loaded={loaded} />
+      <div className="grid grid-cols-1 gap-4 md:gap-6 xl:grid-cols-12">
+        <PerformanceChart className="xl:col-span-8" />
+        <div className="grid gap-4 md:grid-cols-2 md:gap-6 xl:col-span-4 xl:grid-cols-1 xl:content-start">
+          <AllocationCard holdings={holdings} balance={balance + reservedCash} loaded={loaded} />
+          <Highlights holdings={holdings} loaded={loaded} />
+          <AdvisorTeaser />
+        </div>
       </div>
 
       {loaded && holdings.length === 0 ? (
@@ -131,14 +137,25 @@ function Portfolio() {
             icon={<ChartBarIcon />}
             title="Henüz pozisyonun yok"
             description={`${formatTRY(balance)} sanal bakiyenle hisse, kripto, döviz ve emtia alarak portföyünü oluşturmaya başla.`}
-            action={<LinkButton href="/" icon={<MagnifyingGlassIcon className="h-4 w-4" aria-hidden="true" />}>Piyasalara göz at</LinkButton>}
+            action={
+              <LinkButton href="/" icon={<MagnifyingGlassIcon className="h-4 w-4" aria-hidden="true" />}>
+                Piyasalara göz at
+              </LinkButton>
+            }
           />
         </Card>
       ) : (
-        <HoldingsCard holdings={holdings} loaded={loaded} ordersByHolding={orders.activeSellByHolding} onOrders={setSlHolding} />
+        <HoldingsCard
+          holdings={holdings}
+          loaded={loaded}
+          ordersByHolding={orders.activeSellByHolding}
+          onOrders={setSlHolding}
+          onRefresh={() => void reload()}
+          refreshing={refreshing}
+        />
       )}
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 md:gap-6 xl:grid-cols-2">
         <OrdersCard
           id="bekleyen-emirler"
           active={orders.active}
@@ -163,26 +180,8 @@ function Portfolio() {
 
 /* ------------------------------------------------------------------ */
 
-function Metric({ label, value, sub, loading }: { label: string; value: React.ReactNode; sub?: React.ReactNode; loading?: boolean }) {
-  return (
-    <div className="min-w-0 bg-surface p-4 sm:p-5">
-      <dt className="text-xs text-muted">{label}</dt>
-      {loading ? (
-        <dd>
-          <Skeleton className="mt-2 h-6 w-28" />
-          <Skeleton className="mt-2 h-3.5 w-20" />
-        </dd>
-      ) : (
-        <>
-          <dd className="num mt-1.5 truncate text-lg font-semibold tracking-tight sm:text-xl">{value}</dd>
-          {sub && <dd className="num mt-0.5 truncate text-xs text-subtle">{sub}</dd>}
-        </>
-      )}
-    </div>
-  );
-}
-
-function BestWorst({ holdings, loaded }: { holdings: LiveHolding[]; loaded: boolean }) {
+/** En iyi ve en zayıf performanslı pozisyon. */
+function Highlights({ holdings, loaded }: { holdings: LiveHolding[]; loaded: boolean }) {
   const { best, worst } = useMemo(() => {
     if (holdings.length === 0) return { best: null, worst: null };
     const sorted = [...holdings].sort((a, b) => b.livePLPercent - a.livePLPercent);
@@ -192,75 +191,104 @@ function BestWorst({ holdings, loaded }: { holdings: LiveHolding[]; loaded: bool
   if (!loaded || !best) return null;
 
   return (
-    <div className="grid border-t border-line sm:grid-cols-2">
-      <Highlight label="En iyi performans" h={best} />
-      {worst && <Highlight label="En zayıf performans" h={worst} className="border-t border-line sm:border-l sm:border-t-0" />}
-    </div>
+    <Card>
+      <CardHeader title="Öne çıkanlar" description="Maliyete göre en iyi ve en zayıf pozisyon" />
+      <ul className="space-y-3 px-5 pb-5 sm:px-6 sm:pb-6">
+        <Highlight label="En iyi performans" h={best} />
+        {worst && <Highlight label="En zayıf performans" h={worst} />}
+      </ul>
+    </Card>
   );
 }
 
-function Highlight({ label, h, className }: { label: string; h: LiveHolding; className?: string }) {
+function Highlight({ label, h }: { label: string; h: LiveHolding }) {
   return (
-    <div className={cn('flex items-center gap-3 px-4 py-3.5 sm:px-5', className)}>
-      <AssetAvatar symbol={h.symbol} type={h.assetType} image={h.image} size={32} />
-      <div className="min-w-0 flex-1">
-        <p className="text-xs text-muted">{label}</p>
-        <p className="font-mono text-[13px] font-semibold">{h.symbol}</p>
-      </div>
-      <div className="text-right">
-        <Money value={h.livePL} signed className="block text-sm font-medium" />
-        <Delta value={h.livePLPercent} variant="text" className="text-xs" />
-      </div>
-    </div>
+    <li>
+      <Link
+        href={assetHref({ type: h.assetType, symbol: h.symbol })}
+        className="flex items-center gap-3 rounded-xl border border-line p-3 transition-colors hover:bg-surface-2"
+      >
+        <AssetAvatar symbol={h.symbol} type={h.assetType} image={h.image} size={40} />
+        <div className="min-w-0 flex-1">
+          <p className="text-xs text-muted">{label}</p>
+          <p className="truncate text-sm font-semibold text-fg">{h.symbol}</p>
+        </div>
+        <div className="text-right">
+          <Money value={h.livePL} signed className="block text-sm font-medium" />
+          <Delta value={h.livePLPercent} className="mt-0.5" />
+        </div>
+      </Link>
+    </li>
   );
 }
 
 /* ------------------------------------------------------------------ */
 
 function RecentTransactions({ transactions, loaded }: { transactions: Transaction[]; loaded: boolean }) {
-  const recent = transactions.slice(0, 5);
+  const recent = transactions.slice(0, 6);
   return (
     <Card className="overflow-hidden">
       <CardHeader
-        icon={<ClockIcon />}
         title="Son işlemler"
         description="En son alım ve satımların"
-        action={transactions.length > 0 && <LinkButton href="/transactions" variant="ghost" size="sm">Tümü <ArrowRightIcon className="h-3.5 w-3.5" /></LinkButton>}
+        action={
+          transactions.length > 0 && (
+            <Link href="/transactions" className={toolbarButtonClass}>
+              Tümü <ArrowRightIcon className="h-4 w-4" aria-hidden="true" />
+            </Link>
+          )
+        }
       />
       {!loaded ? (
-        <div className="space-y-3 p-5">
-          {[0, 1, 2].map((i) => <Skeleton key={i} className="h-10 w-full" />)}
+        <div className="space-y-3 px-5 pb-6 sm:px-6">
+          {[0, 1, 2].map((i) => (
+            <Skeleton key={i} className="h-10 w-full" />
+          ))}
         </div>
       ) : recent.length === 0 ? (
         <EmptyState icon={<ClockIcon />} title="Henüz işlem yok" description="Yaptığın alım ve satımlar burada listelenir." />
       ) : (
-        <ul className="divide-y divide-line">
-          {recent.map((t) => (
-            <li key={t.id}>
-              <Link href="/transactions" className="flex items-center gap-3 px-5 py-3 transition-colors hover:bg-surface-2/60">
-                <span
-                  className={cn(
-                    'flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold',
-                    t.type === 'buy' ? 'bg-up-soft text-up' : 'bg-down-soft text-down',
-                  )}
-                  aria-hidden="true"
-                >
-                  {t.type === 'buy' ? 'AL' : 'SAT'}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm">
-                    <span className="font-mono text-[13px] font-semibold">{t.symbol}</span>{' '}
-                    <span className={t.type === 'buy' ? 'text-up' : 'text-down'}>{t.type === 'buy' ? 'Alış' : 'Satış'}</span>
-                  </p>
-                  <p className="num truncate text-xs text-muted">
-                    {formatQuantity(t.quantity)} × {formatTRY(t.price, { precise: true })} · {formatRelative(t.createdAt)}
-                  </p>
-                </div>
-                <span className="num text-sm font-medium">{formatTRY(t.netAmount)}</span>
-              </Link>
-            </li>
-          ))}
-        </ul>
+        <DataTable label="Son işlemler" className="pb-2">
+          <THead>
+            <Th>Varlık</Th>
+            <Th className="hidden sm:table-cell">Miktar × fiyat</Th>
+            <Th align="right">Net tutar</Th>
+          </THead>
+          <TBody>
+            {recent.map((t) => {
+              const buy = t.type === 'buy';
+              return (
+                <Tr key={t.id}>
+                  <Td>
+                    <div className="flex min-w-0 items-center gap-3">
+                      <AssetAvatar symbol={t.symbol} type={t.assetType} size={36} />
+                      <div className="min-w-0">
+                        <p className="flex items-center gap-1.5">
+                          <Link href={assetHref({ type: t.assetType, symbol: t.symbol })} className="truncate font-medium text-fg hover:text-brand">
+                            {t.symbol}
+                          </Link>
+                          <Badge tone={buy ? 'up' : 'down'}>{buy ? 'Alış' : 'Satış'}</Badge>
+                        </p>
+                        <p className="num mt-0.5 truncate text-xs text-muted">
+                          <span className="sm:hidden">{formatQuantity(t.quantity)} adet · </span>
+                          {formatRelative(t.createdAt)}
+                        </p>
+                      </div>
+                    </div>
+                  </Td>
+                  <Td className="num hidden whitespace-nowrap text-muted sm:table-cell">
+                    {formatQuantity(t.quantity)} × {formatTRY(t.price, { precise: true })}
+                  </Td>
+                  <Td align="right" className={cn('num whitespace-nowrap font-medium', buy ? 'text-fg' : 'text-up')}>
+                    <span className="sr-only">{buy ? 'Ödenen' : 'Hesaba geçen'}: </span>
+                    {buy ? '−' : '+'}
+                    {formatTRY(t.netAmount)}
+                  </Td>
+                </Tr>
+              );
+            })}
+          </TBody>
+        </DataTable>
       )}
     </Card>
   );

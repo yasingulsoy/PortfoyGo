@@ -2,11 +2,13 @@
 
 import { useMemo, useState } from 'react';
 import useSWR, { useSWRConfig } from 'swr';
-import { ArrowPathIcon, ListBulletIcon, TrophyIcon } from '@heroicons/react/20/solid';
+import { ArrowPathIcon, TrophyIcon } from '@heroicons/react/20/solid';
 import { useRequireAuth } from '@/hooks/useRequireAuth';
 import { leaderboardApi } from '@/lib/api';
 import { cn } from '@portfoygo/shared/format';
 import PageHeader from '@portfoygo/shared/ui/PageHeader';
+import Breadcrumb from '@/components/common/Breadcrumb';
+import { ToolbarButton } from '@/components/common/controls';
 import Tabs from '@portfoygo/shared/ui/Tabs';
 import Button from '@portfoygo/shared/ui/Button';
 import { Card, CardHeader } from '@portfoygo/shared/ui/Card';
@@ -30,7 +32,7 @@ const VIEWS: { value: View; label: string }[] = [
 ];
 
 const SEASON_DESCRIPTION =
-  'Her ay yeni bir sezon başlar. Bakiyen sıfırlanmaz; sezona girdiğin andaki varlığına göre yüzde kaç getiri elde ettiğinle sıralanırsın.';
+  'Sezon sıralaması her ay yeniden başlar; yeni ve eski oyuncular aynı ay penceresinde yüzde getiriyle kıyaslanır.';
 
 /** Yenile düğmesi bu sayfadaki tüm sıralama verilerini (sezon dahil) tazeler. */
 const isRankingKey = (key: unknown) => {
@@ -56,30 +58,25 @@ export default function LeaderboardPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 md:space-y-6">
       <PageHeader
-        eyebrow="Liderlik"
         title="Liderlik tablosu"
-        description="En başarılı sanal yatırımcılar. Tablo her dakika otomatik güncellenir."
+        description={view === 'season' ? SEASON_DESCRIPTION : BOARD_COPY[view].description}
         actions={
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => void refresh()}
-            disabled={refreshing}
-            icon={<ArrowPathIcon className={cn('h-4 w-4', refreshing && 'animate-spin')} aria-hidden="true" />}
-          >
-            Yenile
-          </Button>
+          <>
+            <Tabs label="Sıralama türü" items={VIEWS} value={view} onChange={setView} />
+            <ToolbarButton
+              iconOnly
+              onClick={() => void refresh()}
+              disabled={refreshing}
+              aria-label="Sıralamayı yenile"
+              title="Yenile"
+              icon={<ArrowPathIcon className={cn('h-4 w-4', refreshing && 'animate-spin')} aria-hidden="true" />}
+            />
+            <Breadcrumb items="Liderlik" className="ml-2 hidden xl:block" />
+          </>
         }
       />
-
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <Tabs label="Sıralama türü" items={VIEWS} value={view} onChange={setView} className="self-start" />
-        <p className="max-w-xl text-xs leading-relaxed text-muted sm:text-right">
-          {view === 'season' ? SEASON_DESCRIPTION : BOARD_COPY[view].description}
-        </p>
-      </div>
 
       {view === 'season' ? <SeasonBoard user={user} /> : <ClassicBoard board={view} user={user} />}
     </div>
@@ -99,8 +96,8 @@ function ClassicBoard({ board, user }: { board: Board; user: User }) {
   const showSkeleton = isLoading && leaders.length === 0;
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
-      <div className="min-w-0 space-y-6">
+    <div className="grid grid-cols-1 gap-4 md:gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
+      <div className="min-w-0 space-y-4 md:space-y-6">
         {error && leaders.length > 0 && <Alert tone="error">Tablo güncellenemedi; son alınan sıralama gösteriliyor.</Alert>}
 
         {showSkeleton ? (
@@ -129,21 +126,22 @@ function ClassicBoard({ board, user }: { board: Board; user: User }) {
         {(showSkeleton || rest.length > 0) && (
           <Card className="overflow-hidden">
             <CardHeader
-              icon={<ListBulletIcon />}
               title={copy.title}
               description={showSkeleton ? 'Yükleniyor' : `4–${leaders.length}. sıralar`}
             />
             {showSkeleton ? (
               <RankListSkeleton />
             ) : (
-              <RankList leaders={rest} currentUsername={user.username} plLabel={board === 'week' ? 'Hafta K/Z' : 'K/Z'} />
+              <div className="pb-2">
+                <RankList leaders={rest} currentUsername={user.username} plLabel={board === 'week' ? 'Hafta K/Z' : 'K/Z'} />
+              </div>
             )}
           </Card>
         )}
       </div>
 
-      <aside className="order-first lg:order-none">
-        <div className="lg:sticky lg:top-24">
+      <aside className="order-first xl:order-none">
+        <div className="xl:sticky xl:top-24">
           <MyRankCard board={board} verified={user.email_verified} leaders={leaders} username={user.username} />
         </div>
       </aside>

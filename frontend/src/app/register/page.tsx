@@ -73,18 +73,18 @@ export default function RegisterPage() {
 
   return (
     <AuthLayout
-      title="Hesabını oluştur"
+      title="Kayıt ol"
       description={`Ücretsiz kaydol, ${formatNumber(STARTING_BALANCE, 0)} ₺ sanal bakiyeyle hemen işlem yapmaya başla.`}
       footer={
         <>
           Zaten hesabın var mı?{' '}
-          <Link href="/login" className="font-semibold text-brand hover:underline">
+          <Link href="/login" className="font-medium text-brand hover:text-brand-hover">
             Giriş yap
           </Link>
         </>
       }
     >
-      <form onSubmit={handleSubmit} noValidate className="space-y-4">
+      <form onSubmit={handleSubmit} noValidate className="space-y-5">
         {formError && <Alert tone="error">{formError}</Alert>}
 
         <Field

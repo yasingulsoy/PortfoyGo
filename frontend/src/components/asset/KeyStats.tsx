@@ -1,9 +1,8 @@
-import { Card, CardHeader } from '@portfoygo/shared/ui/Card';
 import { formatCompact, formatTRY, formatUSD } from '@portfoygo/shared/format';
 import type { MarketAsset } from '@/types';
-import { InformationCircleIcon } from '@heroicons/react/20/solid';
+import { cn } from '@portfoygo/shared/format';
 
-interface Item {
+export interface KeyStat {
   label: string;
   value: string;
   sub?: string;
@@ -12,22 +11,22 @@ interface Item {
 const valid = (v: number | null | undefined): v is number => typeof v === 'number' && Number.isFinite(v) && v > 0;
 
 /** USD kotasyonlu bir fiyatı TL (varsa) + USD alt satırıyla gösterir. */
-function usdPrice(label: string, usd: number | undefined, usdTry: number | null): Item | null {
+function usdPrice(label: string, usd: number | undefined, usdTry: number | null): KeyStat | null {
   if (!valid(usd)) return null;
   return usdTry
     ? { label, value: formatTRY(usd * usdTry, { precise: true }), sub: formatUSD(usd, { precise: true }) }
     : { label, value: formatUSD(usd, { precise: true }) };
 }
 
-function usdAmount(label: string, usd: number | undefined, usdTry: number | null): Item | null {
+function usdAmount(label: string, usd: number | undefined, usdTry: number | null): KeyStat | null {
   if (!valid(usd)) return null;
   return usdTry
     ? { label, value: `₺${formatCompact(usd * usdTry)}`, sub: `${formatCompact(usd)} USD` }
     : { label, value: `${formatCompact(usd)} USD` };
 }
 
-export function buildKeyStats(asset: MarketAsset, usdTry: number | null): Item[] {
-  const items: Array<Item | null> = [];
+export function buildKeyStats(asset: MarketAsset, usdTry: number | null): KeyStat[] {
+  const items: Array<KeyStat | null> = [];
   if (asset.type === 'stock') {
     items.push(
       usdPrice('Açılış', asset.open, usdTry),
@@ -48,27 +47,25 @@ export function buildKeyStats(asset: MarketAsset, usdTry: number | null): Item[]
   if (usdTry && (asset.type === 'stock' || asset.type === 'crypto' || asset.priceUSD != null)) {
     items.push({ label: 'Kullanılan USD/TRY', value: usdTry.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 4 }) });
   }
-  return items.filter((i): i is Item => i !== null);
+  return items.filter((i): i is KeyStat => i !== null);
 }
 
-export default function KeyStats({ asset, usdTry }: { asset: MarketAsset; usdTry: number | null }) {
-  const items = buildKeyStats(asset, usdTry);
+/** "Önemli veriler" ızgarası (TailAdmin kutucukları). Kart çerçevesini çağıran sağlar. */
+export default function KeyStats({ asset, usdTry, extra = [], className }: { asset: MarketAsset; usdTry: number | null; extra?: KeyStat[]; className?: string }) {
+  const items = [...buildKeyStats(asset, usdTry), ...extra];
   if (items.length === 0) return null;
 
   return (
-    <Card>
-      <CardHeader icon={<InformationCircleIcon />} title="Önemli veriler" description={asset.type === 'stock' ? 'Son işlem günü' : 'Son 24 saat'} />
-      <dl className="grid grid-cols-2 py-1.5 sm:grid-cols-3">
-        {items.map((it) => (
-          <div key={it.label} className="min-w-0 px-5 py-3">
-            <dt className="text-xs text-muted">{it.label}</dt>
-            <dd className="num mt-1 truncate text-sm font-semibold" title={it.value}>
-              {it.value}
-            </dd>
-            {it.sub && <dd className="num truncate text-xs text-subtle">{it.sub}</dd>}
-          </div>
-        ))}
-      </dl>
-    </Card>
+    <dl className={cn('grid grid-cols-2 gap-3 sm:grid-cols-3', className)}>
+      {items.map((it) => (
+        <div key={it.label} className="min-w-0 rounded-xl border border-line px-4 py-3">
+          <dt className="truncate text-xs text-muted">{it.label}</dt>
+          <dd className="num mt-1 truncate text-sm font-semibold text-fg sm:text-base" title={it.value}>
+            {it.value}
+          </dd>
+          {it.sub && <dd className="num truncate text-xs text-subtle">{it.sub}</dd>}
+        </div>
+      ))}
+    </dl>
   );
 }

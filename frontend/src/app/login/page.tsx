@@ -70,13 +70,13 @@ function LoginForm() {
 
   return (
     <AuthLayout
-      title="Tekrar hoş geldin"
-      description="Portföyüne ve piyasalara erişmek için hesabına giriş yap."
+      title="Giriş yap"
+      description="Portföyüne ve piyasalara erişmek için e-posta adresin ve şifrenle giriş yap."
       footer={
         <>
           Hesabın yok mu?{' '}
-          <Link href="/register" className="font-semibold text-brand hover:underline">
-            Ücretsiz kayıt ol
+          <Link href="/register" className="font-medium text-brand hover:text-brand-hover">
+            Kayıt ol
           </Link>
         </>
       }
@@ -90,7 +90,7 @@ function LoginForm() {
           return res;
         }}
       />
-      <form onSubmit={handleSubmit} noValidate className="mt-4 space-y-4">
+      <form onSubmit={handleSubmit} noValidate className="mt-5 space-y-5">
         {notice && !formError && <Alert tone="success">{NOTICES[notice]}</Alert>}
         {formError && <Alert tone="error">{formError}</Alert>}
 
@@ -124,8 +124,8 @@ function LoginForm() {
             }}
             error={errors.password}
           />
-          <div className="mt-2 flex justify-end">
-            <Link href="/forgot-password" className="text-xs font-medium text-brand hover:underline">
+          <div className="mt-2.5 flex justify-end">
+            <Link href="/forgot-password" className="text-sm text-brand hover:text-brand-hover">
               Şifremi unuttum
             </Link>
           </div>

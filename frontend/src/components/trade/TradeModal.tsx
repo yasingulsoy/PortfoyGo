@@ -17,6 +17,7 @@ import { COMMISSION_RATE } from '@/lib/constants';
 import { cn, formatPercent, formatQuantity, formatTRY } from '@portfoygo/shared/format';
 import { ASSET_TYPE_LABELS } from '@/types';
 import { refreshOrders } from '@/components/portfolio/useOrders';
+import { toolbarButtonClass } from '@/components/common/controls';
 import { EXPIRY_OPTIONS, parseDecimal, priceToInput, reserveForBuy, roundQty, sanitizeDecimal, type ExpiryValue } from './orderInput';
 import type { TradeSide, TradeTarget } from './TradeProvider';
 
@@ -57,6 +58,8 @@ function TradeForm({ target, side, onSideChange, onClose }: Required<Omit<Props,
   const [kind, setKind] = useState<OrderKind>('market');
   const [mode, setMode] = useState<InputMode>('amount');
   const [input, setInput] = useState('');
+  // Satışta "Tümü" seçildiyse tutar yuvarlamasından bağımsız olarak eldeki miktarın tamamı satılır
+  const [sellAll, setSellAll] = useState(false);
   // null → canlı fiyattan türetilen varsayılan limit fiyatı kullanılır (kullanıcı düzenleyene kadar)
   const [limitInput, setLimitInput] = useState<string | null>(null);
   const [expiry, setExpiry] = useState<ExpiryValue>('30');
@@ -87,13 +90,14 @@ function TradeForm({ target, side, onSideChange, onClose }: Required<Omit<Props,
   const parsed = parseFloat(input.replace(',', '.'));
   const value = Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
 
-  const quantity = !unitPrice ? 0 : mode === 'quantity' ? value : value / unitPrice;
-  const gross = !unitPrice ? 0 : mode === 'quantity' ? value * unitPrice : value;
+  const held = holding?.quantity ?? 0;
+  const fullSell = side === 'sell' && sellAll && held > 0;
+  const quantity = fullSell ? held : !unitPrice ? 0 : mode === 'quantity' ? value : value / unitPrice;
+  const gross = !unitPrice ? 0 : fullSell ? held * unitPrice : mode === 'quantity' ? value * unitPrice : value;
 
   const commission = gross * COMMISSION_RATE;
   const reserved = isLimit && side === 'buy' && unitPrice && quantity > 0 ? reserveForBuy(roundQty(quantity), unitPrice) : 0;
   const total = side === 'buy' ? (isLimit ? reserved : gross + commission) : gross - commission;
-  const held = holding?.quantity ?? 0;
 
   const validation = (() => {
     if (!price) return 'Bu varlık için şu an fiyat verisi yok.';
@@ -114,6 +118,7 @@ function TradeForm({ target, side, onSideChange, onClose }: Required<Omit<Props,
 
   const setFraction = (f: number) => {
     if (!unitPrice) return;
+    setSellAll(side === 'sell' && f === 1);
     if (side === 'buy') {
       let spend = (balance * f) / (1 + COMMISSION_RATE);
       // Limit rezervi kuruşa yukarı yuvarlanır; tamamında 1 kuruş pay bırak
@@ -190,7 +195,7 @@ function TradeForm({ target, side, onSideChange, onClose }: Required<Omit<Props,
 
   return (
     <form onSubmit={submit} noValidate>
-      <div className="flex items-center gap-3 rounded-xl bg-surface-2 p-3">
+      <div className="flex items-center gap-3 rounded-xl border border-line bg-surface-2 p-3.5">
         <AssetAvatar symbol={target.symbol} type={target.type} image={target.image ?? asset?.image} size={40} />
         <div className="min-w-0 flex-1">
           <p className="font-mono text-sm font-semibold">{target.symbol}</p>
@@ -202,7 +207,7 @@ function TradeForm({ target, side, onSideChange, onClose }: Required<Omit<Props,
         </div>
       </div>
 
-      <div className="mt-4 grid grid-cols-2 gap-1 rounded-xl bg-surface-2 p-1" role="radiogroup" aria-label="İşlem yönü">
+      <div className="mt-4 grid grid-cols-2 gap-1 rounded-lg bg-surface-3 p-1" role="radiogroup" aria-label="İşlem yönü">
         {(['buy', 'sell'] as const).map((s) => (
           <button
             key={s}
@@ -211,7 +216,7 @@ function TradeForm({ target, side, onSideChange, onClose }: Required<Omit<Props,
             aria-checked={side === s}
             onClick={() => changeSide(s)}
             className={cn(
-              'h-9 rounded-lg text-sm font-semibold transition-colors',
+              'h-9 rounded-md text-sm font-semibold transition-colors',
               side === s ? (s === 'buy' ? 'bg-up text-white' : 'bg-down text-white') : 'text-muted hover:text-fg',
             )}
           >
@@ -221,7 +226,7 @@ function TradeForm({ target, side, onSideChange, onClose }: Required<Omit<Props,
       </div>
 
       <div className="mt-4 flex items-center justify-between gap-3">
-        <span className="text-xs font-medium text-muted">Emir tipi</span>
+        <span className="text-sm font-medium text-fg/80">Emir tipi</span>
         <Tabs
           label="Emir tipi"
           value={kind}
@@ -260,7 +265,7 @@ function TradeForm({ target, side, onSideChange, onClose }: Required<Omit<Props,
       )}
 
       <div className="mt-5 flex items-center justify-between">
-        <label htmlFor="trade-input" className="text-xs font-medium text-muted">
+        <label htmlFor="trade-input" className="text-sm font-medium text-fg/80">
           {mode === 'amount' ? 'Tutar (₺)' : `Miktar (${target.symbol})`}
         </label>
         <Tabs
@@ -281,9 +286,12 @@ function TradeForm({ target, side, onSideChange, onClose }: Required<Omit<Props,
         data-autofocus
         placeholder="0"
         value={input}
-        onChange={(e) => setInput(e.target.value.replace(/[^0-9.,]/g, ''))}
+        onChange={(e) => {
+          setSellAll(false);
+          setInput(e.target.value.replace(/[^0-9.,]/g, ''));
+        }}
         aria-invalid={!!validation}
-        className="num mt-2 h-14 w-full rounded-xl border border-line bg-surface px-4 text-2xl font-semibold tracking-tight text-fg placeholder:text-subtle focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+        className="num mt-2 h-14 w-full rounded-lg border border-line bg-transparent px-4 text-2xl font-semibold text-fg shadow-card placeholder:text-subtle transition-[border-color,box-shadow] hover:border-line-strong focus:border-brand/50 focus:outline-none focus:ring-[3px] focus:ring-brand/10"
       />
       <div className="mt-2 grid grid-cols-4 gap-1.5">
         {[0.25, 0.5, 0.75, 1].map((f) => (
@@ -292,7 +300,7 @@ function TradeForm({ target, side, onSideChange, onClose }: Required<Omit<Props,
             type="button"
             onClick={() => setFraction(f)}
             disabled={!unitPrice || (side === 'sell' && !held)}
-            className="h-8 rounded-lg border border-line text-xs font-medium text-muted transition-colors hover:border-line-strong hover:text-fg disabled:opacity-40"
+            className="h-9 rounded-lg border border-line text-xs font-medium text-muted transition-colors hover:bg-surface-2 hover:text-fg disabled:opacity-40"
           >
             {f === 1 ? 'Tümü' : `%${f * 100}`}
           </button>
@@ -301,7 +309,7 @@ function TradeForm({ target, side, onSideChange, onClose }: Required<Omit<Props,
 
       {isLimit && (
         <div className="mt-4 flex items-center justify-between gap-3">
-          <span className="text-xs font-medium text-muted">Geçerlilik</span>
+          <span className="text-sm font-medium text-fg/80">Geçerlilik</span>
           <Tabs
             label="Emir geçerlilik süresi"
             value={expiry}
@@ -312,7 +320,7 @@ function TradeForm({ target, side, onSideChange, onClose }: Required<Omit<Props,
         </div>
       )}
 
-      <dl className="mt-5 space-y-2.5 rounded-xl bg-surface-2 p-4 text-sm">
+      <dl className="mt-5 space-y-2.5 rounded-xl border border-line bg-surface-2 p-4 text-sm">
         <Row label={side === 'buy' ? 'Kullanılabilir nakit' : 'Elinizdeki miktar'} value={side === 'buy' ? formatTRY(balance) : `${formatQuantity(held)} ${target.symbol}`} />
         <Row label={mode === 'amount' ? 'Tahmini miktar' : 'Tahmini tutar'} value={mode === 'amount' ? `${formatQuantity(roundQty(quantity))} ${target.symbol}` : formatTRY(gross)} />
         <Row label={`Komisyon (%${(COMMISSION_RATE * 100).toLocaleString('tr-TR')})`} value={formatTRY(commission)} />
@@ -361,7 +369,7 @@ function ReceiptView({ receipt, symbol, onClose }: { receipt: Receipt; symbol: s
             <span className="num">{formatQuantity(receipt.quantity)}</span> {symbol} · birim fiyat{' '}
             <span className="num text-fg">{formatTRY(receipt.price, { precise: true })}</span>
           </p>
-          <dl className="mt-5 w-full rounded-xl bg-surface-2 p-4 text-sm">
+          <dl className="mt-5 w-full rounded-xl border border-line bg-surface-2 p-4 text-sm">
             <Row label={isBuy ? 'Ödenen toplam' : 'Hesaba geçen'} value={formatTRY(receipt.total)} strong />
           </dl>
         </>
@@ -372,18 +380,18 @@ function ReceiptView({ receipt, symbol, onClose }: { receipt: Receipt; symbol: s
             Fiyat <span className="num text-fg">{formatTRY(receipt.trigger, { precise: true })}</span> seviyesine gelince{' '}
             <span className="num text-fg">{formatQuantity(receipt.quantity)}</span> {symbol} otomatik olarak {isBuy ? 'alınır' : 'satılır'}.
           </p>
-          <dl className="mt-5 w-full space-y-2.5 rounded-xl bg-surface-2 p-4 text-sm">
+          <dl className="mt-5 w-full space-y-2.5 rounded-xl border border-line bg-surface-2 p-4 text-sm">
             <Row label="Emir tipi" value={isBuy ? 'Limit alış' : 'Limit satış'} />
             <Row label="Geçerlilik" value={`${receipt.expiryDays} gün`} />
             {isBuy && <Row label="Ayrılan nakit" value={formatTRY(receipt.reserved)} strong />}
           </dl>
         </>
       )}
-      <div className="mt-5 grid w-full grid-cols-2 gap-2">
+      <div className="mt-6 grid w-full grid-cols-2 gap-3">
         <Link
           href={receipt.kind === 'limit' ? '/portfolio#bekleyen-emirler' : '/portfolio'}
           onClick={onClose}
-          className="inline-flex h-10 items-center justify-center rounded-lg border border-line bg-surface-2 text-sm font-medium hover:bg-surface-3"
+          className={cn(toolbarButtonClass, 'h-11')}
         >
           {receipt.kind === 'limit' ? 'Emirlerim' : 'Portföye git'}
         </Link>

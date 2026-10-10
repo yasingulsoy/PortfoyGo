@@ -1,7 +1,7 @@
 'use client';
 
 import useSWR from 'swr';
-import { EnvelopeIcon, UserIcon } from '@heroicons/react/20/solid';
+import { EnvelopeIcon } from '@heroicons/react/20/solid';
 import { Card, CardBody, CardHeader } from '@portfoygo/shared/ui/Card';
 import { Delta } from '@portfoygo/shared/ui/Delta';
 import { LinkButton } from '@portfoygo/shared/ui/Button';
@@ -35,8 +35,8 @@ export default function MyRankCard({ board, verified, leaders, username }: Props
 
   return (
     <Card>
-      <CardHeader icon={<UserIcon />} title="Senin sıran" description={board === 'week' ? 'Bu hafta' : 'Tüm zamanlar'} />
-      <CardBody className="space-y-4">
+      <CardHeader title="Senin sıran" description={board === 'week' ? 'Bu hafta' : 'Tüm zamanlar'} />
+      <CardBody className="space-y-4 border-t border-line">
         {!verified ? (
           <>
             <Alert tone="info">
@@ -55,7 +55,7 @@ export default function MyRankCard({ board, verified, leaders, username }: Props
           <Alert tone="error">Sıran şu an alınamadı. Birazdan tekrar denenecek.</Alert>
         ) : (
           <div>
-            <p className="num text-4xl font-semibold tracking-tight">{rank ? `#${rank}` : '—'}</p>
+            <p className="num text-3xl font-semibold text-fg">{rank ? `#${rank}` : '—'}</p>
             <p className="mt-1 text-sm text-muted">
               {!rank
                 ? 'Sıralaman henüz hesaplanmadı.'
@@ -73,12 +73,12 @@ export default function MyRankCard({ board, verified, leaders, username }: Props
           </div>
         )}
 
-        <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-line bg-line text-sm">
-          <div className="bg-surface p-3">
+        <dl className="grid grid-cols-2 gap-3 text-sm">
+          <div className="min-w-0 rounded-xl border border-line bg-surface-2 p-3.5">
             <dt className="text-xs text-muted">Toplam varlık</dt>
             <dd className="num mt-1 truncate font-semibold">{loaded ? formatTRY(me?.totalValue ?? totals.netWorth) : '—'}</dd>
           </div>
-          <div className="bg-surface p-3">
+          <div className="min-w-0 rounded-xl border border-line bg-surface-2 p-3.5">
             <dt className="text-xs text-muted">{board === 'week' ? 'Hafta getirisi' : 'Getiri'}</dt>
             <dd className="mt-1">
               {me ? (

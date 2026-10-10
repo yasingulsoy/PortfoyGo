@@ -7,8 +7,6 @@ import {
   ArrowLeftEndOnRectangleIcon,
   ArrowRightStartOnRectangleIcon,
   ArrowUpRightIcon,
-  ChevronLeftIcon,
-  ChevronRightIcon,
   ClockIcon,
   EnvelopeIcon,
   KeyIcon,
@@ -16,8 +14,8 @@ import {
 } from '@heroicons/react/20/solid';
 import { Card, CardHeader } from '@portfoygo/shared/ui/Card';
 import { Alert, EmptyState, Skeleton } from '@portfoygo/shared/ui/Feedback';
-import Button from '@portfoygo/shared/ui/Button';
 import Tabs from '@portfoygo/shared/ui/Tabs';
+import Pagination from '@/components/common/Pagination';
 import { activityApi } from '@/lib/api';
 import { cn, formatDateTime, formatNumber, formatRelative } from '@portfoygo/shared/format';
 
@@ -81,15 +79,13 @@ export default function ActivityLog() {
 
   const from = total === 0 ? 0 : offset + 1;
   const to = Math.min(offset + PAGE_SIZE, total);
-  const hasPrev = offset > 0;
-  const hasNext = offset + PAGE_SIZE < total;
 
   return (
     <Card>
-      <CardHeader icon={<ClockIcon />} title="Aktivite geçmişi" description="Hesabındaki son hareketler" />
+      <CardHeader title="Aktivite geçmişi" description="Hesabındaki son hareketler" />
 
       {typeList.length > 0 && (
-        <div className="border-b border-line px-5 py-3">
+        <div className="px-5 pb-4 sm:px-6">
           <Tabs
             label="Aktivite türü"
             value={type}
@@ -100,15 +96,15 @@ export default function ActivityLog() {
       )}
 
       {error && logs.length > 0 && (
-        <div className="px-5 pt-4">
+        <div className="px-5 pb-4 sm:px-6">
           <Alert tone="error">Aktiviteler güncellenemedi.</Alert>
         </div>
       )}
 
       {isLoading && logs.length === 0 ? (
-        <div className="divide-y divide-line" aria-hidden="true">
+        <div className="divide-y divide-line border-t border-line" aria-hidden="true">
           {Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="flex items-center gap-3 px-5 py-3.5">
+            <div key={i} className="flex items-center gap-3 px-5 py-3.5 sm:px-6">
               <Skeleton className="h-9 w-9 rounded-lg" />
               <div className="flex-1 space-y-1.5">
                 <Skeleton className="h-3.5 w-3/4" />
@@ -119,24 +115,25 @@ export default function ActivityLog() {
         </div>
       ) : logs.length === 0 ? (
         <EmptyState
+          className="border-t border-line"
           icon={<ClockIcon />}
           title={error ? 'Aktiviteler yüklenemedi' : 'Henüz aktivite yok'}
           description={error ? 'Birazdan tekrar dene.' : type !== ALL ? 'Bu türde kayıt bulunamadı.' : 'Giriş ve işlemlerin burada listelenecek.'}
         />
       ) : (
-        <ul className={cn('divide-y divide-line transition-opacity', isValidating && !isLoading && 'opacity-70')} aria-busy={isValidating}>
+        <ul className={cn('divide-y divide-line border-t border-line transition-opacity', isValidating && !isLoading && 'opacity-70')} aria-busy={isValidating}>
           {logs.map((log) => {
             const meta = typeMeta(log.type);
             const Icon = meta.icon;
             return (
-              <li key={log.id} className="flex items-start gap-3 px-5 py-3.5">
-                <span className={cn('flex h-9 w-9 shrink-0 items-center justify-center rounded-lg', meta.tone)} aria-hidden="true">
+              <li key={log.id} className="flex items-start gap-3 px-5 py-3.5 sm:px-6">
+                <span className={cn('flex h-10 w-10 shrink-0 items-center justify-center rounded-full', meta.tone)} aria-hidden="true">
                   <Icon className="h-4 w-4" />
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="break-words text-sm leading-snug">{log.description || meta.label}</p>
-                  <p className="mt-0.5 text-xs text-subtle">
-                    <span className="font-medium text-muted">{meta.label}</span>
+                  <p className="break-words text-sm leading-snug text-fg">{log.description || meta.label}</p>
+                  <p className="mt-1 text-xs text-muted">
+                    <span className="font-medium text-fg/80">{meta.label}</span>
                     {log.createdAt && (
                       <>
                         {' · '}
@@ -154,21 +151,17 @@ export default function ActivityLog() {
       )}
 
       {total > PAGE_SIZE && (
-        <nav className="flex items-center justify-between gap-3 border-t border-line px-5 py-3" aria-label="Aktivite sayfaları">
+        <div className="flex flex-col gap-3 border-t border-line px-5 py-4 sm:px-6">
           <p className="num text-xs text-muted">
-            {formatNumber(from, 0)}–{formatNumber(to, 0)} / {formatNumber(total, 0)}
+            {formatNumber(from, 0)}–{formatNumber(to, 0)} / {formatNumber(total, 0)} kayıt
           </p>
-          <div className="flex gap-2">
-            <Button variant="secondary" size="sm" disabled={!hasPrev} onClick={() => setOffset((o) => Math.max(0, o - PAGE_SIZE))} aria-label="Önceki sayfa">
-              <ChevronLeftIcon className="h-4 w-4" aria-hidden="true" />
-              <span className="hidden sm:inline">Önceki</span>
-            </Button>
-            <Button variant="secondary" size="sm" disabled={!hasNext} onClick={() => setOffset((o) => o + PAGE_SIZE)} aria-label="Sonraki sayfa">
-              <span className="hidden sm:inline">Sonraki</span>
-              <ChevronRightIcon className="h-4 w-4" aria-hidden="true" />
-            </Button>
-          </div>
-        </nav>
+          <Pagination
+            label="Aktivite sayfaları"
+            page={Math.floor(offset / PAGE_SIZE) + 1}
+            pageCount={Math.ceil(total / PAGE_SIZE)}
+            onChange={(p) => setOffset((p - 1) * PAGE_SIZE)}
+          />
+        </div>
       )}
     </Card>
   );

@@ -9,7 +9,7 @@ export default function Stat({ label, value, sub, icon, className }: { label: st
         {icon}
         {label}
       </div>
-      <div className="num mt-1.5 truncate text-xl font-semibold tracking-tight text-fg sm:text-2xl">{value}</div>
+      <div className="num mt-1.5 truncate text-xl font-semibold tracking-[-0.02em] text-fg sm:text-2xl">{value}</div>
       {sub && <div className="mt-1 text-xs text-muted">{sub}</div>}
     </div>
   );

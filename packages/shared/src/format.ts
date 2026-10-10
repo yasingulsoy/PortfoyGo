@@ -50,7 +50,8 @@ export function formatCompact(value: number | null | undefined): string {
 }
 
 export function formatPercent(value: number | null | undefined, opts: { sign?: boolean } = { sign: true }): string {
-  const v = safe(value);
+  // Gösterilen hassasiyete yuvarla; böylece -0,001 gibi değerler "-%0,00" görünmez
+  const v = Math.round(safe(value) * 100) / 100 || 0;
   const text = `%${Math.abs(v).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   if (!opts.sign) return v < 0 ? `-${text}` : text;
   return v > 0 ? `+${text}` : v < 0 ? `-${text}` : text;

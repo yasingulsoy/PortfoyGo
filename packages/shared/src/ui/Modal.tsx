@@ -49,28 +49,28 @@ export default function Modal({ open, onClose, title, description, children, foo
         if (e.target === ref.current) onClose();
       }}
       className={cn(
-        'm-auto w-[calc(100%-2rem)] rounded-2xl border border-line bg-surface p-0 text-fg shadow-2xl',
+        'm-auto w-[calc(100%-2rem)] rounded-3xl border border-line bg-surface p-0 text-fg shadow-pop',
         'max-sm:mb-0 max-sm:w-full max-sm:max-w-none max-sm:rounded-b-none',
         size === 'sm' ? 'max-w-sm' : 'max-w-md',
       )}
     >
       {open && (
         <div className="flex max-h-[85vh] flex-col">
-          <div className="flex items-start justify-between gap-4 px-5 pb-3 pt-5">
+          <div className="flex items-start justify-between gap-4 px-6 pb-3 pt-6">
             <div className="min-w-0">
-              <h2 id={titleId} className="text-base font-semibold tracking-tight">{title}</h2>
+              <h2 id={titleId} className="text-lg font-semibold tracking-tight">{title}</h2>
               {description && <p id={descId} className="mt-0.5 text-sm text-muted">{description}</p>}
             </div>
             <button
               type="button"
               onClick={onClose}
               aria-label="Kapat"
-              className="-mr-1.5 -mt-1 rounded-lg p-1.5 text-subtle transition-colors hover:bg-surface-2 hover:text-fg"
+              className="-mr-1.5 -mt-1 rounded-full p-1.5 text-subtle transition-colors hover:bg-surface-2 hover:text-fg"
             >
               <XMarkIcon className="h-5 w-5" />
             </button>
           </div>
-          <div className="overflow-y-auto px-5 pb-5">{children}</div>
+          <div className="overflow-y-auto px-6 pb-6">{children}</div>
           {footer && <div className="safe-bottom border-t border-line px-5 py-4">{footer}</div>}
         </div>
       )}

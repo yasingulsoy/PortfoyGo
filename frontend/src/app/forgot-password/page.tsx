@@ -102,7 +102,7 @@ function RequestStep({ email, onEmailChange, cooldown, onSent }: { email: string
       description="Hesabına kayıtlı e-posta adresini gir; şifreni yenilemen için 6 haneli bir kod gönderelim."
       footer={<BackToLogin />}
     >
-      <form onSubmit={handleSubmit} noValidate className="space-y-4">
+      <form onSubmit={handleSubmit} noValidate className="space-y-5">
         {formError && <Alert tone="error">{formError}</Alert>}
         <Field
           label="E-posta"
@@ -190,14 +190,14 @@ function ResetStep({ email, cooldown, onResent, onBack, onDone }: ResetStepProps
       description={
         <>
           <span className="font-medium text-fg">{normalized}</span> adresine gönderilen kodu ve yeni şifreni gir.{' '}
-          <button type="button" onClick={onBack} className="font-medium text-brand hover:underline">
+          <button type="button" onClick={onBack} className="font-medium text-brand hover:text-brand-hover">
             Adresi değiştir
           </button>
         </>
       }
       footer={<BackToLogin />}
     >
-      <form onSubmit={handleSubmit} noValidate className="space-y-4">
+      <form onSubmit={handleSubmit} noValidate className="space-y-5">
         {formError ? (
           <Alert tone="error">{formError}</Alert>
         ) : (
@@ -222,7 +222,7 @@ function ResetStep({ email, cooldown, onResent, onBack, onDone }: ResetStepProps
               type="button"
               onClick={handleResend}
               disabled={cooldown > 0 || resending}
-              className="num font-medium text-brand hover:underline disabled:cursor-not-allowed disabled:text-subtle disabled:no-underline"
+              className="num font-medium text-brand hover:text-brand-hover disabled:cursor-not-allowed disabled:text-subtle disabled:no-underline"
             >
               {resending ? 'Gönderiliyor…' : cooldown > 0 ? `Tekrar gönder (${cooldown} sn)` : 'Tekrar gönder'}
             </button>

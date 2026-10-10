@@ -100,7 +100,7 @@ export default function CodeInput({ value, onChange, onComplete, label = 'Doğru
 
   return (
     <div>
-      <p id={`${baseId}-label`} className="mb-1.5 text-xs font-medium text-muted">{label}</p>
+      <p id={`${baseId}-label`} className="mb-1.5 text-sm font-medium text-fg/80">{label}</p>
       <div role="group" aria-labelledby={`${baseId}-label`} aria-describedby={describedBy} className="grid grid-cols-6 gap-2">
         {digits.map((d, i) => (
           <input
@@ -121,7 +121,7 @@ export default function CodeInput({ value, onChange, onComplete, label = 'Doğru
             onPaste={(e) => handlePaste(i, e)}
             onFocus={() => handleFocus(i)}
             className={cn(
-              'num h-12 w-full min-w-0 rounded-lg border bg-surface text-center font-mono text-xl font-semibold text-fg caret-brand transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--ring)] disabled:opacity-60 sm:h-14 sm:text-2xl',
+              'num h-12 w-full min-w-0 rounded-lg border bg-transparent text-center text-xl font-semibold text-fg shadow-card caret-brand transition-[border-color,box-shadow] focus:border-brand/50 focus:outline-none focus:ring-[3px] focus:ring-brand/10 disabled:opacity-60 sm:h-14 sm:text-2xl',
               error ? 'border-down' : d ? 'border-line-strong' : 'border-line hover:border-line-strong',
             )}
           />

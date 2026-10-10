@@ -19,7 +19,7 @@ const DOT = {
 export function TitleBadge({ rank, title, className }: { rank: number; title: string; className?: string }) {
   const tone = placeTone(rank);
   return (
-    <span className={cn('inline-flex items-center gap-1.5 whitespace-nowrap rounded-md border px-1.5 py-0.5 text-[11px] font-medium', BADGE[tone], className)}>
+    <span className={cn('inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border px-2 py-0.5 text-[11px] font-medium', BADGE[tone], className)}>
       <span aria-hidden="true" className={cn('h-1.5 w-1.5 shrink-0 rounded-full', DOT[tone])} />
       {title || `${rank}. sıra`}
     </span>

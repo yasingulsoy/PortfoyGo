@@ -9,14 +9,11 @@ export const metadata: Metadata = {
 export default function NotFound() {
   return (
     <div className="flex min-h-[60vh] flex-col items-center justify-center py-12 text-center">
-      <p
-        className="num bg-clip-text font-mono text-[96px] font-semibold leading-none tracking-tighter text-transparent sm:text-[128px]"
-        style={{ backgroundImage: 'linear-gradient(180deg, var(--fg), var(--subtle))' }}
-        aria-hidden="true"
-      >
-        404
+      <p className="text-sm font-semibold uppercase tracking-[0.2em] text-brand">Hata</p>
+      <p className="num mt-3 text-[88px] font-bold leading-none tracking-tight text-fg sm:text-[120px]" aria-hidden="true">
+        4<span className="text-brand">0</span>4
       </p>
-      <h1 className="mt-6 text-2xl font-semibold tracking-tight text-fg">Bu sayfa piyasada işlem görmüyor</h1>
+      <h1 className="mt-6 text-xl font-semibold text-fg sm:text-2xl">Bu sayfa piyasada işlem görmüyor</h1>
       <p className="mt-2 max-w-md text-sm leading-relaxed text-muted">
         Aradığın sayfa taşınmış, kaldırılmış ya da hiç var olmamış olabilir. Adresi kontrol et veya aşağıdan devam et.
       </p>

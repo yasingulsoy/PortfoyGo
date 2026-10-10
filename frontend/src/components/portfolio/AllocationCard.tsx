@@ -1,7 +1,6 @@
 'use client';
 
 import { useMemo } from 'react';
-import { ChartPieIcon } from '@heroicons/react/20/solid';
 import type { LiveHolding } from '@/context/PortfolioContext';
 import { cn, formatTRY } from '@portfoygo/shared/format';
 import { ASSET_TYPE_LABELS, type AssetType } from '@/types';
@@ -11,7 +10,7 @@ import { Skeleton } from '@portfoygo/shared/ui/Feedback';
 type Bucket = AssetType | 'cash';
 
 export const ALLOCATION_COLORS: Record<Bucket, string> = {
-  // Halkanın boş izi surface-2 olduğundan nakit dilimi bir ton daha koyu
+  // Halkanın boş izi surface-3 olduğundan nakit dilimi bir ton daha koyu
   cash: 'var(--line-strong)',
   stock: 'var(--brand)',
   crypto: 'var(--gold)',
@@ -47,19 +46,19 @@ export default function AllocationCard({ holdings, balance, loaded, className }:
 
   return (
     <Card className={cn('flex flex-col', className)}>
-      <CardHeader icon={<ChartPieIcon />} title="Varlık dağılımı" description="Nakit ve varlık türlerine göre" />
+      <CardHeader title="Varlık dağılımı" description="Nakit ve varlık türlerine göre" />
       {!loaded ? (
-        <div className="flex items-center gap-5 p-5">
-          <Skeleton className="h-32 w-32 shrink-0 rounded-full" />
-          <div className="flex-1 space-y-2.5">
+        <div className="flex flex-col items-center gap-5 px-5 pb-6 sm:px-6">
+          <Skeleton className="h-40 w-40 rounded-full" />
+          <div className="w-full space-y-2.5">
             {[0, 1, 2].map((i) => <Skeleton key={i} className="h-4 w-full" />)}
           </div>
         </div>
       ) : (
-        <div className="flex flex-1 flex-col items-center gap-5 p-5 sm:flex-row lg:flex-col xl:flex-row">
-          <div className="relative h-36 w-36 shrink-0">
+        <div className="flex flex-1 flex-col items-center gap-6 px-5 pb-5 sm:flex-row sm:px-6 sm:pb-6 md:flex-col xl:flex-col">
+          <div className="relative h-40 w-40 shrink-0">
             <svg viewBox="0 0 120 120" className="h-full w-full -rotate-90" role="img" aria-label={`Varlık dağılımı: ${summary || 'veri yok'}`}>
-              <circle cx="60" cy="60" r={R} fill="none" stroke="var(--surface-2)" strokeWidth="14" />
+              <circle cx="60" cy="60" r={R} fill="none" stroke="var(--surface-3)" strokeWidth="12" />
               {slices.map((s) => (
                 <circle
                   key={s.key}
@@ -68,26 +67,24 @@ export default function AllocationCard({ holdings, balance, loaded, className }:
                   r={R}
                   fill="none"
                   stroke={ALLOCATION_COLORS[s.key]}
-                  strokeWidth="14"
+                  strokeWidth="12"
                   strokeDasharray={`${s.length} ${C - s.length}`}
                   strokeDashoffset={-s.offset}
                 />
               ))}
             </svg>
             <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-              <span className="num text-lg font-semibold tracking-tight">{pctText(invested)}</span>
-              <span className="text-[11px] text-muted">yatırımda</span>
+              <span className="text-xs text-muted">Yatırımda</span>
+              <span className="num text-xl font-semibold text-fg">{pctText(invested)}</span>
             </div>
           </div>
-          <ul className="w-full min-w-0 flex-1 space-y-2 text-sm">
+          <ul className="w-full min-w-0 flex-1 divide-y divide-line text-sm">
             {slices.map((s) => (
-              <li key={s.key} className="flex items-center gap-2.5">
+              <li key={s.key} className="flex items-center gap-3 py-2.5 first:pt-0 last:pb-0">
                 <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: ALLOCATION_COLORS[s.key] }} aria-hidden="true" />
                 <span className="min-w-0 flex-1 truncate text-muted">{LABELS[s.key]}</span>
-                <span className="text-right">
-                  <span className="num block font-medium">{formatTRY(s.value)}</span>
-                  <span className="num block text-[11px] text-subtle">{pctText(s.pct)}</span>
-                </span>
+                <span className="num font-medium text-fg">{formatTRY(s.value)}</span>
+                <span className="num w-14 shrink-0 text-right text-xs text-muted">{pctText(s.pct)}</span>
               </li>
             ))}
           </ul>

@@ -4,72 +4,89 @@
  * Açık tema :root üzerinde, koyu tema [data-theme="dark"] üzerinde tanımlıdır.
  * Bileşenler ham hex kullanmaz; her zaman bu token'lardan türeyen utility'leri kullanır
  * (bg-canvas, bg-surface, text-fg, text-muted, border-line, text-brand, text-up, text-down ...).
+ *
+ * Görsel dil: TailAdmin — açık gri zemin, beyaz ve ince kenarlıklı kartlar, mavi marka rengi (#465FFF),
+ * Outfit yazı tipi, düz yüzeyler ve hafif gölgeler. Koyu temada gray-900 zemin.
  */
 
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
 :root {
-  --canvas: #f5f6fa;
+  /* TailAdmin açık tema paleti */
+  --canvas: #f9fafb;        /* gray-50  */
   --surface: #ffffff;
-  --surface-2: #f0f2f7;
-  --surface-3: #e6e9f1;
-  --line: #e2e5ee;
-  --line-strong: #cfd4e0;
+  --surface-2: #f9fafb;     /* gray-50  */
+  --surface-3: #f2f4f7;     /* gray-100 */
+  --line: #e4e7ec;          /* gray-200 */
+  --line-strong: #d0d5dd;   /* gray-300 */
 
-  --fg: #0d1120;
-  --muted: #535c72;
-  --subtle: #8a92a7;
+  --fg: #1d2939;            /* gray-800 */
+  --muted: #667085;         /* gray-500 */
+  --subtle: #98a2b3;        /* gray-400 */
 
-  --brand: #5b3df5;
-  --brand-hover: #4a2ee0;
-  --brand-soft: rgb(91 61 245 / 0.1);
+  --brand: #465fff;         /* brand-500 */
+  --brand-2: #3641f5;       /* brand-600 */
+  --brand-hover: #3641f5;
+  --brand-soft: #ecf3ff;    /* brand-50  */
   --brand-fg: #ffffff;
+  --glow: rgb(70 95 255 / 0.24);
 
-  --up: #078a55;
-  --up-soft: rgb(7 138 85 / 0.1);
-  --down: #d92d42;
-  --down-soft: rgb(217 45 66 / 0.1);
-  --gold: #b7791f;
-  --gold-soft: rgb(183 121 31 / 0.12);
-  --silver: #9aa3b5;
-  --bronze: #b9773f;
+  --up: #039855;            /* success-600 */
+  --up-soft: #ecfdf3;       /* success-50  */
+  --down: #d92d20;          /* error-600   */
+  --down-soft: #fef3f2;     /* error-50    */
+  --gold: #dc6803;          /* warning-600 */
+  --gold-soft: #fffaeb;     /* warning-50  */
+  --silver: #98a2b3;
+  --bronze: #b54708;
 
-  --ring: rgb(91 61 245 / 0.45);
-  --shadow: 0 1px 2px rgb(13 17 32 / 0.04), 0 4px 16px rgb(13 17 32 / 0.04);
-  --overlay: rgb(13 17 32 / 0.45);
+  --ring: rgb(70 95 255 / 0.25);
+  --highlight: transparent;
+  --shadow: 0 1px 2px 0 rgb(16 24 40 / 0.05);                                        /* theme-xs */
+  --shadow-lg: 0 12px 16px -4px rgb(16 24 40 / 0.08), 0 4px 6px -2px rgb(16 24 40 / 0.03); /* theme-lg */
+  --overlay: rgb(16 24 40 / 0.5);
+  --canvas-glow: transparent;
+  --grid-dot: transparent;
 
   color-scheme: light;
 }
 
 [data-theme="dark"] {
-  --canvas: #0a0d16;
-  --surface: #10141f;
-  --surface-2: #161b28;
-  --surface-3: #1e2433;
-  --line: #222939;
-  --line-strong: #30384b;
+  /* TailAdmin koyu tema paleti */
+  --canvas: #101828;        /* gray-900 */
+  --surface: #171f2f;       /* white/3% üzerinde gray-900 */
+  --surface-2: #1a2231;     /* gray-dark */
+  --surface-3: #1d2939;     /* gray-800 */
+  --line: #1d2939;          /* gray-800 */
+  --line-strong: #344054;   /* gray-700 */
 
-  --fg: #e9ebf2;
-  --muted: #9aa2b6;
-  --subtle: #646d84;
+  --fg: #f2f4f7;            /* white/90 */
+  --muted: #98a2b3;         /* gray-400 */
+  --subtle: #667085;        /* gray-500 */
 
-  --brand: #8466ff;
-  --brand-hover: #9479ff;
-  --brand-soft: rgb(132 102 255 / 0.14);
+  --brand: #465fff;
+  --brand-2: #7592ff;
+  --brand-hover: #3641f5;
+  --brand-soft: rgb(70 95 255 / 0.12);
   --brand-fg: #ffffff;
+  --glow: rgb(70 95 255 / 0.3);
 
-  --up: #2fd389;
-  --up-soft: rgb(47 211 137 / 0.12);
-  --down: #ff5d6e;
-  --down-soft: rgb(255 93 110 / 0.12);
-  --gold: #f2bf4c;
-  --gold-soft: rgb(242 191 76 / 0.12);
-  --silver: #c3cad8;
-  --bronze: #d08f58;
+  --up: #32d583;            /* success-400 */
+  --up-soft: rgb(18 183 106 / 0.15);
+  --down: #f97066;          /* error-400   */
+  --down-soft: rgb(240 68 56 / 0.15);
+  --gold: #fdb022;          /* warning-400 */
+  --gold-soft: rgb(247 144 9 / 0.15);
+  --silver: #d0d5dd;
+  --bronze: #f79009;
 
-  --ring: rgb(132 102 255 / 0.55);
-  --shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 8px 24px rgb(0 0 0 / 0.25);
-  --overlay: rgb(3 5 10 / 0.7);
+  --ring: rgb(70 95 255 / 0.4);
+  --highlight: transparent;
+  --shadow: 0 1px 2px 0 rgb(0 0 0 / 0.2);
+  --shadow-lg: 0 12px 16px -4px rgb(0 0 0 / 0.35), 0 4px 6px -2px rgb(0 0 0 / 0.2);
+  --overlay: rgb(3 7 18 / 0.7);
+  --canvas-glow: transparent;
+  --grid-dot: transparent;
 
   color-scheme: dark;
 }
@@ -85,6 +102,7 @@
   --color-muted: var(--muted);
   --color-subtle: var(--subtle);
   --color-brand: var(--brand);
+  --color-brand-2: var(--brand-2);
   --color-brand-hover: var(--brand-hover);
   --color-brand-soft: var(--brand-soft);
   --color-brand-fg: var(--brand-fg);
@@ -98,23 +116,30 @@
   --color-bronze: var(--bronze);
   --color-overlay: var(--overlay);
 
-  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-outfit), var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, monospace;
 
   --shadow-card: var(--shadow);
+  --shadow-pop: var(--shadow-lg);
+
+  --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 @layer base {
   html {
     -webkit-tap-highlight-color: transparent;
+    scrollbar-gutter: stable;
   }
 
   body {
+    position: relative;
     background: var(--canvas);
     color: var(--fg);
     font-family: var(--font-sans);
     font-feature-settings: "ss01", "cv11";
+    text-rendering: optimizeLegibility;
   }
+
 
   ::selection {
     background: var(--brand-soft);
@@ -125,9 +150,45 @@
     outline-offset: 2px;
   }
 
+  /* İnce, temaya uyumlu kaydırma çubukları */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--line-strong) transparent;
+  }
+
+  /* Modal (yerel <dialog>) giriş/çıkış animasyonu */
+  dialog {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+    transition:
+      opacity 180ms var(--ease-out-soft),
+      transform 220ms var(--ease-out-soft),
+      overlay 220ms allow-discrete,
+      display 220ms allow-discrete;
+  }
+  dialog[open] {
+    opacity: 1;
+    transform: none;
+  }
+  @starting-style {
+    dialog[open] {
+      opacity: 0;
+      transform: translateY(8px) scale(0.98);
+    }
+  }
   dialog::backdrop {
     background: var(--overlay);
-    backdrop-filter: blur(4px);
+    backdrop-filter: blur(6px);
+    opacity: 0;
+    transition: opacity 200ms ease, overlay 200ms allow-discrete, display 200ms allow-discrete;
+  }
+  dialog[open]::backdrop {
+    opacity: 1;
+  }
+  @starting-style {
+    dialog[open]::backdrop {
+      opacity: 0;
+    }
   }
 }
 
@@ -148,6 +209,61 @@
   .safe-bottom {
     padding-bottom: env(safe-area-inset-bottom);
   }
+
+  /* Yüzey: çok hafif dikey ton farkı + üst kenar ışığı */
+  .surface-raised {
+    box-shadow: var(--shadow);
+  }
+
+  /* Öne çıkan kartlar için gradyan kenarlık (arka plan kesimi tekniği) */
+  .edge-glow {
+    border-color: var(--line);
+  }
+
+  /* Marka gradyanı (buton, rozet, vurgu) */
+  .bg-brand-gradient {
+    background-color: var(--brand);
+  }
+  .text-brand-gradient {
+    color: var(--brand);
+  }
+
+  /* Birincil butonun ışığı */
+  .btn-glow {
+    box-shadow: var(--shadow);
+  }
+
+  /* Cam efekti (üst menü, alt menü) */
+  .glass {
+    background: var(--surface);
+  }
+
+  /* Sayfa içeriği girişte hafifçe yukarı kayarak belirir */
+  .animate-enter {
+    animation: enter 420ms var(--ease-out-soft) both;
+  }
+  .animate-enter-delayed {
+    animation: enter 420ms var(--ease-out-soft) 80ms both;
+  }
+
+  /* İskelet yükleme parıltısı */
+  .shimmer {
+    background-image: linear-gradient(90deg, transparent, color-mix(in oklab, var(--fg) 6%, transparent), transparent);
+    background-size: 200% 100%;
+    background-repeat: no-repeat;
+    animation: shimmer 1.4s ease-in-out infinite;
+  }
+}
+
+@keyframes enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 /* Fiyat değişiminde kısa vurgu */
@@ -163,7 +279,8 @@
 .flash-down { animation: flash-down 900ms ease-out; }
 
 @keyframes shimmer {
-  100% { transform: translateX(100%); }
+  from { background-position: 150% 0; }
+  to { background-position: -50% 0; }
 }
 
 @media (prefers-reduced-motion: reduce) {

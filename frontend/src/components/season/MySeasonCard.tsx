@@ -1,4 +1,4 @@
-import { EnvelopeIcon, UserIcon } from '@heroicons/react/20/solid';
+import { EnvelopeIcon } from '@heroicons/react/20/solid';
 import { Card, CardBody, CardHeader } from '@portfoygo/shared/ui/Card';
 import { Delta, Money } from '@portfoygo/shared/ui/Delta';
 import { LinkButton } from '@portfoygo/shared/ui/Button';
@@ -17,8 +17,8 @@ interface Props {
 export default function MySeasonCard({ me, verified, loading, participants }: Props) {
   return (
     <Card>
-      <CardHeader icon={<UserIcon />} title="Senin sezonun" description={me?.joined_at ? `${formatDate(me.joined_at)} itibarıyla` : 'Bu sezon'} />
-      <CardBody className="space-y-4">
+      <CardHeader title="Senin sezonun" description={me?.joined_at ? `${formatDate(me.joined_at)} itibarıyla` : 'Bu sezon'} />
+      <CardBody className="space-y-4 border-t border-line">
         {loading ? (
           <div className="space-y-2">
             <Skeleton className="h-10 w-24" />
@@ -44,29 +44,29 @@ export default function MySeasonCard({ me, verified, loading, participants }: Pr
         ) : (
           <>
             <div>
-              <p className="num text-4xl font-semibold tracking-tight">{me.rank ? `#${me.rank}` : '—'}</p>
+              <p className="num text-3xl font-semibold text-fg">{me.rank ? `#${me.rank}` : '—'}</p>
               <p className="mt-1 text-sm text-muted">
                 {me.rank ? `${participants > 0 ? `${participants} oyuncu arasında` : 'Sezon sıralamasında'}` : 'Sıralaman henüz hesaplanmadı.'}
               </p>
             </div>
-            <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-line bg-line text-sm">
-              <div className="bg-surface p-3">
+            <dl className="grid grid-cols-2 gap-3 text-sm">
+              <div className="min-w-0 rounded-xl border border-line bg-surface-2 p-3.5">
                 <dt className="text-xs text-muted">Sezon getirisi</dt>
                 <dd className="mt-1">
                   <Delta value={me.return_pct} variant="text" />
                 </dd>
               </div>
-              <div className="bg-surface p-3">
+              <div className="min-w-0 rounded-xl border border-line bg-surface-2 p-3.5">
                 <dt className="text-xs text-muted">Sezon K/Z</dt>
                 <dd className="mt-1 truncate font-medium">
                   <Money value={me.profit_tl} signed />
                 </dd>
               </div>
-              <div className="bg-surface p-3">
+              <div className="min-w-0 rounded-xl border border-line bg-surface-2 p-3.5">
                 <dt className="text-xs text-muted">Başlangıç</dt>
                 <dd className="num mt-1 truncate font-medium">{formatTRY(me.baseline_equity)}</dd>
               </div>
-              <div className="bg-surface p-3">
+              <div className="min-w-0 rounded-xl border border-line bg-surface-2 p-3.5">
                 <dt className="text-xs text-muted">Güncel varlık</dt>
                 <dd className="num mt-1 truncate font-semibold">{formatTRY(me.equity)}</dd>
               </div>

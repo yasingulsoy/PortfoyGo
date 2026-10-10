@@ -5,7 +5,8 @@ import { ArrowPathIcon, QueueListIcon } from '@heroicons/react/20/solid';
 import { ordersApi } from '@/lib/api';
 import { useMarket } from '@/hooks/useMarketData';
 import { cn, formatDateTime, formatPercent, formatQuantity, formatRelative, formatTRY } from '@portfoygo/shared/format';
-import { Card, CardHeader } from '@portfoygo/shared/ui/Card';
+import { Card } from '@portfoygo/shared/ui/Card';
+import { DataTable, TBody, THead, Td, Th, Tr } from '@/components/common/Table';
 import Button from '@portfoygo/shared/ui/Button';
 import AssetAvatar from '@portfoygo/shared/ui/AssetAvatar';
 import Modal from '@portfoygo/shared/ui/Modal';
@@ -55,25 +56,24 @@ export default function OrdersCard({ active, history, loading, error, onRetry, o
 
   return (
     <Card id={id} className={cn('scroll-mt-24 overflow-hidden', className)}>
-      <CardHeader
-        icon={<QueueListIcon />}
-        title="Bekleyen emirler"
-        description={
-          reservedTotal > 0 ? (
-            <>
-              Limit alışlar için ayrılan nakit: <span className="num text-fg">{formatTRY(reservedTotal)}</span>
-            </>
-          ) : (
-            'Fiyat seviyeye gelince otomatik gerçekleşen emirler'
-          )
-        }
-      />
-      <div className="px-5 pt-3">
+      <div className="flex flex-col gap-4 px-5 pb-4 pt-5 sm:flex-row sm:items-start sm:justify-between sm:px-6 sm:pt-6">
+        <div className="min-w-0">
+          <h2 className="text-lg font-semibold text-fg">Bekleyen emirler</h2>
+          <p className="mt-1 text-sm text-muted">
+            {reservedTotal > 0 ? (
+              <>
+                Limit alışlar için ayrılan nakit: <span className="num font-medium text-fg">{formatTRY(reservedTotal)}</span>
+              </>
+            ) : (
+              'Fiyat seviyeye gelince otomatik gerçekleşen emirler'
+            )}
+          </p>
+        </div>
         <Tabs
-          variant="underline"
           label="Emir durumu"
           value={view}
           onChange={setView}
+          className="max-w-full shrink-0 self-start"
           items={[
             { value: 'active', label: 'Aktif', count: active.length },
             { value: 'history', label: 'Geçmiş', count: history.length },
@@ -82,11 +82,13 @@ export default function OrdersCard({ active, history, loading, error, onRetry, o
       </div>
 
       {loading ? (
-        <div className="space-y-3 p-5">
-          {[0, 1].map((i) => <Skeleton key={i} className="h-12 w-full" />)}
+        <div className="space-y-3 px-5 pb-6 sm:px-6">
+          {[0, 1].map((i) => (
+            <Skeleton key={i} className="h-12 w-full" />
+          ))}
         </div>
       ) : error && rows.length === 0 ? (
-        <div className="p-5">
+        <div className="px-5 pb-6 sm:px-6">
           <Alert tone="error">
             <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
               Emirler yüklenemedi.
@@ -98,29 +100,60 @@ export default function OrdersCard({ active, history, loading, error, onRetry, o
         </div>
       ) : rows.length === 0 ? (
         <EmptyState
+          className="border-t border-line"
           icon={<QueueListIcon />}
           title={view === 'active' ? 'Bekleyen emrin yok' : 'Geçmiş emir yok'}
           description={
             view === 'active'
-              ? 'Al/Sat penceresinde “Limit” seçerek ya da pozisyonlar tablosundaki “Emir” düğmesiyle zarar durdur / kâr al emri oluşturabilirsin.'
+              ? 'Al/Sat penceresinde “Limit” seçerek ya da pozisyonlar tablosundaki “Emir” eylemiyle zarar durdur / kâr al emri oluşturabilirsin.'
               : undefined
           }
         />
       ) : (
-        <ul className="divide-y divide-line">
-          {rows.map((o) => {
-            const asset = find(o.assetType, o.symbol);
-            return (
-              <OrderListRow
-                key={o.id}
-                order={o}
-                livePrice={asset?.priceTRY ?? null}
-                image={asset?.image}
-                onCancel={view === 'active' ? () => setPending(o) : undefined}
-              />
-            );
-          })}
-        </ul>
+        <>
+          {/* Küçük ekranlar: liste */}
+          <ul className="divide-y divide-line border-t border-line sm:hidden">
+            {rows.map((o) => {
+              const asset = find(o.assetType, o.symbol);
+              return (
+                <OrderListRow
+                  key={o.id}
+                  order={o}
+                  livePrice={asset?.priceTRY ?? null}
+                  image={asset?.image}
+                  onCancel={view === 'active' ? () => setPending(o) : undefined}
+                />
+              );
+            })}
+          </ul>
+          {/* sm ve üzeri: tablo */}
+          <DataTable label={view === 'active' ? 'Aktif emirler' : 'Geçmiş emirler'} className="hidden pb-2 sm:block">
+            <THead>
+              <Th>Varlık</Th>
+              <Th>Emir</Th>
+              <Th align="right">Tetikleme</Th>
+              {view === 'active' && (
+                <Th align="right" className="w-16">
+                  <span className="sr-only">İşlem</span>
+                </Th>
+              )}
+            </THead>
+            <TBody>
+              {rows.map((o) => {
+                const asset = find(o.assetType, o.symbol);
+                return (
+                  <OrderTableRow
+                    key={o.id}
+                    order={o}
+                    livePrice={asset?.priceTRY ?? null}
+                    image={asset?.image}
+                    onCancel={view === 'active' ? () => setPending(o) : undefined}
+                  />
+                );
+              })}
+            </TBody>
+          </DataTable>
+        </>
       )}
 
       <CancelOrderDialog
@@ -135,7 +168,92 @@ export default function OrdersCard({ active, history, loading, error, onRetry, o
   );
 }
 
-/** Tek emir satırı (portföy kartı ve varlık sayfası ortak kullanır). */
+/** Emir satırının alt bilgi metni (miktar, ayrılan nakit, kalan süre ya da sonuç). */
+function orderDetail(order: OrderRow) {
+  if (order.status === 'active') {
+    return [`${formatQuantity(order.quantity)} adet`, order.reservedCash > 0 ? `${formatTRY(order.reservedCash)} ayrıldı` : null, formatTimeLeft(order.expiresAt)]
+      .filter(Boolean)
+      .join(' · ');
+  }
+  if (order.status === 'filled') {
+    const qty = order.filledQuantity ?? order.quantity;
+    return `${formatQuantity(qty)} adet × ${formatTRY(order.filledPrice ?? 0, { precise: true })}${order.filledAt ? ` · ${formatRelative(order.filledAt)}` : ''}`;
+  }
+  return [order.failReason, order.updatedAt ? formatRelative(order.updatedAt) : null].filter(Boolean).join(' · ');
+}
+
+function CancelButton({ order, onCancel }: { order: OrderRow; onCancel: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onCancel}
+      aria-label={`${order.symbol} ${orderLabel(order).toLocaleLowerCase('tr-TR')} emrini iptal et`}
+      className="inline-flex h-8 shrink-0 items-center rounded-lg px-2.5 text-xs font-medium text-down transition-colors hover:bg-down-soft"
+    >
+      İptal
+    </button>
+  );
+}
+
+function TriggerCell({ order, livePrice }: { order: OrderRow; livePrice: number | null }) {
+  const isActive = order.status === 'active';
+  const distance = isActive ? distanceToTrigger(order, livePrice) : null;
+  return (
+    <>
+      <p className="num whitespace-nowrap text-sm font-semibold text-fg">{formatTRY(order.triggerPrice, { precise: true })}</p>
+      <p className="num mt-0.5 whitespace-nowrap text-xs text-muted">
+        {isActive && distance != null ? (
+          <>
+            <span className="sr-only">Güncel fiyata uzaklık: </span>
+            {formatPercent(distance)}
+          </>
+        ) : (
+          'tetikleme'
+        )}
+      </p>
+    </>
+  );
+}
+
+function OrderTableRow({ order, livePrice, image, onCancel }: { order: OrderRow; livePrice: number | null; image?: string; onCancel?: () => void }) {
+  const isActive = order.status === 'active';
+  const status = ORDER_STATUS[order.status] ?? { label: order.status, tone: 'neutral' as const };
+  const detail = orderDetail(order);
+  return (
+    <Tr>
+      <Td>
+        <div className="flex min-w-0 items-center gap-3">
+          <AssetAvatar symbol={order.symbol} type={order.assetType} image={image} size={36} />
+          <div className="min-w-0">
+            <p className="font-medium text-fg">{order.symbol}</p>
+            <p
+              className="num mt-0.5 max-w-[14rem] truncate text-xs text-muted"
+              title={order.expiresAt && isActive ? `Son geçerlilik: ${formatDateTime(order.expiresAt)}` : undefined}
+            >
+              {detail || '—'}
+            </p>
+          </div>
+        </div>
+      </Td>
+      <Td>
+        <span className="flex flex-wrap gap-1.5">
+          <OrderTypeBadge order={order} />
+          {!isActive && <Badge tone={status.tone}>{status.label}</Badge>}
+        </span>
+      </Td>
+      <Td align="right">
+        <TriggerCell order={order} livePrice={livePrice} />
+      </Td>
+      {onCancel && (
+        <Td align="right">
+          <CancelButton order={order} onCancel={onCancel} />
+        </Td>
+      )}
+    </Tr>
+  );
+}
+
+/** Tek emir satırı (portföy kartının mobil listesi ve varlık sayfası ortak kullanır). */
 export function OrderListRow({
   order,
   livePrice,
@@ -150,33 +268,15 @@ export function OrderListRow({
   showAvatar?: boolean;
 }) {
   const isActive = order.status === 'active';
-  const distance = isActive ? distanceToTrigger(order, livePrice) : null;
   const status = ORDER_STATUS[order.status] ?? { label: order.status, tone: 'neutral' as const };
-  const timeLeft = isActive ? formatTimeLeft(order.expiresAt) : null;
-
-  const detail = (() => {
-    if (isActive) {
-      return [
-        `${formatQuantity(order.quantity)} adet`,
-        order.reservedCash > 0 ? `${formatTRY(order.reservedCash)} ayrıldı` : null,
-        timeLeft,
-      ]
-        .filter(Boolean)
-        .join(' · ');
-    }
-    if (order.status === 'filled') {
-      const qty = order.filledQuantity ?? order.quantity;
-      return `${formatQuantity(qty)} adet × ${formatTRY(order.filledPrice ?? 0, { precise: true })}${order.filledAt ? ` · ${formatRelative(order.filledAt)}` : ''}`;
-    }
-    return [order.failReason, order.updatedAt ? formatRelative(order.updatedAt) : null].filter(Boolean).join(' · ');
-  })();
+  const detail = orderDetail(order);
 
   return (
-    <li className="flex items-center gap-3 px-5 py-3.5">
-      {showAvatar && <AssetAvatar symbol={order.symbol} type={order.assetType} image={image} size={32} />}
+    <li className="flex items-center gap-3 px-5 py-3.5 sm:px-6">
+      {showAvatar && <AssetAvatar symbol={order.symbol} type={order.assetType} image={image} size={36} />}
       <div className="min-w-0 flex-1">
         <p className="flex flex-wrap items-center gap-1.5">
-          <span className="font-mono text-[13px] font-semibold">{order.symbol}</span>
+          <span className="text-sm font-medium text-fg">{order.symbol}</span>
           <OrderTypeBadge order={order} />
           {!isActive && <Badge tone={status.tone}>{status.label}</Badge>}
         </p>
@@ -185,23 +285,9 @@ export function OrderListRow({
         </p>
       </div>
       <div className="shrink-0 text-right">
-        <p className="num text-sm font-semibold">{formatTRY(order.triggerPrice, { precise: true })}</p>
-        <p className="num mt-0.5 text-xs text-subtle">
-          {isActive && distance != null ? (
-            <>
-              <span className="sr-only">Güncel fiyata uzaklık: </span>
-              {formatPercent(distance)}
-            </>
-          ) : (
-            'tetikleme'
-          )}
-        </p>
+        <TriggerCell order={order} livePrice={livePrice} />
       </div>
-      {onCancel && (
-        <Button size="sm" variant="ghost" onClick={onCancel} aria-label={`${order.symbol} ${orderLabel(order).toLocaleLowerCase('tr-TR')} emrini iptal et`}>
-          İptal
-        </Button>
-      )}
+      {onCancel && <CancelButton order={order} onCancel={onCancel} />}
     </li>
   );
 }
@@ -253,14 +339,18 @@ export function CancelOrderDialog({
       title="Emri iptal et"
       description={order ? `${order.symbol} için ${orderLabel(order).toLocaleLowerCase('tr-TR')} emri kaldırılacak.` : undefined}
       footer={
-        <div className="grid grid-cols-2 gap-2">
-          <Button variant="secondary" onClick={close} disabled={busy}>Vazgeç</Button>
-          <Button variant="danger" onClick={confirm} loading={busy}>İptal et</Button>
+        <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+          <Button variant="secondary" onClick={close} disabled={busy} data-autofocus>
+            Vazgeç
+          </Button>
+          <Button variant="danger" onClick={confirm} loading={busy}>
+            Emri iptal et
+          </Button>
         </div>
       }
     >
       {order && (
-        <dl className="space-y-2 rounded-xl bg-surface-2 p-4 text-sm">
+        <dl className="space-y-2.5 rounded-xl border border-line bg-surface-2 p-4 text-sm">
           <div className="flex justify-between gap-4">
             <dt className="text-muted">Tetikleme fiyatı</dt>
             <dd className="num font-medium">{formatTRY(order.triggerPrice, { precise: true })}</dd>

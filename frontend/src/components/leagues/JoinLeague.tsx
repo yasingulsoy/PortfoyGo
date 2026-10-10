@@ -3,16 +3,16 @@
 import { useId, useState, type FormEvent } from 'react';
 import Link from 'next/link';
 import useSWR from 'swr';
-import { ArrowRightIcon, UserGroupIcon } from '@heroicons/react/20/solid';
+import { ArrowRightIcon, CalendarDaysIcon, FlagIcon, UserGroupIcon } from '@heroicons/react/20/solid';
 import Button from '@portfoygo/shared/ui/Button';
 import { Alert, Badge, Skeleton } from '@portfoygo/shared/ui/Feedback';
 import Modal from '@portfoygo/shared/ui/Modal';
 import { cn } from '@portfoygo/shared/format';
 import { ApiError, leaguesApi } from '@/lib/api';
-import { INVITE_CODE_MIN, normalizeInviteCode } from '@/lib/competition';
+import { INVITE_CODE_LENGTH, formatLeagueDate, leagueTiming, normalizeInviteCode } from '@/lib/competition';
 import { useNow } from '@/hooks/useNow';
 import type { League, LeaguePreview } from '@/types';
-import { LEAGUES_KEY, controlClass, leagueTimeLabel } from './shared';
+import { LEAGUES_KEY, MemberBar, StatusBadge, VisibilityBadge, controlClass } from './shared';
 
 const previewKey = (code: string) => ['leagues:preview', code] as const;
 
@@ -38,19 +38,19 @@ export function JoinForm({ initialCode = '', verified, onJoined, onCancel, autoF
   const [pending, setPending] = useState(false);
   const [error, setError] = useState('');
   const inputId = useId();
-  const ready = code.length >= INVITE_CODE_MIN;
+  const ready = code.length >= INVITE_CODE_LENGTH;
 
   const preview = useSWR(ready ? previewKey(code) : null, ([, c]) => leaguesApi.preview(c), {
     revalidateOnFocus: false,
     shouldRetryOnError: false,
   });
   // "Zaten üyesin" durumunda lige bağlantı verebilmek için kendi liglerimizden kimliği buluruz
-  const mine = useSWR(preview.data?.already_member ? LEAGUES_KEY : null, () => leaguesApi.list());
-  const existing = mine.data?.find((l) => l.invite_code.toUpperCase() === code);
+  const mine = useSWR(preview.data?.already_member && !preview.data.id ? LEAGUES_KEY : null, () => leaguesApi.list());
+  const existingId = preview.data?.id ?? mine.data?.find((l) => l.invite_code.toUpperCase() === code)?.id;
 
   const now = useNow();
   const p = preview.data;
-  const ended = !!p && leagueTimeLabel(p.ends_at, now).ended;
+  const ended = p?.status === 'finished';
   const full = !!p && p.member_count >= p.max_members;
   const canJoin = verified && ready && !!p && !p.already_member && !ended && !full;
 
@@ -80,7 +80,7 @@ export function JoinForm({ initialCode = '', verified, onJoined, onCancel, autoF
       )}
 
       <div>
-        <label htmlFor={inputId} className="mb-1.5 block text-xs font-medium text-muted">
+        <label htmlFor={inputId} className="mb-1.5 block text-sm font-medium text-fg/80">
           Davet kodu
         </label>
         <input
@@ -101,7 +101,7 @@ export function JoinForm({ initialCode = '', verified, onJoined, onCancel, autoF
           className={cn(controlClass, 'h-12 font-mono text-lg uppercase tracking-[0.25em] placeholder:tracking-[0.25em]')}
         />
         <p id={`${inputId}-hint`} className="mt-1.5 text-xs text-subtle">
-          {ready ? 'Kod kontrol ediliyor; lig bilgisi aşağıda görünür.' : `Arkadaşının paylaştığı ${INVITE_CODE_MIN} karakterlik kodu gir.`}
+          Arkadaşının paylaştığı {INVITE_CODE_LENGTH} karakterlik kodu gir; lig bilgisi otomatik görünür.
         </p>
       </div>
 
@@ -118,16 +118,19 @@ export function JoinForm({ initialCode = '', verified, onJoined, onCancel, autoF
       {p?.already_member && (
         <Alert tone="success">
           Zaten bu ligdesin.{' '}
-          <Link href={existing ? `/leagues/${existing.id}` : '/leagues'} className="font-semibold underline underline-offset-2">
-            {existing ? 'Lige git' : 'Liglerime git'}
+          <Link href={existingId ? `/leagues/${existingId}` : '/leagues'} className="font-semibold underline underline-offset-2">
+            {existingId ? 'Lige git' : 'Liglerime git'}
           </Link>
         </Alert>
       )}
       {p && !p.already_member && full && <Alert tone="error">Bu lig dolu ({p.max_members} oyuncu).</Alert>}
-      {p && !p.already_member && !full && ended && <Alert tone="error">Bu ligin süresi dolmuş; yeni oyuncu katılamaz.</Alert>}
+      {p && !p.already_member && !full && ended && <Alert tone="error">Bu lig sona erdi; yeni oyuncu katılamaz.</Alert>}
+      {p && !p.already_member && !full && p.status === 'active' && (
+        <Alert tone="info">Lig devam ediyor. Katılırsan getirin katıldığın andan itibaren ölçülür.</Alert>
+      )}
       {error && <Alert tone="error">{error}</Alert>}
 
-      <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+      <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
         {onCancel && (
           <Button variant="secondary" onClick={onCancel} disabled={pending}>
             Vazgeç
@@ -142,9 +145,9 @@ export function JoinForm({ initialCode = '', verified, onJoined, onCancel, autoF
 }
 
 function PreviewCard({ preview, now }: { preview: LeaguePreview; now: number }) {
-  const time = leagueTimeLabel(preview.ends_at, now);
+  const timing = leagueTiming(preview, now);
   return (
-    <div className="rounded-xl border border-line bg-surface-2/60 p-4">
+    <div className="rounded-xl border border-line bg-surface-2 p-4">
       <div className="flex items-start gap-3">
         <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-brand-soft text-brand">
           <UserGroupIcon className="h-5 w-5" aria-hidden="true" />
@@ -155,15 +158,24 @@ function PreviewCard({ preview, now }: { preview: LeaguePreview; now: number }) 
         </div>
       </div>
       {preview.description && <p className="mt-3 break-words text-sm leading-relaxed text-muted">{preview.description}</p>}
-      <div className="mt-3 flex flex-wrap items-center gap-2">
-        <Badge>
-          <span className="num">
-            {preview.member_count}/{preview.max_members}
-          </span>{' '}
-          oyuncu
-        </Badge>
-        <Badge tone={time.ended ? 'down' : 'neutral'}>{time.text}</Badge>
+      <div className="mt-3 flex flex-wrap items-center gap-1.5">
+        <StatusBadge status={preview.status} />
+        <VisibilityBadge visibility={preview.visibility} />
+        {preview.status !== 'finished' && <Badge>{timing.label}</Badge>}
       </div>
+      <dl className="mt-3 grid gap-2 text-xs min-[420px]:grid-cols-2">
+        <div className="flex min-w-0 items-center gap-1.5">
+          <CalendarDaysIcon className="h-3.5 w-3.5 shrink-0 text-subtle" aria-hidden="true" />
+          <dt className="text-muted">Başlangıç</dt>
+          <dd className="num truncate font-medium text-fg">{preview.starts_at ? formatLeagueDate(preview.starts_at) : 'Başladı'}</dd>
+        </div>
+        <div className="flex min-w-0 items-center gap-1.5">
+          <FlagIcon className="h-3.5 w-3.5 shrink-0 text-subtle" aria-hidden="true" />
+          <dt className="text-muted">Bitiş</dt>
+          <dd className="num truncate font-medium text-fg">{preview.ends_at ? formatLeagueDate(preview.ends_at) : 'Süresiz'}</dd>
+        </div>
+      </dl>
+      <MemberBar count={preview.member_count} max={preview.max_members} className="mt-3" />
     </div>
   );
 }

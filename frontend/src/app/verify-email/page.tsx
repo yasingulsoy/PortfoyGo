@@ -39,7 +39,7 @@ function VerifyEmail() {
   if (!user) {
     return (
       <AuthLayout title="Önce giriş yapmalısın" description="E-posta doğrulaması hesabına bağlıdır. Giriş yaptıktan sonra bu sayfaya geri döneceksin.">
-        <div className="flex flex-col items-center rounded-2xl border border-line bg-surface p-6 text-center shadow-card">
+        <div className="flex flex-col items-center rounded-2xl border border-line bg-surface-2 p-6 text-center">
           <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-brand-soft text-brand">
             <LockClosedIcon className="h-6 w-6" aria-hidden="true" />
           </span>
@@ -47,7 +47,7 @@ function VerifyEmail() {
           <LinkButton href={`/login?redirect=${encodeURIComponent('/verify-email')}`} size="lg" className="mt-5 w-full">
             Giriş yap
           </LinkButton>
-          <Link href="/register" className="mt-3 text-sm font-medium text-brand hover:underline">
+          <Link href="/register" className="mt-3 text-sm font-medium text-brand hover:text-brand-hover">
             Hesabın yok mu? Kayıt ol
           </Link>
         </div>
@@ -135,7 +135,7 @@ function VerifyEmail() {
         )}
         {error && <Alert tone="error">{error}</Alert>}
 
-        <div className="flex items-center gap-3 rounded-xl border border-line bg-surface p-3.5 shadow-card">
+        <div className="flex items-center gap-3 rounded-xl border border-line bg-surface-2 p-3.5">
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-brand-soft text-brand">
             <EnvelopeIcon className="h-5 w-5" aria-hidden="true" />
           </span>
