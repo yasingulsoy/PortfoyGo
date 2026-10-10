@@ -1,37 +1,34 @@
-'use client';
+import type { Metadata } from 'next';
+import { RecentSignups, TopUsers } from '@/components/AdminStats';
+import { ActivityChartCard, OverviewMetrics, RefreshOverviewButton, SystemSummaryCard } from '@/components/Overview';
+import { PageBreadcrumb } from '@/components/ui';
 
-import { useRequireAdmin } from '@/lib/auth';
-import PageHeader from '@portfoygo/shared/ui/PageHeader';
-import { PageLoader } from '@portfoygo/shared/ui/Spinner';
-import AdminStats, { RetryStatsButton, TopUsers } from '@/components/AdminStats';
-import UsersTable from '@/components/UsersTable';
-import CacheActions from '@/components/CacheActions';
+export const metadata: Metadata = {
+  // Kök segmentte şablon uygulanmaz; başlık tam yazılır
+  title: { absolute: 'Genel bakış · PortfoyGo Yönetim' },
+};
 
-export default function AdminPage() {
-  // Yetki kapısı AdminShell'dedir; burada yalnızca kullanıcı bilgisi okunur
-  const { user, ready } = useRequireAdmin();
-  if (!ready || !user) return <PageLoader />;
-
+export default function OverviewPage() {
   return (
-    <div className="space-y-6">
-      <PageHeader
-        eyebrow="Genel bakış"
-        title="Yönetici paneli"
-        description="Kullanıcıları yönet, genel istatistikleri izle ve piyasa önbelleğini yenile."
-        actions={<RetryStatsButton />}
-      />
-
-      <AdminStats />
-
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px] xl:items-start">
-        <div className="min-w-0">
-          <UsersTable currentUserId={String(user.id)} />
+    <>
+      <PageBreadcrumb title="Genel bakış" description="Kullanıcı, işlem ve sistem özetleri." actions={<RefreshOverviewButton />} />
+      <div className="grid grid-cols-12 gap-4 md:gap-6">
+        <div className="col-span-12">
+          <OverviewMetrics />
         </div>
-        <div className="space-y-6">
-          <CacheActions />
+        <div className="col-span-12 min-w-0 xl:col-span-8">
+          <ActivityChartCard />
+        </div>
+        <div className="col-span-12 min-w-0 xl:col-span-4">
+          <SystemSummaryCard />
+        </div>
+        <div className="col-span-12 min-w-0 xl:col-span-8">
           <TopUsers />
         </div>
+        <div className="col-span-12 min-w-0 xl:col-span-4">
+          <RecentSignups />
+        </div>
       </div>
-    </div>
+    </>
   );
 }

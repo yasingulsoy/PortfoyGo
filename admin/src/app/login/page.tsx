@@ -3,16 +3,15 @@
 import { Suspense, useEffect, useState, type FormEvent } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ShieldCheckIcon } from '@heroicons/react/20/solid';
-import Logo from '@portfoygo/shared/ui/Logo';
-import ThemeToggle from '@portfoygo/shared/ui/ThemeToggle';
+import AuthSplitLayout from '@portfoygo/shared/ui/AuthSplitLayout';
 import Button from '@portfoygo/shared/ui/Button';
-import { Card } from '@portfoygo/shared/ui/Card';
 import { Alert } from '@portfoygo/shared/ui/Feedback';
 import { Field } from '@portfoygo/shared/ui/Field';
 import { PageLoader } from '@portfoygo/shared/ui/Spinner';
 import { safeRedirect } from '@portfoygo/shared/url';
 import DevQuickLogin from '@portfoygo/shared/ui/DevQuickLogin';
 import { useAdminAuth } from '@/lib/auth';
+import { APP_URL } from '@/lib/api';
 
 export default function AdminLoginPage() {
   return (
@@ -52,48 +51,43 @@ function LoginForm() {
   };
 
   return (
-    <div className="relative flex min-h-dvh items-center justify-center px-4 py-12">
-      <div className="absolute right-4 top-4">
-        <ThemeToggle />
-      </div>
-      <div className="w-full max-w-sm">
-        <div className="mb-6 flex flex-col items-center gap-3 text-center">
-          <Logo />
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-brand-soft px-2.5 py-1 text-xs font-medium text-brand">
-            <ShieldCheckIcon className="h-3.5 w-3.5" /> Yönetim paneli
-          </span>
-        </div>
-        <Card className="p-6">
-          <h1 className="text-lg font-semibold tracking-tight">Yönetici girişi</h1>
-          <p className="mt-1 text-sm text-muted">Yalnızca yönetici yetkisi olan hesaplar erişebilir.</p>
+    <AuthSplitLayout
+      title="Yönetici girişi"
+      description="Yalnızca yönetici yetkisi olan hesaplar yönetim paneline erişebilir."
+      backHref={APP_URL}
+      backExternal
+      backLabel="Siteye dön"
+      tagline="Kullanıcıları, piyasa önbelleğini ve sezonları tek yerden yönet."
+      panelBadge={
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-brand-fg/10 px-3 py-1 text-sm font-medium text-brand-fg">
+          <ShieldCheckIcon className="h-4 w-4" aria-hidden="true" /> Yönetim paneli
+        </span>
+      }
+      legal={<span>© {new Date().getFullYear()} PortfoyGo · Yönetim paneli</span>}
+    >
+      {status === 'forbidden' && !error && (
+        <Alert tone="error" className="mb-5">
+          Oturum açık olan hesabın yönetici yetkisi yok. Yönetici hesabıyla giriş yapın.
+        </Alert>
+      )}
 
-          {status === 'forbidden' && !error && (
-            <Alert tone="error" className="mt-4">
-              Oturum açık olan hesabın yönetici yetkisi yok. Yönetici hesabıyla giriş yapın.
-            </Alert>
-          )}
+      <DevQuickLogin
+        adminOnly
+        onLogin={async (username) => {
+          const res = await devLogin(username);
+          if (res.success) router.replace(redirectTo);
+          return res;
+        }}
+      />
 
-          <div className="mt-5">
-            <DevQuickLogin
-              adminOnly
-              onLogin={async (username) => {
-                const res = await devLogin(username);
-                if (res.success) router.replace(redirectTo);
-                return res;
-              }}
-            />
-          </div>
-
-          <form onSubmit={submit} noValidate className="mt-5 space-y-4">
-            <Field label="E-posta" type="email" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} />
-            <Field label="Şifre" type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} />
-            {error && <Alert tone="error">{error}</Alert>}
-            <Button type="submit" size="lg" className="w-full" loading={submitting}>
-              Giriş yap
-            </Button>
-          </form>
-        </Card>
-      </div>
-    </div>
+      <form onSubmit={submit} noValidate className="mt-5 space-y-5">
+        <Field label="E-posta" type="email" autoComplete="username" inputMode="email" placeholder="yonetici@eposta.com" value={email} onChange={(e) => setEmail(e.target.value)} autoFocus />
+        <Field label="Şifre" type="password" autoComplete="current-password" placeholder="Şifren" value={password} onChange={(e) => setPassword(e.target.value)} />
+        {error && <Alert tone="error">{error}</Alert>}
+        <Button type="submit" size="lg" className="w-full" loading={submitting}>
+          {submitting ? 'Giriş yapılıyor…' : 'Giriş yap'}
+        </Button>
+      </form>
+    </AuthSplitLayout>
   );
 }

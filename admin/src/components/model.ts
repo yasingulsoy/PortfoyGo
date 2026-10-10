@@ -50,35 +50,6 @@ export function normalizeUsers(res: any): { users: AdminUser[]; total: number } 
   return { users, total: t == null ? users.length : num(t) };
 }
 
-export interface StatDef {
-  key: string;
-  label: string;
-  keys: string[];
-  kind: 'count' | 'money';
-  tone?: 'up' | 'down' | 'gold' | 'brand';
-}
-
-/** Backend hangi alanları dönerse onları gösterir (camelCase ve snake_case desteklenir). */
-export const STAT_DEFS: StatDef[] = [
-  { key: 'users', label: 'Toplam kullanıcı', keys: ['totalUsers', 'total_users'], kind: 'count', tone: 'brand' },
-  { key: 'active', label: 'Doğrulanmış / aktif', keys: ['activeUsers', 'active_users', 'verifiedUsers', 'verified_users'], kind: 'count', tone: 'up' },
-  { key: 'banned', label: 'Yasaklı', keys: ['bannedUsers', 'banned_users'], kind: 'count', tone: 'down' },
-  { key: 'new', label: 'Bugün katılan', keys: ['newUsersToday', 'new_users_today', 'newUsers', 'new_users'], kind: 'count' },
-  { key: 'tx', label: 'Toplam işlem', keys: ['totalTransactions', 'total_transactions'], kind: 'count', tone: 'gold' },
-  { key: 'volume', label: 'İşlem hacmi', keys: ['totalVolume', 'total_volume', 'transactionVolume', 'transaction_volume'], kind: 'money' },
-  { key: 'portfolio', label: 'Toplam portföy değeri', keys: ['totalPortfolioValue', 'total_portfolio_value'], kind: 'money' },
-];
-
-export function pickStats(res: any): { def: StatDef; value: number }[] {
-  const s = res?.stats ?? res?.data ?? res ?? {};
-  const out: { def: StatDef; value: number }[] = [];
-  for (const def of STAT_DEFS) {
-    const k = def.keys.find((key) => s[key] != null && s[key] !== '');
-    if (k) out.push({ def, value: num(s[k]) });
-  }
-  return out;
-}
-
 export function pickTopUsers(res: any): AdminUser[] {
   const s = res?.stats ?? res?.data ?? res ?? {};
   const raw = s.topUsers ?? s.top_users;

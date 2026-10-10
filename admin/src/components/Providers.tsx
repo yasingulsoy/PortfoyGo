@@ -7,7 +7,7 @@ import { AdminAuthProvider } from '@/lib/auth';
 
 export default function Providers({ children }: { children: ReactNode }) {
   return (
-    <ThemeProvider attribute="data-theme" defaultTheme="dark" enableSystem disableTransitionOnChange>
+    <ThemeProvider attribute="data-theme" defaultTheme="light" enableSystem disableTransitionOnChange>
       <ToastProvider>
         <AdminAuthProvider>{children}</AdminAuthProvider>
       </ToastProvider>

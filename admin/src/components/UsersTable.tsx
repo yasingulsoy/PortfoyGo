@@ -1,185 +1,193 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import useSWR from 'swr';
-import { ChevronLeftIcon, ChevronRightIcon, MagnifyingGlassIcon, UsersIcon } from '@heroicons/react/20/solid';
-import { Card, CardHeader } from '@portfoygo/shared/ui/Card';
-import { Alert, Badge, EmptyState, Skeleton } from '@portfoygo/shared/ui/Feedback';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import useSWR, { useSWRConfig } from 'swr';
+import { MagnifyingGlassIcon, UsersIcon } from '@heroicons/react/20/solid';
+import { Card } from '@portfoygo/shared/ui/Card';
+import { Badge, EmptyState } from '@portfoygo/shared/ui/Feedback';
 import Button from '@portfoygo/shared/ui/Button';
-import Modal from '@portfoygo/shared/ui/Modal';
+import Tabs from '@portfoygo/shared/ui/Tabs';
 import UserInitial from '@portfoygo/shared/ui/UserInitial';
-import { adminApi } from '@/lib/api';
+import { useToast } from '@portfoygo/shared/ui/Toast';
+import { adminApi, adminKeys, apiFetch, type UserStatusFilter } from '@/lib/api';
+import { useDebouncedValue } from '@/lib/hooks';
 import { cn, formatDate, formatNumber, formatRelative, formatTRY } from '@portfoygo/shared/format';
-import { normalizeUsers, type AdminUser } from './model';
-import { useAdminStats } from './AdminStats';
+import { normalizeUsers, num, type AdminUser } from './model';
+import { ADMIN_STATS_KEY } from './AdminStats';
+import { useMetrics } from './Overview';
+import { TableCardHeader, TableSkeleton, table } from './ui';
+import { ConfirmModal, LoadError, Pagination, SearchInput, StaleNotice } from './controls';
 
 const PAGE_SIZE = 20;
 
+const STATUS_TABS: { value: UserStatusFilter; label: string }[] = [
+  { value: 'all', label: 'Tümü' },
+  { value: 'banned', label: 'Yasaklı' },
+  { value: 'admins', label: 'Yöneticiler' },
+  { value: 'unverified', label: 'Doğrulanmamış' },
+];
+
+export const userHref = (id: string) => `/users/${encodeURIComponent(id)}`;
+
 export default function UsersTable({ currentUserId }: { currentUserId: string }) {
+  const router = useRouter();
+  const toast = useToast();
   const [offset, setOffset] = useState(0);
   const [query, setQuery] = useState('');
+  const [status, setStatus] = useState<UserStatusFilter>('all');
   const [target, setTarget] = useState<AdminUser | null>(null);
-  const [saving, setSaving] = useState(false);
-  const [modalError, setModalError] = useState('');
-  const [notice, setNotice] = useState<{ tone: 'success' | 'error'; message: string } | null>(null);
+  const search = useDebouncedValue(query.trim(), 350);
 
-  const { data, error, isLoading, isValidating, mutate } = useSWR(`admin:users:${offset}`, () => adminApi.users(PAGE_SIZE, offset), {
-    keepPreviousData: true,
-  });
-  const { mutate: mutateStats } = useAdminStats();
+  const key = adminKeys.users({ limit: PAGE_SIZE, offset, search, status });
+  const { data, error, isLoading, isValidating, mutate } = useSWR(key, (k: string) => apiFetch(k), { keepPreviousData: true, revalidateOnFocus: false });
+  const { mutate: mutateKey } = useSWRConfig();
   const { users, total } = useMemo(() => normalizeUsers(data), [data]);
+  const metrics = useMetrics();
+  const t = metrics.data?.totals;
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLocaleLowerCase('tr');
-    if (!q) return users;
-    return users.filter((u) => u.username.toLocaleLowerCase('tr').includes(q) || u.email.toLocaleLowerCase('tr').includes(q));
-  }, [users, query]);
-
-  const page = Math.floor(offset / PAGE_SIZE) + 1;
-  const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-
-  const openConfirm = (u: AdminUser) => {
-    setModalError('');
-    setTarget(u);
-  };
+  const tabs = STATUS_TABS.map((tab) => ({
+    ...tab,
+    count: !t
+      ? undefined
+      : tab.value === 'all'
+        ? num(t.users)
+        : tab.value === 'banned'
+          ? num(t.banned_users)
+          : tab.value === 'admins'
+            ? num(t.admins)
+            : Math.max(0, num(t.users) - num(t.verified_users)),
+  }));
 
   const confirmBan = async () => {
     if (!target) return;
     const ban = !target.isBanned;
-    setSaving(true);
-    setModalError('');
-    try {
-      const res = await adminApi.setBan(target.id, ban);
-      setNotice({ tone: 'success', message: res?.message || (ban ? `${target.username} yasaklandı.` : `${target.username} kullanıcısının yasağı kaldırıldı.`) });
-      setTarget(null);
-      void mutate();
-      void mutateStats();
-    } catch (err) {
-      setModalError(err instanceof Error ? err.message : 'İşlem başarısız.');
-    } finally {
-      setSaving(false);
-    }
+    const res = await adminApi.setBan(target.id, ban);
+    toast.success(ban ? `${target.username} yasaklandı` : `${target.username} kullanıcısının yasağı kaldırıldı`, { description: res?.message });
+    setTarget(null);
+    void mutate();
+    void mutateKey(ADMIN_STATS_KEY);
+    void mutateKey('admin:users:recent');
+    void metrics.mutate();
   };
+
+  const filtered = search !== '' || status !== 'all';
+  const loading = isLoading && users.length === 0;
 
   return (
     <Card className="overflow-hidden">
-      <CardHeader
-        icon={<UsersIcon />}
-        title="Kullanıcılar"
-        description={data ? `${formatNumber(total, 0)} kayıtlı kullanıcı` : 'Yükleniyor'}
-      />
-
-      <div className="space-y-3 border-b border-line px-5 py-3">
-        <label className="relative block sm:max-w-xs">
-          <span className="sr-only">Bu sayfada kullanıcı ara</span>
-          <MagnifyingGlassIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-subtle" aria-hidden="true" />
-          <input
-            type="search"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
+      <TableCardHeader
+        title="Tüm kullanıcılar"
+        description={data ? `${formatNumber(total, 0)} ${filtered ? 'eşleşen' : 'kayıtlı'} kullanıcı · en yeni kayıt önce` : 'Yükleniyor'}
+        actions={
+          <SearchInput
+            label="Kullanıcı ara"
             placeholder="Kullanıcı adı veya e-posta"
-            className="h-9 w-full rounded-lg border border-line bg-surface-2 pl-9 pr-3 text-sm placeholder:text-subtle focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+            value={query}
+            onChange={(v) => {
+              setQuery(v);
+              setOffset(0);
+            }}
           />
-        </label>
-        {query && <p className="text-xs text-subtle">Arama yalnızca bu sayfadaki {users.length} kullanıcıda yapılır.</p>}
-        {notice && (
-          <Alert tone={notice.tone}>
-            <span className="flex flex-wrap items-center gap-x-3">
-              {notice.message}
-              <button type="button" className="text-xs font-semibold underline underline-offset-2" onClick={() => setNotice(null)}>
-                Kapat
-              </button>
-            </span>
-          </Alert>
-        )}
-        {error && users.length > 0 && <Alert tone="error">Liste güncellenemedi; son alınan veriler gösteriliyor.</Alert>}
+        }
+      />
+      <div className="px-5 pb-4 sm:px-6">
+        <Tabs
+          label="Kullanıcı durumu"
+          items={tabs}
+          value={status}
+          onChange={(v) => {
+            setStatus(v);
+            setOffset(0);
+          }}
+          className="w-fit max-w-full"
+        />
       </div>
+      <StaleNotice show={!!error && users.length > 0} />
 
-      {isLoading && users.length === 0 ? (
-        <div className="divide-y divide-line" aria-hidden="true">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="flex items-center gap-3 px-5 py-3.5">
-              <Skeleton className="h-8 w-8 rounded-full" />
-              <div className="flex-1 space-y-1.5">
-                <Skeleton className="h-3.5 w-32" />
-                <Skeleton className="h-3 w-48" />
-              </div>
-              <Skeleton className="h-8 w-20" />
-            </div>
-          ))}
-        </div>
+      {loading ? (
+        <TableSkeleton />
+      ) : error && users.length === 0 ? (
+        <LoadError error={error} title="Kullanıcılar yüklenemedi" onRetry={() => void mutate()} />
       ) : users.length === 0 ? (
         <EmptyState
-          icon={<UsersIcon />}
-          title={error ? 'Kullanıcılar yüklenemedi' : 'Kullanıcı yok'}
-          description={error instanceof Error ? error.message : undefined}
-          action={error ? <Button variant="secondary" size="sm" onClick={() => void mutate()}>Tekrar dene</Button> : undefined}
+          icon={filtered ? <MagnifyingGlassIcon /> : <UsersIcon />}
+          title={filtered ? 'Eşleşen kullanıcı yok' : 'Kullanıcı yok'}
+          description={search ? `"${search}" için sonuç bulunamadı.` : undefined}
+          className="border-t border-line"
         />
-      ) : filtered.length === 0 ? (
-        <EmptyState icon={<MagnifyingGlassIcon />} title="Eşleşen kullanıcı yok" description={`"${query}" bu sayfada bulunamadı.`} />
       ) : (
         <div className={cn('transition-opacity', isValidating && !isLoading && 'opacity-70')} aria-busy={isValidating}>
           {/* md+ : tablo */}
-          <table className="hidden w-full text-sm md:table">
-            <caption className="sr-only">Kullanıcı listesi, sayfa {page}</caption>
-            <thead>
-              <tr className="border-b border-line text-left text-xs font-medium text-subtle">
-                <th scope="col" className="px-5 py-2.5 font-medium">Kullanıcı</th>
-                <th scope="col" className="px-3 py-2.5 font-medium">Durum</th>
-                <th scope="col" className="px-3 py-2.5 text-right font-medium">Toplam varlık</th>
-                <th scope="col" className="hidden px-3 py-2.5 text-right font-medium lg:table-cell">Nakit</th>
-                <th scope="col" className="hidden px-3 py-2.5 font-medium xl:table-cell">Kayıt / son giriş</th>
-                <th scope="col" className="px-5 py-2.5 text-right font-medium">
-                  <span className="sr-only">İşlem</span>
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-line">
-              {filtered.map((u) => (
-                <tr key={u.id} className={cn('transition-colors hover:bg-surface-2/60', u.isBanned && 'bg-down-soft/40')}>
-                  <td className="min-w-[12rem] max-w-[18rem] px-5 py-3">
-                    <div className="flex min-w-0 items-center gap-3">
-                      <UserInitial name={u.username} size={32} tone={u.isBanned ? 'neutral' : 'brand'} />
-                      <div className="min-w-0">
-                        <p className="truncate font-medium">{u.username}</p>
-                        <p className="truncate text-xs text-muted">{u.email}</p>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-3 py-3">
-                    <StatusBadges user={u} />
-                  </td>
-                  <td className="num whitespace-nowrap px-3 py-3 text-right font-medium">{formatTRY(u.totalValue)}</td>
-                  <td className="num hidden whitespace-nowrap px-3 py-3 text-right text-muted lg:table-cell">{formatTRY(u.balance)}</td>
-                  <td className="hidden whitespace-nowrap px-3 py-3 text-xs text-muted xl:table-cell">
-                    <p>{u.createdAt ? formatDate(u.createdAt) : '—'}</p>
-                    <p className="text-subtle">{u.lastLogin ? formatRelative(u.lastLogin) : 'Hiç giriş yok'}</p>
-                  </td>
-                  <td className="px-5 py-3 text-right">
-                    <BanButton user={u} self={u.id === currentUserId} onClick={() => openConfirm(u)} />
-                  </td>
+          <div className={cn(table.wrap, 'hidden md:block')}>
+            <table className={table.table}>
+              <caption className="sr-only">Kullanıcı listesi</caption>
+              <thead>
+                <tr className={table.headRow}>
+                  <th scope="col" className={table.th}>Kullanıcı</th>
+                  <th scope="col" className={table.th}>Durum</th>
+                  <th scope="col" className={cn(table.th, 'text-right')}>Toplam varlık</th>
+                  <th scope="col" className={cn(table.th, 'hidden text-right lg:table-cell')}>Nakit</th>
+                  <th scope="col" className={cn(table.th, 'hidden xl:table-cell')}>Kayıt / son giriş</th>
+                  <th scope="col" className={cn(table.th, 'text-right')}>
+                    <span className="sr-only">İşlem</span>
+                  </th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className={table.body}>
+                {users.map((u) => (
+                  <tr key={u.id} onClick={() => router.push(userHref(u.id))} className={cn(table.rowLink, u.isBanned && 'bg-down-soft/40')}>
+                    <td className={cn(table.td, 'min-w-[12rem] max-w-[18rem]')}>
+                      <div className="flex min-w-0 items-center gap-3">
+                        <UserInitial name={u.username} size={40} tone={u.isBanned ? 'neutral' : 'brand'} />
+                        <div className="min-w-0">
+                          <Link href={userHref(u.id)} onClick={(e) => e.stopPropagation()} className="block truncate font-medium text-fg hover:text-brand">
+                            {u.username}
+                          </Link>
+                          <p className="truncate text-xs text-muted">{u.email}</p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className={table.td}>
+                      <StatusBadges user={u} />
+                    </td>
+                    <td className={cn(table.td, 'num whitespace-nowrap text-right font-medium text-fg')}>{formatTRY(u.totalValue)}</td>
+                    <td className={cn(table.td, 'num hidden whitespace-nowrap text-right lg:table-cell')}>{formatTRY(u.balance)}</td>
+                    <td className={cn(table.td, 'hidden whitespace-nowrap text-xs xl:table-cell')}>
+                      <p>{u.createdAt ? formatDate(u.createdAt) : '—'}</p>
+                      <p className="text-subtle">{u.lastLogin ? formatRelative(u.lastLogin) : 'Hiç giriş yok'}</p>
+                    </td>
+                    <td className={cn(table.td, 'text-right')} onClick={(e) => e.stopPropagation()}>
+                      <BanButton user={u} self={u.id === currentUserId} onClick={() => setTarget(u)} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
 
           {/* mobil : kart listesi */}
-          <ul className="divide-y divide-line md:hidden">
-            {filtered.map((u) => (
-              <li key={u.id} className={cn('space-y-2.5 px-5 py-3.5', u.isBanned && 'bg-down-soft/40')}>
+          <ul className="divide-y divide-line border-t border-line md:hidden">
+            {users.map((u) => (
+              <li key={u.id} className={cn('relative space-y-2.5 px-5 py-4', u.isBanned && 'bg-down-soft/40')}>
                 <div className="flex items-start gap-3">
-                  <UserInitial name={u.username} size={36} tone={u.isBanned ? 'neutral' : 'brand'} />
+                  <UserInitial name={u.username} size={40} tone={u.isBanned ? 'neutral' : 'brand'} />
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium">{u.username}</p>
+                    <Link href={userHref(u.id)} className="block truncate text-sm font-medium text-fg after:absolute after:inset-0">
+                      {u.username}
+                    </Link>
                     <p className="truncate text-xs text-muted">{u.email}</p>
                   </div>
-                  <BanButton user={u} self={u.id === currentUserId} onClick={() => openConfirm(u)} />
+                  <div className="relative z-10">
+                    <BanButton user={u} self={u.id === currentUserId} onClick={() => setTarget(u)} />
+                  </div>
                 </div>
-                <div className="flex flex-wrap items-center justify-between gap-2 pl-12">
+                <div className="flex flex-wrap items-center justify-between gap-2 pl-[52px]">
                   <StatusBadges user={u} />
-                  <span className="num text-sm font-medium">{formatTRY(u.totalValue)}</span>
+                  <span className="num text-sm font-medium text-fg">{formatTRY(u.totalValue)}</span>
                 </div>
-                <p className="pl-12 text-xs text-subtle">
+                <p className="pl-[52px] text-xs text-subtle">
                   Kayıt {u.createdAt ? formatDate(u.createdAt) : '—'} · {u.lastLogin ? `son giriş ${formatRelative(u.lastLogin)}` : 'hiç giriş yok'}
                 </p>
               </li>
@@ -188,55 +196,28 @@ export default function UsersTable({ currentUserId }: { currentUserId: string })
         </div>
       )}
 
-      {total > PAGE_SIZE && (
-        <nav className="flex items-center justify-between gap-3 border-t border-line px-5 py-3" aria-label="Kullanıcı sayfaları">
-          <p className="num text-xs text-muted">
-            Sayfa {page} / {pages}
-          </p>
-          <div className="flex gap-2">
-            <Button variant="secondary" size="sm" disabled={offset === 0} onClick={() => setOffset((o) => Math.max(0, o - PAGE_SIZE))} aria-label="Önceki sayfa">
-              <ChevronLeftIcon className="h-4 w-4" aria-hidden="true" />
-              <span className="hidden sm:inline">Önceki</span>
-            </Button>
-            <Button variant="secondary" size="sm" disabled={offset + PAGE_SIZE >= total} onClick={() => setOffset((o) => o + PAGE_SIZE)} aria-label="Sonraki sayfa">
-              <span className="hidden sm:inline">Sonraki</span>
-              <ChevronRightIcon className="h-4 w-4" aria-hidden="true" />
-            </Button>
-          </div>
-        </nav>
-      )}
+      <Pagination offset={offset} limit={PAGE_SIZE} total={total} onChange={setOffset} label="Kullanıcı sayfaları" />
 
-      <Modal
+      <ConfirmModal
         open={!!target}
-        onClose={() => !saving && setTarget(null)}
-        size="sm"
+        onClose={() => setTarget(null)}
         title={target?.isBanned ? 'Yasağı kaldır' : 'Kullanıcıyı yasakla'}
         description={target ? `${target.username} · ${target.email}` : undefined}
-        footer={
-          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-            <Button variant="secondary" onClick={() => setTarget(null)} disabled={saving} data-autofocus>
-              Vazgeç
-            </Button>
-            <Button variant={target?.isBanned ? 'primary' : 'danger'} loading={saving} onClick={() => void confirmBan()}>
-              {target?.isBanned ? 'Yasağı kaldır' : 'Yasakla'}
-            </Button>
-          </div>
-        }
+        confirmLabel={target?.isBanned ? 'Yasağı kaldır' : 'Yasakla'}
+        tone={target?.isBanned ? 'primary' : 'danger'}
+        onConfirm={confirmBan}
       >
-        <div className="space-y-3 text-sm text-muted">
-          {target?.isBanned ? (
-            <p>Bu kullanıcı yeniden giriş yapabilecek, işlem yapabilecek ve liderlik tablosunda görünebilecek.</p>
-          ) : (
-            <p>Yasaklanan kullanıcı oturum açamaz, işlem yapamaz ve liderlik tablosundan çıkarılır. Bu işlemi daha sonra geri alabilirsin.</p>
-          )}
-          {modalError && <Alert tone="error">{modalError}</Alert>}
-        </div>
-      </Modal>
+        {target?.isBanned ? (
+          <p>Bu kullanıcı yeniden giriş yapabilecek, işlem yapabilecek ve liderlik tablosunda görünebilecek.</p>
+        ) : (
+          <p>Yasaklanan kullanıcı oturum açamaz, işlem yapamaz ve liderlik tablosundan çıkarılır. Bu işlemi daha sonra geri alabilirsin.</p>
+        )}
+      </ConfirmModal>
     </Card>
   );
 }
 
-function StatusBadges({ user }: { user: AdminUser }) {
+export function StatusBadges({ user }: { user: Pick<AdminUser, 'isBanned' | 'isAdmin' | 'emailVerified'> }) {
   return (
     <span className="flex flex-wrap gap-1">
       {user.isBanned && <Badge tone="down">Yasaklı</Badge>}
