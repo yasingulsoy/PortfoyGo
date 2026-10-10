@@ -110,6 +110,13 @@ PortfoyGo/
 - [x] Bildirim merkezi: zil + açılır panel, bildirimler sayfası, SSE ile anlık iletim ve toast; emir, rozet, sezon, lig ve hesap olayları; kategori tercihleri; yönetim panelinden duyuru.
 - [ ] 🔜 Herkese açık bir lige üye olmadan detay/sıralama görüntüleme (şu an yalnızca üyeler görebiliyor), profilde "Lig birincilikleri", çoklu sunucu için Redis pub/sub.
 
+## 3.6.2 Arena ve Portföy Sihirbazı ✅ (toplantı kararlarının ilk uygulaması)
+
+- [x] **Arena (hızlı al-sat):** 4 enstrüman (EUR/USD, altın, Brent, BTC), tek dokunuşla uzun/kısa, zarar kes/kâr al, alış/satış makası, canlı K/Z; 1–10 dakikalık bireysel turlar ve yöneticinin planladığı sponsorlu canlı meydan okumalar. Fiyatlar sunucuda üretilir: gerçek geçmiş hareketin hızlandırılmış tekrarı (tur sonunda gerçek tarih açıklanır). Saatlik tur sınırı ve "sanal para" uyarıları.
+- [x] **Portföy Sihirbazı:** 8 soruluk risk anketi → 5 profil; kısıtlı ortalama-varyans optimizasyonu, Monte Carlo (beklenen getiri aralığı, zarar olasılığı, VaR, maksimum düşüş); mevcut portföyle sapma; tek tıkla sanal portföye uygulama. Algoritma deterministik, arka planda; YZ sohbeti yok.
+- [ ] 🔜 Gerçek zamanlı kotasyon sağlayıcısı geldiğinde Arena'ya "canlı" mod; H.Burak'ın anket taslağı ve TL nakit getiri varsayımının netleşmesi.
+- [x] Yayına alma adımları: [YAYIN_KONTROL_LISTESI.md](YAYIN_KONTROL_LISTESI.md)
+
 ## 3.7 Ekip toplantısı kararları (8 Ekim 2026) 📌
 
 Ürün iki hedefe hizmet edecek:
