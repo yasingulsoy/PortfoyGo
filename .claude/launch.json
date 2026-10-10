@@ -1,11 +1,8 @@
 {
   "version": "0.0.1",
   "configurations": [
-    {
-      "name": "portfoygo-local",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev:local"],
-      "port": 3000
-    }
+    { "name": "portfoygo-api", "runtimeExecutable": "npm", "runtimeArgs": ["run", "dev:local", "-w", "@portfoygo/backend"], "port": 5001 },
+    { "name": "portfoygo-admin", "runtimeExecutable": "npm", "runtimeArgs": ["run", "dev", "-w", "@portfoygo/admin"], "port": 3001 },
+    { "name": "portfoygo-web", "runtimeExecutable": "npm", "runtimeArgs": ["run", "dev", "-w", "@portfoygo/frontend"], "port": 3000 }
   ]
 }

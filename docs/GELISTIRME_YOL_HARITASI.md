@@ -86,11 +86,46 @@ PortfoyGo/
 
 ---
 
+## 3.5 TailAdmin tasarımı ve fiyat geçmişi ✅
+
+- [x] Arayüzün tamamı TailAdmin (Stocks dashboard) tasarım diline taşındı: Outfit yazı tipi, #465FFF marka rengi, açık/koyu tema, daraltılabilir sol menü + ⌘K arama, TailAdmin kart/tablo/rozet/sayfalama düzeni. Kod kopyalanmadı; tasarım kendi bileşenlerimizle yeniden kuruldu (Stocks ekranı TailAdmin Pro'ya aittir).
+- [x] Panel: varlık kartları, portföy performansı, varlık dağılımı, izleme listesi, trend varlıklar, liderler, son işlemler.
+- [x] Yeni Piyasalar sayfası (7 günlük mini grafikli tablo) ve TradingView tarzı varlık sayfası (aralık seçimli grafik, piyasa açık/kapalı, performans kutucukları).
+- [x] Fiyat geçmişi: 15 dakikalık / saatlik / günlük kayıt, `GET /api/market/history | performance | sparklines`.
+- [x] Yönetim paneli de aynı kabukta: Genel bakış, Kullanıcılar, Piyasa önbelleği, Sezonlar.
+
+## 3.6 Yönetim paneli v2 ve yayına hazırlık ✅
+
+- [x] Yönetim paneli: metrik grafikleri, kullanıcı detayı ve eylemleri (admin yetkisi, e-posta doğrulama, oturum kapatma, yasaklama), işlemler, emirler (iptal + iade), lig moderasyonu, sistem durumu (DB, migration, cron işleri, veri tazeliği, sağlayıcılar; işleri elle çalıştırma), denetim kaydı.
+- [x] Backend: `admin_audit_log` (migration 008), cron iş kayıt defteri, `/healthz` ve `/readyz`, pino ile yapılandırılmış log ve `X-Request-Id`.
+- [x] Güvenlik başlıkları (CSP, HSTS (prod), frame/nosniff/referrer/permissions) her iki Next uygulamasında.
+- [x] Docker: backend/frontend/admin imajları ve `docker compose` (postgres + migrate + api + web + admin). *İmajlar henüz derlenip denenmedi (geliştirme makinesinde Docker yok).*
+- [x] Playwright uçtan uca testleri (giriş, piyasalar, al-sat, liderlik, admin) ve CI'da E2E işi.
+- [ ] 🔜 Docker imajlarının gerçek ortamda derlenip denenmesi; staging ortamı; Sentry.
+
+## 3.6.1 Ligler v2 ve bildirim merkezi ✅
+
+- [x] Zamanlı ligler: başlangıç saati + süre (1 gün … 3 ay), adil başlangıç (başlamadan katılan herkes başlangıç anındaki varlığından ölçülür), bitişte sıralamanın dondurulması ve şampiyonluk ekranı.
+- [x] Herkese açık ligler ve "Keşfet" (kodsuz katılım), lig akışı (üyelerin son işlemleri, tutarsız), canlı geri sayım ve animasyonlu sıra değişimleri.
+- [x] Bildirim merkezi: zil + açılır panel, bildirimler sayfası, SSE ile anlık iletim ve toast; emir, rozet, sezon, lig ve hesap olayları; kategori tercihleri; yönetim panelinden duyuru.
+- [ ] 🔜 Herkese açık bir lige üye olmadan detay/sıralama görüntüleme (şu an yalnızca üyeler görebiliyor), profilde "Lig birincilikleri", çoklu sunucu için Redis pub/sub.
+
+## 3.7 Ekip toplantısı kararları (8 Ekim 2026) 📌
+
+Ürün iki hedefe hizmet edecek:
+1. **Oyuncu odaklı hızlı al-sat:** az sayıda enstrüman (EUR/USD, altın, petrol, BTC/gümüş), tek dokunuşla işlem, sürekli haber akışı, kısa periyotlu ligler ve sunuculu canlı "challenge" etkinlikleri. Ekran: sağda kotasyon akışı, ortada büyük al-sat düğmeleri, altta anlık K/Z.
+2. **Yatırımcı eğitimi ve portföy:** risk profili anketi → beklenen drawdown/volatilite ile önerilen dağılım (Monte Carlo, modern portföy teorisi). Yapay zekâ algoritmayı arka planda kurar; kullanıcı her karar için YZ'ye sormaz.
+
+Diğer notlar: gerçek zamanlı veri (bid/ask dahil) kritik ama maliyetli; lisanslı sağlayıcı gerekli (kazıma IP engeli riski). Gelir: sponsor ödülleri, veri satışı, premium analiz/portföy, reklam/ortaklık. MVP önerisi: demo lig + ~3 enstrüman + gecikmeli veri, ~1.000 kişilik test. Risk: kumar benzeri yüksek frekans → sorumlu oyun tasarımı ve uyarılar. Ayrıca: Goat Problem tarzı oyunlar, ekspres trader ekranları, zarar kes/kâr al, animasyonlu rekabetçi oyunlar.
+
+Eylemler: Yasin canlı veri gereksinimleri · Art oyun akışı ve lig/etkinlik formatı · Koray veri sağlayıcı ve maliyet · H.Burak risk anketi soruları ve YZ senaryoları · Ekip MVP kapsam toplantısı (15 Ekim 2026'ya kadar).
+
 ## 4. Ürün ve oyun mekaniği
 
-### 4.1 Rekabet (en yüksek etki) 🔜
-- [ ] **Sezonlar:** Aylık sezonlar; sezon başında herkes 100.000 ₺ ile başlar, tüm zamanlar sıralaması ayrıca korunur. Sezon sonunda rozet ve unvan verilir.
-- [ ] **Özel ligler:** Kullanıcı bir lig kurar, davet koduyla arkadaşlarını çağırır (okul, şirket, Discord topluluğu). *B2B'ye açılan kapı budur.*
+### 4.1 Rekabet (en yüksek etki)
+- [x] **Sezonlar:** Aylık ve getiri bazlı. Bakiyeler sıfırlanmıyor; herkes sezona girdiği andaki varlığına göre yüzde getiriyle sıralanıyor. Ay sonunda sıralama donduruluyor; sezonda en az bir işlem yapmış ilk 10'a unvan veriliyor (Sezon Şampiyonu, Sezon Podyumu, Sezonun İlk 10'u).
+- [x] **Özel ligler:** Davet koduyla katılım ve paylaşılabilir bağlantı. Katılımdan itibaren getiri sıralaması. Kurucu üye çıkarabilir, kodu yenileyebilir ve ligi silebilir (lig başına en fazla 50 üye, kullanıcı başına 10 lig).
+- [ ] 🔜 Lig bitiş tarihinde sıralamanın dondurulması, lig sohbeti ve duyuruları, kurumsal (okul/şirket) lig paneli.
 - [ ] **Turnuvalar:** Belirli tarih aralıkları, kısıtlı varlık evreni (ör. "Sadece BIST 30"), giriş koşulları.
 - [ ] Liderlik tablosunda risk ayarlı getiri (Sharpe) ve maksimum düşüş gösterimi; yalnızca "en çok kazanan" değil, "en istikrarlı" da ödüllendirilsin.
 
@@ -230,7 +265,7 @@ PortfoyGo/
 3. ✅ Klasör ayrımı (`frontend/` · `admin/` · `backend/` · `packages/shared`) ve veri sağlayıcı arayüzü
 4. **Yeni veri sağlayıcıları** (ekip araştırıyor): kararlaştırılınca `backend/src/providers/adapters/` altına adaptör yazılacak.
 5. **Yayına hazırlık:** migration'ların uygulanması, secret yenileme, git geçmişi temizliği, staging, Sentry, yedekleme, E2E testleri (Playwright).
-6. **Rekabet:** sezonlar ve özel ligler (davet koduyla).
+6. ✅ **Rekabet:** aylık sezonlar ve özel ligler · ✅ tasarım modernizasyonu · ✅ yerelde hızlı giriş
 7. **Admin paneli 2:** işlemler, emirler, sistem sağlığı, denetim kaydı.
 8. **Kapsam:** BIST, piyasa saatleri, gerçek zamanlı fiyat akışı.
 9. **Büyüme:** herkese açık profiller, paylaşılabilir kartlar, haftalık e-posta raporu, kurumsal paket.

@@ -59,3 +59,54 @@ jobs:
       # Gömülü PGlite (WASM PostgreSQL) kullanır: harici veritabanı veya secret gerekmez
       - name: Integration tests
         run: npm run test -w @portfoygo/backend
+
+  e2e:
+    name: E2E (Playwright, yerel yığın)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      NEXT_TELEMETRY_DISABLED: '1'
+      # Yerel PGlite tohum verisindeki demo hesaplarının şifresi (yalnızca CI'daki geçici veritabanı)
+      LOCAL_DEMO_PASSWORD: e2e-local-demo-password
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install
+        run: npm ci
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+      # Gömülü PGlite + API (:5001) + site (:3000) + admin (:3001); dış API'ler kapalı
+      - name: Start local stack
+        run: |
+          nohup npm run dev:local > dev-local.log 2>&1 &
+          echo $! > dev-local.pid
+      - name: Wait for stack
+        run: |
+          wait_for() {
+            for i in $(seq 1 120); do
+              if curl -fsS -o /dev/null "$1"; then echo "hazır: $1"; return 0; fi
+              sleep 2
+            done
+            echo "zaman aşımı: $1"; tail -n 100 dev-local.log; return 1
+          }
+          wait_for http://localhost:5001/healthz
+          wait_for http://localhost:5001/readyz
+          wait_for http://localhost:3000/login
+          wait_for http://localhost:3001/login
+      - name: E2E tests
+        run: npm run e2e
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            e2e/playwright-report/
+            e2e/test-results/
+          retention-days: 7
+      - name: Stack log
+        if: failure()
+        run: tail -n 200 dev-local.log || true

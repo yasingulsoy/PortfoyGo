@@ -18,9 +18,13 @@
     "lint": "npm run lint -w @portfoygo/frontend && npm run lint -w @portfoygo/admin",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "npm run test -w @portfoygo/frontend && npm run test -w @portfoygo/backend",
-    "migrate": "npm run migrate -w @portfoygo/backend"
+    "migrate": "npm run migrate -w @portfoygo/backend",
+    "e2e": "playwright test -c e2e/playwright.config.ts",
+    "e2e:ui": "playwright test -c e2e/playwright.config.ts --ui",
+    "e2e:report": "playwright show-report e2e/playwright-report"
   },
   "devDependencies": {
+    "@playwright/test": "^1.64.0",
     "concurrently": "^9.2.1"
   }
 }

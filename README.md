@@ -23,7 +23,7 @@ Gerçek piyasa verileriyle çalışan **sanal yatırım simülasyonu**. Her kull
 | --- | --- |
 | Frontend ve Admin | Next.js 16 (App Router), React 19, Tailwind CSS v4, SWR, lightweight-charts |
 | Backend | Express 4, PostgreSQL (`pg`), zod, helmet, express-rate-limit, node-cron, nodemailer |
-| Geliştirme | npm workspaces, vitest, PGlite (gömülü yerel Postgres), GitHub Actions |
+| Geliştirme | npm workspaces, vitest, Playwright, PGlite (gömülü yerel Postgres), pino, Docker, GitHub Actions |
 
 ## Klasör yapısı
 
@@ -96,6 +96,7 @@ npm run create-admin -w @portfoygo/backend
 | `npm run typecheck` | Tüm paketlerde tip kontrolü |
 | `npm test` | Frontend birim testleri ve backend entegrasyon testleri |
 | `npm run migrate` | Bekleyen migration'ları uygula (`-- --dry-run` ile önizle) |
+| `npm run e2e` / `e2e:ui` | Playwright uçtan uca testleri (çalışan `dev:local` yığınına karşı) |
 
 #### Veritabanı ve API anahtarı olmadan çalıştırma
 
@@ -113,6 +114,94 @@ Adresler: site <http://localhost:3000>, yönetim paneli <http://localhost:3001>,
 
 **Hızlı giriş:** Yerel veritabanıyla çalışırken giriş sayfalarında (site ve yönetim paneli) bir "Hızlı giriş" bölümü çıkar. Yerel hesaplardan birine tıklamak yeterlidir; e-posta ve şifre gerekmez. Bu özellik yalnızca backend `localhost`/`127.0.0.1` üzerindeki bir veritabanına bağlıyken ve `NODE_ENV` production değilken açılır. Uzak veritabanında uç 404 döner ve bölüm görünmez. Kapatmak için `DEV_LOGIN=0` ayarlayın.
 Sıfırlamak için `npm run dev:local -w @portfoygo/backend -- --reset` kullanın.
+
+## Docker ile çalıştırma
+
+Production derlemeleriyle tam yığın: PostgreSQL 16 + migration + API + site + yönetim paneli.
+Build bağlamı repo köküdür (npm workspaces); her uygulamanın kendi `Dockerfile`'ı vardır.
+
+```bash
+cp .env.docker.example .env.docker      # JWT_SECRET ve POSTGRES_PASSWORD'ü mutlaka değiştirin
+docker compose --env-file .env.docker up --build
+```
+
+| Servis | Ne yapar |
+| --- | --- |
+| `postgres` | `postgres:16-alpine`, veri `pgdata` volume'ünde; `pg_isready` sağlık kontrolü |
+| `migrate` | API imajında `node dist/scripts/migrate.js` çalıştırır ve çıkar (postgres sağlıklı olunca) |
+| `api` | `node dist/index.js` (:5001), root olmayan kullanıcı, `HEALTHCHECK` → `/healthz`; migrate başarıyla bitince başlar |
+| `web` | Next.js `output: 'standalone'` (:3000) |
+| `admin` | Next.js `output: 'standalone'` (:3001) |
+
+- **`NEXT_PUBLIC_*` build sırasında gömülür.** Tarayıcının göreceği API adresi `.env.docker` içindeki
+  `PUBLIC_API_URL` ile verilir; değiştirince `--build` ile yeniden derleyin. CSP `connect-src` de bu adresten üretilir.
+- API compose'ta `NODE_ENV=production` çalışır: oturum çerezi `Secure` olur (Chrome/Firefox `http://localhost`'u
+  güvenli sayar; Safari saymaz). Production'da localhost origin'leri normalde reddedilir; yerel yığın için
+  `CORS_ALLOW_LOCALHOST=1` ile açıkça izin verilir — gerçek alan adlarında `0` yapın.
+- Veritabanı boş başlar (örnek veri yok, hızlı giriş kapalı). İlk yönetici:
+  ```bash
+  docker compose --env-file .env.docker run --rm \
+    -e ADMIN_EMAIL=admin@ornek.com -e ADMIN_USERNAME=admin -e ADMIN_PASSWORD='en-az-12-karakter' \
+    migrate node dist/scripts/createAdminUser.js
+  ```
+- Piyasa verisi için `FINNHUB_API_KEY`, `DOVIZ`, `EMTIA` vb. anahtarları `.env.docker`'a ekleyin; SMTP yoksa e-posta
+  doğrulama kodları gönderilemez.
+- Tek imaj: `docker build -f backend/Dockerfile -t portfoygo-api .` (site/admin için `--build-arg NEXT_PUBLIC_API_URL=...`).
+- Sıfırlamak için: `docker compose --env-file .env.docker down -v` (veritabanı volume'ü silinir).
+
+## Sağlık uçları ve loglama
+
+| Uç | Yanıt |
+| --- | --- |
+| `GET /healthz` | Süreç ayakta mı (veritabanına dokunmaz): `200 {"status":"ok"}` |
+| `GET /readyz` | Veritabanında `SELECT 1` (2 sn zaman aşımı): `200 {"status":"ready","db_latency_ms":…}` ya da `503 {"status":"not_ready"}` |
+
+Her iki uç da `/api` önekisizdir, rate limit dışındadır ve istek logunda görünmez. Eski `GET /api/health` duruyor.
+
+**Loglama (pino):** Backend `src/utils/logger.ts` üzerinden yapılandırılmış log yazar.
+
+- Production'da satır başına bir JSON nesnesi; geliştirmede (`NODE_ENV` production değilken, terminal TTY ise ya da
+  `LOG_PRETTY=1`) okunabilir renkli çıktı (`pino-pretty`). `npm run dev:local` bunu otomatik açar; `LOG_PRETTY=0` JSON'a zorlar.
+- `LOG_LEVEL`: `trace | debug | info | warn | error | fatal | silent` (varsayılan `info`; testlerde `silent`).
+- **İstek kimliği:** Her yanıtta `X-Request-Id` başlığı vardır. İstemci geçerli bir kimlik gönderirse (UUID benzeri,
+  8–128 karakter) o kullanılır, yoksa `crypto.randomUUID()` üretilir. İstek logları ve hata logları bu kimliği taşır
+  (`reqId`); bir kullanıcı hatası bildirdiğinde loglarda bu değerle arayın.
+- `Authorization`, `Cookie`, `Set-Cookie` başlıkları ve `password` alanları loglara `[REDACTED]` olarak yazılır;
+  sorgu dizeleri loglanmaz.
+
+**Güvenlik başlıkları (site ve admin):** `next.config.ts` her sayfaya Content-Security-Policy
+(`default-src 'self'`, `connect-src` = kendi origin + API origin'i + `https://api.coingecko.com`, `img-src https:`,
+`frame-ancestors 'none'`, …), `Referrer-Policy: strict-origin-when-cross-origin`, `X-Content-Type-Options: nosniff`,
+`X-Frame-Options: DENY` ve `Permissions-Policy` ekler. Next hidrasyonu satır içi betik kullandığı için
+`script-src 'unsafe-inline'` vardır; `'unsafe-eval'` ve HMR websocket'i (`ws:`) yalnızca geliştirmededir.
+`Strict-Transport-Security` yalnızca production derlemesinde gönderilir. Yeni bir dış alan adına tarayıcıdan istek
+atılacaksa `connect-src`'ye eklenmelidir.
+
+## Uçtan uca testler (Playwright)
+
+Testler `e2e/` klasöründedir ve **zaten çalışan** yerel yığına karşı koşar (sunucu başlatmaz):
+
+```bash
+npx playwright install chromium   # ilk sefer
+npm run dev:local                 # 1. terminal: PGlite + API + site + admin
+npm run e2e                       # 2. terminal (arayüzle: npm run e2e:ui, rapor: npm run e2e:report)
+```
+
+| Test | Kapsam |
+| --- | --- |
+| `auth.setup.ts` | Giriş sayfasındaki "Hızlı giriş" ile demo hesabı → panel; oturumu `e2e/.auth/demo.json`'a kaydeder |
+| `guest.spec.ts` | Misafir açılış sayfası ve `/login` bağlantısı |
+| `markets.spec.ts` | Piyasalar tablosu → AAPL varlık sayfası → fiyat grafiği |
+| `trade.spec.ts` | Piyasalardan 1.000 ₺'lik hisse alımı → portföyde pozisyon → tamamını geri satış |
+| `leaderboard.spec.ts` | Liderlik tablosu "Sezon" sekmesi |
+| `admin.spec.ts` | Yönetim paneli (:3001) genel bakış, demo yönetici |
+
+- Testler yalnızca yerel veritabanında çalışır (hızlı giriş uzak veritabanında kapalıdır). Alım-satım testi demo hesabının
+  elinde olmayan bir hisseyi seçip aynı miktarı geri sattığı için tekrar çalıştırılabilir; işlem geçmişine kayıt ekler.
+- Adresler `E2E_BASE_URL`, `E2E_ADMIN_URL`, `E2E_API_URL` ile değiştirilebilir. Başarısız testlerin iz (trace),
+  ekran görüntüsü ve videoları `e2e/test-results/`, HTML rapor `e2e/playwright-report/` altındadır.
+- CI'da ayrı bir `e2e` işi yığını arka planda başlatır, `/healthz`, `/readyz` ve sayfaları bekler, testleri koşar ve
+  başarısızlıkta raporu artifact olarak yükler.
 
 ## Güvenlik notları
 

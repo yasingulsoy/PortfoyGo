@@ -1,0 +1,131 @@
+# =============================================================================
+# PortfoyGo — production derlemeleriyle yerel tam yığın (PostgreSQL + API + site + admin)
+#
+#   cp .env.docker.example .env.docker          # JWT_SECRET ve POSTGRES_PASSWORD'ü değiştirin
+#   docker compose --env-file .env.docker up --build
+#
+# Adresler: site http://localhost:3000 · admin http://localhost:3001 · API http://localhost:5001/api
+# Sağlık:   http://localhost:5001/healthz · http://localhost:5001/readyz
+# İlk yönetici: README → "Docker ile çalıştırma".
+# =============================================================================
+name: portfoygo
+
+x-api-build: &api-build
+  context: .
+  dockerfile: backend/Dockerfile
+
+x-db-env: &db-env
+  DATABASE_URL: postgres://${POSTGRES_USER:-portfoygo}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD tanımlayın (.env.docker)}@postgres:5432/${POSTGRES_DB:-portfoygo}
+  DB_SSL: "false"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-portfoygo}
+      POSTGRES_USER: ${POSTGRES_USER:-portfoygo}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD tanımlayın (.env.docker)}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+    # Veritabanına host'tan erişmek isterseniz (ör. psql) açın:
+    # ports:
+    #   - "127.0.0.1:55432:5432"
+
+  # Tek seferlik: bekleyen migration'ları uygular ve çıkar (api bunu bekler)
+  migrate:
+    image: portfoygo-api:local
+    build: *api-build
+    command: ["node", "dist/scripts/migrate.js"]
+    environment:
+      <<: *db-env
+      NODE_ENV: production
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  api:
+    image: portfoygo-api:local
+    build: *api-build
+    init: true
+    restart: unless-stopped
+    environment:
+      <<: *db-env
+      NODE_ENV: production
+      PORT: "5001"
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET tanımlayın (.env.docker)}
+      # Site ve admin origin'leri. Production modunda localhost origin'leri varsayılan olarak reddedilir;
+      # yerel compose yığını için CORS_ALLOW_LOCALHOST=1 ile açıkça izin verilir.
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:3001}
+      CORS_ALLOW_LOCALHOST: ${CORS_ALLOW_LOCALHOST:-1}
+      # NODE_ENV=production iken oturum çerezi her zaman Secure'dur; Chrome/Firefox http://localhost'u
+      # güvenli bağlam saydığı için yerelde çalışır. Ortak alan adı gerekmez (boş).
+      COOKIE_DOMAIN: ${COOKIE_DOMAIN:-}
+      TRUST_PROXY: ${TRUST_PROXY:-}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      # Piyasa verisi / e-posta (isteğe bağlı; boşsa ilgili özellikler önbellekle sınırlı çalışır)
+      DISABLE_MARKET_REFRESH: ${DISABLE_MARKET_REFRESH:-}
+      FINNHUB_API_KEY: ${FINNHUB_API_KEY:-}
+      FINNHUB_API_KEYS: ${FINNHUB_API_KEYS:-}
+      COINGECKO_API_KEY: ${COINGECKO_API_KEY:-}
+      DOVIZ: ${DOVIZ:-}
+      EMTIA: ${EMTIA:-}
+      DEFAULT_USD_TRY: ${DEFAULT_USD_TRY:-}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+    ports:
+      - "5001:5001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+  web:
+    image: portfoygo-web:local
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+      args:
+        # Tarayıcının API'ye ulaşacağı adres (build sırasında gömülür)
+        NEXT_PUBLIC_API_URL: ${PUBLIC_API_URL:-http://localhost:5001/api}
+        NEXT_PUBLIC_SITE_URL: ${PUBLIC_SITE_URL:-http://localhost:3000}
+    init: true
+    restart: unless-stopped
+    environment:
+      FINNHUB_API_KEY: ${FINNHUB_API_KEY:-}
+      COINGECKO_API_KEY: ${COINGECKO_API_KEY:-}
+    ports:
+      - "3000:3000"
+    depends_on:
+      api:
+        condition: service_healthy
+
+  admin:
+    image: portfoygo-admin:local
+    build:
+      context: .
+      dockerfile: admin/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${PUBLIC_API_URL:-http://localhost:5001/api}
+        NEXT_PUBLIC_APP_URL: ${PUBLIC_SITE_URL:-http://localhost:3000}
+    init: true
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  pgdata:

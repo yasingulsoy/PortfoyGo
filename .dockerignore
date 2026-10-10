@@ -1,0 +1,28 @@
+# Docker build bağlamı = repo kökü. İmajlara yalnızca kaynak + manifest'ler girer.
+**/node_modules
+**/.next
+**/dist
+**/.localdb
+**/coverage
+**/test-results
+**/playwright-report
+**/*.tsbuildinfo
+**/next-env.d.ts
+
+# Ortam dosyaları ve sırlar
+**/.env*
+**/*.pem
+
+# Veritabanı dökümleri ve yerel araçlar
+**/*.dump
+backend/portfoygo.sql
+.git
+.github
+.claude
+.vscode
+.idea
+e2e
+docs
+*.md
+!backend/migrations/*.md
+*.txt
