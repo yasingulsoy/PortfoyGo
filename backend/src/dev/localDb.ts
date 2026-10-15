@@ -5,6 +5,7 @@ import { Pool } from 'pg';
 import { startPgliteServer } from './pgliteServer';
 import { runMigrations } from '../db/migrator';
 import { DEMO_EMAIL, DEMO_USERNAME, seedArena, seedCompetitions, seedMarketData, seedPriceHistory, seedUsers, tickMarket } from './seed';
+import { seedScenarios } from './seed';
 
 /**
  * Yerel geliştirme veritabanı: gömülü PostgreSQL (PGlite, WASM) + wire protokol soketi.
@@ -118,6 +119,11 @@ export async function startLocalDb(opts: StartLocalDbOptions = {}): Promise<Loca
           (arena.upcomingCreated ? ', yaklaşan meydan okuma' : '') +
           (arena.finishedCreated ? ', bitmiş meydan okuma (sonuçlarla)' : '')
       );
+    }
+
+    const scen = await seedScenarios(pool);
+    if (scen.scenarioCreated || scen.series.length > 0) {
+      log(`Senaryo örnek verisi (SENTETİK): seriler [${scen.series.join(', ') || '-'}]${scen.scenarioCreated ? ', "Ani Çöküş Tatbikatı"' : ''}`);
     }
   } catch (err) {
     await pool.end().catch(() => undefined);

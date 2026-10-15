@@ -4,7 +4,11 @@ import { AppError } from '../../utils/errors';
 import { logger } from '../../utils/logger';
 import { NotificationService } from '../notifications';
 import { BadgeService } from '../badges';
+import { ResponsiblePlay } from '../game/responsible';
+import { ScenarioRepository } from '../scenarios/repository';
 import { arenaBus } from './bus';
+import { arenaEvents, type ArenaRoundFinishedEvent, type ArenaRoundKindEvent } from './events';
+import { isKnownBot, publicUsers, rememberBot } from './users';
 import {
   ARENA_INSTRUMENTS,
   AVAILABILITY_LOOKBACK_MS,
@@ -99,9 +103,11 @@ function parseJson<T>(v: unknown): T | null {
 const ROUND_SELECT = `
   SELECT r.id, r.kind, r.challenge_id, r.user_id, r.status, r.starts_at, r.ends_at, r.duration_s, r.instruments,
          r."window" AS win, r.seed::text AS seed, r.starting_cash, r.created_at, r.finished_at,
-         c.title AS c_title, c.sponsor AS c_sponsor, c.prize_text AS c_prize
+         c.title AS c_title, c.sponsor AS c_sponsor, c.prize_text AS c_prize, r.scenario_id,
+         d.id AS d_id, d.code AS d_code, d.creator_id AS d_creator, d.opponent_id AS d_opponent, d.opponent_is_bot AS d_bot
     FROM arena_rounds r
-    LEFT JOIN arena_challenges c ON c.id = r.challenge_id`;
+    LEFT JOIN arena_challenges c ON c.id = r.challenge_id
+    LEFT JOIN arena_duels d ON d.round_id = r.id`;
 
 function toRound(row: any): RoundRow {
   return {
@@ -121,6 +127,10 @@ function toRound(row: any): RoundRow {
     finished_at: row.finished_at ? toDate(row.finished_at) : null,
     challenge: row.challenge_id
       ? { id: row.challenge_id, title: row.c_title ?? '', sponsor: row.c_sponsor ?? null, prize_text: row.c_prize ?? null }
+      : null,
+    scenario_id: row.scenario_id ?? null,
+    duel: row.d_id
+      ? { id: row.d_id, code: row.d_code, creator_id: row.d_creator, opponent_id: row.d_opponent ?? null, opponent_is_bot: row.d_bot === true }
       : null,
   };
 }
@@ -159,6 +169,7 @@ function toEntry(row: any): EntryRow {
     rank: row.rank === null || row.rank === undefined ? null : Number(row.rank),
     trades_count: Number(row.trades_count ?? 0),
     joined_at: toDate(row.joined_at),
+    is_bot: row.is_bot === true,
   };
 }
 
@@ -282,7 +293,7 @@ export function computeMe(
 // Yardımcılar
 // ---------------------------------------------------------------------------
 
-async function withTx<T>(fn: (c: PoolClient) => Promise<T>): Promise<T> {
+export async function withTx<T>(fn: (c: PoolClient) => Promise<T>): Promise<T> {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -407,9 +418,90 @@ function publishPositions(roundId: string, rows: PositionRow[]): void {
     users.add(p.user_id);
   }
   for (const u of users) arenaBus.publish(roundId, { kind: 'me', userId: u });
+  // Alan olayı: kapanan pozisyonlar (bot pozisyonları hariç)
+  for (const p of rows) {
+    if (p.status !== 'closed' || isKnownBot(p.user_id)) continue;
+    arenaEvents.emit('position_closed', {
+      round_id: roundId,
+      user_id: p.user_id,
+      position: {
+        instrument: p.instrument,
+        side: p.side,
+        pnl: p.pnl ?? 0,
+        close_reason: p.close_reason ?? 'manual',
+        amount: p.amount,
+        opened_tick: p.entry_tick,
+        closed_tick: p.close_tick ?? p.last_checked_tick,
+        stop_loss: p.stop_loss,
+        take_profit: p.take_profit,
+      },
+    });
+  }
+}
+
+/** Alan olayı: tur başladı / oluşturuldu (bot kullanıcıları user_ids'e girmez) */
+export function emitRoundStarted(roundId: string, kind: ArenaRoundKindEvent, userIds: string[]): void {
+  arenaEvents.emit('round_started', { round_id: roundId, kind, user_ids: userIds.filter((u) => !isKnownBot(u)) });
 }
 
 const notFound = () => new ArenaError(404, 'Tur bulunamadı', 'NOT_FOUND');
+
+/**
+ * Tura erişim: solo / senaryo → yalnızca sahibi; düello → iki taraf; meydan okuma → oturum açmış herkes
+ * (katılmayan salt okunur).
+ */
+export function canViewRound(round: RoundRow, viewerId: string): boolean {
+  if (round.kind === 'solo' || round.kind === 'scenario') return round.user_id === viewerId;
+  if (round.kind === 'duel') return !!round.duel && (round.duel.creator_id === viewerId || round.duel.opponent_id === viewerId);
+  return true;
+}
+
+/** Sorumlu oyun kontrolü (mola / 18+ / kişisel günlük sınır) — tur oluşturma / katılma öncesi */
+export async function assertCanPlay(userId: string): Promise<void> {
+  await ResponsiblePlay.assertCanPlay(userId);
+}
+
+// ---------------------------------------------------------------------------
+// Senaryo bilgisi (başlık / brifing / değerlendirme) — tur başına yeniden yüklenmesin diye önbellekli
+// ---------------------------------------------------------------------------
+
+export interface ScenarioInfo {
+  id: string;
+  title: string;
+  briefing: string;
+  debrief: string;
+  synthetic: boolean;
+}
+
+const scenarioCache = new Map<string, { at: number; info: ScenarioInfo | null }>();
+const SCENARIO_CACHE_TTL_MS = 10 * 60_000;
+
+function rememberScenario(info: ScenarioInfo): void {
+  scenarioCache.set(info.id, { at: Date.now(), info });
+  if (scenarioCache.size > 200) scenarioCache.delete(scenarioCache.keys().next().value as string);
+}
+
+export async function scenarioInfo(scenarioId: string | null): Promise<ScenarioInfo | null> {
+  if (!scenarioId) return null;
+  const hit = scenarioCache.get(scenarioId);
+  if (hit && Date.now() - hit.at < SCENARIO_CACHE_TTL_MS) return hit.info;
+  let info: ScenarioInfo | null = null;
+  try {
+    const data = await ScenarioRepository.loadScenarioWindow(scenarioId, { includeUnpublished: true });
+    if (data) {
+      info = { id: data.meta.id, title: data.meta.title, briefing: data.meta.briefing, debrief: data.meta.debrief, synthetic: !!data.meta.synthetic };
+    }
+  } catch (err: any) {
+    logger.warn({ err, scenarioId }, `[arena] senaryo bilgisi yüklenemedi: ${err?.message || err}`);
+  }
+  scenarioCache.set(scenarioId, { at: Date.now(), info });
+  return info;
+}
+
+/** Testler için */
+export function clearScenarioCache(): void {
+  scenarioCache.clear();
+}
 
 // ---------------------------------------------------------------------------
 // Liderlik (meydan okuma)
@@ -541,11 +633,15 @@ export class ArenaService {
   // Solo tur
   // -------------------------------------------------------------------------
 
-  static async createSoloRound(userId: string, input: CreateSoloInput): Promise<RoundStateDto> {
+  /**
+   * Enstrüman listesini doğrular / varsayılanı seçer (en fazla MAX_ROUND_INSTRUMENTS; yalnızca verisi olanlar).
+   * Solo turlar ve düello davetleri kullanır.
+   */
+  static async resolveInstruments(requested?: string[]): Promise<string[]> {
     const avail = await getAvailability(pool);
     let codes: string[];
-    if (input.instruments && input.instruments.length > 0) {
-      codes = [...new Set(input.instruments.map((c) => c.trim().toUpperCase()))];
+    if (requested && requested.length > 0) {
+      codes = [...new Set(requested.map((c) => c.trim().toUpperCase()))];
       if (codes.length > MAX_ROUND_INSTRUMENTS) {
         throw new ArenaError(400, `Bir turda en fazla ${MAX_ROUND_INSTRUMENTS} enstrüman seçilebilir`, 'VALIDATION_ERROR');
       }
@@ -562,27 +658,82 @@ export class ArenaService {
     if (codes.length === 0) {
       throw new ArenaError(503, 'Şu anda Arena için yeterli fiyat verisi yok. Biraz sonra tekrar dene.', 'ARENA_UNAVAILABLE');
     }
+    return codes;
+  }
 
-    // Süresi dolmuş ama kapanmamış turları önce kapat (tek aktif tur kuralı doğru işlesin)
-    const stale = await pool.query(
-      `SELECT id FROM arena_rounds WHERE kind = 'solo' AND user_id = $1 AND status IN ('scheduled', 'running') AND ends_at <= now()`,
-      [userId]
-    );
-    for (const r of stale.rows) await ArenaService.finalizeRound(r.id);
-
-    const seed = randomSeed();
-    const now = new Date();
-    const window = await pickRoundWindow(codes, seed, now, input.duration_s);
+  /** Güncel verilerden tohumlu pencere (yalnızca penceresi olan enstrümanlar) */
+  static async pickWindow(codes: string[], seed: number, durationS: number): Promise<{ window: RoundWindow; used: string[] }> {
+    const window = await pickRoundWindow(codes, seed, new Date(), durationS);
     const used = codes.filter((c) => window[c]);
     if (used.length === 0) {
       throw new ArenaError(503, 'Şu anda Arena için yeterli fiyat verisi yok. Biraz sonra tekrar dene.', 'ARENA_UNAVAILABLE');
     }
+    return { window, used };
+  }
 
-    const roundId = await withTx(async (client) => {
+  static async createSoloRound(userId: string, input: CreateSoloInput): Promise<RoundStateDto> {
+    const codes = await ArenaService.resolveInstruments(input.instruments);
+    await assertCanPlay(userId);
+    const seed = randomSeed();
+    const { window, used } = await ArenaService.pickWindow(codes, seed, input.duration_s);
+    const roundId = await ArenaService.insertPrivateRound(userId, 'solo', input.duration_s, used, window, seed, null);
+    emitRoundStarted(roundId, 'solo', [userId]);
+    return ArenaService.getRoundState(roundId, userId);
+  }
+
+  /**
+   * Senaryo turu: fiyat penceresi rastgele yakın geçmiş yerine senaryodan (ScenarioRepository) gelir.
+   * Solo turla aynı sınırlar (tek aktif tur, saatlik sınır) uygulanır.
+   */
+  static async createScenarioRound(userId: string, input: { scenario_id: string; duration_s: number }): Promise<RoundStateDto> {
+    const data = await ScenarioRepository.loadScenarioWindow(input.scenario_id);
+    if (!data) throw new ArenaError(404, 'Senaryo bulunamadı', 'ARENA_SCENARIO_NOT_FOUND');
+    const window: RoundWindow = {};
+    for (const [rawCode, spec] of Object.entries(data.window ?? {})) {
+      const inst = getInstrument(rawCode);
+      if (!inst || !spec || !Array.isArray(spec.points)) continue;
+      const points = spec.points
+        .map((pt) => [Math.floor(pt.t > 1e11 ? pt.t / 1000 : pt.t), Number(pt.p)] as [number, number])
+        .filter(([t, p]) => Number.isFinite(t) && Number.isFinite(p) && p > 0);
+      if (points.length < 2) continue;
+      window[inst.code] = {
+        from: spec.from ?? new Date(points[0][0] * 1000).toISOString(),
+        to: spec.to ?? new Date(points[points.length - 1][0] * 1000).toISOString(),
+        points,
+      };
+    }
+    const used = ARENA_INSTRUMENTS.map((i) => i.code as string).filter((c) => window[c]);
+    if (used.length === 0) throw new ArenaError(422, 'Bu senaryoda oynanabilir fiyat verisi yok', 'ARENA_SCENARIO_INVALID');
+    await assertCanPlay(userId);
+    const meta = data.meta;
+    rememberScenario({ id: meta.id, title: meta.title, briefing: meta.briefing, debrief: meta.debrief, synthetic: !!meta.synthetic });
+    const roundId = await ArenaService.insertPrivateRound(userId, 'scenario', input.duration_s, used, window, randomSeed(), meta.id);
+    emitRoundStarted(roundId, 'scenario', [userId]);
+    return ArenaService.getRoundState(roundId, userId);
+  }
+
+  /** Solo / senaryo turu ekler: tek aktif tur + saatlik sınır (iki tür birlikte sayılır) */
+  private static async insertPrivateRound(
+    userId: string,
+    kind: 'solo' | 'scenario',
+    durationS: number,
+    used: string[],
+    window: RoundWindow,
+    seed: number,
+    scenarioId: string | null
+  ): Promise<string> {
+    // Süresi dolmuş ama kapanmamış turları önce kapat (tek aktif tur kuralı doğru işlesin)
+    const stale = await pool.query(
+      `SELECT id FROM arena_rounds WHERE kind IN ('solo', 'scenario') AND user_id = $1 AND status IN ('scheduled', 'running') AND ends_at <= now()`,
+      [userId]
+    );
+    for (const r of stale.rows) await ArenaService.finalizeRound(r.id);
+
+    return withTx(async (client) => {
       await client.query('SELECT id FROM users WHERE id = $1 FOR UPDATE', [userId]);
       const active = await client.query(
         `SELECT id FROM arena_rounds
-          WHERE kind = 'solo' AND user_id = $1 AND status IN ('scheduled', 'running') AND ends_at > now()
+          WHERE kind IN ('solo', 'scenario') AND user_id = $1 AND status IN ('scheduled', 'running') AND ends_at > now()
           ORDER BY created_at DESC LIMIT 1`,
         [userId]
       );
@@ -591,7 +742,7 @@ export class ArenaService {
       }
       const recent = await client.query(
         `SELECT COUNT(*)::int AS n, MIN(created_at) AS oldest FROM arena_rounds
-          WHERE kind = 'solo' AND user_id = $1 AND created_at > now() - INTERVAL '1 hour'`,
+          WHERE kind IN ('solo', 'scenario') AND user_id = $1 AND created_at > now() - INTERVAL '1 hour'`,
         [userId]
       );
       const n = Number(recent.rows[0]?.n ?? 0);
@@ -607,26 +758,24 @@ export class ArenaService {
         );
       }
       const startsAt = new Date(Date.now() + SOLO_START_DELAY_MS);
-      const endsAt = new Date(startsAt.getTime() + input.duration_s * 1000);
+      const endsAt = new Date(startsAt.getTime() + durationS * 1000);
       const ins = await client.query(
-        `INSERT INTO arena_rounds (kind, user_id, status, starts_at, ends_at, duration_s, instruments, "window", seed, starting_cash)
-         VALUES ('solo', $1, 'running', $2, $3, $4, $5::jsonb, $6::jsonb, $7, $8)
+        `INSERT INTO arena_rounds (kind, user_id, status, starts_at, ends_at, duration_s, instruments, "window", seed, starting_cash, scenario_id)
+         VALUES ($1, $2, 'running', $3, $4, $5, $6::jsonb, $7::jsonb, $8, $9, $10)
          RETURNING id`,
-        [userId, startsAt.toISOString(), endsAt.toISOString(), input.duration_s, JSON.stringify(used), JSON.stringify(window), seed, STARTING_CASH]
+        [kind, userId, startsAt.toISOString(), endsAt.toISOString(), durationS, JSON.stringify(used), JSON.stringify(window), seed, STARTING_CASH, scenarioId]
       );
       const id = ins.rows[0].id as string;
       await client.query('INSERT INTO arena_entries (round_id, user_id, cash) VALUES ($1, $2, $3)', [id, userId, STARTING_CASH]);
       return id;
     });
-
-    return ArenaService.getRoundState(roundId, userId);
   }
 
-  /** Kullanıcının devam eden solo turu (yoksa null) */
+  /** Kullanıcının devam eden solo / senaryo turu (yoksa null) */
   static async activeSoloRound(userId: string): Promise<RoundStateDto | null> {
     const r = await pool.query(
       `SELECT id, ends_at FROM arena_rounds
-        WHERE kind = 'solo' AND user_id = $1 AND status IN ('scheduled', 'running')
+        WHERE kind IN ('solo', 'scenario') AND user_id = $1 AND status IN ('scheduled', 'running')
         ORDER BY created_at DESC`,
       [userId]
     );
@@ -652,7 +801,7 @@ export class ArenaService {
    */
   static async getRoundState(roundId: string, viewerId: string): Promise<RoundStateDto> {
     let round = await loadRound(roundId);
-    if (!round || (round.kind === 'solo' && round.user_id !== viewerId)) throw notFound();
+    if (!round || !canViewRound(round, viewerId)) throw notFound();
     round = await ArenaService.refreshLifecycle(round);
 
     let paths = roundPaths(round);
@@ -675,7 +824,41 @@ export class ArenaService {
       leaderboard = lb.items;
       myRank = lb.myRank;
     }
-    return ArenaService.buildState(round, paths, tick, entry, pos, viewerId, leaderboard, myRank);
+    const state = ArenaService.buildState(round, paths, tick, entry, pos, viewerId, leaderboard, myRank);
+    await ArenaService.decorateState(state, round, paths, tick, viewerId);
+    return state;
+  }
+
+  /** Düello (rakip özeti) ve senaryo (başlık / brifing / değerlendirme) ekleri */
+  static async decorateState(
+    state: RoundStateDto,
+    round: RoundRow,
+    paths: Map<string, number[]> | null,
+    tick: number,
+    viewerId: string
+  ): Promise<void> {
+    if (round.kind === 'duel' && round.duel) {
+      const d = await duelStateFor(round, paths, tick, viewerId);
+      if (d) state.duel = d;
+    }
+    if (round.kind === 'scenario' && round.scenario_id) {
+      const info = await scenarioInfo(round.scenario_id);
+      if (info) {
+        state.scenario = { id: info.id, title: info.title, briefing: info.briefing, synthetic: info.synthetic };
+        if (state.round.reveal) state.round.reveal.debrief = info.debrief;
+      }
+    }
+  }
+
+  /** Bitmiş tur için gerçek tarih aralığı + (senaryoda) değerlendirme metni */
+  static async revealWithDebrief(round: RoundRow): Promise<RoundStateDto['round']['reveal'] | null> {
+    const reveal = ArenaService.reveal(round);
+    if (!reveal) return null;
+    if (round.kind === 'scenario' && round.scenario_id) {
+      const info = await scenarioInfo(round.scenario_id);
+      if (info) reveal.debrief = info.debrief;
+    }
+    return reveal;
   }
 
   /** Tembel yaşam döngüsü: süresi dolan turu kapat, başlaması gereken meydan okumayı başlat. */
@@ -778,7 +961,7 @@ export class ArenaService {
     fn: (ctx: WriteCtx) => Promise<{ result: T; touched: PositionRow[] }>
   ): Promise<{ result: T; ctx: { round: RoundRow; paths: Map<string, number[]>; tick: number } }> {
     let round = await loadRound(roundId);
-    if (!round || (round.kind === 'solo' && round.user_id !== userId)) throw notFound();
+    if (!round || !canViewRound(round, userId)) throw notFound();
     if (round.status === 'cancelled') throw new ArenaError(409, 'Bu tur iptal edildi', 'ARENA_ROUND_OVER');
     const now = Date.now();
     if (round.status === 'finished' || now >= round.ends_at.getTime()) {
@@ -799,7 +982,7 @@ export class ArenaService {
     const result = await withTx(async (client) => {
       const e = await client.query('SELECT * FROM arena_entries WHERE round_id = $1 AND user_id = $2 FOR UPDATE', [r.id, userId]);
       if (!e.rows[0]) {
-        if (r.kind === 'solo') throw notFound();
+        if (r.kind !== 'challenge') throw notFound();
         throw new ArenaError(403, 'Bu meydan okumaya katılmadın', 'ARENA_NOT_JOINED');
       }
       const st = await client.query('SELECT status FROM arena_rounds WHERE id = $1', [r.id]);
@@ -862,6 +1045,7 @@ export class ArenaService {
       const p = toPosition(ins.rows[0]);
       return { result: p, touched: [p] };
     });
+    arenaBus.publish(ctx.round.id, { kind: 'trade', userId, instrument: result.instrument, side: result.side, at: result.opened_at.toISOString() });
     return {
       position: formatPosition(result, ctx.paths, ctx.tick),
       me: await ArenaService.meAfterWrite(ctx.round, ctx.paths, userId, ctx.tick),
@@ -993,7 +1177,7 @@ export class ArenaService {
         if (used.length === 0) {
           await client.query(`UPDATE arena_rounds SET status = 'cancelled', finished_at = now() WHERE id = $1`, [round.id]);
           if (round.challenge_id) await client.query(`UPDATE arena_challenges SET status = 'cancelled' WHERE id = $1`, [round.challenge_id]);
-          return { round, results: [] as { user_id: string; return_pct: number; rank: number | null }[], closed: [] as PositionRow[] };
+          return { round, results: [] as FinalResult[], closed: [] as PositionRow[], cancelled: true, finishedAt: new Date() };
         }
         await client.query(`UPDATE arena_rounds SET "window" = $2::jsonb, instruments = $3::jsonb WHERE id = $1`, [
           round.id,
@@ -1037,9 +1221,20 @@ export class ArenaService {
           return_pct: round4(((equity - round.starting_cash) / round.starting_cash) * 100),
           trades_count: Number(e.trades_count),
           joined_at: toDate(e.joined_at).getTime(),
+          is_bot: e.is_bot === true,
         };
       });
-      const ranked = round.kind === 'challenge' ? rankEntries(scored) : scored.map((s: (typeof scored)[number]) => ({ ...s, rank: null as number | null }));
+      for (const e of scored) if (e.is_bot) rememberBot(e.user_id);
+      let duelOutcome: DuelOutcome | null = null;
+      let ranked: FinalResult[];
+      if (round.kind === 'challenge') {
+        ranked = rankEntries(scored);
+      } else if (round.kind === 'duel') {
+        duelOutcome = decideDuel(scored);
+        ranked = scored.map((s: (typeof scored)[number]) => ({ ...s, rank: duelOutcome!.ranks.get(s.user_id) ?? null }));
+      } else {
+        ranked = scored.map((s: (typeof scored)[number]) => ({ ...s, rank: null as number | null }));
+      }
       if (ranked.length > 0) {
         await client.query(
           `UPDATE arena_entries e
@@ -1049,7 +1244,16 @@ export class ArenaService {
           [round.id, ranked.map((r) => r.user_id), ranked.map((r) => r.equity), ranked.map((r) => r.return_pct), ranked.map((r) => r.rank)]
         );
       }
-      await client.query(`UPDATE arena_rounds SET status = 'finished', finished_at = now() WHERE id = $1`, [round.id]);
+      const fin = await client.query(`UPDATE arena_rounds SET status = 'finished', finished_at = now() WHERE id = $1 RETURNING finished_at`, [round.id]);
+      const finishedAt = fin.rows[0]?.finished_at ? toDate(fin.rows[0].finished_at) : new Date();
+
+      if (round.kind === 'duel') {
+        await client.query(
+          `UPDATE arena_duels SET status = 'finished', winner_id = $2, is_draw = $3
+            WHERE round_id = $1 AND status IN ('matched', 'running')`,
+          [round.id, duelOutcome?.winnerId ?? null, duelOutcome?.isDraw ?? false]
+        );
+      }
 
       if (round.kind === 'challenge' && round.challenge_id) {
         await client.query(`UPDATE arena_challenges SET status = 'finished' WHERE id = $1 AND status <> 'cancelled'`, [round.challenge_id]);
@@ -1070,15 +1274,48 @@ export class ArenaService {
           );
         }
       }
-      return { round, results: ranked.map((r) => ({ user_id: r.user_id, return_pct: r.return_pct, rank: r.rank })), closed };
+      return {
+        round,
+        results: ranked.map((r) => ({
+          user_id: r.user_id,
+          return_pct: r.return_pct,
+          rank: r.rank,
+          trades_count: r.trades_count,
+          equity: r.equity,
+          is_bot: r.is_bot,
+        })),
+        closed,
+        cancelled: false,
+        finishedAt,
+      };
     });
 
     if (!outcome) return false;
     lbCache.delete(roundId);
     if (outcome.closed.length > 0) publishPositions(roundId, outcome.closed);
     arenaBus.publish(roundId, { kind: 'finished' });
-    // Rozetler (arka planda; hata fırlatmaz)
-    const results = outcome.results;
+    if (!outcome.cancelled) {
+      const r = outcome.round;
+      const ev: ArenaRoundFinishedEvent = {
+        round_id: r.id,
+        kind: r.kind,
+        finished_at: outcome.finishedAt.toISOString(),
+        entries: outcome.results.map((x) => ({
+          user_id: x.user_id,
+          return_pct: x.return_pct,
+          rank: x.rank,
+          trades_count: x.trades_count,
+          equity_final: x.equity,
+          ...(x.is_bot ? { is_bot: true } : {}),
+        })),
+      };
+      if (r.duel) ev.duel_id = r.duel.id;
+      if (r.challenge_id) ev.challenge_id = r.challenge_id;
+      if (r.scenario_id) ev.scenario_id = r.scenario_id;
+      arenaEvents.emit('round_finished', ev);
+    }
+    // Rozetler (arka planda; hata fırlatmaz) — bot hariç
+    const results = outcome.results.filter((r) => !r.is_bot);
     void (async () => {
       for (const r of results) {
         await BadgeService.awardByCondition(r.user_id, 'arena_rounds_finished', 1);
@@ -1200,15 +1437,23 @@ export class ArenaService {
           client
         );
       }
-      return round.id as string;
+      return { roundId: round.id as string, userIds: ids };
     });
     if (!out) return false;
-    pathCache.delete(out);
-    arenaBus.publish(out, { kind: 'started' });
+    pathCache.delete(out.roundId);
+    arenaBus.publish(out.roundId, { kind: 'started' });
+    emitRoundStarted(out.roundId, 'challenge', out.userIds);
     return true;
   }
 
   static async joinChallenge(challengeId: string, userId: string): Promise<{ round_id: string }> {
+    // Sorumlu oyun: yalnızca yeni katılımda (zaten katılmış kullanıcı tura geri dönebilir)
+    const pre = await pool.query(
+      `SELECT EXISTS (SELECT 1 FROM arena_challenges c JOIN arena_entries e ON e.round_id = c.round_id
+                       WHERE c.id = $1 AND e.user_id = $2) AS joined`,
+      [challengeId, userId]
+    );
+    if (pre.rows[0]?.joined !== true) await assertCanPlay(userId);
     return withTx(async (client) => {
       const u = await client.query('SELECT email_verified FROM users WHERE id = $1', [userId]);
       if (u.rows[0]?.email_verified !== true) {
@@ -1333,7 +1578,7 @@ export class ArenaService {
          SELECT s.user_id, s.best, s.rounds, u.username,
                 ROW_NUMBER() OVER (ORDER BY s.best DESC, s.rounds ASC, u.username ASC) AS rank
            FROM s JOIN users u ON u.id = s.user_id
-          WHERE COALESCE(u.is_banned, FALSE) = FALSE
+          WHERE COALESCE(u.is_banned, FALSE) = FALSE AND COALESCE(u.is_bot, FALSE) = FALSE
        )
        SELECT * FROM ranked WHERE rank <= ${LEADERBOARD_TOP} OR user_id = $1 ORDER BY rank`,
       [viewerId ?? null]
@@ -1430,7 +1675,13 @@ export class ArenaService {
       items: r.rows.map((row: any) => {
         const { joined: _joined, ...rest } = toChallengeDto(row);
         void _joined;
-        return { ...rest, created_by_username: row.created_by_username ?? null, created_at: toDate(row.created_at).toISOString() };
+        return {
+          ...rest,
+          created_by_username: row.created_by_username ?? null,
+          created_at: toDate(row.created_at).toISOString(),
+          broadcast_token: row.broadcast_token ?? null,
+          overlay_path: row.broadcast_token ? `/yayin/${row.broadcast_token}` : null,
+        };
       }),
       total: Number(total.rows[0]?.n ?? 0),
       limit,
@@ -1496,4 +1747,94 @@ function toChallengeDto(row: any): ChallengeDto {
     joined: row.joined === true,
     round_id: row.round_id ?? null,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Düello yardımcıları
+// ---------------------------------------------------------------------------
+
+interface FinalResult {
+  user_id: string;
+  return_pct: number;
+  rank: number | null;
+  trades_count: number;
+  equity: number;
+  is_bot: boolean;
+}
+
+/** Beraberlik eşiği: getiriler arasındaki fark 0,01 yüzde puandan küçükse berabere */
+export const DUEL_DRAW_EPSILON_PP = 0.01;
+
+export interface DuelOutcome {
+  winnerId: string | null;
+  isDraw: boolean;
+  ranks: Map<string, number>;
+}
+
+/** Kazanan: daha yüksek getiri; |fark| < 0,01 yp → berabere (iki taraf da 1.) */
+export function decideDuel(entries: { user_id: string; return_pct: number }[]): DuelOutcome {
+  const ranks = new Map<string, number>();
+  if (entries.length === 0) return { winnerId: null, isDraw: false, ranks };
+  if (entries.length === 1) {
+    ranks.set(entries[0].user_id, 1);
+    return { winnerId: entries[0].user_id, isDraw: false, ranks };
+  }
+  const [a, b] = entries;
+  const diff = a.return_pct - b.return_pct;
+  if (Math.abs(diff) < DUEL_DRAW_EPSILON_PP - 1e-9) {
+    ranks.set(a.user_id, 1);
+    ranks.set(b.user_id, 1);
+    return { winnerId: null, isDraw: true, ranks };
+  }
+  const winner = diff > 0 ? a : b;
+  const loser = diff > 0 ? b : a;
+  ranks.set(winner.user_id, 1);
+  ranks.set(loser.user_id, 2);
+  return { winnerId: winner.user_id, isDraw: false, ranks };
+}
+
+/** Düelloda rakibin anlık (veya kesin) özsermayesi */
+export async function opponentSnapshot(
+  round: RoundRow,
+  viewerId: string,
+  paths: Map<string, number[]> | null,
+  tick: number
+): Promise<{ user_id: string; equity: number; return_pct: number } | null> {
+  const e = await pool.query('SELECT * FROM arena_entries WHERE round_id = $1 AND user_id <> $2 ORDER BY joined_at LIMIT 1', [round.id, viewerId]);
+  if (!e.rows[0]) return null;
+  const entry = toEntry(e.rows[0]);
+  if (round.status === 'finished' && entry.equity_final !== null) {
+    return { user_id: entry.user_id, equity: round2(entry.equity_final), return_pct: round2(entry.return_pct ?? 0) };
+  }
+  const open = await loadOpenPositions(round.id, entry.user_id);
+  const equity = equityOf(entry.cash, open, (code) => quoteFor(paths, code, tick));
+  return { user_id: entry.user_id, equity: round2(equity), return_pct: returnPct(equity, round.starting_cash) };
+}
+
+export async function duelStateFor(
+  round: RoundRow,
+  paths: Map<string, number[]> | null,
+  tick: number,
+  viewerId: string
+): Promise<RoundStateDto['duel'] | null> {
+  const d = round.duel;
+  if (!d) return null;
+  const opponentId = d.creator_id === viewerId ? d.opponent_id : d.creator_id;
+  if (!opponentId) return null;
+  const users = await publicUsers([opponentId]);
+  const u = users.get(opponentId);
+  const snap = await opponentSnapshot(round, viewerId, paths, tick);
+  const out: NonNullable<RoundStateDto['duel']> = {
+    id: d.id,
+    code: d.code,
+    opponent: { username: u?.username ?? '—', is_bot: u?.is_bot ?? false, ...(u && 'avatar_id' in u ? { avatar_id: u.avatar_id ?? null } : {}) },
+    opponent_equity: snap?.equity ?? round2(round.starting_cash),
+    opponent_return_pct: snap?.return_pct ?? 0,
+  };
+  if (round.status === 'finished') {
+    const r = await pool.query('SELECT winner_id, is_draw FROM arena_duels WHERE id = $1', [d.id]);
+    const row = r.rows[0];
+    if (row) out.result = row.is_draw ? 'draw' : row.winner_id === viewerId ? 'win' : 'loss';
+  }
+  return out;
 }

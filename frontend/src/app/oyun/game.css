@@ -1,0 +1,908 @@
+/*
+ * PortfoyGo oyun derisi ([data-skin="game"]): Kafa Topu tarzı gökyüzü maviliği, tıknaz 3B düğmeler,
+ * kalın yuvarlak yazı tipi (Baloo 2 → --font-game) ve sevimli mikro animasyonlar.
+ *
+ * Ham renkler YALNIZCA burada, token tanımı olarak bulunur. Bileşenler bu değişkenleri
+ * (bg-(--g-panel), text-(--g-ink) …) ya da aşağıdaki .g-* sınıflarını kullanır.
+ * Açık tema "gökyüzü", koyu tema "gece" paletidir.
+ */
+
+/* Tailwind'in katman sırasıyla aynı (bu dosya önce yüklenirse sıra bozulmasın) */
+@layer theme, base, components, utilities;
+
+/* ------------------------------------------------------------------ */
+/* Token'lar — gökyüzü (açık)                                            */
+/* ------------------------------------------------------------------ */
+
+[data-skin="game"],
+.g-avatar {
+  /* Avatar paleti (SVG karakterler) */
+  --g-c-ink: #1b2a4a;
+  --g-c-white: #ffffff;
+  --g-c-cream: #fff1d6;
+  --g-c-blush: #ff9eb0;
+  --g-c-orange: #ff9a3c;
+  --g-c-orange-dark: #e2711d;
+  --g-c-brown: #9b6a43;
+  --g-c-brown-dark: #6f4a2c;
+  --g-c-tan: #d9a46c;
+  --g-c-red: #ff5a5f;
+  --g-c-yellow: #ffd43b;
+  --g-c-green: #5fd068;
+  --g-c-green-dark: #2f9e44;
+  --g-c-lime: #b6f05a;
+  --g-c-teal: #2ec4b6;
+  --g-c-blue: #4dabf7;
+  --g-c-navy: #2b3a67;
+  --g-c-purple: #9c6bff;
+  --g-c-lilac: #d7c4ff;
+  --g-c-pink: #ff8cc6;
+  --g-c-grey: #aab4c3;
+  --g-c-grey-dark: #6c7a91;
+  --g-c-black: #2a2d3a;
+  --g-c-bg-1: #ffe08a;
+  --g-c-bg-2: #a5e3ff;
+  --g-c-bg-3: #c3f7c9;
+  --g-c-bg-4: #ffd0e3;
+  --g-c-bg-5: #e1d5ff;
+  --g-c-bg-6: #ffd8b0;
+  --g-c-sand: #f4c25e;
+  --g-c-teal-dark: #128a7c;
+  --g-c-gold: #ffc72c;
+  --g-c-gold-dark: #b97800;
+  --g-c-gold-light: #ffe998;
+  --g-c-bg-epic: #4b2f93;
+  --g-c-bg-legend: #fff0b3;
+}
+
+[data-skin="game"] {
+  /* Gökyüzü arka planı */
+  --g-sky-top: #8fe0ff;
+  --g-sky-mid: #45b1ff;
+  --g-sky-bottom: #2a73e6;
+  --g-cloud: rgb(255 255 255 / 0.6);
+  --g-ray: rgb(255 255 255 / 0.08);
+
+  /* Gece arka planı (gece varyantı ve koyu tema) */
+  --g-night-top: #33328f;
+  --g-night-mid: #1f2266;
+  --g-night-bottom: #10133b;
+  --g-star: rgb(255 255 255 / 0.75);
+
+  /* Altın (zafer / ödül) arka planı */
+  --g-goldbg-top: #ffe680;
+  --g-goldbg-mid: #ffb932;
+  --g-goldbg-bottom: #f07d0a;
+
+  /* Metin */
+  --g-ink: #183062;
+  --g-ink-soft: #4b6596;
+  --g-ink-faint: #8aa0c4;
+  --g-on-color: #ffffff;
+  --g-outline: #0f2a5c;
+  --g-outline-soft: rgb(15 42 92 / 0.35);
+
+  /* Paneller */
+  --g-panel: #ffffff;
+  --g-panel-2: #eef6ff;
+  --g-panel-3: #dcebff;
+  --g-panel-edge: #b9d7ff;
+  --g-panel-shadow: rgb(22 63 140 / 0.3);
+  --g-glass: rgb(255 255 255 / 0.22);
+  --g-glass-strong: rgb(255 255 255 / 0.34);
+  --g-glass-edge: rgb(255 255 255 / 0.5);
+  --g-hud: rgb(14 36 92 / 0.55);
+  --g-hud-edge: rgb(255 255 255 / 0.25);
+  --g-scrim: rgb(9 24 61 / 0.62);
+  --g-drop: rgb(10 30 80 / 0.35);
+
+  /* Düğme renkleri: üst (parlak) / yüz / alt kenar */
+  --g-green: #4fd23a;
+  --g-green-top: #93f266;
+  --g-green-edge: #27901b;
+  --g-blue: #2f8bff;
+  --g-blue-top: #77c6ff;
+  --g-blue-edge: #1656c0;
+  --g-gold: #ffbd1c;
+  --g-gold-top: #ffe873;
+  --g-gold-edge: #c27600;
+  --g-gold-ink: #5a3300;
+  --g-red: #ff5258;
+  --g-red-top: #ff9384;
+  --g-red-edge: #b5232b;
+  --g-purple: #9a5bff;
+  --g-purple-top: #caa0ff;
+  --g-purple-edge: #5d2ec4;
+  --g-teal: #18c4b2;
+  --g-teal-top: #6aeedb;
+  --g-teal-edge: #0b8678;
+  --g-orange: #ff8a26;
+  --g-orange-top: #ffbd66;
+  --g-orange-edge: #c25208;
+  --g-pink: #ff5ea8;
+  --g-pink-top: #ffa3cf;
+  --g-pink-edge: #c0256f;
+
+  /* Oyun durumları */
+  --g-up: #1fb84a;
+  --g-up-soft: #dbfbe3;
+  --g-down: #f0424a;
+  --g-down-soft: #ffe2e2;
+  --g-coin: #ffc928;
+  --g-coin-edge: #cf8600;
+  --g-coin-shine: #fff4b3;
+  --g-gem: #3ad6ff;
+  --g-gem-edge: #0d8bc0;
+  --g-xp: #a76cff;
+  --g-xp-edge: #6a35d6;
+  --g-badge: #ff3b4a;
+  --g-focus: #ffe14d;
+
+  /* Kademeler */
+  --g-tier-rookie: #8fb3d9;
+  --g-tier-rookie-edge: #5b7fa8;
+  --g-tier-bronze: #e09254;
+  --g-tier-bronze-edge: #9c5a25;
+  --g-tier-silver: #c9d5e3;
+  --g-tier-silver-edge: #7f91a8;
+  --g-tier-gold: #ffcb2b;
+  --g-tier-gold-edge: #c27f00;
+  --g-tier-platinum: #5fe3d2;
+  --g-tier-platinum-edge: #17978a;
+  --g-tier-diamond: #74b9ff;
+  --g-tier-diamond-edge: #2c6ed6;
+  --g-tier-master: #b874ff;
+  --g-tier-master-edge: #6a2fd0;
+
+  /* Çerçeveler */
+  --g-frame-neon-1: #39f3ff;
+  --g-frame-neon-2: #ff4fd8;
+
+  /* Konfeti */
+  --g-confetti-1: #ff5a5f;
+  --g-confetti-2: #ffc928;
+  --g-confetti-3: #4fd23a;
+  --g-confetti-4: #2f8bff;
+  --g-confetti-5: #a76cff;
+  --g-confetti-6: #ff8cc6;
+
+  /* Grafik (tuval; çalışma anında okunur) */
+  --g-chart-up: #1fb84a;
+  --g-chart-down: #f0424a;
+  --g-chart-grid: rgb(24 48 98 / 0.07);
+  --g-chart-text: #4b6596;
+  --g-chart-cross: rgb(24 48 98 / 0.35);
+  --g-chart-label: #183062;
+  --g-chart-surface: #ffffff;
+
+  color: var(--g-ink);
+  font-family: var(--font-game), var(--font-outfit), ui-rounded, system-ui, sans-serif;
+  color-scheme: light;
+}
+
+/* ------------------------------------------------------------------ */
+/* Token'lar — gece (koyu tema)                                         */
+/* ------------------------------------------------------------------ */
+
+[data-theme="dark"] [data-skin="game"],
+[data-skin="game"].g-force-night {
+  --g-sky-top: #2b2e86;
+  --g-sky-mid: #1a1e5c;
+  --g-sky-bottom: #0c0f30;
+  --g-cloud: rgb(160 180 255 / 0.12);
+  --g-ray: rgb(160 180 255 / 0.05);
+
+  --g-ink: #eef3ff;
+  --g-ink-soft: #b4c2ea;
+  --g-ink-faint: #7f8fbf;
+  --g-outline: #070a26;
+  --g-outline-soft: rgb(0 0 0 / 0.45);
+
+  --g-panel: #232b66;
+  --g-panel-2: #1b2256;
+  --g-panel-3: #2c3678;
+  --g-panel-edge: #3d4a9c;
+  --g-panel-shadow: rgb(3 5 25 / 0.6);
+  --g-glass: rgb(255 255 255 / 0.08);
+  --g-glass-strong: rgb(255 255 255 / 0.14);
+  --g-glass-edge: rgb(255 255 255 / 0.2);
+  --g-hud: rgb(5 8 32 / 0.6);
+  --g-hud-edge: rgb(255 255 255 / 0.16);
+  --g-scrim: rgb(3 5 22 / 0.75);
+  --g-drop: rgb(0 0 0 / 0.5);
+
+  --g-up: #3ee06a;
+  --g-up-soft: rgb(62 224 106 / 0.16);
+  --g-down: #ff6b71;
+  --g-down-soft: rgb(255 107 113 / 0.16);
+  --g-focus: #ffe14d;
+
+  --g-chart-up: #3ee06a;
+  --g-chart-down: #ff6b71;
+  --g-chart-grid: rgb(200 210 255 / 0.07);
+  --g-chart-text: #b4c2ea;
+  --g-chart-cross: rgb(200 210 255 / 0.35);
+  --g-chart-label: #2c3678;
+  --g-chart-surface: #232b66;
+
+  color-scheme: dark;
+}
+
+/* Bileşen sınıfları "components" katmanında: Tailwind yardımcıları (h-*, px-* …) bunları ezebilir. */
+@layer components {
+/* ------------------------------------------------------------------ */
+/* Kök ve arka planlar                                                  */
+/* ------------------------------------------------------------------ */
+
+.g-root {
+  min-height: 100dvh;
+  background: linear-gradient(180deg, var(--g-sky-top) 0%, var(--g-sky-mid) 45%, var(--g-sky-bottom) 100%);
+  overflow-x: clip;
+}
+
+.g-screen {
+  position: relative;
+  min-height: 100dvh;
+  isolation: isolate;
+  overflow-x: clip;
+}
+
+/* Arka plan katmanı: ışınlar + bulutlar (dekor; tıklanamaz) */
+.g-screen::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+}
+
+.g-bg-sky {
+  background: linear-gradient(180deg, var(--g-sky-top) 0%, var(--g-sky-mid) 42%, var(--g-sky-bottom) 100%);
+}
+.g-bg-sky::before {
+  background:
+    radial-gradient(60px 26px at 12% 14%, var(--g-cloud) 98%, transparent),
+    radial-gradient(44px 22px at 17% 12%, var(--g-cloud) 98%, transparent),
+    radial-gradient(70px 30px at 86% 26%, var(--g-cloud) 98%, transparent),
+    radial-gradient(48px 24px at 80% 24%, var(--g-cloud) 98%, transparent),
+    radial-gradient(90px 34px at 30% 78%, var(--g-cloud) 98%, transparent),
+    radial-gradient(60px 26px at 70% 90%, var(--g-cloud) 98%, transparent),
+    repeating-conic-gradient(from 0deg at 50% -10%, var(--g-ray) 0deg 6deg, transparent 6deg 18deg);
+}
+
+.g-bg-night {
+  background: linear-gradient(180deg, var(--g-night-top) 0%, var(--g-night-mid) 45%, var(--g-night-bottom) 100%);
+  --g-ink: #eef3ff;
+}
+.g-bg-night::before {
+  background:
+    radial-gradient(1.5px 1.5px at 10% 12%, var(--g-star) 99%, transparent),
+    radial-gradient(1px 1px at 22% 30%, var(--g-star) 99%, transparent),
+    radial-gradient(2px 2px at 38% 8%, var(--g-star) 99%, transparent),
+    radial-gradient(1px 1px at 55% 22%, var(--g-star) 99%, transparent),
+    radial-gradient(1.5px 1.5px at 70% 10%, var(--g-star) 99%, transparent),
+    radial-gradient(1px 1px at 85% 34%, var(--g-star) 99%, transparent),
+    radial-gradient(2px 2px at 92% 16%, var(--g-star) 99%, transparent),
+    radial-gradient(1px 1px at 6% 46%, var(--g-star) 99%, transparent),
+    radial-gradient(1.5px 1.5px at 64% 52%, var(--g-star) 99%, transparent),
+    radial-gradient(1px 1px at 30% 64%, var(--g-star) 99%, transparent);
+}
+
+.g-bg-gold {
+  background: radial-gradient(120% 80% at 50% 30%, var(--g-goldbg-top) 0%, var(--g-goldbg-mid) 45%, var(--g-goldbg-bottom) 100%);
+}
+.g-bg-gold::before {
+  background: repeating-conic-gradient(from 0deg at 50% 32%, rgb(255 255 255 / 0.16) 0deg 8deg, transparent 8deg 20deg);
+  animation: g-ray-spin 40s linear infinite;
+  transform-origin: 50% 32%;
+  inset: -30%;
+}
+
+/* ------------------------------------------------------------------ */
+/* Tipografi                                                            */
+/* ------------------------------------------------------------------ */
+
+.g-font {
+  font-family: var(--font-game), var(--font-outfit), ui-rounded, system-ui, sans-serif;
+}
+
+/* Kontur + gölgeli oyun başlığı (beyaz dolgu, lacivert kontur) */
+.g-title {
+  font-family: var(--font-game), ui-rounded, system-ui, sans-serif;
+  font-weight: 800;
+  line-height: 1.05;
+  letter-spacing: 0.01em;
+  color: var(--g-on-color);
+  text-shadow:
+    0 2px 0 var(--g-outline),
+    0 -2px 0 var(--g-outline),
+    2px 0 0 var(--g-outline),
+    -2px 0 0 var(--g-outline),
+    1.5px 1.5px 0 var(--g-outline),
+    -1.5px 1.5px 0 var(--g-outline),
+    1.5px -1.5px 0 var(--g-outline),
+    -1.5px -1.5px 0 var(--g-outline),
+    0 4px 0 var(--g-outline);
+}
+.g-title-sm {
+  font-family: var(--font-game), ui-rounded, system-ui, sans-serif;
+  font-weight: 800;
+  line-height: 1.1;
+  color: var(--g-on-color);
+  text-shadow:
+    0 1.5px 0 var(--g-outline),
+    0 -1px 0 var(--g-outline),
+    1px 0 0 var(--g-outline),
+    -1px 0 0 var(--g-outline),
+    0 3px 0 var(--g-outline-soft);
+}
+.g-title--gold {
+  color: var(--g-gold-top);
+}
+
+/* ------------------------------------------------------------------ */
+/* 3B düğme                                                            */
+/* ------------------------------------------------------------------ */
+
+.g-btn {
+  --b-top: var(--g-blue-top);
+  --b-face: var(--g-blue);
+  --b-edge: var(--g-blue-edge);
+  --b-ink: var(--g-on-color);
+  --b-depth: 5px;
+  --b-radius: 15px;
+  position: relative;
+  height: 46px;
+  font-size: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45em;
+  min-width: 0;
+  border: 2px solid var(--b-edge);
+  border-radius: var(--b-radius);
+  padding: 0 1.15em;
+  font-family: var(--font-game), ui-rounded, system-ui, sans-serif;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  color: var(--b-ink);
+  text-shadow: 0 2px 0 var(--b-edge);
+  background: linear-gradient(180deg, var(--b-top) 0%, var(--b-face) 58%);
+  box-shadow:
+    0 var(--b-depth) 0 var(--b-edge),
+    0 calc(var(--b-depth) + 5px) 14px -4px var(--g-drop),
+    inset 0 2px 0 rgb(255 255 255 / 0.45),
+    inset 0 -3px 0 rgb(0 0 0 / 0.08);
+  transform: translateY(0);
+  transition:
+    transform 90ms ease-out,
+    box-shadow 90ms ease-out,
+    filter 120ms ease-out;
+  cursor: pointer;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  white-space: nowrap;
+}
+/* Üstteki parlak yansıma */
+.g-btn::before {
+  content: "";
+  position: absolute;
+  left: 8%;
+  right: 8%;
+  top: 3px;
+  height: 38%;
+  border-radius: calc(var(--b-radius) - 6px) calc(var(--b-radius) - 6px) 50% 50% / calc(var(--b-radius) - 6px) calc(var(--b-radius) - 6px) 100% 100%;
+  background: linear-gradient(180deg, rgb(255 255 255 / 0.5), rgb(255 255 255 / 0));
+  pointer-events: none;
+}
+.g-btn > * {
+  position: relative;
+}
+@media (hover: hover) {
+  .g-btn:hover:not(:disabled) {
+    filter: brightness(1.06) saturate(1.05);
+  }
+}
+.g-btn:active:not(:disabled),
+.g-btn[data-pressed="true"]:not(:disabled) {
+  transform: translateY(calc(var(--b-depth) - 2px));
+  box-shadow:
+    0 2px 0 var(--b-edge),
+    0 4px 8px -4px var(--g-drop),
+    inset 0 2px 0 rgb(255 255 255 / 0.35),
+    inset 0 -2px 0 rgb(0 0 0 / 0.08);
+}
+.g-btn:disabled,
+.g-btn[aria-disabled="true"] {
+  cursor: not-allowed;
+  filter: grayscale(0.55) brightness(0.96);
+  opacity: 0.72;
+}
+.g-btn:focus-visible {
+  outline: 3px solid var(--g-focus);
+  outline-offset: 3px;
+}
+
+.g-btn--green { --b-top: var(--g-green-top); --b-face: var(--g-green); --b-edge: var(--g-green-edge); }
+.g-btn--blue { --b-top: var(--g-blue-top); --b-face: var(--g-blue); --b-edge: var(--g-blue-edge); }
+.g-btn--gold { --b-top: var(--g-gold-top); --b-face: var(--g-gold); --b-edge: var(--g-gold-edge); --b-ink: var(--g-gold-ink); }
+.g-btn--gold { text-shadow: 0 1px 0 rgb(255 255 255 / 0.55); }
+.g-btn--red { --b-top: var(--g-red-top); --b-face: var(--g-red); --b-edge: var(--g-red-edge); }
+.g-btn--purple { --b-top: var(--g-purple-top); --b-face: var(--g-purple); --b-edge: var(--g-purple-edge); }
+.g-btn--teal { --b-top: var(--g-teal-top); --b-face: var(--g-teal); --b-edge: var(--g-teal-edge); }
+.g-btn--orange { --b-top: var(--g-orange-top); --b-face: var(--g-orange); --b-edge: var(--g-orange-edge); }
+.g-btn--ghost {
+  --b-top: var(--g-glass-strong);
+  --b-face: var(--g-glass);
+  --b-edge: var(--g-outline-soft);
+  --b-ink: var(--g-on-color);
+  border-color: var(--g-glass-edge);
+  text-shadow: 0 1.5px 0 var(--g-outline-soft);
+  backdrop-filter: blur(6px);
+}
+.g-btn--ghost::before {
+  opacity: 0.4;
+}
+/* Panel içinde (beyaz zeminde) sade düğme */
+.g-btn--plain {
+  --b-top: var(--g-panel);
+  --b-face: var(--g-panel-2);
+  --b-edge: var(--g-panel-edge);
+  --b-ink: var(--g-ink);
+  text-shadow: none;
+}
+
+.g-btn--sm { height: 36px; font-size: 14px; --b-radius: 12px; --b-depth: 4px; padding: 0 0.85em; }
+.g-btn--md { height: 46px; font-size: 16px; --b-radius: 15px; --b-depth: 5px; }
+.g-btn--lg { height: 58px; font-size: 20px; --b-radius: 18px; --b-depth: 6px; }
+.g-btn--xl { height: 76px; font-size: 30px; --b-radius: 24px; --b-depth: 8px; padding: 0 1.3em; letter-spacing: 0.03em; }
+.g-btn--icon { padding: 0; aspect-ratio: 1; }
+
+/* ------------------------------------------------------------------ */
+/* Paneller, çipler, HUD                                                */
+/* ------------------------------------------------------------------ */
+
+.g-panel {
+  position: relative;
+  background: var(--g-panel);
+  color: var(--g-ink);
+  border: 3px solid var(--g-panel-edge);
+  border-radius: 24px;
+  box-shadow:
+    0 6px 0 var(--g-panel-shadow),
+    0 18px 30px -14px var(--g-drop);
+}
+.g-panel-inset {
+  background: var(--g-panel-2);
+  border: 2px solid var(--g-panel-3);
+  border-radius: 16px;
+}
+
+/* Panel başlığı kurdelesi */
+.g-ribbon {
+  --r-face: var(--g-blue);
+  --r-edge: var(--g-blue-edge);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4em;
+  padding: 0.3em 1em 0.35em;
+  border-radius: 999px;
+  background: var(--r-face);
+  border: 2px solid var(--r-edge);
+  box-shadow: 0 3px 0 var(--r-edge);
+  color: var(--g-on-color);
+  font-family: var(--font-game), ui-rounded, system-ui, sans-serif;
+  font-weight: 800;
+  text-shadow: 0 1.5px 0 var(--r-edge);
+  line-height: 1.1;
+}
+.g-ribbon--green { --r-face: var(--g-green); --r-edge: var(--g-green-edge); }
+.g-ribbon--gold { --r-face: var(--g-gold); --r-edge: var(--g-gold-edge); color: var(--g-gold-ink); text-shadow: none; }
+.g-ribbon--red { --r-face: var(--g-red); --r-edge: var(--g-red-edge); }
+.g-ribbon--purple { --r-face: var(--g-purple); --r-edge: var(--g-purple-edge); }
+.g-ribbon--teal { --r-face: var(--g-teal); --r-edge: var(--g-teal-edge); }
+.g-ribbon--orange { --r-face: var(--g-orange); --r-edge: var(--g-orange-edge); }
+.g-ribbon--pink { --r-face: var(--g-pink); --r-edge: var(--g-pink-edge); }
+
+/* Üst çubuktaki koyu yarı saydam sayaç kapsülü (jeton, puan) */
+.g-hud {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  height: 34px;
+  padding: 0 0.6rem 0 0.25rem;
+  border-radius: 999px;
+  background: var(--g-hud);
+  border: 2px solid var(--g-hud-edge);
+  color: var(--g-on-color);
+  font-family: var(--font-game), ui-rounded, system-ui, sans-serif;
+  font-weight: 800;
+  box-shadow: inset 0 2px 4px rgb(0 0 0 / 0.2);
+  backdrop-filter: blur(6px);
+}
+
+.g-glass {
+  background: var(--g-glass);
+  border: 2px solid var(--g-glass-edge);
+  backdrop-filter: blur(8px);
+}
+
+.g-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35em;
+  border-radius: 14px;
+  border: 2px solid var(--g-panel-edge);
+  background: var(--g-panel-2);
+  color: var(--g-ink);
+  font-weight: 700;
+  box-shadow: 0 3px 0 var(--g-panel-edge);
+  transition: transform 90ms ease-out, box-shadow 90ms ease-out, background-color 120ms;
+  -webkit-tap-highlight-color: transparent;
+}
+.g-chip:active:not(:disabled) {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 var(--g-panel-edge);
+}
+.g-chip[aria-pressed="true"],
+.g-chip[aria-selected="true"],
+.g-chip[data-active="true"] {
+  background: var(--g-blue);
+  border-color: var(--g-blue-edge);
+  color: var(--g-on-color);
+  box-shadow: 0 3px 0 var(--g-blue-edge);
+}
+.g-chip:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.g-chip:focus-visible {
+  outline: 3px solid var(--g-focus);
+  outline-offset: 2px;
+}
+
+/* Bildirim rozeti */
+.g-badge-dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--g-badge);
+  border: 2.5px solid var(--g-on-color);
+  color: var(--g-on-color);
+  font-family: var(--font-game), ui-rounded, system-ui, sans-serif;
+  font-weight: 800;
+  font-size: 13px;
+  line-height: 1;
+  box-shadow: 0 3px 0 var(--g-drop);
+}
+
+/* İlerleme çubuğu (XP, tur süresi) */
+.g-progress {
+  position: relative;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--g-hud);
+  border: 2px solid var(--g-hud-edge);
+  box-shadow: inset 0 2px 3px rgb(0 0 0 / 0.25);
+}
+.g-progress > .g-progress-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 999px;
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 0.45), rgb(255 255 255 / 0) 55%),
+    var(--p-color, var(--g-xp));
+  transition: width 500ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.g-progress > .g-progress-fill::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, transparent 20%, rgb(255 255 255 / 0.55) 45%, transparent 70%);
+  background-size: 200% 100%;
+  animation: g-shine 2.6s ease-in-out infinite;
+}
+
+/* Sayı / fiyat: eşit genişlikli rakam (oyun fontunda) */
+.g-num {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Tıklanabilir kartın odak halkası */
+.g-focus:focus-visible {
+  outline: 3px solid var(--g-focus);
+  outline-offset: 3px;
+}
+
+/* Mod kutusu */
+.g-tile {
+  --t-face: var(--g-blue);
+  --t-top: var(--g-blue-top);
+  --t-edge: var(--g-blue-edge);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border-radius: 22px;
+  border: 3px solid var(--t-edge);
+  background: linear-gradient(165deg, var(--t-top) 0%, var(--t-face) 55%);
+  box-shadow:
+    0 6px 0 var(--t-edge),
+    0 14px 22px -10px var(--g-drop),
+    inset 0 2px 0 rgb(255 255 255 / 0.4);
+  color: var(--g-on-color);
+  transition: transform 90ms ease-out, box-shadow 90ms ease-out, filter 120ms;
+  -webkit-tap-highlight-color: transparent;
+  text-align: left;
+}
+@media (hover: hover) {
+  .g-tile:hover {
+    filter: brightness(1.05);
+    transform: translateY(-2px);
+  }
+}
+.g-tile:active {
+  transform: translateY(4px);
+  box-shadow:
+    0 2px 0 var(--t-edge),
+    0 4px 8px -4px var(--g-drop),
+    inset 0 2px 0 rgb(255 255 255 / 0.3);
+}
+.g-tile:focus-visible {
+  outline: 3px solid var(--g-focus);
+  outline-offset: 3px;
+}
+.g-tile--green { --t-face: var(--g-green); --t-top: var(--g-green-top); --t-edge: var(--g-green-edge); }
+.g-tile--blue { --t-face: var(--g-blue); --t-top: var(--g-blue-top); --t-edge: var(--g-blue-edge); }
+.g-tile--gold { --t-face: var(--g-gold); --t-top: var(--g-gold-top); --t-edge: var(--g-gold-edge); }
+.g-tile--red { --t-face: var(--g-red); --t-top: var(--g-red-top); --t-edge: var(--g-red-edge); }
+.g-tile--purple { --t-face: var(--g-purple); --t-top: var(--g-purple-top); --t-edge: var(--g-purple-edge); }
+.g-tile--teal { --t-face: var(--g-teal); --t-top: var(--g-teal-top); --t-edge: var(--g-teal-edge); }
+.g-tile--orange { --t-face: var(--g-orange); --t-top: var(--g-orange-top); --t-edge: var(--g-orange-edge); }
+.g-tile--pink { --t-face: var(--g-pink); --t-top: var(--g-pink-top); --t-edge: var(--g-pink-edge); }
+.g-tile--gold .g-tile-text { color: var(--g-gold-ink); text-shadow: 0 1px 0 rgb(255 255 255 / 0.5); }
+
+/* Diyalog (oyun penceresi) */
+dialog.g-dialog {
+  margin: auto;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--g-ink);
+  max-width: min(440px, calc(100vw - 24px));
+  width: 100%;
+  overflow: visible;
+}
+dialog.g-dialog::backdrop {
+  background: var(--g-scrim);
+  backdrop-filter: blur(4px);
+}
+
+/* ------------------------------------------------------------------ */
+/* Animasyonlar                                                         */
+/* ------------------------------------------------------------------ */
+
+@keyframes g-pop {
+  0% { transform: scale(0.4); opacity: 0; }
+  60% { transform: scale(1.12); opacity: 1; }
+  80% { transform: scale(0.96); }
+  100% { transform: scale(1); }
+}
+@keyframes g-bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+@keyframes g-float {
+  0%, 100% { transform: translateY(0) rotate(-2deg); }
+  50% { transform: translateY(-6px) rotate(2deg); }
+}
+@keyframes g-wiggle {
+  0%, 100% { transform: rotate(0); }
+  20% { transform: rotate(-10deg); }
+  40% { transform: rotate(9deg); }
+  60% { transform: rotate(-6deg); }
+  80% { transform: rotate(4deg); }
+}
+@keyframes g-shine {
+  0% { background-position: 150% 0; }
+  60%, 100% { background-position: -50% 0; }
+}
+@keyframes g-spin {
+  to { transform: rotate(360deg); }
+}
+@keyframes g-ray-spin {
+  to { transform: rotate(360deg); }
+}
+@keyframes g-pulse-ring {
+  0% { transform: scale(0.6); opacity: 0.85; }
+  100% { transform: scale(1.9); opacity: 0; }
+}
+@keyframes g-coin-fly {
+  0% { transform: translate(0, 0) scale(0.6); opacity: 0; }
+  20% { opacity: 1; transform: translate(0, -10px) scale(1.1); }
+  100% { transform: translate(var(--fly-x, 0), var(--fly-y, -120px)) scale(0.5); opacity: 0; }
+}
+@keyframes g-rise {
+  0% { transform: translate(0, 0) scale(0.6); opacity: 0; }
+  12% { transform: translate(0, -12px) scale(1.25); opacity: 1; }
+  100% { transform: translate(var(--drift, 0px), -240px) scale(1); opacity: 0; }
+}
+@keyframes g-slide-left {
+  from { transform: translateX(-120%) rotate(-8deg); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+@keyframes g-slide-right {
+  from { transform: translateX(120%) rotate(8deg); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+@keyframes g-shake {
+  0%, 100% { transform: translate(0, 0) rotate(0); }
+  20% { transform: translate(-3px, 2px) rotate(-4deg); }
+  40% { transform: translate(3px, -2px) rotate(3deg); }
+  60% { transform: translate(-2px, -1px) rotate(-2deg); }
+  80% { transform: translate(2px, 1px) rotate(2deg); }
+}
+@keyframes g-count {
+  0% { transform: scale(2.2); opacity: 0; }
+  35% { transform: scale(0.92); opacity: 1; }
+  55% { transform: scale(1.06); }
+  100% { transform: scale(1); opacity: 1; }
+}
+@keyframes g-drop-in {
+  0% { transform: translateY(-24px); opacity: 0; }
+  100% { transform: none; opacity: 1; }
+}
+@keyframes g-rope {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(1.5px); }
+}
+
+.g-anim-pop { animation: g-pop 520ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+.g-anim-bounce { animation: g-bounce 1.6s ease-in-out infinite; }
+.g-anim-float { animation: g-float 3.2s ease-in-out infinite; }
+.g-anim-wiggle { animation: g-wiggle 900ms ease-in-out both; }
+.g-anim-wiggle-loop { animation: g-wiggle 900ms ease-in-out 2.4s infinite; }
+.g-anim-spin { animation: g-spin 1.2s linear infinite; }
+.g-anim-spin-slow { animation: g-spin 6s linear infinite; }
+.g-anim-pulse-ring { animation: g-pulse-ring 1.8s ease-out infinite; }
+.g-anim-slide-left { animation: g-slide-left 520ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+.g-anim-slide-right { animation: g-slide-right 520ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+.g-anim-shake { animation: g-shake 420ms ease-in-out 2; }
+.g-anim-count { animation: g-count 900ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+.g-anim-drop-in { animation: g-drop-in 360ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+.g-anim-rise { animation: g-rise 2.4s cubic-bezier(0.2, 0.7, 0.4, 1) forwards; }
+.g-anim-coin-fly { animation: g-coin-fly 900ms cubic-bezier(0.3, 0.7, 0.4, 1) forwards; }
+
+/* Hareket azaltma: sıçrama / konfeti / dönen ışınlar kapalı */
+@media (prefers-reduced-motion: reduce) {
+  [data-skin="game"] .g-anim-pop,
+  [data-skin="game"] .g-anim-bounce,
+  [data-skin="game"] .g-anim-float,
+  [data-skin="game"] .g-anim-wiggle,
+  [data-skin="game"] .g-anim-wiggle-loop,
+  [data-skin="game"] .g-anim-spin,
+  [data-skin="game"] .g-anim-spin-slow,
+  [data-skin="game"] .g-anim-pulse-ring,
+  [data-skin="game"] .g-anim-slide-left,
+  [data-skin="game"] .g-anim-slide-right,
+  [data-skin="game"] .g-anim-shake,
+  [data-skin="game"] .g-anim-count,
+  [data-skin="game"] .g-anim-drop-in,
+  [data-skin="game"] .g-anim-coin-fly,
+  [data-skin="game"] .g-progress-fill::after,
+  .g-bg-gold::before {
+    animation: none !important;
+  }
+  [data-skin="game"] .g-anim-rise {
+    animation: g-rise 2.4s linear forwards !important;
+    animation-duration: 1.2s !important;
+  }
+  .g-btn,
+  .g-tile,
+  .g-chip {
+    transition: none;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Uyumluluk takma adları (oyun alanındaki diğer bileşenler için)        */
+/* ------------------------------------------------------------------ */
+
+.g-btn-primary { --b-top: var(--g-green-top); --b-face: var(--g-green); --b-edge: var(--g-green-edge); --b-ink: var(--g-on-color); }
+.g-btn-secondary { --b-top: var(--g-blue-top); --b-face: var(--g-blue); --b-edge: var(--g-blue-edge); --b-ink: var(--g-on-color); }
+.g-btn-gold { --b-top: var(--g-gold-top); --b-face: var(--g-gold); --b-edge: var(--g-gold-edge); --b-ink: var(--g-gold-ink); text-shadow: 0 1px 0 rgb(255 255 255 / 0.55); }
+.g-btn-danger { --b-top: var(--g-red-top); --b-face: var(--g-red); --b-edge: var(--g-red-edge); --b-ink: var(--g-on-color); }
+.g-btn-ghost {
+  --b-top: var(--g-glass-strong);
+  --b-face: var(--g-glass);
+  --b-edge: var(--g-outline-soft);
+  --b-ink: var(--g-on-color);
+  border-color: var(--g-glass-edge);
+  text-shadow: 0 1.5px 0 var(--g-outline-soft);
+}
+/* Panel içinde hayalet düğme beyaz zemin üstünde görünür kalsın */
+.g-panel .g-btn-ghost,
+.g-panel .g-btn--ghost {
+  --b-top: var(--g-panel);
+  --b-face: var(--g-panel-2);
+  --b-edge: var(--g-panel-edge);
+  --b-ink: var(--g-ink);
+  border-color: var(--g-panel-edge);
+  text-shadow: none;
+}
+.g-btn-sm { height: 36px; font-size: 14px; --b-radius: 12px; --b-depth: 4px; padding: 0 0.85em; }
+.g-btn-lg { height: 58px; font-size: 20px; --b-radius: 18px; --b-depth: 6px; }
+
+.g-pop-in { animation: g-pop 520ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+.g-overlay,
+.g-gate {
+  background: var(--g-scrim);
+  backdrop-filter: blur(4px);
+}
+.g-gate-badge {
+  background: var(--g-red);
+  border: 3px solid var(--g-on-color);
+  color: var(--g-on-color);
+  box-shadow: 0 4px 0 var(--g-red-edge);
+  font-family: var(--font-game), ui-rounded, system-ui, sans-serif;
+}
+.g-gate-list li {
+  position: relative;
+  padding-left: 1.6em;
+  font-weight: 600;
+}
+.g-gate-list li::before {
+  content: "✓";
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 1.2em;
+  height: 1.2em;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8em;
+  font-weight: 800;
+  color: var(--g-on-color);
+  background: var(--g-green);
+}
+.g-check {
+  background: var(--g-panel-2);
+  border: 2px solid var(--g-panel-3);
+  color: var(--g-ink);
+}
+.g-error { color: var(--g-down); }
+.g-link { color: var(--g-ink-soft); }
+.g-panel .g-link { color: var(--g-blue-edge); }
+.g-notice-soft { background: var(--g-panel); }
+.g-notice-icon,
+.g-reminder-icon {
+  background: var(--g-gold);
+  color: var(--g-gold-ink);
+  border: 3px solid var(--g-gold-edge);
+}
+.g-break-moon {
+  background: var(--g-purple);
+  color: var(--g-gold-top);
+  border: 3px solid var(--g-purple-edge);
+  box-shadow: 0 5px 0 var(--g-purple-edge);
+}
+.g-rarity-common { --rarity: var(--g-tier-silver); --rarity-edge: var(--g-tier-silver-edge); }
+.g-rarity-rare { --rarity: var(--g-blue); --rarity-edge: var(--g-blue-edge); }
+.g-rarity-epic { --rarity: var(--g-purple); --rarity-edge: var(--g-purple-edge); }
+.g-rarity-legendary { --rarity: var(--g-gold); --rarity-edge: var(--g-gold-edge); }
+
+@media (prefers-reduced-motion: reduce) {
+  [data-skin="game"] .g-pop-in {
+    animation: none !important;
+  }
+}
+}

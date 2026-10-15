@@ -11,7 +11,7 @@ import Pagination from '@/components/common/Pagination';
 import { DataTable, TBody, THead, Th } from '@/components/common/Table';
 import { useArenaHistory } from '@/hooks/useArena';
 import { ApiError } from '@/lib/api';
-import { durationLabel } from './model';
+import { historyHref, historyTitle } from './model';
 
 const PAGE = 10;
 
@@ -32,7 +32,7 @@ export default function ArenaHistory({ className }: { className?: string }) {
 
   return (
     <Card className={cn('overflow-hidden', className)}>
-      <CardHeader title="Geçmiş turlarım" description="Tüm arena turların ve meydan okumaların" icon={<ClockIcon />} />
+      <CardHeader title="Geçmiş turlarım" description="Oyun Merkezi'ndeki tüm turların, düelloların, senaryoların ve meydan okumaların" icon={<ClockIcon />} />
       <dl className="grid grid-cols-2 gap-3 px-5 pb-5 sm:px-6 md:grid-cols-4">
         {tiles.map((t) => (
           <div key={t.label} className="rounded-xl border border-line bg-surface-2 p-3.5">
@@ -74,8 +74,8 @@ export default function ArenaHistory({ className }: { className?: string }) {
               {data.items.map((r) => (
                 <tr key={r.round_id} className="transition-colors hover:bg-surface-2">
                   <td className="py-3 pr-3">
-                    <Link href={`/arena/round/${encodeURIComponent(r.round_id)}`} className="font-medium text-fg hover:text-brand">
-                      {r.kind === 'challenge' ? (r.challenge_title ?? 'Meydan okuma') : `Hızlı tur · ${durationLabel(r.duration_s)}`}
+                    <Link href={historyHref(r)} className="font-medium text-fg hover:text-brand">
+                      {historyTitle(r)}
                     </Link>
                   </td>
                   <td className="whitespace-nowrap px-3 py-3 text-muted">{formatDateTime(r.finished_at)}</td>

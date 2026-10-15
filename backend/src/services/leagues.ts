@@ -5,6 +5,7 @@ import { logger } from '../utils/logger';
 import { EQUITY_SQL, generateInviteCode, normalizeInviteCode } from '../utils/competition';
 import type { LeagueDuration } from '../utils/validation';
 import { NotificationService, NotificationInput } from './notifications';
+import { GameService } from './game/service';
 
 /**
  * Ligler (özel: davet kodu; herkese açık: keşfet + tek tıkla katıl).
@@ -839,6 +840,8 @@ export class LeagueService {
        VALUES ($1, $2, 'member', $3, CASE WHEN $4::boolean THEN now() END)`,
       [league.id, userId, me.equity, league.started]
     );
+    // Oyun ekonomisi: lige katılım XP'si (lig başına bir kez; SAVEPOINT içinde, hata fırlatmaz)
+    await GameService.onLeagueJoin(userId, league.id, client);
     await notify(
       league.owner_id,
       {

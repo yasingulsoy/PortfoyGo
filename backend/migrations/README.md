@@ -192,3 +192,19 @@ Arena (hızlı al-sat oyun modu): `arena_challenges` (yöneticinin planladığı
 ## 012_advisor.sql
 
 Portföy Sihirbazı: `risk_profiles` (anket cevapları, puan ve profil) ve `portfolio_plans` (önerilen dağılım, metrikler, Monte Carlo simülasyonu, uygulama sonucu).
+
+## 013_arena_social.sql
+
+Arena sosyal katmanı: `users.is_bot` ve antrenman botu hesabı (`antrenman_botu`; liderlik, sezon ve sıralamalardan hariç), `arena_duels` (davet linkli veya eşleştirmeyle 1v1 düello), `arena_matchmaking` (eşleştirme biletleri; 15 sn'de rakip çıkmazsa bot), `arena_host_messages` (meydan okuma sunucusunun canlı mesajları), `arena_challenges.broadcast_token` (herkese açık yayın ekranı) ve `arena_rounds.kind` için `duel` / `scenario` türleri.
+
+## 014_game_economy.sql
+
+Oyun ekonomisi: kullanıcıya jeton, XP, Arena reytingi ve kozmetik sütunları; jeton/XP defteri, günlük seri, günlük görevler, ücretsiz günlük çark, mağaza envanteri ve sorumlu oyun ayarları (18+ onayı, günlük tur limiti, oturum hatırlatıcısı, mola). Jeton ve XP yalnızca oyun içidir; gerçek parayla alınamaz ve gerçek paraya çevrilemez.
+
+## 015_scenarios.sql
+
+Senaryo modu ve Arena koçu: `historical_series_meta` / `historical_series` (yöneticinin CSV ile yüklediği lisanslı tarihsel seriler; kaynak ve lisans notu zorunlu), `scenarios` (brifing + "gerçekte ne oldu" debrief'i), `coach_reports` (bitmiş tur için kural tabanlı koç raporu önbelleği). 013'ten sonra çalışırsa `arena_rounds.scenario_id` için yabancı anahtar ekler.
+
+## 016_idle.sql
+
+Yatırım İmparatorluğu (idle oyun): kullanıcı başına tek satırlık `idle_states` (oyun içi para, binalar, yükseltmeler, halka arz payları, ödenen kilometre taşları). Kazanç sunucuda hesaplanır; çevrimdışı süre üst sınırlıdır. Kurallar ve denge: `backend/src/services/idle/{config,math}.ts`.

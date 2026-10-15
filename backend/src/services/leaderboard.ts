@@ -115,6 +115,7 @@ export class LeaderboardService {
       LEFT JOIN inv ON u.id = inv.user_id
       WHERE u.email_verified = true
         AND (u.is_banned IS NULL OR u.is_banned = false)
+        AND COALESCE(u.is_bot, false) = false
       ORDER BY
         (u.balance + u.reserved_cash + COALESCE(inv.portfolio_value, 0) - $1) / $1 * 100 DESC NULLS LAST,
         COALESCE(inv.total_profit_loss, 0) DESC,
@@ -170,6 +171,7 @@ export class LeaderboardService {
       LEFT JOIN inv ON u.id = inv.user_id
       WHERE u.email_verified = true
         AND (u.is_banned IS NULL OR u.is_banned = false)
+        AND COALESCE(u.is_bot, false) = false
       ORDER BY
         CASE
           WHEN COALESCE(u.week_baseline_equity, 0) > 0
@@ -225,6 +227,7 @@ export class LeaderboardService {
            LEFT JOIN inv ON u.id = inv.user_id
           WHERE u.email_verified = true
             AND (u.is_banned IS NULL OR u.is_banned = false)
+        AND COALESCE(u.is_bot, false) = false
        )
        SELECT rn FROM ranked WHERE id = $2`,
       [INITIAL_ACCOUNT_BALANCE, userId]
@@ -241,7 +244,7 @@ export class LeaderboardService {
       await pool.query(`
         UPDATE users
         SET rank = NULL
-        WHERE (email_verified = false OR (is_banned IS NOT NULL AND is_banned = true))
+        WHERE (email_verified = false OR (is_banned IS NOT NULL AND is_banned = true) OR COALESCE(is_bot, false) = true)
           AND rank IS NOT NULL
       `);
 
@@ -268,6 +271,7 @@ export class LeaderboardService {
            ) inv ON u2.id = inv.user_id
            WHERE u2.email_verified = true
              AND (u2.is_banned IS NULL OR u2.is_banned = false)
+             AND COALESCE(u2.is_bot, false) = false
          ) ranked
          WHERE u.id = ranked.id
            AND u.rank IS DISTINCT FROM ranked.rn`,
@@ -305,6 +309,7 @@ export class LeaderboardService {
           FROM users u2
           WHERE u2.email_verified = true
             AND (u2.is_banned IS NULL OR u2.is_banned = false)
+             AND COALESCE(u2.is_bot, false) = false
         ),
         w AS (
           SELECT id, RANK() OVER (ORDER BY wret DESC NULLS LAST) AS wk

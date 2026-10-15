@@ -49,8 +49,24 @@ export const AUDIT_ACTIONS: Record<AuditAction, { label: string; tone: Tone }> =
   'announcement.create': { label: 'Duyuru gönderildi', tone: 'brand' },
   'arena.challenge_create': { label: 'Meydan okuma planlandı', tone: 'brand' },
   'arena.challenge_cancel': { label: 'Meydan okuma iptal edildi', tone: 'gold' },
+  'arena.broadcast_token': { label: 'Yayın bağlantısı oluşturuldu', tone: 'brand' },
+  'arena.host_message': { label: 'Sunucu mesajı gönderildi', tone: 'brand' },
+  'scenario.series_import': { label: 'Tarihsel seri yüklendi', tone: 'brand' },
+  'scenario.series_delete': { label: 'Tarihsel seri silindi', tone: 'down' },
+  'scenario.create': { label: 'Senaryo oluşturuldu', tone: 'brand' },
+  'scenario.update': { label: 'Senaryo güncellendi', tone: 'neutral' },
+  'scenario.delete': { label: 'Senaryo silindi', tone: 'down' },
+  'scenario.publish': { label: 'Senaryo yayın durumu değişti', tone: 'up' },
 };
-export const auditAction = (a: string) => AUDIT_ACTIONS[a as AuditAction] ?? { label: a, tone: 'neutral' as Tone };
+
+/** Listede olmayan senaryo eylemleri (ör. backend'e sonradan eklenen 'scenario.*') için okunur yedek etiket */
+const AUDIT_PREFIX: Record<string, string> = { 'scenario.': 'Senaryo', 'series.': 'Tarihsel seri', 'arena.': 'Arena' };
+export const auditAction = (a: string) => {
+  const known = AUDIT_ACTIONS[a as AuditAction];
+  if (known) return known;
+  const prefix = Object.keys(AUDIT_PREFIX).find((p) => a.startsWith(p));
+  return prefix ? { label: `${AUDIT_PREFIX[prefix]}: ${a.slice(prefix.length).replace(/_/g, ' ')}`, tone: 'neutral' as Tone } : { label: a, tone: 'neutral' as Tone };
+};
 
 export const ARENA_STATUS: Record<ArenaChallengeStatus, { label: string; tone: Tone }> = {
   scheduled: { label: 'Planlandı', tone: 'brand' },

@@ -12,6 +12,19 @@ import {
 import { DAY_MS, GRANULARITY_MS, bucketStart, istanbulDayStart } from '../utils/priceBuckets';
 import { completedHoursEnd, loadHourlySeries, type ArenaInstrumentCode } from '../services/arena/instruments';
 import { pickWindows, randomSeed } from '../services/arena/paths';
+import {
+  CRASH_DRILL_BRIEFING,
+  CRASH_DRILL_DEBRIEF,
+  CRASH_DRILL_DESCRIPTION,
+  CRASH_DRILL_FROM,
+  CRASH_DRILL_SERIES,
+  CRASH_DRILL_SLUG,
+  CRASH_DRILL_TITLE,
+  CRASH_DRILL_TO,
+  SYNTHETIC_LICENSE_NOTE,
+  SYNTHETIC_SOURCE,
+  generateCrashDrillSeries,
+} from '../services/scenarios/synthetic';
 
 /**
  * Yerel geliştirme veritabanı için örnek veri (SADECE yerel PGlite; canlı veritabanında KULLANMAYIN).
@@ -1060,4 +1073,77 @@ async function insertSeedChallenge(
   } finally {
     client.release();
   }
+}
+
+// ---------------------------------------------------------------------------
+// Senaryo modu: SENTETİK "Ani Çöküş Tatbikatı" (yalnızca yerel)
+// ---------------------------------------------------------------------------
+
+export interface SeedScenariosResult {
+  /** Bu çalıştırmada oluşturulan seriler */
+  series: string[];
+  scenarioCreated: boolean;
+}
+
+/**
+ * Senaryo örnek verisi (idempotent; SADECE yerel PGlite — localDb.ts ve src/dev/seedScenariosLocal.ts çağırır):
+ * açıkça SENTETİK 3 seri (SYN_CRASH_BTC / _BRENT / _XAU, USD, saatlik) + yayında "Ani Çöküş Tatbikatı (sentetik veri)"
+ * senaryosu (synthetic = true). Seri zaten varsa noktalarına dokunulmaz; senaryo slug'ı varsa yeniden eklenmez.
+ * 015_scenarios.sql uygulanmamışsa hiçbir şey yapmaz.
+ */
+export async function seedScenarios(pool: Pool): Promise<SeedScenariosResult> {
+  if (process.env.NODE_ENV === 'production') throw new Error('seedScenarios yalnızca yerel geliştirme içindir');
+  const result: SeedScenariosResult = { series: [], scenarioCreated: false };
+  const ready = await pool.query(`SELECT to_regclass('scenarios') AS s, to_regclass('historical_series') AS h`);
+  if (!ready.rows[0]?.s || !ready.rows[0]?.h) return result;
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    for (const spec of CRASH_DRILL_SERIES) {
+      const ins = await client.query(
+        `INSERT INTO historical_series_meta (series_code, label, currency, source, license_note)
+         VALUES ($1, $2, 'USD', $3, $4) ON CONFLICT (series_code) DO NOTHING RETURNING series_code`,
+        [spec.series_code, spec.series_label, SYNTHETIC_SOURCE, SYNTHETIC_LICENSE_NOTE]
+      );
+      if (ins.rows.length === 0) continue;
+      const pts = generateCrashDrillSeries(spec);
+      await client.query(
+        `INSERT INTO historical_series (series_code, ts, price)
+         SELECT $1, x.ts, x.p FROM unnest($2::timestamptz[], $3::numeric[]) AS x(ts, p)
+         ON CONFLICT (series_code, ts) DO NOTHING`,
+        [spec.series_code, pts.map((p) => new Date(p.ts).toISOString()), pts.map((p) => p.price)]
+      );
+      await client.query(
+        `UPDATE historical_series_meta m SET points = s.n, from_ts = s.f, to_ts = s.l
+           FROM (SELECT COUNT(*)::int AS n, MIN(ts) AS f, MAX(ts) AS l FROM historical_series WHERE series_code = $1) s
+          WHERE m.series_code = $1`,
+        [spec.series_code]
+      );
+      result.series.push(spec.series_code);
+    }
+    const sc = await client.query(
+      `INSERT INTO scenarios (slug, title, description, briefing, debrief, difficulty, instruments, window_from, window_to, published, synthetic)
+       VALUES ($1, $2, $3, $4, $5, 'kolay', $6::jsonb, $7, $8, true, true)
+       ON CONFLICT (slug) DO NOTHING RETURNING id`,
+      [
+        CRASH_DRILL_SLUG,
+        CRASH_DRILL_TITLE,
+        CRASH_DRILL_DESCRIPTION,
+        CRASH_DRILL_BRIEFING,
+        CRASH_DRILL_DEBRIEF,
+        JSON.stringify(CRASH_DRILL_SERIES.map((s) => ({ code: s.code, label: s.label, series_code: s.series_code }))),
+        CRASH_DRILL_FROM.toISOString(),
+        CRASH_DRILL_TO.toISOString(),
+      ]
+    );
+    result.scenarioCreated = sc.rows.length > 0;
+    await client.query('COMMIT');
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => undefined);
+    throw err;
+  } finally {
+    client.release();
+  }
+  return result;
 }

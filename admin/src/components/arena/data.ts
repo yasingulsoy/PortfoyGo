@@ -32,6 +32,7 @@ export function toChallenge(r: any): ArenaChallenge {
     round_id: r?.round_id ? String(r.round_id) : null,
     created_by_username: r?.created_by_username ?? null,
     created_at: String(r?.created_at ?? ''),
+    overlay_path: r?.overlay_path ? String(r.overlay_path) : null,
   };
 }
 

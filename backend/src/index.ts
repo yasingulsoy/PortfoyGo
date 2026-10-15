@@ -17,6 +17,8 @@ import { LeagueService } from './services/leagues';
 import { PriceHistoryService } from './services/priceHistory';
 import { jobs } from './services/jobs';
 import { ArenaService } from './services/arena/service';
+import { ArenaDuels } from './services/arena/duels';
+import { ArenaBot } from './services/arena/bot';
 
 const app = createApp();
 const PORT = parseInt(process.env.PORT || '5001', 10);
@@ -110,6 +112,11 @@ jobs.register('arena-finalize', '*/5 * * * * *', () => ArenaService.finalizeJob(
 jobs.register('arena-challenges', '*/5 * * * * *', () => ArenaService.challengesJob(), {
   description: 'Arena meydan okuma başlangıçları',
 });
+// Arena düelloları: eşleştirme ve antrenman botu saniyede bir (bot yalnızca geçmiş tick'leri görür);
+// süresi dolan davetler + düello durum eşitlemesi 5 sn'de bir. Hepsi idempotent (bilet / düello satırı kilitli).
+jobs.register('arena-matchmaking', '* * * * * *', () => ArenaDuels.matchmakingJob(), { description: 'Arena düello eşleştirmesi' });
+jobs.register('arena-bots', '* * * * * *', () => ArenaBot.botsJob(), { description: 'Arena antrenman botu' });
+jobs.register('arena-duels', '*/5 * * * * *', () => ArenaDuels.duelsJob(), { description: 'Arena düello davetleri / durumları' });
 
 jobs.start(CRON_TZ);
 

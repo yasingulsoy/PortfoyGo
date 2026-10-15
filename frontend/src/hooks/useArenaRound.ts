@@ -11,6 +11,7 @@ import {
   toQuotes,
   toReveal,
 } from '@/components/arena/model';
+import { toHostMessage, toRoundDuel } from '@/components/game/model';
 import type { ArenaMe, ArenaPosition } from '@/types';
 
 const MAX_BACKOFF_MS = 15_000;
@@ -45,13 +46,22 @@ function toMePatch(raw: any): Partial<ArenaMe> {
  * - Tur bitince (`end`) akış kapatılır ve son durum bir kez daha alınır.
  * Kimlik değişirse bileşen `key` ile yeniden kurulmalıdır (durum kimliğe özeldir).
  */
-export function useArenaRound(id: string, opts: { onServerClose?: (p: ArenaPosition) => void } = {}) {
+export function useArenaRound(
+  id: string,
+  opts: {
+    onServerClose?: (p: ArenaPosition) => void;
+    /** Düello / meydan okumada gelen emoji tepkisi */
+    onReaction?: (r: { emoji: string; username: string }) => void;
+  } = {},
+) {
   const [store, dispatch] = useReducer(roundReducer, INITIAL_STORE);
   const [live, setLive] = useState(false);
   const reloadRef = useRef<() => void>(() => undefined);
   const onServerCloseRef = useRef(opts.onServerClose);
+  const onReactionRef = useRef(opts.onReaction);
   useEffect(() => {
     onServerCloseRef.current = opts.onServerClose;
+    onReactionRef.current = opts.onReaction;
   });
 
   useEffect(() => {
@@ -121,6 +131,21 @@ export function useArenaRound(id: string, opts: { onServerClose?: (p: ArenaPosit
         const d = parse(e);
         if (d) dispatch({ type: 'leaderboard', rows: toLeaderboardRows(d) });
       });
+      source.addEventListener('opponent', (e) => {
+        const d = parse(e);
+        if (!d) return;
+        const equity = Number(d.equity);
+        const ret = Number(d.return_pct);
+        dispatch({ type: 'opponent', equity: Number.isFinite(equity) ? equity : null, return_pct: Number.isFinite(ret) ? ret : null });
+      });
+      source.addEventListener('reaction', (e) => {
+        const d = parse(e);
+        if (d && typeof d.emoji === 'string') onReactionRef.current?.({ emoji: d.emoji, username: typeof d.username === 'string' ? d.username : '' });
+      });
+      source.addEventListener('host_message', (e) => {
+        const message = toHostMessage(parse(e));
+        if (message) dispatch({ type: 'host_message', message });
+      });
       source.addEventListener('end', (e) => {
         const d = parse(e) ?? {};
         finished = true;
@@ -133,6 +158,8 @@ export function useArenaRound(id: string, opts: { onServerClose?: (p: ArenaPosit
           reveal: toReveal(d.reveal),
           leaderboard: d.leaderboard ? toLeaderboardRows(d.leaderboard) : undefined,
           cancelled: d.cancelled === true,
+          duel: d.duel ? toRoundDuel(d.duel) : undefined,
+          debrief: typeof d.reveal?.debrief === 'string' ? d.reveal.debrief : typeof d.debrief === 'string' ? d.debrief : null,
         });
         // Tur sonunda kapanan pozisyonlar ve kesin sonuçlar
         timer = setTimeout(() => void load(), 600);

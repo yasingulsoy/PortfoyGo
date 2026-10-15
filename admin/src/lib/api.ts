@@ -123,3 +123,60 @@ export const adminApi = {
 
 /** Kullanıcı uygulamasının adresi (panelden siteye bağlantı) */
 export const APP_URL = (process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000').replace(/\/+$/, '');
+
+/* ------------------------------------------------------------------ */
+/* Arena senaryoları: lisanslı tarihsel seriler ve senaryo düzenleyici    */
+/* ------------------------------------------------------------------ */
+
+import type { BroadcastToken, ScenarioInput, SeriesCurrency } from './types';
+
+export interface SeriesImportInput {
+  /** ^[A-Z0-9_]{3,40}$ */
+  series_code: string;
+  label: string;
+  currency: SeriesCurrency;
+  /** Verinin kaynağı (zorunlu) */
+  source: string;
+  /** Lisans / kullanım hakkı notu (zorunlu) */
+  license_note: string;
+  csv?: string;
+  rows?: [string | number, number][];
+  /** true → mevcut noktalar silinip yenileriyle değiştirilir (varsayılan: birleştir) */
+  replace?: boolean;
+}
+
+export const scenarioKeys = {
+  series: '/admin/arena/series',
+  seriesPreview: (code: string, limit = 500, range?: { from?: string; to?: string }) =>
+    withQuery(`/admin/arena/series/${id(code)}/preview`, { limit, from: range?.from, to: range?.to }),
+  scenarios: '/admin/arena/scenarios',
+};
+
+export const scenarioApi = {
+  importSeries: (input: SeriesImportInput) => apiFetch<{ data?: unknown }>('/admin/arena/series/import', post(input)),
+  deleteSeries: (code: string) => apiFetch(`/admin/arena/series/${id(code)}`, { method: 'DELETE' }),
+  createScenario: (input: ScenarioInput) => apiFetch<{ data?: unknown }>('/admin/arena/scenarios', post(input)),
+  updateScenario: (scenarioId: string, patch: Partial<ScenarioInput>) =>
+    apiFetch<{ data?: unknown }>(`/admin/arena/scenarios/${id(scenarioId)}`, { method: 'PATCH', body: JSON.stringify(patch) }),
+  deleteScenario: (scenarioId: string) => apiFetch(`/admin/arena/scenarios/${id(scenarioId)}`, { method: 'DELETE' }),
+  publishScenario: (scenarioId: string, published: boolean) =>
+    apiFetch<{ data?: unknown }>(`/admin/arena/scenarios/${id(scenarioId)}/publish`, post({ published })),
+};
+
+/** Canlı yayın (OBS kaplaması) ve sunucu mesajı */
+export const broadcastApi = {
+  createToken: async (challengeId: string): Promise<BroadcastToken> => {
+    const res = await apiFetch<{ data?: Partial<BroadcastToken> } & Partial<BroadcastToken>>(
+      `/admin/arena/challenges/${id(challengeId)}/broadcast-token`,
+      post({}),
+    );
+    const d = (res?.data ?? res) as Partial<BroadcastToken>;
+    const token = String(d?.token ?? '');
+    return { token, overlay_path: String(d?.overlay_path || (token ? `/yayin/${token}` : '')) };
+  },
+  /** text ≤ 140 karakter */
+  sendMessage: (challengeId: string, text: string) => apiFetch(`/admin/arena/challenges/${id(challengeId)}/message`, post({ text })),
+};
+
+/** Yayın kaplamasının tam adresi (site kökü + overlay_path) */
+export const overlayUrl = (overlayPath: string) => `${APP_URL}${overlayPath.startsWith('/') ? '' : '/'}${overlayPath}`;

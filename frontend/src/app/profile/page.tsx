@@ -34,6 +34,8 @@ import BadgesGrid from '@/components/profile/BadgesGrid';
 import ActivityLog from '@/components/profile/ActivityLog';
 import SeasonAwards from '@/components/profile/SeasonAwards';
 import NotificationPrefsCard from '@/components/notifications/NotificationPrefsCard';
+import ResponsibleProfileCard from '@/components/game/responsible/ResponsibleProfileCard';
+import ArenaHistory from '@/components/arena/ArenaHistory';
 import { computeTradeStats } from '@/components/profile/tradeStats';
 import { MY_RANK_KEY } from '@/components/leaderboard/MyRankCard';
 import { normalizeMyRank } from '@/components/leaderboard/model';
@@ -44,7 +46,7 @@ export default function ProfilePage() {
 
   return (
     <div className="space-y-4 md:space-y-6">
-      <PageHeader title="Profil" description="Hesap bilgilerin, performansın, sezon unvanların, rozetlerin ve son aktivitelerin." actions={<Breadcrumb items="Profil" />} />
+      <PageHeader title="Profil" description="Hesap bilgilerin, performansın, sezon unvanların, rozetlerin, oyun geçmişin ve son aktivitelerin." actions={<Breadcrumb items="Profil" />} />
       <UserCard user={user} />
       <InfoCard user={user} />
       <StatsRow />
@@ -53,7 +55,9 @@ export default function ProfilePage() {
         <BadgesGrid />
         <ActivityLog />
       </div>
+      <ArenaHistory />
       <NotificationPrefsCard />
+      <ResponsibleProfileCard />
       <SecurityCard />
     </div>
   );

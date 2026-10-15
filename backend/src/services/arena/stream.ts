@@ -4,7 +4,10 @@ import { arenaBus, type ArenaBusEvent } from './bus';
 import {
   ArenaService,
   anyTrigger,
+  canViewRound,
   computeMe,
+  duelStateFor,
+  opponentSnapshot,
   displayQuote,
   formatPosition,
   loadEntry,
@@ -25,7 +28,11 @@ import type { EntryRow, PositionRow, RoundRow } from './types';
  *  event: me          {cash, equity, return_pct, rank}   değişiklikte ve 5 tick'te bir
  *  event: position    <Position>                         açıldı / kapandı / SL / TP / tasfiye
  *  event: leaderboard [...]                              meydan okuma, 5 sn'de bir
- *  event: end         {final, reveal, leaderboard?}      ardından bağlantı kapanır
+ *  event: opponent    {equity, return_pct}               düello, saniyede bir (rakibin anlık durumu)
+ *  event: reaction    {emoji, username}                  katılımcı tepkisi
+ *  event: host_message {text, at}                        meydan okuma sunucusunun mesajı
+ *  event: end         {final, reveal, leaderboard?, duel?} ardından bağlantı kapanır
+ *                     (reveal.debrief: senaryo turu; duel: {result, opponent_equity, opponent_return_pct, …})
  *  : ping                                                25 sn'de bir
  */
 
@@ -43,7 +50,7 @@ export function arenaStreamCount(userId: string): number {
 
 export async function openRoundStream(req: Request, res: Response, roundId: string, userId: string): Promise<void> {
   let round = await loadRound(roundId);
-  if (!round || (round.kind === 'solo' && round.user_id !== userId)) {
+  if (!round || !canViewRound(round, userId)) {
     res.status(404).json({ success: false, message: 'Tur bulunamadı', code: 'NOT_FOUND' });
     return;
   }
@@ -112,9 +119,13 @@ export async function openRoundStream(req: Request, res: Response, roundId: stri
       await refreshMine();
       const paths = roundPaths(current);
       const final = computeMe(current, paths, entry, open, current.duration_s, entry?.rank ?? null);
-      const payload: Record<string, unknown> = { final, reveal: ArenaService.reveal(current) ?? null };
+      const payload: Record<string, unknown> = { final, reveal: (await ArenaService.revealWithDebrief(current)) ?? null };
       if (current.status === 'cancelled') payload.cancelled = true;
       if (current.kind === 'challenge') payload.leaderboard = (await roundLeaderboard(current, userId)).items;
+      if (current.kind === 'duel') {
+        const d = await duelStateFor(current, paths, current.duration_s, userId);
+        if (d) payload.duel = d;
+      }
       send('end', payload);
     } catch (err: any) {
       logger.warn({ err }, `[arena] SSE bitiş olayı gönderilemedi: ${err?.message || err}`);
@@ -169,6 +180,10 @@ export async function openRoundStream(req: Request, res: Response, roundId: stri
         send('leaderboard', lb.items);
       }
       if (entry && tick % ME_EVERY_TICKS === 0) send('me', meNow());
+      if (current.kind === 'duel') {
+        const snap = await opponentSnapshot(current, userId, paths, tick);
+        if (snap) send('opponent', { equity: snap.equity, return_pct: snap.return_pct });
+      }
     } catch (err: any) {
       logger.warn({ err, roundId }, `[arena] SSE döngü hatası: ${err?.message || err}`);
     } finally {
@@ -193,6 +208,10 @@ export async function openRoundStream(req: Request, res: Response, roundId: stri
       });
     } else if (e.kind === 'finished') {
       void enqueue(finish);
+    } else if (e.kind === 'reaction') {
+      send('reaction', { emoji: e.emoji, username: e.username });
+    } else if (e.kind === 'host_message') {
+      send('host_message', { text: e.text, at: e.at });
     }
   });
 

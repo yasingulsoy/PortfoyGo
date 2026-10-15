@@ -9,7 +9,13 @@ export type ArenaBusEvent =
   | { kind: 'position'; userId: string; position: PositionRow }
   | { kind: 'me'; userId: string }
   | { kind: 'started' }
-  | { kind: 'finished' };
+  | { kind: 'finished' }
+  /** Yeni açılan pozisyon (yayın ekranı için; tutar içermez) */
+  | { kind: 'trade'; userId: string; instrument: string; side: 'long' | 'short'; at: string }
+  /** Katılımcı tepkisi (emoji) */
+  | { kind: 'reaction'; userId: string; username: string; emoji: string }
+  /** Meydan okuma sunucusunun mesajı */
+  | { kind: 'host_message'; text: string; at: string };
 
 class ArenaBus {
   private readonly emitter = new EventEmitter();

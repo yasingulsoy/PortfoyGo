@@ -478,3 +478,205 @@ export const advisorApi = {
   apply: async (id: string, amount_try: number) =>
     toApplyResult(unwrap(await apiFetch(`/advisor/plans/${encodeURIComponent(id)}/apply`, post({ amount_try, mode: 'buy_only' })))),
 };
+
+/* ------------------------------------------------------------------ */
+/* Arena koçu: tur sonu değerlendirmesi                                  */
+/* ------------------------------------------------------------------ */
+
+import { toCoachReport } from '@/components/arena/coach/model';
+
+export const coachApi = {
+  /** 404: tur yok · 409 ROUND_NOT_FINISHED: tur henüz bitmedi */
+  key: (roundId: string) => `/arena/rounds/${encodeURIComponent(roundId)}/coach`,
+  report: async (roundId: string) => toCoachReport(await swrFetcher<unknown>(coachApi.key(roundId))),
+};
+
+/* ------------------------------------------------------------------ */
+/* Oyun ekonomisi: çark, görevler, mağaza, sıralama, sorumlu oyun        */
+/* ------------------------------------------------------------------ */
+
+import type { GameBreakDuration, GameLeaderboardType, GameResponsibleSettings } from '@/types';
+import { toGameReward, toSpinResult, toWheelState } from '@/components/game/wheel/model';
+import { toQuestList } from '@/components/game/quests/model';
+import { toShopItems } from '@/components/game/shop/model';
+import { toGameLeaderboard, toLedgerPage } from '@/components/game/ranks/model';
+import { toResponsibleState } from '@/components/game/responsible/model';
+
+/** Oyun uç noktası hatası: sözleşmedeki `code` (ör. NO_SPINS, ADULT_CONFIRM_REQUIRED) ve ek veriyle. */
+export class GameApiError extends ApiError {
+  constructor(
+    message: string,
+    status: number,
+    public code: string | null,
+    public data: Record<string, any> | null,
+  ) {
+    super(message, status);
+    this.name = 'GameApiError';
+  }
+}
+
+/** Hata gövdesini (code, next_free_at, break_until…) koruyan istek; apiFetch ile aynı çerez/CSRF kuralları. */
+async function gameRequest(endpoint: string, init: RequestInit = {}): Promise<any> {
+  let res: Response;
+  try {
+    res = await fetch(`${ARENA_API_BASE}${endpoint}`, {
+      ...init,
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'PortfoyGo' },
+    });
+  } catch {
+    throw new GameApiError('Sunucuya ulaşılamadı. Bağlantınızı kontrol edip tekrar deneyin.', 0, null, null);
+  }
+  const body = await res.json().catch(() => null);
+  if (!res.ok) {
+    if (res.status === 401 && typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('auth:logout'));
+    const code = typeof body?.code === 'string' ? body.code : typeof body?.error === 'string' && /^[A-Z_]+$/.test(body.error) ? body.error : null;
+    const data = body?.data && typeof body.data === 'object' ? { ...body, ...body.data } : body && typeof body === 'object' ? body : null;
+    throw new GameApiError((body && (body.message || (code ? null : body.error))) || 'Beklenmeyen bir hata oluştu.', res.status, code, data);
+  }
+  return unwrap(body);
+}
+
+const gid = (id: string) => encodeURIComponent(id);
+const gamePost = (endpoint: string, body: unknown = {}) => gameRequest(endpoint, { method: 'POST', body: JSON.stringify(body) });
+
+export const gameEconomyApi = {
+  profileKey: '/game/profile',
+
+  wheelKey: '/game/wheel',
+  wheel: async () => toWheelState(await gameRequest('/game/wheel')),
+  /** 429 NO_SPINS {next_free_at} · 403 ADULT_CONFIRM_REQUIRED · 403 ARENA_BREAK {break_until} (GameApiError) */
+  spin: async (segments: Parameters<typeof toSpinResult>[1]) => {
+    const raw = await gamePost('/game/wheel/spin');
+    return { ...toSpinResult(raw, segments), profile: raw?.profile ?? null };
+  },
+
+  questsKey: '/game/quests',
+  quests: async () => toQuestList(await gameRequest('/game/quests')),
+  claimQuest: async (key: string) => {
+    const raw = await gamePost(`/game/quests/${gid(key)}/claim`);
+    return { reward: toGameReward(raw?.reward), profile: raw?.profile ?? null };
+  },
+
+  shopKey: '/game/shop',
+  shop: async () => toShopItems(await gameRequest('/game/shop')),
+  buy: async (id: string) => {
+    const raw = await gamePost(`/game/shop/${gid(id)}/buy`);
+    return { profile: raw?.profile ?? null };
+  },
+  equip: async (body: { avatar_id?: string | null; frame_id?: string | null; title_id?: string | null }) => {
+    const raw = await gamePost('/game/cosmetics/equip', body);
+    return { profile: raw?.profile ?? null };
+  },
+
+  leaderboardKey: (type: GameLeaderboardType, limit = 50) => `/game/leaderboard?type=${type}&limit=${limit}`,
+  leaderboard: async (type: GameLeaderboardType, limit = 50) => toGameLeaderboard(await gameRequest(gameEconomyApi.leaderboardKey(type, limit))),
+
+  ledgerKey: (limit = 20, offset = 0) => `/game/ledger?limit=${limit}&offset=${offset}`,
+  ledger: async (limit = 20, offset = 0) => toLedgerPage(await gameRequest(gameEconomyApi.ledgerKey(limit, offset))),
+
+
+  responsibleKey: '/game/responsible',
+  responsible: async () => toResponsibleState(await gameRequest('/game/responsible')),
+  updateResponsible: async (body: Partial<GameResponsibleSettings>) =>
+    toResponsibleState(await gameRequest('/game/responsible', { method: 'PUT', body: JSON.stringify(body) })),
+  confirmAdult: async () => {
+    const raw = await gamePost('/game/responsible/confirm-adult', { confirm: true });
+    return { profile: raw?.profile ?? null, responsible: toResponsibleState(raw?.responsible ?? raw?.profile?.responsible ?? raw) };
+  },
+  takeBreak: async (duration: GameBreakDuration) => {
+    const raw = await gamePost('/game/responsible/break', { duration });
+    return toResponsibleState(raw?.responsible ?? raw);
+  },
+};
+
+/* ------------------------------------------------------------------ */
+/* Oyun profili ve arena sosyal: düello, eşleşme, tepkiler, yayın        */
+/* ------------------------------------------------------------------ */
+
+import {
+  toBroadcastState,
+  toDuel,
+  toDuelHistory,
+  toDuelInvite,
+  toGameProfile,
+  toMatchTicket,
+  toPublicProfile,
+  toRoundRewards,
+} from '@/components/game/model';
+
+export const gameProfileApi = {
+  /** gameEconomyApi.profileKey ile aynı anahtar: ödül / mağaza işlemleri profili yeniler */
+  profileKey: '/game/profile',
+  profile: async () => toGameProfile(await gameRequest('/game/profile')),
+  publicProfileKey: (username: string) => `/game/public-profile/${gid(username)}`,
+  publicProfile: async (username: string) => toPublicProfile(await gameRequest(gameProfileApi.publicProfileKey(username))),
+  /** Bu turdan kazanılan jeton / XP + reyting farkı (sunucu defteri; ödül yazılana dek ready=false) */
+  roundRewardsKey: (roundId: string) => `/game/rewards/round/${gid(roundId)}`,
+  roundRewards: async (roundId: string) => toRoundRewards(await gameRequest(gameProfileApi.roundRewardsKey(roundId))),
+};
+
+export const arenaSocialApi = {
+  /** 403 ADULT_CONFIRM_REQUIRED / ARENA_BREAK · 429 ARENA_PERSONAL_LIMIT (GameApiError) */
+  createDuel: async (duration_s: number, instruments?: string[]) =>
+    toDuelInvite(await gamePost('/arena/duels', instruments?.length ? { duration_s, instruments } : { duration_s })),
+  duelKey: (code: string) => `/arena/duels/${gid(code)}`,
+  duel: async (code: string) => toDuel(await gameRequest(arenaSocialApi.duelKey(code))),
+  acceptDuel: async (code: string) => {
+    const raw = await gamePost(`/arena/duels/${gid(code)}/accept`);
+    return { round_id: String(raw?.round_id ?? ''), starts_at: typeof raw?.starts_at === 'string' ? raw.starts_at : null };
+  },
+  cancelDuel: (id: string) => gamePost(`/arena/duels/${gid(id)}/cancel`),
+  rematch: async (id: string) => toDuelInvite(await gamePost(`/arena/duels/${gid(id)}/rematch`)),
+  /** Son düellolar + galibiyet/mağlubiyet kaydı */
+  myDuelsKey: (limit = 10) => `/arena/duels/mine?limit=${limit}`,
+  myDuels: async (limit = 10) => toDuelHistory(await gameRequest(arenaSocialApi.myDuelsKey(limit))),
+
+  matchmake: async (duration_s: number) => toMatchTicket(await gamePost('/arena/matchmaking', { duration_s })),
+  ticket: async (ticket: string) => toMatchTicket(await gameRequest(`/arena/matchmaking/${gid(ticket)}`), ticket),
+  cancelTicket: (ticket: string) => gameRequest(`/arena/matchmaking/${gid(ticket)}`, { method: 'DELETE' }),
+
+  react: (roundId: string, emoji: string) => gamePost(`/arena/rounds/${gid(roundId)}/reactions`, { emoji }),
+
+  /** Herkese açık yayın (OBS) */
+  broadcastKey: (token: string) => `/arena/broadcast/${gid(token)}`,
+  broadcast: async (token: string) => toBroadcastState(await gameRequest(arenaSocialApi.broadcastKey(token))),
+  broadcastStreamUrl: (token: string) => `${ARENA_API_BASE}/arena/broadcast/${gid(token)}/stream`,
+};
+
+/* ------------------------------------------------------------------ */
+/* Yatırım İmparatorluğu (idle) ve arena senaryoları                     */
+/* ------------------------------------------------------------------ */
+
+import type { IdleBuyQuantity } from '@/types';
+import { toIdleLeaderboard, toIdleState, toTapResult } from '@/components/game/idle/model';
+import { toRecentScenarioRounds, toScenarioDetail, toScenarioRoundInfo, toScenarios } from '@/components/game/scenarios/model';
+
+/** Hatalar GameApiError (code: ör. INSUFFICIENT_CASH, UPGRADE_LOCKED, PRESTIGE_UNAVAILABLE) */
+export const idleApi = {
+  stateKey: '/idle/state',
+  state: async () => toIdleState(await gameRequest('/idle/state')),
+  buy: async (building_id: string, quantity: IdleBuyQuantity) => toIdleState(await gamePost('/idle/buy', { building_id, quantity })),
+  upgrade: async (upgrade_id: string) => toIdleState(await gamePost('/idle/upgrade', { upgrade_id })),
+  /** count: 1..20 */
+  tap: async (count: number) => toTapResult(await gamePost('/idle/tap', { count: Math.max(1, Math.min(20, Math.floor(count))) })),
+  prestige: async () => toIdleState(await gamePost('/idle/prestige')),
+  leaderboardKey: '/idle/leaderboard',
+  leaderboard: async () => toIdleLeaderboard(await gameRequest('/idle/leaderboard')),
+};
+
+export const scenariosApi = {
+  listKey: '/arena/scenarios',
+  list: async () => toScenarios(await gameRequest('/arena/scenarios')),
+  /** Senaryo turu başlatır → RoundState (409 ARENA_ROUND_ACTIVE · 429 ARENA_LIMIT · 403 ADULT_CONFIRM_REQUIRED) */
+  start: async (scenario_id: string, duration_s: number) =>
+    toRoundState(await gamePost('/arena/rounds', { scenario_id, duration_s })),
+  /** Brifing; debrief yalnızca kullanıcı senaryoyu en az bir kez bitirdiyse */
+  detailKey: (idOrSlug: string) => `/arena/scenarios/${encodeURIComponent(idOrSlug)}`,
+  detail: async (idOrSlug: string) => toScenarioDetail(await gameRequest(`/arena/scenarios/${encodeURIComponent(idOrSlug)}`)),
+  roundKey: (roundId: string) => `/arena/rounds/${encodeURIComponent(roundId)}#senaryo`,
+  round: async (roundId: string) => toScenarioRoundInfo(await gameRequest(`/arena/rounds/${encodeURIComponent(roundId)}`)),
+  /** Son bitmiş senaryo turları (geçmişten kind = 'scenario') */
+  recentKey: '/arena/me/history?limit=30&offset=0#senaryo',
+  recent: async () => toRecentScenarioRounds(await gameRequest('/arena/me/history?limit=30&offset=0')),
+};

@@ -2,7 +2,7 @@
 
 import useSWR from 'swr';
 import { ApiError, arenaApi } from '@/lib/api';
-import type { ArenaChallengeStatus, ArenaLeaderPeriod } from '@/types';
+import type { ArenaChallengeStatus } from '@/types';
 
 /** Uç henüz yoksa / kayıt bulunamadıysa tekrar denemeye gerek yok. */
 const retryUnlessMissing = (err: unknown) => !(err instanceof ApiError && [400, 403, 404].includes(err.status));
@@ -19,14 +19,6 @@ export function useActiveArenaRound() {
 export function useArenaHistory(limit: number, offset: number) {
   return useSWR(arenaApi.historyKey(limit, offset), () => arenaApi.history(limit, offset), {
     keepPreviousData: true,
-    shouldRetryOnError: retryUnlessMissing,
-  });
-}
-
-export function useArenaLeaders(period: ArenaLeaderPeriod) {
-  return useSWR(arenaApi.leadersKey(period), () => arenaApi.leaders(period), {
-    keepPreviousData: true,
-    refreshInterval: 60_000,
     shouldRetryOnError: retryUnlessMissing,
   });
 }

@@ -17,9 +17,14 @@ import type {
   ArenaReveal,
   ArenaRound,
   ArenaRoundInstrument,
+  ArenaRoundKind,
   ArenaRoundState,
   ArenaSide,
+  ArenaHostMessage,
+  ArenaRoundDuel,
+  ArenaRoundScenario,
 } from '@/types';
+import { toRoundDuel, toRoundScenario } from '@/components/game/model';
 
 /** Arena başlangıç sermayesi (USD, sanal). */
 export const ARENA_START_CASH = 10_000;
@@ -146,7 +151,7 @@ export function toRound(raw: any): ArenaRound {
   const c = raw?.challenge;
   return {
     id: str(raw?.id),
-    kind: raw?.kind === 'challenge' ? 'challenge' : 'solo',
+    kind: toRoundKind(raw?.kind),
     status,
     starts_at: str(raw?.starts_at),
     ends_at: str(raw?.ends_at),
@@ -158,6 +163,7 @@ export function toRound(raw: any): ArenaRound {
     challenge: c && typeof c === 'object' ? { id: str(c.id), title: str(c.title), sponsor: strOrNull(c.sponsor), prize_text: strOrNull(c.prize_text) } : null,
     reveal: toReveal(raw?.reveal),
     ...(cancelled ? { cancelled: true } : {}),
+    ...(strOrNull(raw?.reveal?.debrief ?? raw?.debrief) ? { debrief: strOrNull(raw?.reveal?.debrief ?? raw?.debrief) } : {}),
   };
 }
 
@@ -185,6 +191,9 @@ export function toRoundState(raw: any): ArenaRoundState {
     history_ticks: ticks.length && ticks.every(Number.isFinite) ? ticks : undefined,
     positions: { open: arr(raw?.positions?.open).map(toPosition), closed: arr(raw?.positions?.closed).map(toPosition) },
     leaderboard: raw?.leaderboard ? toLeaderboardRows(raw.leaderboard) : undefined,
+    // Düello / senaryo turları (yalnızca varsa)
+    ...(raw?.duel && typeof raw.duel === 'object' ? { duel: toRoundDuel(raw.duel) } : {}),
+    ...(raw?.scenario && typeof raw.scenario === 'object' ? { scenario: toRoundScenario(raw.scenario) } : {}),
   };
 }
 
@@ -198,10 +207,30 @@ export function toFinal(raw: any, fallback?: ArenaMe): ArenaFinal {
   };
 }
 
+const ROUND_KINDS: readonly ArenaRoundKind[] = ['solo', 'challenge', 'duel', 'scenario'];
+/** Bilinmeyen tür → 'solo' (eski sunucularla uyum). */
+export function toRoundKind(v: unknown): ArenaRoundKind {
+  return ROUND_KINDS.includes(v as ArenaRoundKind) ? (v as ArenaRoundKind) : 'solo';
+}
+
+/** Geçmiş satırının açılacağı sayfa: senaryo turları "Ne oldu?" ekranına, diğerleri oyun tur ekranına. */
+export function historyHref(item: Pick<ArenaHistoryItem, 'kind' | 'round_id'>): string {
+  const id = encodeURIComponent(item.round_id);
+  return item.kind === 'scenario' ? `/oyun/senaryolar/tur/${id}` : `/oyun/tur/${id}`;
+}
+
+/** Geçmiş satırının başlığı. */
+export function historyTitle(item: Pick<ArenaHistoryItem, 'kind' | 'challenge_title' | 'duration_s'>): string {
+  if (item.kind === 'challenge') return item.challenge_title ?? 'Meydan okuma';
+  if (item.kind === 'duel') return `Düello · ${durationLabel(item.duration_s)}`;
+  if (item.kind === 'scenario') return `Senaryo · ${durationLabel(item.duration_s)}`;
+  return `Hızlı tur · ${durationLabel(item.duration_s)}`;
+}
+
 export function toHistoryItem(raw: any): ArenaHistoryItem {
   return {
     round_id: str(raw?.round_id ?? raw?.id),
-    kind: raw?.kind === 'challenge' ? 'challenge' : 'solo',
+    kind: toRoundKind(raw?.kind),
     challenge_title: strOrNull(raw?.challenge_title),
     duration_s: num(raw?.duration_s, 60),
     return_pct: num(raw?.return_pct),
@@ -375,7 +404,9 @@ export function revealSentence(reveal: ArenaReveal | null | undefined, labels: s
   const range = formatRevealRange(reveal);
   if (!range) return null;
   const what = labels.length ? `${joinTr(labels)} ` : '';
-  return `Bu tur, ${range} arasındaki gerçek ${what}hareketinin hızlandırılmış tekrarıydı.`;
+  // Tek günlük pencere: "12 Eylül 2026 tarihindeki"; aralık: "12–13 Eylül 2026 arasındaki"
+  const when = range.includes('–') ? 'arasındaki' : 'tarihindeki';
+  return `Bu tur, ${range} ${when} gerçek ${what}hareketinin hızlandırılmış tekrarıydı.`;
 }
 
 /** Kapanan pozisyonlar içinde en iyi ve en kötü işlem (kâr/zarar tutarına göre). */
@@ -481,6 +512,12 @@ export interface RoundModel {
   baseEquity: number;
   /** Tur başındaki orta fiyatlar (tick olaylarında "başlangıçtan beri değişim" için) */
   startMids: Record<string, number>;
+  /** Düello turunda rakibin canlı durumu */
+  duel?: ArenaRoundDuel | null;
+  /** Senaryo turu */
+  scenario?: ArenaRoundScenario | null;
+  /** Meydan okuma sunucusunun son mesajı */
+  hostMessage?: ArenaHostMessage | null;
 }
 
 export interface RoundStore {
@@ -499,7 +536,17 @@ export type RoundAction =
   | { type: 'positions'; positions: ArenaPosition[] }
   | { type: 'leaderboard'; rows: ArenaLeaderboardRow[] }
   | { type: 'countdown'; starts_in_ms: number; now: number }
-  | { type: 'end'; final: ArenaFinal | null; reveal: ArenaReveal | null; leaderboard?: ArenaLeaderboardRow[]; cancelled?: boolean };
+  | { type: 'opponent'; equity: number | null; return_pct: number | null }
+  | { type: 'host_message'; message: ArenaHostMessage }
+  | {
+      type: 'end';
+      final: ArenaFinal | null;
+      reveal: ArenaReveal | null;
+      leaderboard?: ArenaLeaderboardRow[];
+      cancelled?: boolean;
+      duel?: ArenaRoundDuel | null;
+      debrief?: string | null;
+    };
 
 export const INITIAL_STORE: RoundStore = { model: null, error: null, version: 0 };
 
@@ -593,6 +640,9 @@ export function roundReducer(store: RoundStore, action: RoundAction): RoundStore
         countdownUntil: s.round.status === 'scheduled' ? (m?.countdownUntil ?? null) : null,
         final: s.round.status === 'finished' ? (m?.final ?? toFinal(null, s.me)) : null,
         baseEquity: baseFrom(s.me),
+        duel: s.duel ? { ...s.duel, result: s.duel.result ?? m?.duel?.result ?? null } : (m?.duel ?? null),
+        scenario: s.scenario ?? m?.scenario ?? null,
+        hostMessage: m?.hostMessage ?? null,
       };
       return { model, error: null, version: store.version + 1 };
     }
@@ -648,16 +698,39 @@ export function roundReducer(store: RoundStore, action: RoundAction): RoundStore
       return m ? { ...store, model: { ...m, leaderboard: action.rows } } : store;
     case 'countdown':
       return m && m.round.status === 'scheduled' ? { ...store, model: { ...m, countdownUntil: action.now + Math.max(0, action.starts_in_ms) } } : store;
+    case 'opponent': {
+      if (!m?.duel || m.round.status === 'finished') return store;
+      return {
+        ...store,
+        model: {
+          ...m,
+          duel: {
+            ...m.duel,
+            opponent_equity: action.equity ?? m.duel.opponent_equity,
+            opponent_return_pct: action.return_pct ?? m.duel.opponent_return_pct,
+          },
+        },
+      };
+    }
+    case 'host_message':
+      return m ? { ...store, model: { ...m, hostMessage: action.message } } : store;
     case 'end': {
       if (!m) return store;
       return {
         ...store,
         model: {
           ...m,
-          round: { ...m.round, status: 'finished', reveal: action.reveal ?? m.round.reveal ?? null, ...(action.cancelled ? { cancelled: true } : {}) },
+          round: {
+            ...m.round,
+            status: 'finished',
+            reveal: action.reveal ?? m.round.reveal ?? null,
+            ...(action.cancelled ? { cancelled: true } : {}),
+            ...(action.debrief ? { debrief: action.debrief } : {}),
+          },
           final: action.final ?? toFinal(null, m.me),
           leaderboard: action.leaderboard ?? m.leaderboard,
           countdownUntil: null,
+          duel: action.duel ? { ...(m.duel ?? {}), ...action.duel, result: action.duel.result ?? m.duel?.result ?? null } : m.duel,
         },
         version: store.version + 1,
       };
@@ -677,11 +750,3 @@ export function shareText(opts: { returnPct: number; durationS: number; rank?: n
   const rank = opts.rank ? ` ${opts.rank}.${opts.participants ? ` / ${opts.participants}` : ''} oldum,` : '';
   return `${where}${rank} getirim ${pct} (sanal para).${opts.url ? ` ${opts.url}` : ''}`;
 }
-
-/** Klavye kısayolları (yardım ipucunda listelenir) */
-export const ARENA_SHORTCUTS: { keys: string; label: string }[] = [
-  { keys: 'B', label: 'Al' },
-  { keys: 'S', label: 'Sat' },
-  { keys: '1–4', label: 'Enstrüman seç' },
-  { keys: 'X', label: 'Tümünü kapat' },
-];

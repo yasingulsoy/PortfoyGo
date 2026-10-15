@@ -17,7 +17,7 @@ Bu liste, `feature/platform-v0.4` dalındaki çalışmanın canlıya alınmadan 
 ## 3. Veritabanı
 
 - [ ] Uzak veritabanının yedeğini al: `pg_dump "$DATABASE_URL" -Fc -f yedek_<tarih>.dump`.
-- [ ] Bekleyen migration'ları önizle: `npm run migrate -- --dry-run` (000–012).
+- [ ] Bekleyen migration'ları önizle: `npm run migrate -- --dry-run` (000–016).
 - [ ] Uygula: `npm run migrate`.
   - 002 sonrası tüm kullanıcılar bir kez yeniden giriş yapar (çerez oturumu).
   - 009 sonrası bekleyen e-posta doğrulama kodları geçersiz olur.
@@ -28,6 +28,7 @@ Bu liste, `feature/platform-v0.4` dalındaki çalışmanın canlıya alınmadan 
 - [ ] Docker'lı bir makinede imajları derle ve `docker compose --env-file .env.docker up --build` ile ayağa kaldır. İmajlar geliştirme makinesinde **hiç derlenmedi**.
 - [ ] Alan adları: site, API ve yönetim paneli **aynı sitede** olmalı (ör. `app.` / `api.` / `admin.portfoygo.com`, `COOKIE_DOMAIN=.portfoygo.com`). Farklı sitelerde (ör. `vercel.app` + `onrender.com`) oturum çalışmaz.
 - [ ] Ters vekil (reverse proxy) arkasında `TRUST_PROXY=1` (rate limit gerçek IP'yi görsün).
+- [ ] API'yi **HTTP/2** ile sun. Her sekme bildirim + Arena/yayın için canlı akış (SSE) bağlantısı açar; HTTP/1.1'de tarayıcının alan adı başına 6 bağlantı sınırı birkaç sekmede dolar ve istekler askıda kalır (yerelde görüldü).
 - [ ] `/healthz` ve `/readyz` uçlarını yük dengeleyici sağlık kontrolüne bağla.
 - [ ] Birden fazla API örneği çalıştırılacaksa:
   - Bildirim ve Arena canlı akışları için Redis pub/sub gerekir (şu an tek süreç içi).
@@ -46,6 +47,11 @@ Bu liste, `feature/platform-v0.4` dalındaki çalışmanın canlıya alınmadan 
 - [ ] **Arena:**
   - Saatlik tur sınırı (12).
   - Meydan okuma ödül metinleri ve sponsorlukların yasal çerçevesi (sorumlu oyun).
+- [ ] **Oyun Merkezi (`/oyun`):**
+  - Çark, görev, mağaza ve idle oyun ödülleri yalnızca oyun içi jeton/XP'dir; gerçek parayla satın alma veya paraya çevirme **eklenmemeli**. Ödüllü çark ve 18+ kapısı hukuk tarafından gözden geçirilmeli.
+  - Ekonomi dengesi tek dosyada: `backend/src/services/game/config.ts` ve `backend/src/services/idle/config.ts`.
+  - Senaryo modu için yüklenecek tarihsel veriler lisanslı olmalı (kaynak ve lisans notu zorunlu alan).
+  - Eşleştirme kuyruğu ve bot işleri (`arena-matchmaking`, `arena-bots`, `arena-duels`) tek süreçte çalışır; çok örnekte tek worker'a taşınmalı.
 - [ ] KVKK ve kullanım şartları metinlerinin hukuk onayı.
 
 ## 6. Canlı sonrası ilk gün

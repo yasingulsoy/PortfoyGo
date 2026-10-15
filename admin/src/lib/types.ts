@@ -175,7 +175,15 @@ export type AuditAction =
   | 'job.run'
   | 'announcement.create'
   | 'arena.challenge_create'
-  | 'arena.challenge_cancel';
+  | 'arena.challenge_cancel'
+  | 'arena.broadcast_token'
+  | 'arena.host_message'
+  | 'scenario.series_import'
+  | 'scenario.series_delete'
+  | 'scenario.create'
+  | 'scenario.update'
+  | 'scenario.delete'
+  | 'scenario.publish';
 
 export interface AuditEntry {
   id: string;
@@ -210,6 +218,8 @@ export interface ArenaChallenge {
   round_id: string | null;
   created_by_username?: string | null;
   created_at: string;
+  /** Mevcut yayın kaplaması yolu ('/yayin/<token>'), yoksa null */
+  overlay_path?: string | null;
 }
 
 export interface ArenaInstrument {
@@ -230,4 +240,87 @@ export interface ArenaLeaderboardEntry {
 export interface ArenaLeaderboard {
   items: ArenaLeaderboardEntry[];
   status: ArenaChallengeStatus | string;
+}
+
+/* ------------------------------------------------- Senaryolar ve seriler */
+
+export type SeriesCurrency = 'USD' | 'TRY';
+export type ScenarioDifficulty = 'kolay' | 'orta' | 'zor';
+
+/** Yöneticinin içe aktardığı lisanslı tarihsel fiyat serisi */
+export interface HistoricalSeries {
+  series_code: string;
+  label: string;
+  currency: SeriesCurrency;
+  source: string;
+  license_note: string;
+  points: number;
+  from: string | null;
+  to: string | null;
+  imported_at: string | null;
+  imported_by: string | null;
+  /** Bu seriyi kullanan senaryolar */
+  used_by: { id: string; title: string; published: boolean }[];
+}
+
+export interface SeriesImportResult {
+  series_code: string;
+  points: number;
+  imported: number | null;
+  from: string | null;
+  to: string | null;
+  rejected_rows: number;
+  rejected_samples: { line: number; reason: string }[];
+  duplicates: number;
+}
+
+export interface SeriesPreview {
+  series_code: string;
+  label: string;
+  currency: SeriesCurrency | string;
+  total: number;
+  /** t: unix ms, p: fiyat */
+  points: { t: number; p: number }[];
+}
+
+export interface ScenarioInstrumentInput {
+  code: string;
+  label: string;
+  series_code: string;
+}
+
+export interface AdminScenario {
+  id: string;
+  slug: string;
+  title: string;
+  description: string | null;
+  briefing: string;
+  debrief: string;
+  difficulty: ScenarioDifficulty;
+  instruments: ScenarioInstrumentInput[];
+  window_from: string;
+  window_to: string;
+  published: boolean;
+  synthetic: boolean;
+  plays: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ScenarioInput {
+  title: string;
+  description: string;
+  briefing: string;
+  debrief: string;
+  difficulty: ScenarioDifficulty;
+  instruments: ScenarioInstrumentInput[];
+  /** ISO 8601 */
+  window_from: string;
+  window_to: string;
+}
+
+/** Yayın (OBS) bağlantısı */
+export interface BroadcastToken {
+  token: string;
+  overlay_path: string;
 }

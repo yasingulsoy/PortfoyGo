@@ -1,7 +1,7 @@
 import http from 'http';
 import type { AddressInfo } from 'net';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { api, app, createUser, pool, settle, TestUser } from './helpers';
+import { api, app, confirmAdult, createUser as createBaseUser, pool, settle, TestUser } from './helpers';
 import { clearAvailabilityCache, getInstrument, quoteAt } from '../src/services/arena/instruments';
 import { ArenaService, clearPathCache, loadRound, roundPaths } from '../src/services/arena/service';
 import { closePrice, findTrigger, openPrice, positionPnl, quantityFor } from '../src/services/arena/engine';
@@ -54,6 +54,16 @@ async function startedRound(u: TestUser, seconds = 10, body: Record<string, unkn
 async function pathsOf(roundId: string) {
   const round = (await loadRound(roundId))!;
   return { round, paths: roundPaths(round)! };
+}
+
+/**
+ * Arena turları sorumlu oyun kontrolünden geçer (ResponsiblePlay.assertCanPlay: 18+ onayı, mola, kişisel sınır).
+ * Kontrol gerçek haliyle çalışır; test kullanıcıları 18+ onaylı oluşturulur (bkz. helpers.confirmAdult).
+ */
+async function createUser(opts?: Parameters<typeof createBaseUser>[0]): Promise<TestUser> {
+  const u = await createBaseUser(opts);
+  await confirmAdult(u.id);
+  return u;
 }
 
 beforeAll(async () => {
@@ -265,7 +275,8 @@ describe('Arena: işlemler', () => {
       const row = await pool.query('SELECT close_tick FROM arena_positions WHERE id = $1', [p.id]);
       expect(row.rows[0].close_tick).toBe(expected.tick);
       const pnl = positionPnl('long', p.entry_price, expected.price, p.qty, 2000);
-      expect(state.me.cash).toBeCloseTo(10000 + pnl, 2);
+      // me.* 2 ondalığa yuvarlanır: x.xx5 sınırında 0,005'lik fark olabilir
+      expect(Math.abs(state.me.cash - (10000 + pnl))).toBeLessThanOrEqual(0.0051);
     }
   });
 
@@ -319,7 +330,8 @@ describe('Arena: işlemler', () => {
     expect(state.round.tick).toBe(60);
     expect(state.round.reveal.from).toMatch(/^\d{4}-/);
     expect(state.round.reveal.instruments.EURUSD.to).toBeDefined();
-    expect(state.me.equity).toBeCloseTo(10000 + expectedPnl, 2);
+    // me.* 2 ondalığa yuvarlanır: x.xx5 sınırında 0,005'lik fark olabilir
+    expect(Math.abs(state.me.equity - (10000 + expectedPnl))).toBeLessThanOrEqual(0.0051);
     expect(state.me.return_pct).toBeCloseTo((expectedPnl / 10000) * 100, 2);
     await api().post(`/api/arena/rounds/${id}/positions`).set(u.auth).send({ instrument: 'EURUSD', side: 'long', amount: 100 }).expect(409);
 

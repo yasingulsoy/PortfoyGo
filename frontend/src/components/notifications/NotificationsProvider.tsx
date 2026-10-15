@@ -8,6 +8,7 @@ import { useAuth } from '@/context/AuthContext';
 import { API_BASE_URL, notificationsApi, toNotification, type AppNotification, type NotificationCategory } from '@/lib/api';
 import { NotificationsContext, type NotificationsContextValue } from '@/hooks/useNotifications';
 import { applyChange, isExternalLink, isInternalLink, type NotificationChange } from './model';
+import GameCelebrations from '@/components/game/ranks/GameCelebrations';
 
 /** Açılır paneldeki öğe sayısı */
 export const RECENT_LIMIT = 8;
@@ -253,5 +254,11 @@ export default function NotificationsProvider({ children }: { children: ReactNod
     [userId, unread.data, recent.data, recent.isLoading, recent.error, live, mutateRecent, mutateUnread, markRead, markAllRead, remove, subscribe],
   );
 
-  return <NotificationsContext.Provider value={value}>{children}</NotificationsContext.Provider>;
+  return (
+    <NotificationsContext.Provider value={value}>
+      {children}
+      {/* Oyun: seviye / kademe atlama kutlaması (bir kez) */}
+      <GameCelebrations />
+    </NotificationsContext.Provider>
+  );
 }

@@ -7,6 +7,8 @@ import {
   formatCountdown,
   formatPrice,
   formatRevealRange,
+  historyHref,
+  historyTitle,
   livePnl,
   pushFeed,
   revealSentence,
@@ -16,6 +18,7 @@ import {
   stopPrice,
   timeToTick,
   toChallengeStatus,
+  toHistoryItem,
   toRoundState,
 } from './model';
 
@@ -143,6 +146,9 @@ describe('reveal', () => {
     expect(revealSentence({ from: '2026-09-12T00:00:00Z', to: '2026-09-13T00:00:00Z' }, ['BTC', 'Altın', 'EUR/USD'])).toBe(
       'Bu tur, 12–13 Eylül 2026 arasındaki gerçek BTC, Altın ve EUR/USD hareketinin hızlandırılmış tekrarıydı.',
     );
+    expect(revealSentence({ from: '2026-09-12T08:00:00Z', to: '2026-09-12T20:00:00Z' }, ['BTC'])).toBe(
+      'Bu tur, 12 Eylül 2026 tarihindeki gerçek BTC hareketinin hızlandırılmış tekrarıydı.',
+    );
     expect(revealSentence(null, ['BTC'])).toBeNull();
   });
 });
@@ -268,5 +274,21 @@ describe('roundReducer — challenge before start', () => {
     expect(s1.model!.round.status).toBe('running');
     expect(s2.model!.quotes.BTC.change_pct_since_start).toBeCloseTo(2);
     expect(s2.model!.series.BTC.map((p) => p.t)).toEqual([0, 1]);
+  });
+});
+
+describe('history rows (düello / senaryo türleri)', () => {
+  it('keeps every round kind and links to the game screens', () => {
+    const duel = toHistoryItem({ round_id: 'a b', kind: 'duel', duration_s: 180 });
+    expect(duel.kind).toBe('duel');
+    expect(historyTitle(duel)).toBe('Düello · 3 dk');
+    expect(historyHref(duel)).toBe('/oyun/tur/a%20b');
+
+    const sc = toHistoryItem({ round_id: 'r1', kind: 'scenario', duration_s: 60 });
+    expect(historyTitle(sc)).toBe('Senaryo · 1 dk');
+    expect(historyHref(sc)).toBe('/oyun/senaryolar/tur/r1');
+
+    expect(historyTitle(toHistoryItem({ round_id: 'c', kind: 'challenge', challenge_title: 'Cuma Kupası' }))).toBe('Cuma Kupası');
+    expect(toHistoryItem({ round_id: 'x', kind: 'weird' }).kind).toBe('solo');
   });
 });

@@ -30,7 +30,7 @@ import TopBar from './TopBar';
 import Footer from './Footer';
 import UserMenu from './UserMenu';
 import NotificationBell from '@/components/notifications/NotificationBell';
-import { BARE_ROUTES } from './nav';
+import { BARE_ROUTES, isGameRoute } from './nav';
 
 /** Herkese açık sayfalar: misafirler bu sayfalarda menüsüz, sade üst çubukla gezer. */
 const PUBLIC_ROUTES = ['/', '/terms', '/privacy'];
@@ -40,6 +40,8 @@ export default function AppShell({ children }: { children: ReactNode }) {
   const { user, loading } = useAuth();
 
   if (BARE_ROUTES.includes(pathname)) return <>{children}</>;
+  // Oyun alanı (/oyun/**) kendi oyun düzenini, yayın katmanı (/yayin/**) hiçbir kabuğu kullanmaz
+  if (isGameRoute(pathname)) return <>{children}</>;
 
   // Ziyaretçi (veya oturum kontrol edilirken herkese açık sayfa): sade üst çubuk + footer
   if (!user && (loading ? PUBLIC_ROUTES.includes(pathname) : true)) {
@@ -67,7 +69,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
     },
     {
       title: 'Oyun',
-      items: [{ href: '/arena', label: 'Arena', icon: BoltIcon }],
+      items: [{ href: '/oyun', label: 'Oyun Merkezi', icon: BoltIcon, match: (p) => p === '/oyun' || p.startsWith('/oyun/') || p.startsWith('/arena') }],
     },
     {
       title: 'Rekabet',

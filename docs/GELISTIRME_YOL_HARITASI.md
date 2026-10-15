@@ -117,6 +117,18 @@ PortfoyGo/
 - [ ] 🔜 Gerçek zamanlı kotasyon sağlayıcısı geldiğinde Arena'ya "canlı" mod; H.Burak'ın anket taslağı ve TL nakit getiri varsayımının netleşmesi.
 - [x] Yayına alma adımları: [YAYIN_KONTROL_LISTESI.md](YAYIN_KONTROL_LISTESI.md)
 
+## 3.6.3 Oyun Merkezi (`/oyun`) ✅ (mobil oyun hissi + toplantı kararlarının ikinci uygulaması)
+
+Oyun alanı TailAdmin panelinden ayrıldı: kendi "oyun derisi" (gökyüzü / gece paleti, Baloo 2 yazı tipi, basılınca çöken kalın düğmeler, çizgi avatarlar, jeton sayacı, ödül pencereleri ve konfeti). Eski `/arena` adresleri `/oyun`'a yönlenir. Jeton ve XP yalnızca oyun içidir; gerçek parayla alınamaz, paraya çevrilemez.
+
+- [x] **1v1 Düello:** "HIZLI MAÇ" eşleştirmesi (15 sn'de rakip çıkmazsa açıkça etiketli "Antrenman Botu 🤖"), VS ekranı, 3-2-1 sayımı, halat çekme çubuğu, emoji tepkileri; davet linkiyle arkadaş düellosu ve rövanş. İnsan düellolarında ELO puanı ve kademeler (Bronz → Elmas).
+- [x] **İlerleme:** jeton, XP / seviye, günlük seri (7. gün bonusu), günlük görevler, **ücretsiz Günlük Çark** (sonuç sunucuda, olasılıklar her zaman görünür, ücretli çevirme yok), mağaza (avatar / çerçeve / unvan), puan ve seviye sıralamaları. Tur sonu ödülleri sunucunun defterinden (`GET /api/game/rewards/round/:id`).
+- [x] **Yatırım İmparatorluğu (idle):** 6 bina (Kumbara → Holding), gelirler gerçek piyasa hareketine bağlı çarpanlarla değişir ("Bugün altın %1,2 düştü → ×0,93"), çevrimdışı kazanç (8–12 sa sınır), yükseltmeler, kilometre taşı ödülleri, "Halka Arz" (prestij), bileşik getiri / çeşitlendirme ipuçları.
+- [x] **Koç ve senaryolar:** her bitmiş tura kural tabanlı "Koç Kemal" karnesi (A–E not, risk / disiplin / kalite / sonuç dağılımı, "Neden önemli?"); senaryo kütüphanesi (brifing → tur → "Ne oldu?"). Yönetim panelinde lisanslı tarihsel seri CSV içe aktarma (kaynak + lisans notu zorunlu) ve senaryo editörü. Örnek: "Ani Çöküş Tatbikatı (sentetik veri)".
+- [x] **Yayın modu:** meydan okumalar için OBS'ye uygun herkese açık `/yayin/<jeton>` ekranı (süre, ilk 10, son işlemler — tutar yok —, tepkiler, sunucu mesajı); yönetim panelinden bağlantı üretme ve canlı mesaj.
+- [x] **Sorumlu oyun:** 18+ ve "sanal para" onayı, kişisel günlük tur limiti, oturum hatırlatıcısı, kısaltılamayan mola (24 sa / 1 hafta), art arda zarar uyarısı, YEDAM 115 bilgisi. Kurallar sunucuda uygulanır.
+- [ ] 🔜 Ekonomi dengesinin gerçek kullanıcı verisiyle ayarı (`backend/src/services/game/config.ts`, `backend/src/services/idle/config.ts`); haftalık düello ligi ve sezonluk kademe ödülleri; Art ile oyun akışı ve etkinlik formatı gözden geçirmesi.
+
 ## 3.7 Ekip toplantısı kararları (8 Ekim 2026) 📌
 
 Ürün iki hedefe hizmet edecek:
@@ -150,6 +162,7 @@ Eylemler: Yasin canlı veri gereksinimleri · Art oyun akışı ve lig/etkinlik 
 - [ ] Fonlar ve ETF'ler.
 
 ### 4.4 Öğrenme
+- [x] Arena turları için işlem sonrası analiz (Koç Kemal karnesi) ve tarihsel olay senaryoları — ana portföy işlemleri için mini analiz hâlâ açık.
 - [ ] İşlem sonrası mini analiz: "Bu işlemde %X kazandın; ortalama maliyetin şuydu…"
 - [ ] Haftalık e-posta raporu: performans, en iyi ve en kötü işlem, sıralama değişimi.
 - [ ] Varlık sayfalarında kısa, sade açıklamalar ("Bu şirket ne yapar?", "Volatilite nedir?").
@@ -158,6 +171,7 @@ Eylemler: Yasin canlı veri gereksinimleri · Art oyun akışı ve lig/etkinlik 
 ### 4.5 Sosyal
 - [ ] Herkese açık profil sayfası (`/u/kullaniciadi`) ve paylaşılabilir performans kartı (OG görseli)
 - [ ] Başarılı yatırımcıları takip etme, işlemlerini gecikmeli görme
+- [x] Oyun içi günlük seri (7. gün bonusu) ve kozmetik ödüller; herkese açık oyun profili uç noktası (`/api/game/public-profile/:username`)
 - [ ] Rozetlerin genişletilmesi: seriler (7 gün üst üste giriş), sezon rozetleri
 
 ---
@@ -276,3 +290,4 @@ Eylemler: Yasin canlı veri gereksinimleri · Art oyun akışı ve lig/etkinlik 
 7. **Admin paneli 2:** işlemler, emirler, sistem sağlığı, denetim kaydı.
 8. **Kapsam:** BIST, piyasa saatleri, gerçek zamanlı fiyat akışı.
 9. **Büyüme:** herkese açık profiller, paylaşılabilir kartlar, haftalık e-posta raporu, kurumsal paket.
+10. ✅ **Oyun Merkezi:** düello, ilerleme ve çark, idle oyun, koç ve senaryolar, yayın modu, sorumlu oyun (bkz. 3.6.3).

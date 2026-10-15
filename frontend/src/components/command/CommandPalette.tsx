@@ -209,7 +209,7 @@ function PaletteBody({ onClose }: { onClose: () => void }) {
       nav('nav-transactions', 'İşlemler', '/transactions', ArrowsRightLeftIcon, 'islem gecmis alim satim', 'G I'),
       nav('nav-advisor', 'Portföy Sihirbazı', '/advisor', SparklesIcon, 'portfoy sihirbazi risk profili anket oneri dagilim robo danisman monte carlo'),
       nav('nav-leaderboard', 'Liderlik', '/leaderboard', TrophyIcon, 'liderlik siralama yarisma sezon unvan', 'G L'),
-      nav('cmd-arena', 'Arena / Hızlı tur', '/arena', BoltIcon, 'arena hizli tur oyun al sat meydan okuma challenge'),
+      nav('cmd-arena', 'Oyun Merkezi', '/oyun', BoltIcon, 'oyun merkezi arena hizli mac tur duello al sat meydan okuma challenge cark gorev'),
       nav('nav-leagues', 'Ligler', '/leagues', UserGroupIcon, 'lig ozel arkadas davet kod'),
       nav('cmd-join-league', 'Lige katıl', '/leagues?join=1', KeyIcon, 'lig katil ozel arkadas davet kod'),
       nav('nav-news', 'Haberler', '/news', NewspaperIcon, 'haber gundem', 'G H'),

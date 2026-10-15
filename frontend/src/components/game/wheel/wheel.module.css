@@ -1,0 +1,72 @@
+/* Çark mikro animasyonları (renkler yalnızca game.css değişkenleri) */
+
+.win {
+  animation: win-pulse 700ms ease-in-out infinite alternate;
+}
+
+.bulbA {
+  animation: bulb 420ms steps(1, end) infinite;
+}
+
+.bulbB {
+  animation: bulb 420ms steps(1, end) 210ms infinite;
+}
+
+.pointerTick {
+  animation: pointer-tick 150ms ease-in-out infinite alternate;
+}
+
+.ready {
+  animation: ready-wobble 2.8s ease-in-out infinite;
+}
+
+@keyframes win-pulse {
+  from {
+    filter: brightness(1);
+  }
+  to {
+    filter: brightness(1.25) drop-shadow(0 0 6px var(--g-on-color));
+  }
+}
+
+@keyframes bulb {
+  0% {
+    fill: var(--g-on-color);
+  }
+  50% {
+    fill: var(--g-gold-top);
+  }
+}
+
+@keyframes pointer-tick {
+  from {
+    transform: rotate(-7deg);
+  }
+  to {
+    transform: rotate(7deg);
+  }
+}
+
+@keyframes ready-wobble {
+  0%,
+  80%,
+  100% {
+    transform: rotate(0deg);
+  }
+  86% {
+    transform: rotate(-3deg);
+  }
+  93% {
+    transform: rotate(2deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .win,
+  .bulbA,
+  .bulbB,
+  .pointerTick,
+  .ready {
+    animation: none;
+  }
+}

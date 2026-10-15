@@ -16,6 +16,8 @@ import {
   UserPlusIcon,
   BellIcon,
   ClipboardDocumentListIcon,
+  StarIcon,
+  UsersIcon,
 } from '@heroicons/react/24/outline';
 import type { AppNotification, NotificationCategory } from '@/lib/api';
 
@@ -48,14 +50,20 @@ const TYPE_META: Record<string, { icon: Icon; tone?: string }> = {
   'system.announcement': { icon: MegaphoneIcon, tone: 'bg-brand-soft text-brand' },
   'arena.challenge_started': { icon: BoltIcon, tone: 'bg-up-soft text-up' },
   'arena.challenge_result': { icon: TrophyIcon, tone: 'bg-gold-soft text-gold' },
+  'arena.duel_invite': { icon: UsersIcon, tone: 'bg-brand-soft text-brand' },
+  'game.level_up': { icon: StarIcon, tone: 'bg-gold-soft text-gold' },
+  'game.tier_up': { icon: TrophyIcon, tone: 'bg-gold-soft text-gold' },
 };
+
+/** Diğer oyun bildirimleri (görev, seri bonusu …) */
+const GAME_META = { icon: SparklesIcon, tone: 'bg-gold-soft text-gold' };
 
 /** Diğer arena bildirimleri (ör. ileride eklenecek türler) için ortak görünüm. */
 const ARENA_META = { icon: BoltIcon, tone: 'bg-brand-soft text-brand' };
 
 export function notificationVisual(n: Pick<AppNotification, 'type' | 'category'>): { icon: Icon; tone: string; label: string } {
   const cat = CATEGORY_META[n.category] ?? CATEGORY_META.system;
-  const t = TYPE_META[n.type] ?? (n.type.startsWith('arena.') ? ARENA_META : undefined);
+  const t = TYPE_META[n.type] ?? (n.type.startsWith('arena.') ? ARENA_META : n.type.startsWith('game.') ? GAME_META : undefined);
   return { icon: t?.icon ?? cat.icon, tone: t?.tone ?? cat.tone, label: cat.label };
 }
 

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { BoltIcon, TrophyIcon, XMarkIcon } from '@heroicons/react/20/solid';
+import { BoltIcon, SignalIcon, TrophyIcon, XMarkIcon } from '@heroicons/react/20/solid';
 import { Card } from '@portfoygo/shared/ui/Card';
 import { Badge, EmptyState } from '@portfoygo/shared/ui/Feedback';
 import Button from '@portfoygo/shared/ui/Button';
@@ -16,6 +16,7 @@ import { PAGE_SIZE, instrumentName, useArenaChallenges, useArenaInstruments } fr
 import { Countdown, LiveDot } from './parts';
 import { formatTr } from './time';
 import ResultsModal from './ResultsModal';
+import BroadcastModal from './BroadcastModal';
 
 type ChallengesState = ReturnType<typeof useArenaChallenges>;
 
@@ -36,8 +37,28 @@ export default function ChallengesTable({
   const { items, total, error, loading, isValidating, mutate } = list;
   const [cancelTarget, setCancelTarget] = useState<ArenaChallenge | null>(null);
   const [resultsFor, setResultsFor] = useState<ArenaChallenge | null>(null);
+  const [broadcastFor, setBroadcastFor] = useState<ArenaChallenge | null>(null);
 
+  /** Planlanan / canlı meydan okumada yayın bağlantısı + sunucu mesajı */
   const action = (c: ArenaChallenge) =>
+    c.status === 'scheduled' || c.status === 'running' ? (
+      <span className="inline-flex flex-wrap justify-end gap-1.5">
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => setBroadcastFor(c)}
+          icon={<SignalIcon className="h-4 w-4" aria-hidden="true" />}
+          aria-label={`${c.title} yayın denetimi`}
+        >
+          Yayın
+        </Button>
+        {baseAction(c)}
+      </span>
+    ) : (
+      baseAction(c)
+    );
+
+  const baseAction = (c: ArenaChallenge) =>
     c.status === 'scheduled' ? (
       <Button
         variant="down"
@@ -197,6 +218,7 @@ export default function ChallengesTable({
       </ConfirmModal>
 
       <ResultsModal challenge={resultsFor} onClose={() => setResultsFor(null)} />
+      <BroadcastModal challenge={broadcastFor} onClose={() => setBroadcastFor(null)} onTokenCreated={() => void mutate()} />
     </Card>
   );
 }

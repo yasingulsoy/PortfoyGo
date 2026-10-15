@@ -27,7 +27,11 @@ import seasonsRoutes from './routes/seasons';
 import leaguesRoutes from './routes/leagues';
 import notificationsRoutes from './routes/notifications';
 import arenaRoutes from './routes/arena';
+import arenaCoachRoutes from './routes/arenaCoach';
+import adminScenariosRoutes, { SERIES_IMPORT_PATH, seriesImportBodyParser } from './routes/adminScenarios';
 import advisorRoutes from './routes/advisor';
+import gameRoutes from './routes/game';
+import idleRoutes from './routes/idle';
 import healthRoutes from './routes/health';
 import { globalApiLimiter } from './middleware/rateLimits';
 import { errorHandler, notFoundHandler } from './utils/errors';
@@ -100,6 +104,9 @@ export function createApp(): express.Express {
   app.use(cors(corsOptions));
   app.options('*', cors(corsOptions));
 
+  // Senaryo serisi içe aktarma (yönetici, büyük CSV): önce yönetici doğrulaması, sonra 10 MB'a kadar JSON.
+  // Genel 50 KB ayrıştırıcıdan ÖNCE olmalı (gövde bir kez ayrıştırılır).
+  app.use(SERIES_IMPORT_PATH, ...seriesImportBodyParser);
   app.use(express.json({ limit: '50kb' }));
   app.use(express.urlencoded({ extended: false, limit: '50kb' }));
   // Oturum çerezi (pg_session) için. CORS credentials: true + ALLOWED_ORIGINS listesi (asla '*').
@@ -136,6 +143,8 @@ export function createApp(): express.Express {
   app.use('/api/transactions', transactionsRoutes);
   app.use('/api/portfolio', portfolioRoutes);
   app.use('/api/leaderboard', leaderboardRoutes);
+  // Senaryo modu yönetimi: /api/admin/arena/series*, /api/admin/arena/scenarios* (kendi authenticateToken + isAdmin'i)
+  app.use('/api/admin/arena', adminScenariosRoutes);
   app.use('/api/admin', adminRoutes);
   app.use('/api/badges', badgesRoutes);
   app.use('/api/activity-logs', activityLogsRoutes);
@@ -155,8 +164,14 @@ export function createApp(): express.Express {
   app.use('/api/notifications', notificationsRoutes);
   // Arena: hızlı al/sat oyun modu (+ SSE: /api/arena/rounds/:id/stream)
   app.use('/api/arena', arenaRoutes);
+  // Arena koçu (GET /rounds/:id/coach) + herkese açık senaryo listesi (GET /scenarios)
+  app.use('/api/arena', arenaCoachRoutes);
   // Portföy danışmanı: risk profili anketi + önerilen dağılım (MPT + Monte Carlo)
   app.use('/api/advisor', advisorRoutes);
+  // Oyun ekonomisi: jeton, XP/seviye, reyting, görevler, ücretsiz çark, kozmetikler, sorumlu oyun
+  app.use('/api/game', gameRoutes);
+  // Yatırım İmparatorluğu: idle / tycoon oyunu (gerçek piyasa hareketine bağlı binalar)
+  app.use('/api/idle', idleRoutes);
 
   // Proxy /api önekini siliyorsa: /currencies, /commodities, /news için geriye dönük uyumluluk
   app.use(['/commodities', '/currencies', '/news'], globalApiLimiter);

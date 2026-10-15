@@ -1,0 +1,52 @@
+/* Mağaza kartı parıltıları (renkler yalnızca game.css değişkenleri; --r-face / --r-edge karttan gelir) */
+
+.card {
+  border: 3px solid var(--r-edge);
+  box-shadow:
+    0 5px 0 var(--r-edge),
+    0 14px 22px -12px var(--g-drop);
+}
+
+.glow {
+  box-shadow:
+    0 5px 0 var(--r-edge),
+    0 0 0 2px var(--r-face),
+    0 0 22px -2px var(--r-face);
+}
+
+.selected {
+  outline: 3px solid var(--g-focus);
+  outline-offset: 3px;
+}
+
+.shine {
+  position: relative;
+  overflow: hidden;
+}
+
+.shine::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(110deg, transparent 30%, var(--g-glass-strong) 48%, transparent 66%);
+  background-size: 250% 100%;
+  animation: shop-shine 3.2s ease-in-out infinite;
+}
+
+@keyframes shop-shine {
+  0% {
+    background-position: 150% 0;
+  }
+  55%,
+  100% {
+    background-position: -60% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shine::after {
+    animation: none;
+    display: none;
+  }
+}

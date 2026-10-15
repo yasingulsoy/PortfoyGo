@@ -1,7 +1,7 @@
 import type { RoundWindow } from './paths';
 import type { CloseReason, Side } from './engine';
 
-export type RoundKind = 'solo' | 'challenge';
+export type RoundKind = 'solo' | 'challenge' | 'duel' | 'scenario';
 export type RoundStatus = 'scheduled' | 'running' | 'finished' | 'cancelled';
 
 export interface RoundRow {
@@ -20,6 +20,10 @@ export interface RoundRow {
   created_at: Date;
   finished_at: Date | null;
   challenge: { id: string; title: string; sponsor: string | null; prize_text: string | null } | null;
+  /** Senaryo turu (kind = 'scenario') */
+  scenario_id: string | null;
+  /** Düello turu (kind = 'duel'): arena_duels satırının özeti */
+  duel: { id: string; code: string; creator_id: string; opponent_id: string | null; opponent_is_bot: boolean } | null;
 }
 
 export interface PositionRow {
@@ -53,6 +57,7 @@ export interface EntryRow {
   rank: number | null;
   trades_count: number;
   joined_at: Date;
+  is_bot: boolean;
 }
 
 /** API: pozisyon */
@@ -112,7 +117,13 @@ export interface RoundStateDto {
     ticks_total: number;
     instruments: { code: string; label: string; decimals: number }[];
     challenge?: { id: string; title: string; sponsor: string | null; prize_text: string | null };
-    reveal?: { from: string; to: string; instruments: Record<string, { from: string; to: string }> };
+    reveal?: {
+      from: string;
+      to: string;
+      instruments: Record<string, { from: string; to: string }>;
+      /** Senaryo turu bittiğinde: senaryonun açıklaması (ne oldu?) */
+      debrief?: string;
+    };
   };
   me: MeDto;
   quotes: Record<string, QuoteDto & { change_pct_since_start: number }>;
@@ -120,4 +131,24 @@ export interface RoundStateDto {
   history_ticks: number[];
   positions: { open: PositionDto[]; closed: PositionDto[] };
   leaderboard?: LeaderboardItemDto[];
+  /** Düello turu: rakibin anlık durumu */
+  duel?: DuelStateDto;
+  /** Senaryo turu */
+  scenario?: { id: string; title: string; briefing: string; synthetic: boolean };
+}
+
+export interface DuelOpponentDto {
+  username: string;
+  is_bot: boolean;
+  avatar_id?: string | null;
+}
+
+export interface DuelStateDto {
+  id: string;
+  code: string;
+  opponent: DuelOpponentDto;
+  opponent_equity: number;
+  opponent_return_pct: number;
+  /** Tur bittiyse: izleyicinin sonucu */
+  result?: 'win' | 'loss' | 'draw';
 }

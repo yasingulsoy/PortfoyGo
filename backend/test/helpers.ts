@@ -43,6 +43,18 @@ export async function createUser(opts: { balance?: number; verified?: boolean } 
   return { id: row.id, username, email, token, auth: { Authorization: `Bearer ${token}` } };
 }
 
+/**
+ * Sorumlu oyun 18+ onayı (responsible_play.adult_confirmed_at). Arena turu / çark için
+ * ResponsiblePlay.assertCanPlay bunu ister; POST /api/game/responsible/confirm-adult ile aynı etki.
+ */
+export async function confirmAdult(userId: string): Promise<void> {
+  await pool.query(
+    `INSERT INTO responsible_play (user_id, adult_confirmed_at, updated_at) VALUES ($1, now(), now())
+     ON CONFLICT (user_id) DO UPDATE SET adult_confirmed_at = COALESCE(responsible_play.adult_confirmed_at, now()), updated_at = now()`,
+    [userId]
+  );
+}
+
 /** market_data_cache satırı ekler/günceller (fiyat USD). ageMinutes: cached_at ne kadar eski olsun */
 export async function setMarketPrice(
   symbol: string,

@@ -8,6 +8,7 @@ import {
   BoltIcon,
   CalendarDaysIcon,
   CircleStackIcon,
+  FilmIcon,
   MegaphoneIcon,
   ClipboardDocumentListIcon,
   ClockIcon,
@@ -36,7 +37,8 @@ const SECTIONS: SidebarSection[] = [
       { href: '/transactions', label: 'İşlemler', icon: ArrowsRightLeftIcon },
       { href: '/orders', label: 'Emirler', icon: ClockIcon },
       { href: '/leagues', label: 'Ligler', icon: TrophyIcon },
-      { href: '/arena', label: 'Arena', icon: BoltIcon },
+      { href: '/arena', label: 'Arena', icon: BoltIcon, match: (p) => p === '/arena' || (p.startsWith('/arena/') && !p.startsWith('/arena/scenarios')) },
+      { href: '/arena/scenarios', label: 'Senaryolar', icon: FilmIcon },
     ],
   },
   {

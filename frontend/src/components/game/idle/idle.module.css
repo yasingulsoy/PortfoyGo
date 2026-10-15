@@ -1,0 +1,88 @@
+/* Yatırım İmparatorluğu animasyonları (renkler oyun token'larından). */
+
+.pop {
+  position: absolute;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  animation: idle-pop 900ms cubic-bezier(0.2, 0.7, 0.4, 1) forwards;
+  white-space: nowrap;
+}
+
+@keyframes idle-pop {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -30%) scale(0.6);
+  }
+  15% {
+    opacity: 1;
+    transform: translate(-50%, -70%) scale(1.15);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(calc(-50% + var(--drift, 0px)), -260%) scale(0.95);
+  }
+}
+
+.grow {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+  animation: idle-grow 520ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+@keyframes idle-grow {
+  from {
+    transform: scaleY(0.4) scaleX(1.2);
+  }
+  to {
+    transform: none;
+  }
+}
+
+.cloud {
+  animation: idle-cloud 40s linear infinite;
+}
+
+@keyframes idle-cloud {
+  from {
+    transform: translateX(-60px);
+  }
+  to {
+    transform: translateX(460px);
+  }
+}
+
+.hint {
+  animation: idle-hint 1.4s ease-in-out infinite;
+}
+
+@keyframes idle-hint {
+  0%,
+  100% {
+    transform: translate(-50%, 0);
+  }
+  50% {
+    transform: translate(-50%, -6px);
+  }
+}
+
+.carousel {
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+}
+.carousel::-webkit-scrollbar {
+  display: none;
+}
+.carousel > * {
+  scroll-snap-align: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pop {
+    animation-duration: 600ms;
+  }
+  .grow,
+  .cloud,
+  .hint {
+    animation: none;
+  }
+}

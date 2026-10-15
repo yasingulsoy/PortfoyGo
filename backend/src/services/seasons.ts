@@ -76,7 +76,7 @@ const num = (v: unknown): number => {
 };
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
-const ELIGIBLE_USER_SQL = `u.email_verified = true AND (u.is_banned IS NULL OR u.is_banned = false)`;
+const ELIGIBLE_USER_SQL = `u.email_verified = true AND (u.is_banned IS NULL OR u.is_banned = false) AND COALESCE(u.is_bot, false) = false`;
 
 function mapSeason(row: any): Season {
   return {

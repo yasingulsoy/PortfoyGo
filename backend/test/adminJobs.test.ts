@@ -139,6 +139,9 @@ describe('JobRegistry', () => {
       'arena-tick',
       'arena-finalize',
       'arena-challenges',
+      'arena-matchmaking',
+      'arena-bots',
+      'arena-duels',
     ]);
   });
 });

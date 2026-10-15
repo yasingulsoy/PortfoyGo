@@ -3,9 +3,12 @@ import rateLimit from 'express-rate-limit';
 import { z } from 'zod';
 import { authenticateToken, optionalAuth, optionalUserId, requireUser } from '../middleware/auth';
 import { AuditService } from '../services/audit';
+import { openBroadcastStream } from '../services/arena/broadcastStream';
+import { ArenaDuels, CODE_LENGTH, DUEL_DURATIONS, invitePath } from '../services/arena/duels';
 import { ArenaError, ArenaService, SOLO_DURATIONS } from '../services/arena/service';
+import { ArenaSocial, HOST_MESSAGE_MAX, REACTION_EMOJIS } from '../services/arena/social';
 import { openRoundStream } from '../services/arena/stream';
-import { asyncHandler } from '../utils/errors';
+import { AppError, asyncHandler } from '../utils/errors';
 import { parseOrThrow } from '../utils/validation';
 
 /**
@@ -13,7 +16,8 @@ import { parseOrThrow } from '../utils/validation';
  * Çerezle gelen POST/PATCH isteklerinde `X-Requested-With: PortfoyGo` zorunludur (CSRF).
  *
  *  GET    /instruments                                   (herkese açık)
- *  POST   /rounds                    {duration_s, instruments?}         → 201 RoundState
+ *  POST   /rounds                    {duration_s, instruments?}         → 201 RoundState (solo)
+ *  POST   /rounds                    {duration_s, scenario_id}          → 201 RoundState (senaryo)
  *  GET    /rounds/active                                                → RoundState | null
  *  GET    /rounds/:id                                                   → RoundState
  *  GET    /rounds/:id/stream         SSE
@@ -26,6 +30,22 @@ import { parseOrThrow } from '../utils/validation';
  *  GET    /challenges                ?status=upcoming|live|finished     (herkese açık; oturum varsa joined)
  *  POST   /challenges/:id/join                                          → {round_id}
  *  GET    /challenges/:id/leaderboard                                   (herkese açık)
+ *  POST   /rounds/:id/reactions      {emoji}                            → 204 (katılımcı; 2 sn'de bir)
+ *
+ *  Düellolar:
+ *  POST   /duels                     {duration_s, instruments?}         → 201 {duel, code, invite_path}
+ *  GET    /duels/mine                ?limit&offset                      → {items, record, total}
+ *  GET    /duels/:code                                                  → Duel
+ *  POST   /duels/:code/accept                                           → {round_id, starts_at, duel_id}
+ *  POST   /duels/:id/cancel                                             → Duel (davet eden, bekleyen)
+ *  POST   /duels/:id/rematch                                            → 201 {duel, code, invite_path}
+ *  POST   /matchmaking               {duration_s}                       → {ticket, status:'searching'}
+ *  GET    /matchmaking/:ticket                                          → {status, searching_for_s, duel_id?, round_id?, starts_at?, opponent?}
+ *  DELETE /matchmaking/:ticket                                          → {ticket, status}
+ *
+ *  Yayın (herkese açık, IP başına sınırlı):
+ *  GET    /broadcast/:token                                             → BroadcastState
+ *  GET    /broadcast/:token/stream   SSE (state / trade / reaction / host_message / end)
  *
  * Yönetici uçları: adminArenaRouter → /api/admin/arena/* (routes/admin.ts bağlar).
  */
@@ -56,6 +76,47 @@ const createRoundSchema = z.object({
     .number({ message: 'Süre saniye cinsinden sayı olmalı' })
     .refine((n) => (SOLO_DURATIONS as readonly number[]).includes(n), `Süre ${SOLO_DURATIONS.join(', ')} saniyeden biri olmalı`),
   instruments: z.array(codeField, { message: 'Enstrümanlar liste olmalı' }).max(4, 'En fazla 4 enstrüman seçilebilir').optional(),
+  /** Senaryo turu: senaryo ID'si (veya kısa adı) */
+  scenario_id: z
+    .string({ message: 'Senaryo ID metin olmalı' })
+    .trim()
+    .min(1, 'Senaryo ID gerekli')
+    .max(80, 'Geçersiz senaryo ID')
+    .regex(/^[A-Za-z0-9_-]+$/, 'Geçersiz senaryo ID')
+    .optional(),
+});
+
+const duelDurationField = z
+  .number({ message: 'Süre saniye cinsinden sayı olmalı' })
+  .refine((n) => (DUEL_DURATIONS as readonly number[]).includes(n), `Süre ${DUEL_DURATIONS.join(', ')} saniyeden biri olmalı`);
+
+const createDuelSchema = z.object({
+  duration_s: duelDurationField,
+  instruments: z.array(codeField, { message: 'Enstrümanlar liste olmalı' }).max(4, 'En fazla 4 enstrüman seçilebilir').optional(),
+});
+
+const matchmakingSchema = z.object({ duration_s: duelDurationField });
+
+const duelCodeParams = z.object({
+  code: z
+    .string({ message: 'Davet kodu gerekli' })
+    .trim()
+    .regex(new RegExp(`^[A-Za-z0-9]{${CODE_LENGTH}}$`), 'Geçersiz davet kodu')
+    .transform((s) => s.toUpperCase()),
+});
+const duelIdParams = z.object({ id: uuid('düello ID') });
+const ticketParams = z.object({ ticket: uuid('bilet') });
+
+const reactionSchema = z.object({
+  emoji: z.string({ message: 'Tepki gerekli' }).refine((v) => (REACTION_EMOJIS as readonly string[]).includes(v), `Tepki şunlardan biri olmalı: ${REACTION_EMOJIS.join(' ')}`),
+});
+
+const broadcastParams = z.object({
+  token: z
+    .string({ message: 'Jeton gerekli' })
+    .trim()
+    .regex(/^[0-9a-fA-F]{32}$/, 'Geçersiz yayın jetonu')
+    .transform((s) => s.toLowerCase()),
 });
 
 const priceField = (label: string) =>
@@ -129,9 +190,60 @@ const arenaWriteLimiter = rateLimit({
   message: { success: false, message: 'Çok hızlı işlem yapıyorsun. Biraz yavaşla ve tekrar dene.', code: 'RATE_LIMITED' },
 });
 
+/** Arena sorgulama (düello / eşleştirme durumu yoklaması): kullanıcı başına dakikada 240 */
+const arenaPollLimiter = rateLimit({
+  windowMs: 60_000,
+  limit: 240,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  keyGenerator: (req) => `arena-poll:${(req as Request & { user?: { id: string } }).user?.id ?? 'anon'}`,
+  message: { success: false, message: 'Çok sık istek gönderiliyor. Biraz yavaşla.', code: 'RATE_LIMITED' },
+});
+
+/** Herkese açık yayın durumu: IP başına dakikada 120 */
+const broadcastLimiter = rateLimit({
+  windowMs: 60_000,
+  limit: 120,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: { success: false, message: 'Çok fazla istek gönderildi. Lütfen biraz sonra tekrar deneyin.', code: 'RATE_LIMITED' },
+});
+
+/** Herkese açık yayın akışı bağlantısı: IP başına dakikada 20 (ayrıca eşzamanlı bağlantı sınırı var) */
+const broadcastStreamLimiter = rateLimit({
+  windowMs: 60_000,
+  limit: 20,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: { success: false, message: 'Çok fazla yayın bağlantısı açıldı. Lütfen biraz sonra tekrar deneyin.', code: 'RATE_LIMITED' },
+});
+
 // ---------------------------------------------------------------------------
 // Herkese açık
 // ---------------------------------------------------------------------------
+
+router.get(
+  '/broadcast/:token',
+  broadcastLimiter,
+  asyncHandler(async (req, res) => {
+    const { token } = parseOrThrow(broadcastParams, req.params);
+    res.setHeader('Cache-Control', 'no-store');
+    res.json({ success: true, data: await ArenaSocial.broadcastState(token) });
+  })
+);
+
+router.get('/broadcast/:token/stream', broadcastStreamLimiter, (req: Request, res: Response, next: NextFunction) => {
+  let token: string;
+  try {
+    token = parseOrThrow(broadcastParams, req.params).token;
+  } catch (err) {
+    return next(err);
+  }
+  openBroadcastStream(req, res, token).catch((err) => {
+    if (!res.headersSent) next(err);
+    else if (!res.writableEnded) res.end();
+  });
+});
 
 router.get(
   '/instruments',
@@ -196,7 +308,10 @@ router.post(
   arenaWriteLimiter,
   asyncHandler(async (req, res) => {
     const input = parseOrThrow(createRoundSchema, req.body);
-    const data = await ArenaService.createSoloRound(requireUser(req).id, input);
+    const userId = requireUser(req).id;
+    const data = input.scenario_id
+      ? await ArenaService.createScenarioRound(userId, { scenario_id: input.scenario_id, duration_s: input.duration_s })
+      : await ArenaService.createSoloRound(userId, { duration_s: input.duration_s, instruments: input.instruments });
     res.status(201).json({ success: true, data });
   })
 );
@@ -273,11 +388,126 @@ router.post(
   })
 );
 
-/** ArenaError'daki ek alanları (round_id, retry_after) yanıta ekler; diğer hatalar genel işleyiciye gider. */
+router.post(
+  '/rounds/:id/reactions',
+  authenticateToken,
+  asyncHandler(async (req, res) => {
+    const { id } = parseOrThrow(roundParams, req.params);
+    const { emoji } = parseOrThrow(reactionSchema, req.body);
+    await ArenaSocial.react(id, requireUser(req).id, emoji);
+    res.status(204).end();
+  })
+);
+
+// ---------------------------------------------------------------------------
+// Düellolar
+// ---------------------------------------------------------------------------
+
+router.post(
+  '/duels',
+  authenticateToken,
+  arenaWriteLimiter,
+  asyncHandler(async (req, res) => {
+    const input = parseOrThrow(createDuelSchema, req.body);
+    const duel = await ArenaDuels.createInvite(requireUser(req).id, input);
+    res.status(201).json({ success: true, data: { duel, code: duel.code, invite_path: invitePath(duel.code) } });
+  })
+);
+
+router.get(
+  '/duels/mine',
+  authenticateToken,
+  asyncHandler(async (req, res) => {
+    const { limit, offset } = parseOrThrow(historyQuery, req.query);
+    res.json({ success: true, data: await ArenaDuels.mine(requireUser(req).id, limit, offset) });
+  })
+);
+
+router.get(
+  '/duels/:code',
+  authenticateToken,
+  arenaPollLimiter,
+  asyncHandler(async (req, res) => {
+    const { code } = parseOrThrow(duelCodeParams, req.params);
+    res.json({ success: true, data: await ArenaDuels.getByCode(code, requireUser(req).id) });
+  })
+);
+
+router.post(
+  '/duels/:code/accept',
+  authenticateToken,
+  arenaWriteLimiter,
+  asyncHandler(async (req, res) => {
+    const { code } = parseOrThrow(duelCodeParams, req.params);
+    res.json({ success: true, data: await ArenaDuels.accept(code, requireUser(req).id) });
+  })
+);
+
+router.post(
+  '/duels/:id/cancel',
+  authenticateToken,
+  arenaWriteLimiter,
+  asyncHandler(async (req, res) => {
+    const { id } = parseOrThrow(duelIdParams, req.params);
+    res.json({ success: true, data: await ArenaDuels.cancel(id, requireUser(req).id) });
+  })
+);
+
+router.post(
+  '/duels/:id/rematch',
+  authenticateToken,
+  arenaWriteLimiter,
+  asyncHandler(async (req, res) => {
+    const { id } = parseOrThrow(duelIdParams, req.params);
+    const { duel, created } = await ArenaDuels.rematch(id, requireUser(req).id);
+    res.status(created ? 201 : 200).json({ success: true, data: { duel, code: duel.code, invite_path: invitePath(duel.code) } });
+  })
+);
+
+// ---------------------------------------------------------------------------
+// Eşleştirme
+// ---------------------------------------------------------------------------
+
+router.post(
+  '/matchmaking',
+  authenticateToken,
+  arenaWriteLimiter,
+  asyncHandler(async (req, res) => {
+    const { duration_s } = parseOrThrow(matchmakingSchema, req.body);
+    res.json({ success: true, data: await ArenaDuels.joinMatchmaking(requireUser(req).id, duration_s) });
+  })
+);
+
+router.get(
+  '/matchmaking/:ticket',
+  authenticateToken,
+  arenaPollLimiter,
+  asyncHandler(async (req, res) => {
+    const { ticket } = parseOrThrow(ticketParams, req.params);
+    res.json({ success: true, data: await ArenaDuels.getTicket(ticket, requireUser(req).id) });
+  })
+);
+
+router.delete(
+  '/matchmaking/:ticket',
+  authenticateToken,
+  arenaWriteLimiter,
+  asyncHandler(async (req, res) => {
+    const { ticket } = parseOrThrow(ticketParams, req.params);
+    res.json({ success: true, data: await ArenaDuels.cancelTicket(ticket, requireUser(req).id) });
+  })
+);
+
+/**
+ * Ek alan taşıyan hatalar (ArenaError: round_id, retry_after, duel_id …; oyun modülünün GameError'u:
+ * break_until, limit, resets_at …) yanıta eklenir; diğer hatalar genel işleyiciye gider.
+ */
 export function arenaErrorHandler(err: unknown, _req: Request, res: Response, next: NextFunction): void {
-  if (err instanceof ArenaError && Object.keys(err.extra).length > 0 && !res.headersSent) {
-    if (typeof err.extra.retry_after === 'number') res.setHeader('Retry-After', String(err.extra.retry_after));
-    res.status(err.status).json({ success: false, message: err.publicMessage, code: err.code, ...err.extra, data: err.extra });
+  const extra = err instanceof AppError ? (err as AppError & { extra?: unknown }).extra : undefined;
+  if (err instanceof AppError && extra && typeof extra === 'object' && Object.keys(extra).length > 0 && !res.headersSent) {
+    const ex = extra as Record<string, unknown>;
+    if (typeof ex.retry_after === 'number') res.setHeader('Retry-After', String(ex.retry_after));
+    res.status(err.status).json({ success: false, message: err.publicMessage, code: err.code, ...ex, data: ex });
     return;
   }
   next(err);
@@ -369,6 +599,47 @@ adminArenaRouter.get(
   asyncHandler(async (req, res) => {
     const { limit, offset } = parseOrThrow(adminListQuery, req.query);
     res.json({ success: true, data: await ArenaService.adminListChallenges(limit, offset) });
+  })
+);
+
+const hostMessageSchema = z.object({
+  text: z
+    .string({ message: 'Mesaj gerekli' })
+    .trim()
+    .min(1, 'Mesaj gerekli')
+    .max(HOST_MESSAGE_MAX, `Mesaj en fazla ${HOST_MESSAGE_MAX} karakter olabilir`),
+});
+
+adminArenaRouter.post(
+  '/challenges/:id/broadcast-token',
+  asyncHandler(async (req, res) => {
+    const { id } = parseOrThrow(challengeParams, req.params);
+    const { token, overlay_path, title } = await ArenaSocial.regenerateBroadcastToken(id);
+    await AuditService.log(req, {
+      action: 'arena.broadcast_token',
+      targetType: 'arena_challenge',
+      targetId: id,
+      targetLabel: title,
+      metadata: { regenerated: true },
+    });
+    res.json({ success: true, message: 'Yayın bağlantısı oluşturuldu', data: { token, overlay_path } });
+  })
+);
+
+adminArenaRouter.post(
+  '/challenges/:id/message',
+  asyncHandler(async (req, res) => {
+    const { id } = parseOrThrow(challengeParams, req.params);
+    const { text } = parseOrThrow(hostMessageSchema, req.body);
+    const data = await ArenaSocial.hostMessage(id, requireUser(req).id, text);
+    await AuditService.log(req, {
+      action: 'arena.host_message',
+      targetType: 'arena_challenge',
+      targetId: id,
+      targetLabel: null,
+      metadata: { text: data.text, message_id: data.id },
+    });
+    res.status(201).json({ success: true, message: 'Mesaj yayınlandı', data });
   })
 );
 

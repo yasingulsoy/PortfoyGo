@@ -129,6 +129,13 @@ function afterCommit(userId: string, log: { activity_type: 'buy' | 'sell'; descr
     } catch (error: any) {
       console.error('[trade] Badge check error:', error?.message);
     }
+    // Oyun ekonomisi: günün ilk işlemi XP, günlük seri, 'main_buy' görevi (hata fırlatmaz)
+    try {
+      const { GameService } = await import('./game/service');
+      await GameService.onMainTrade(userId, log.activity_type);
+    } catch (error: any) {
+      console.error('[trade] Game hook error:', error?.message);
+    }
   });
 }
 
