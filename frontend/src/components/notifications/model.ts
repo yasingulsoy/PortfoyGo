@@ -16,6 +16,7 @@ import {
   UserPlusIcon,
   BellIcon,
   ClipboardDocumentListIcon,
+  EnvelopeOpenIcon,
   StarIcon,
   UsersIcon,
 } from '@heroicons/react/24/outline';
@@ -53,7 +54,20 @@ const TYPE_META: Record<string, { icon: Icon; tone?: string }> = {
   'arena.duel_invite': { icon: UsersIcon, tone: 'bg-brand-soft text-brand' },
   'game.level_up': { icon: StarIcon, tone: 'bg-gold-soft text-gold' },
   'game.tier_up': { icon: TrophyIcon, tone: 'bg-gold-soft text-gold' },
+  'picks.revealed': { icon: EnvelopeOpenIcon, tone: 'bg-brand-soft text-brand' },
+  'picks.results': { icon: TrophyIcon, tone: 'bg-gold-soft text-gold' },
 };
+
+/** Sunucu bağlantı göndermezse türe göre varsayılan uygulama içi yol. */
+const TYPE_LINK: Record<string, string> = {
+  'picks.revealed': '/oyun/haftalik-secim',
+  'picks.results': '/oyun/haftalik-secim',
+};
+
+/** Bildirimin açacağı bağlantı: sunucunun `link`'i, yoksa türün varsayılanı (ör. Haftalık Seçim). */
+export function notificationLink(n: Pick<AppNotification, 'type' | 'link'>): string | null {
+  return n.link ?? TYPE_LINK[n.type] ?? (n.type.startsWith('picks.') ? '/oyun/haftalik-secim' : null);
+}
 
 /** Diğer oyun bildirimleri (görev, seri bonusu …) */
 const GAME_META = { icon: SparklesIcon, tone: 'bg-gold-soft text-gold' };

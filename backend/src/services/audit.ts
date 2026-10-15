@@ -9,7 +9,8 @@ import type { AuthenticatedRequest } from '../middleware/auth';
  * Kararlı action adları (admin paneli bunlara göre filtreler):
  *   user.ban, user.unban, user.role, user.verify_email, user.revoke_sessions,
  *   order.cancel, league.delete, job.run, cache.refresh_stocks, cache.refresh_currencies,
- *   announcement.create, arena.challenge_create, arena.challenge_cancel
+ *   announcement.create, arena.challenge_create, arena.challenge_cancel,
+ *   picks.comment_delete, picks.note_hide
  */
 
 export const AUDIT_ACTIONS = [
@@ -26,6 +27,8 @@ export const AUDIT_ACTIONS = [
   'announcement.create',
   'arena.challenge_create',
   'arena.challenge_cancel',
+  'picks.comment_delete',
+  'picks.note_hide',
 ] as const;
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
 

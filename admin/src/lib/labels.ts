@@ -57,10 +57,12 @@ export const AUDIT_ACTIONS: Record<AuditAction, { label: string; tone: Tone }> =
   'scenario.update': { label: 'Senaryo güncellendi', tone: 'neutral' },
   'scenario.delete': { label: 'Senaryo silindi', tone: 'down' },
   'scenario.publish': { label: 'Senaryo yayın durumu değişti', tone: 'up' },
+  'picks.comment_delete': { label: 'Haftalık seçim yorumu silindi', tone: 'down' },
+  'picks.note_hide': { label: 'Haftalık seçim notu gizlendi', tone: 'gold' },
 };
 
 /** Listede olmayan senaryo eylemleri (ör. backend'e sonradan eklenen 'scenario.*') için okunur yedek etiket */
-const AUDIT_PREFIX: Record<string, string> = { 'scenario.': 'Senaryo', 'series.': 'Tarihsel seri', 'arena.': 'Arena' };
+const AUDIT_PREFIX: Record<string, string> = { 'scenario.': 'Senaryo', 'series.': 'Tarihsel seri', 'arena.': 'Arena', 'picks.': 'Haftalık seçim' };
 export const auditAction = (a: string) => {
   const known = AUDIT_ACTIONS[a as AuditAction];
   if (known) return known;

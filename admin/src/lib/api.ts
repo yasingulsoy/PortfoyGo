@@ -180,3 +180,21 @@ export const broadcastApi = {
 
 /** Yayın kaplamasının tam adresi (site kökü + overlay_path) */
 export const overlayUrl = (overlayPath: string) => `${APP_URL}${overlayPath.startsWith('/') ? '' : '/'}${overlayPath}`;
+
+/* ------------------------------------------------------------------ */
+/* Haftalık Seçim (Kitlelerin Bilgeliği): hafta özeti ve moderasyon       */
+/* ------------------------------------------------------------------ */
+
+export const picksKeys = {
+  weeks: (p: { limit: number; offset: number }) => withQuery('/admin/picks/weeks', p),
+  comments: (p: { limit: number; offset: number; week_id?: string | null }) => withQuery('/admin/picks/comments', p),
+  /** Oyuncu uç noktası: açılıştan sonra seçimler ve notlar (not gizleme için) */
+  week: (weekId: string) => `/picks/weeks/${id(weekId)}`,
+};
+
+export const picksAdminApi = {
+  /** Yorumu kaldırır (yumuşak silme; denetim kaydı: picks.comment_delete) */
+  deleteComment: (commentId: string) => apiFetch(`/admin/picks/comments/${id(commentId)}`, { method: 'DELETE' }),
+  /** Seçimin notunu gizler (denetim kaydı: picks.note_hide) */
+  hideNote: (pickId: string) => apiFetch(`/admin/picks/picks/${id(pickId)}/hide-note`, post({})),
+};

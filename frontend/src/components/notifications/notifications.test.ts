@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { toNotification, type AppNotification } from '@/lib/api';
-import { applyChange, dayLabel, groupByDay, isExternalLink, isInternalLink, notificationVisual } from './model';
+import { applyChange, dayLabel, groupByDay, isExternalLink, isInternalLink, notificationLink, notificationVisual } from './model';
 
 const n = (over: Partial<AppNotification> = {}): AppNotification => ({
   id: 'a',
@@ -94,5 +94,15 @@ describe('helpers', () => {
     expect(isExternalLink('https://example.com/x')).toBe(true);
     expect(isExternalLink('http://example.com')).toBe(false);
     expect(isExternalLink('javascript:alert(1)')).toBe(false);
+  });
+});
+
+describe('weekly picks notifications', () => {
+  it('maps picks.* types to icons and a default link', () => {
+    expect(notificationVisual({ type: 'picks.revealed', category: 'competition' }).tone).toContain('text-brand');
+    expect(notificationVisual({ type: 'picks.results', category: 'competition' }).tone).toContain('text-gold');
+    expect(notificationLink({ type: 'picks.revealed', link: null })).toBe('/oyun/haftalik-secim');
+    expect(notificationLink({ type: 'picks.results', link: '/oyun/haftalik-secim/gecmis/w1' })).toBe('/oyun/haftalik-secim/gecmis/w1');
+    expect(notificationLink({ type: 'order.filled', link: null })).toBeNull();
   });
 });

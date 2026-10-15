@@ -142,6 +142,7 @@ describe('JobRegistry', () => {
       'arena-matchmaking',
       'arena-bots',
       'arena-duels',
+      'weekly-picks',
     ]);
   });
 });

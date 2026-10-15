@@ -17,7 +17,7 @@ Bu liste, `feature/platform-v0.4` dalındaki çalışmanın canlıya alınmadan 
 ## 3. Veritabanı
 
 - [ ] Uzak veritabanının yedeğini al: `pg_dump "$DATABASE_URL" -Fc -f yedek_<tarih>.dump`.
-- [ ] Bekleyen migration'ları önizle: `npm run migrate -- --dry-run` (000–016).
+- [ ] Bekleyen migration'ları önizle: `npm run migrate -- --dry-run` (000–017).
 - [ ] Uygula: `npm run migrate`.
   - 002 sonrası tüm kullanıcılar bir kez yeniden giriş yapar (çerez oturumu).
   - 009 sonrası bekleyen e-posta doğrulama kodları geçersiz olur.
@@ -51,7 +51,9 @@ Bu liste, `feature/platform-v0.4` dalındaki çalışmanın canlıya alınmadan 
   - Çark, görev, mağaza ve idle oyun ödülleri yalnızca oyun içi jeton/XP'dir; gerçek parayla satın alma veya paraya çevirme **eklenmemeli**. Ödüllü çark ve 18+ kapısı hukuk tarafından gözden geçirilmeli.
   - Ekonomi dengesi tek dosyada: `backend/src/services/game/config.ts` ve `backend/src/services/idle/config.ts`.
   - Senaryo modu için yüklenecek tarihsel veriler lisanslı olmalı (kaynak ve lisans notu zorunlu alan).
-  - Eşleştirme kuyruğu ve bot işleri (`arena-matchmaking`, `arena-bots`, `arena-duels`) tek süreçte çalışır; çok örnekte tek worker'a taşınmalı.
+  - Eşleştirme kuyruğu ve bot işleri (`arena-matchmaking`, `arena-bots`, `arena-duels`, `weekly-picks`) tek süreçte çalışır; çok örnekte tek worker'a taşınmalı.
+  - Haftalık Seçim tartışması kullanıcı içeriğidir: moderasyon sorumlusu belirlenmeli (yönetim paneli → Haftalık Seçim).
+  - Haftalık Seçim emtia seçimleri fiyat geçmişine dayanır; emtia verisi düzenli güncellenmiyorsa emtialar seçim listesinde görünmez.
 - [ ] KVKK ve kullanım şartları metinlerinin hukuk onayı.
 
 ## 6. Canlı sonrası ilk gün

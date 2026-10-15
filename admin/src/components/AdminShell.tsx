@@ -11,6 +11,7 @@ import {
   FilmIcon,
   MegaphoneIcon,
   ClipboardDocumentListIcon,
+  EnvelopeIcon,
   ClockIcon,
   ServerStackIcon,
   Squares2X2Icon,
@@ -39,6 +40,7 @@ const SECTIONS: SidebarSection[] = [
       { href: '/leagues', label: 'Ligler', icon: TrophyIcon },
       { href: '/arena', label: 'Arena', icon: BoltIcon, match: (p) => p === '/arena' || (p.startsWith('/arena/') && !p.startsWith('/arena/scenarios')) },
       { href: '/arena/scenarios', label: 'Senaryolar', icon: FilmIcon },
+      { href: '/picks', label: 'Haftalık Seçim', icon: EnvelopeIcon },
     ],
   },
   {

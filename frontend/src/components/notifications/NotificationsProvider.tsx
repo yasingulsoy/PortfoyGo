@@ -7,7 +7,7 @@ import { useToast } from '@portfoygo/shared/ui/Toast';
 import { useAuth } from '@/context/AuthContext';
 import { API_BASE_URL, notificationsApi, toNotification, type AppNotification, type NotificationCategory } from '@/lib/api';
 import { NotificationsContext, type NotificationsContextValue } from '@/hooks/useNotifications';
-import { applyChange, isExternalLink, isInternalLink, type NotificationChange } from './model';
+import { applyChange, isExternalLink, isInternalLink, notificationLink, type NotificationChange } from './model';
 import GameCelebrations from '@/components/game/ranks/GameCelebrations';
 
 /** Açılır paneldeki öğe sayısı */
@@ -140,18 +140,19 @@ export default function NotificationsProvider({ children }: { children: ReactNod
       toast.dismiss(id);
       void markRead(item);
     };
+    const link = notificationLink(item);
     id = toast.info(item.title, {
       duration: 7000,
       description: (
         <>
           {item.body && <span className="line-clamp-2 block">{item.body}</span>}
-          {isInternalLink(item.link) ? (
-            <Link href={item.link} onClick={open} className="mt-1.5 flex w-fit font-medium text-brand hover:underline">
+          {isInternalLink(link) ? (
+            <Link href={link} onClick={open} className="mt-1.5 flex w-fit font-medium text-brand hover:underline">
               Görüntüle
             </Link>
           ) : (
-            isExternalLink(item.link) && (
-              <a href={item.link} target="_blank" rel="noopener noreferrer" onClick={open} className="mt-1.5 flex w-fit font-medium text-brand hover:underline">
+            isExternalLink(link) && (
+              <a href={link} target="_blank" rel="noopener noreferrer" onClick={open} className="mt-1.5 flex w-fit font-medium text-brand hover:underline">
                 Bağlantıyı aç
               </a>
             )

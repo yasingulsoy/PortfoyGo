@@ -30,6 +30,7 @@ import { AppError } from '../utils/errors';
  *   arena-matchmaking          Arena: düello eşleştirmesi (1 sn; 15 sn sonra antrenman botu)
  *   arena-bots                 Arena: antrenman botunun düello işlemleri (1 sn)
  *   arena-duels                Arena: süresi dolan düello davetleri + düello durum eşitlemesi (5 sn)
+ *   weekly-picks               Haftalık Seçim: hafta satırları, açıklama bildirimi, giriş fiyatları, kapanış + ödüller (5 dk)
  */
 
 export const JOB_NAMES = [
@@ -51,6 +52,7 @@ export const JOB_NAMES = [
   'arena-matchmaking',
   'arena-bots',
   'arena-duels',
+  'weekly-picks',
 ] as const;
 export type JobName = (typeof JOB_NAMES)[number];
 

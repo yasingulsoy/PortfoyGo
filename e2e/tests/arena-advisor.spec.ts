@@ -45,3 +45,11 @@ test('(j) Yatırım İmparatorluğu: idle oyun açılır, binalar listelenir', a
   await expect(heading).toBeVisible();
   await expect(page.getByRole('list', { name: 'Binalar' })).toBeVisible();
 });
+
+test('(k) Haftalık Seçim: sayfa her aşamada açılır ve kitlelerin bilgeliği ilkesini anlatır', async ({ page }) => {
+  await page.goto('/oyun/haftalik-secim');
+  const heading = page.getByRole('heading', { level: 1, name: 'Haftalık Seçim' });
+  await passAdultGate(page, heading);
+  await expect(heading).toBeVisible();
+  await expect(page.getByText(/Kitlelerin Bilgeliği/).first()).toBeVisible();
+});

@@ -12,6 +12,9 @@ import { ActiveRoundBanner, ChallengesDialog, DurationChips, HubHero, RecentDuel
 import { ChartArt, ChecklistArt, FlagArt, PodiumArt, ScrollArt, ShopArt, TowerArt } from '@/components/game/hub/arts';
 import ProblemDialog from '@/components/game/ProblemDialog';
 import { useGameActions } from '@/components/game/useGameActions';
+import { usePicksCurrent } from '@/hooks/usePicks';
+import { picksHubBadge, PICKS_PATH } from '@/components/game/picks/model';
+import { PicksArt } from '@/components/game/picks/parts';
 
 const MATCH_DURATIONS = [60, 180, 300] as const;
 type MatchDuration = (typeof MATCH_DURATIONS)[number];
@@ -34,6 +37,8 @@ export default function OyunHubPage() {
   const upcomingCount = upcoming.data?.length ?? 0;
   const freeSpin = profile ? profile.spins.free_available || profile.spins.extra > 0 : false;
   const unclaimed = profile?.quests.unclaimed ?? 0;
+  const picks = usePicksCurrent();
+  const picksBadge = picksHubBadge(picks.data);
 
   return (
     <GameScreen topBar back="/" backLabel="Uygulamaya dön">
@@ -91,6 +96,7 @@ export default function OyunHubPage() {
           <ModeTile title="Görevler" subtitle={profile ? `${profile.quests.completed_today}/${profile.quests.total_today} tamam` : 'Günlük görevler'} art={<ChecklistArt />} color="green" href="/oyun/gorevler" badge={unclaimed || null} />
           <ModeTile title="Mağaza" subtitle="Avatar ve çerçeveler" art={<ShopArt />} color="purple" href="/oyun/magaza" />
           <ModeTile title="Sıralama" subtitle="Puan ve seviye listesi" art={<PodiumArt />} color="red" href="/oyun/siralama" />
+          <ModeTile title="Haftalık Seçim" subtitle="Kitlelerin Bilgeliği" art={<PicksArt />} color="teal" href={PICKS_PATH} badge={picksBadge} wide />
         </div>
       </section>
 

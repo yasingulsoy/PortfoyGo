@@ -32,6 +32,7 @@ import adminScenariosRoutes, { SERIES_IMPORT_PATH, seriesImportBodyParser } from
 import advisorRoutes from './routes/advisor';
 import gameRoutes from './routes/game';
 import idleRoutes from './routes/idle';
+import picksRoutes, { devPicksRouter } from './routes/picks';
 import healthRoutes from './routes/health';
 import { globalApiLimiter } from './middleware/rateLimits';
 import { errorHandler, notFoundHandler } from './utils/errors';
@@ -172,6 +173,10 @@ export function createApp(): express.Express {
   app.use('/api/game', gameRoutes);
   // Yatırım İmparatorluğu: idle / tycoon oyunu (gerçek piyasa hareketine bağlı binalar)
   app.use('/api/idle', idleRoutes);
+  // Haftalık Seçim ("Kitlelerin Bilgeliği"): kör seçim → Pazar 15:00 açıklama → Pzt–Cuma yarışma (+ tartışma)
+  app.use('/api/picks', picksRoutes);
+  // YALNIZCA yerel geliştirme: Haftalık Seçim saatini kaydırma (isDevLoginEnabled() değilse 404)
+  app.use('/api/dev/picks', devPicksRouter);
 
   // Proxy /api önekini siliyorsa: /currencies, /commodities, /news için geriye dönük uyumluluk
   app.use(['/commodities', '/currencies', '/news'], globalApiLimiter);

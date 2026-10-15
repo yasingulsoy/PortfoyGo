@@ -14,7 +14,7 @@ import RowMenu from '@/components/common/RowMenu';
 import { ToolbarButton } from '@/components/common/controls';
 import { useNotifications, useNotificationChanges } from '@/hooks/useNotifications';
 import { notificationsApi, type AppNotification, type NotificationCategory, type NotificationPage } from '@/lib/api';
-import { CATEGORY_META, CATEGORY_ORDER, applyChange, groupByDay, isExternalLink, isInternalLink } from './model';
+import { CATEGORY_META, CATEGORY_ORDER, applyChange, groupByDay, isExternalLink, isInternalLink, notificationLink } from './model';
 import { NotificationIcon, NotificationMeta, UnreadDot } from './NotificationIcon';
 
 type ReadFilter = 'all' | 'unread';
@@ -221,6 +221,7 @@ export default function NotificationCenter() {
 
 function NotificationRow({ item, onOpen, onRemove }: { item: AppNotification; onOpen: () => void; onRemove: () => void }) {
   const unread = !item.read_at;
+  const link = notificationLink(item);
   const body = (
     <>
       <NotificationIcon item={item} />
@@ -234,12 +235,12 @@ function NotificationRow({ item, onOpen, onRemove }: { item: AppNotification; on
 
   return (
     <li className={cn('flex items-start gap-2 px-3 py-2 transition-colors sm:px-4', unread && 'bg-brand-soft/30')}>
-      {isInternalLink(item.link) ? (
-        <Link href={item.link} onClick={onOpen} className="flex min-w-0 flex-1 gap-3 rounded-xl p-2 transition-colors hover:bg-surface-3">
+      {isInternalLink(link) ? (
+        <Link href={link} onClick={onOpen} className="flex min-w-0 flex-1 gap-3 rounded-xl p-2 transition-colors hover:bg-surface-3">
           {body}
         </Link>
-      ) : isExternalLink(item.link) ? (
-        <a href={item.link} target="_blank" rel="noopener noreferrer" onClick={onOpen} className="flex min-w-0 flex-1 gap-3 rounded-xl p-2 transition-colors hover:bg-surface-3">
+      ) : isExternalLink(link) ? (
+        <a href={link} target="_blank" rel="noopener noreferrer" onClick={onOpen} className="flex min-w-0 flex-1 gap-3 rounded-xl p-2 transition-colors hover:bg-surface-3">
           {body}
         </a>
       ) : (

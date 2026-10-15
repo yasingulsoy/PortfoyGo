@@ -680,3 +680,50 @@ export const scenariosApi = {
   recentKey: '/arena/me/history?limit=30&offset=0#senaryo',
   recent: async () => toRecentScenarioRounds(await gameRequest('/arena/me/history?limit=30&offset=0')),
 };
+
+/* ------------------------------------------------------------------ */
+/* Haftalık Seçim — Kitlelerin Bilgeliği (haftalık kör seçim yarışması)  */
+/* ------------------------------------------------------------------ */
+
+import type { PickInput } from '@/types';
+import { toPicksAssets, toPicksComment, toPicksCommentPage, toPicksCurrent, toPicksWeek, toPicksWeekPage, toWeeklyPick } from '@/components/game/picks/model';
+
+const picksQuery = (path: string, params: Record<string, string | number | null | undefined>) => {
+  const qs = new URLSearchParams();
+  for (const [k, v] of Object.entries(params)) if (v !== undefined && v !== null && v !== '') qs.set(k, String(v));
+  const s = qs.toString();
+  return s ? `${path}?${s}` : path;
+};
+
+/**
+ * Hatalar GameApiError: 409 PICKS_CLOSED (açılış geçti) · 400 ASSET_UNAVAILABLE ·
+ * 403 ADULT_CONFIRM_REQUIRED / ARENA_BREAK · yorumlarda 409 PICKS_HIDDEN (açılıştan önce).
+ */
+export const picksApi = {
+  currentKey: '/picks/current',
+  /** Aktif ve önceki hafta + sunucu saati (geri sayımlar sunucu saatine göre) */
+  current: async () => toPicksCurrent(await gameRequest('/picks/current'), Date.now()),
+  weeksKey: (limit = 20, offset = 0) => `/picks/weeks?limit=${limit}&offset=${offset}`,
+  weeks: async (limit = 20, offset = 0) => toPicksWeekPage(await gameRequest(picksApi.weeksKey(limit, offset))),
+  weekKey: (weekId: string) => `/picks/weeks/${gid(weekId)}`,
+  week: async (weekId: string) => toPicksWeek(await gameRequest(picksApi.weekKey(weekId))),
+  /** Seçimi gönderir / değiştirir (açılışa kadar) */
+  submit: async (weekId: string, body: PickInput) => {
+    const raw = await gameRequest(`/picks/weeks/${gid(weekId)}/pick`, { method: 'PUT', body: JSON.stringify(body) });
+    return { pick: raw?.pick ? toWeeklyPick(raw.pick, true) : null, week: raw?.week ? toPicksWeek(raw.week) : null };
+  },
+  /** Seçimi geri çeker (açılışa kadar) → {deleted, week} */
+  withdraw: async (weekId: string) => {
+    const raw = await gameRequest(`/picks/weeks/${gid(weekId)}/pick`, { method: 'DELETE' });
+    return { deleted: raw?.deleted !== false, week: raw?.week ? toPicksWeek(raw.week) : null };
+  },
+  assetsKey: (q: string, type: string | null) => picksQuery('/picks/assets', { q: q.trim(), type }),
+  assets: async (q: string, type: string | null) => toPicksAssets(await gameRequest(picksApi.assetsKey(q, type))),
+  commentsKey: (weekId: string, limit = 50, before?: string | null) => picksQuery(`/picks/weeks/${gid(weekId)}/comments`, { limit, before }),
+  comments: async (weekId: string, limit = 50, before?: string | null) => toPicksCommentPage(await gameRequest(picksApi.commentsKey(weekId, limit, before))),
+  postComment: async (weekId: string, text: string) => {
+    const raw = await gamePost(`/picks/weeks/${gid(weekId)}/comments`, { text });
+    return toPicksComment(raw?.comment ?? raw);
+  },
+  deleteComment: (commentId: string) => gameRequest(`/picks/comments/${gid(commentId)}`, { method: 'DELETE' }),
+};

@@ -19,6 +19,7 @@ import { jobs } from './services/jobs';
 import { ArenaService } from './services/arena/service';
 import { ArenaDuels } from './services/arena/duels';
 import { ArenaBot } from './services/arena/bot';
+import { PicksService } from './services/picks/service';
 
 const app = createApp();
 const PORT = parseInt(process.env.PORT || '5001', 10);
@@ -118,6 +119,10 @@ jobs.register('arena-matchmaking', '* * * * * *', () => ArenaDuels.matchmakingJo
 jobs.register('arena-bots', '* * * * * *', () => ArenaBot.botsJob(), { description: 'Arena antrenman botu' });
 jobs.register('arena-duels', '*/5 * * * * *', () => ArenaDuels.duelsJob(), { description: 'Arena düello davetleri / durumları' });
 
+// Haftalık Seçim: 5 dakikada bir, saniye 30'da (Pzt 00:00:30 giriş fiyatı, Paz 15:00:30 açıklama, Cmt 00:00:30 kapanış).
+// İdempotent durum makinesi (hafta satırı FOR UPDATE + adım bayrakları); sunucu kapalı kaldıysa kaçırılan adımları telafi eder.
+jobs.register('weekly-picks', '30 */5 * * * *', () => PicksService.job(), { description: 'Haftalık Seçim (açıklama / fiyatlar / kapanış)' });
+
 jobs.start(CRON_TZ);
 
 // Açılışta ilk doldurma (run() hata fırlatmaz; sonuçlar iş kaydına yazılır)
@@ -133,6 +138,7 @@ void jobs.run('week-baseline');
 void jobs.run('leaderboard-ranks');
 void jobs.run('seasons');
 void jobs.run('leagues-start').then(() => jobs.run('leagues-finalize'));
+void jobs.run('weekly-picks');
 
 app.listen(PORT, () => {
   console.log(`[server] API ${PORT} portunda çalışıyor (NODE_ENV=${process.env.NODE_ENV || 'development'})`);

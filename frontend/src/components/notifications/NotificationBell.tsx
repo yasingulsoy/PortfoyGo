@@ -9,7 +9,7 @@ import { Skeleton } from '@portfoygo/shared/ui/Feedback';
 import { cn, formatNumber } from '@portfoygo/shared/format';
 import { useNotifications } from '@/hooks/useNotifications';
 import type { AppNotification } from '@/lib/api';
-import { isExternalLink, isInternalLink } from './model';
+import { isExternalLink, isInternalLink, notificationLink } from './model';
 import { NotificationIcon, NotificationMeta, UnreadDot } from './NotificationIcon';
 
 const ITEM_SELECTOR = '[role="menuitem"]:not([disabled])';
@@ -208,6 +208,7 @@ export default function NotificationBell() {
 
 function PanelItem({ item, onSelect }: { item: AppNotification; onSelect: () => void }) {
   const unread = !item.read_at;
+  const link = notificationLink(item);
   const className = cn(
     'flex w-full gap-3 rounded-lg px-2.5 py-3 text-left transition-colors hover:bg-surface-3 focus:bg-surface-3 focus:outline-none',
     unread && 'bg-brand-soft/40',
@@ -224,16 +225,16 @@ function PanelItem({ item, onSelect }: { item: AppNotification; onSelect: () => 
     </>
   );
 
-  if (isInternalLink(item.link)) {
+  if (isInternalLink(link)) {
     return (
-      <Link href={item.link} role="menuitem" tabIndex={-1} data-item onClick={onSelect} className={className}>
+      <Link href={link} role="menuitem" tabIndex={-1} data-item onClick={onSelect} className={className}>
         {content}
       </Link>
     );
   }
-  if (isExternalLink(item.link)) {
+  if (isExternalLink(link)) {
     return (
-      <a href={item.link} target="_blank" rel="noopener noreferrer" role="menuitem" tabIndex={-1} data-item onClick={onSelect} className={className}>
+      <a href={link} target="_blank" rel="noopener noreferrer" role="menuitem" tabIndex={-1} data-item onClick={onSelect} className={className}>
         {content}
       </a>
     );

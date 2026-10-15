@@ -183,7 +183,9 @@ export type AuditAction =
   | 'scenario.create'
   | 'scenario.update'
   | 'scenario.delete'
-  | 'scenario.publish';
+  | 'scenario.publish'
+  | 'picks.comment_delete'
+  | 'picks.note_hide';
 
 export interface AuditEntry {
   id: string;
@@ -323,4 +325,58 @@ export interface ScenarioInput {
 export interface BroadcastToken {
   token: string;
   overlay_path: string;
+}
+
+/* ------------------------------------------- Haftalık Seçim (Kitlelerin Bilgeliği) */
+
+export type PicksWeekPhase = 'upcoming' | 'submit' | 'revealed' | 'live' | 'settling' | 'finished';
+
+/** GET /admin/picks/weeks satırı */
+export interface AdminPicksWeek {
+  week_id: string;
+  phase: PicksWeekPhase;
+  opens_at: string;
+  reveal_at: string;
+  starts_at: string;
+  ends_at: string;
+  participants: number;
+  void_picks: number;
+  notes_hidden: number;
+  comments: number;
+  comments_deleted: number;
+  bullish_pct: number | null;
+  crowd_return_pct: number | null;
+  /** Kitle portföyü katılımcıların yüzde kaçından iyi */
+  beat_pct: number | null;
+  winner: { username: string; return_pct: number | null } | null;
+  settled_at: string | null;
+  rewarded_at: string | null;
+}
+
+/** GET /admin/picks/comments satırı (silinenler dahil) */
+export interface AdminPicksComment {
+  id: string;
+  week_id: string;
+  username: string;
+  text: string;
+  created_at: string;
+  deleted: boolean;
+  deleted_at: string | null;
+  deleted_by_username: string | null;
+}
+
+/** Haftanın bir seçimi (oyuncu uç noktasından; not gizleme için) */
+export interface AdminWeekPick {
+  id: string;
+  username: string;
+  asset_type: string;
+  symbol: string;
+  name: string;
+  direction: 'up' | 'down';
+  note: string | null;
+  /** Not yönetici tarafından gizlendi */
+  note_hidden: boolean;
+  status: string;
+  return_pct: number | null;
+  rank: number | null;
 }

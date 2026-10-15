@@ -6,6 +6,7 @@ import { jobs } from '../services/jobs';
 import { OrderService } from '../services/orders';
 import { NotificationService } from '../services/notifications';
 import { adminArenaRouter, arenaErrorHandler } from './arena';
+import { adminPicksRouter } from './picks';
 import { authenticateToken, requireUser } from '../middleware/auth';
 import { isAdmin } from '../middleware/admin';
 import { asyncHandler } from '../utils/errors';
@@ -480,5 +481,11 @@ router.get(
 // ---------------------------------------------------------------------------
 
 router.use('/arena', adminArenaRouter, arenaErrorHandler);
+
+// ---------------------------------------------------------------------------
+// Haftalık Seçim (/api/admin/picks/weeks, /comments, /comments/:id, /picks/:id/hide-note) — bkz. routes/picks.ts
+// ---------------------------------------------------------------------------
+
+router.use('/picks', adminPicksRouter);
 
 export default router;

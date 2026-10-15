@@ -208,3 +208,7 @@ Senaryo modu ve Arena koçu: `historical_series_meta` / `historical_series` (yö
 ## 016_idle.sql
 
 Yatırım İmparatorluğu (idle oyun): kullanıcı başına tek satırlık `idle_states` (oyun içi para, binalar, yükseltmeler, halka arz payları, ödenen kilometre taşları). Kazanç sunucuda hesaplanır; çevrimdışı süre üst sınırlıdır. Kurallar ve denge: `backend/src/services/idle/{config,math}.ts`.
+
+## 017_weekly_picks.sql
+
+Haftalık Seçim ("Kitlelerin Bilgeliği"): `weekly_pick_weeks` (hafta başına tek satır, `week_id` = yarışma Pazartesisinin ISO haftası, ör. `2026-W43`; Cumartesi 00:00 açılış → Pazar 15:00 açıklama → Pazartesi 00:00 başlangıç → Cumartesi 00:00 bitiş, Europe/Istanbul; iş adımı bayrakları ve kapanışta dondurulan kitle istatistikleri), `weekly_picks` (kullanıcı + hafta başına tek kör seçim: varlık, yön, en fazla 280 karakterlik not; giriş/çıkış fiyatı varlığın kendi kote para biriminde, getiri, sıra, `void`) ve `weekly_pick_comments` (açıklamadan sonra tartışma; yumuşak silme). Sadece yeni tablo ekler. Haftalar istek / `weekly-picks` işi (5 dk) ile kendiliğinden oluşturulur; ek veri taşıma gerekmez. Kurallar: `backend/src/services/picks/{config,timeline,scoring}.ts`.

@@ -1197,3 +1197,147 @@ export interface ScenarioRoundInfo {
   duration_s: number;
   window: { from: string; to: string } | null;
 }
+
+// ---------------------------------------------------------------------------
+// Haftalık Seçim — Kitlelerin Bilgeliği (haftalık kör seçim yarışması)
+// ---------------------------------------------------------------------------
+
+/**
+ * Hafta evresi (İstanbul saati): upcoming → submit (Cmt 00:00 – Paz 15:00, seçimler gizli) →
+ * revealed (Paz 15:00 – Pzt 00:00) → live (Pzt 00:00 – Cmt 00:00) → settling → finished.
+ */
+export type PicksPhase = 'upcoming' | 'submit' | 'revealed' | 'live' | 'settling' | 'finished';
+export type PickDirection = 'up' | 'down';
+
+export interface WeeklyPick {
+  id: string;
+  username: string;
+  avatar_id: string | null;
+  frame_id: string | null;
+  asset_type: AssetType;
+  symbol: string;
+  name: string;
+  direction: PickDirection;
+  /** Kısa not (≤ 280); yönetici gizlediyse null */
+  note: string | null;
+  /** Yönetici notu gizledi (`note` null) */
+  note_hidden: boolean;
+  submitted_at: string;
+  entry_price: number | null;
+  current_price: number | null;
+  exit_price: number | null;
+  /** 'USD' | 'TRY' */
+  quote_currency: string;
+  /** Yöne göre işaretlenmiş getiri (düşüş seçiminde fiyat düşerse pozitif) */
+  return_pct: number | null;
+  rank: number | null;
+  status: 'active' | 'void';
+  /** Geçersizlik nedeni (fiyat verisi yok → sıralama dışı) */
+  void_reason: 'no_entry_price' | 'no_exit_price' | null;
+  is_me: boolean;
+}
+
+export interface PicksCrowdAsset {
+  asset_type: AssetType;
+  symbol: string;
+  name: string;
+  picks: number;
+  up: number;
+  down: number;
+  /** Seçenlerin yöne göre ortalama getirisi */
+  avg_return_pct: number | null;
+  /** Varlığın kendi fiyat değişimi */
+  change_pct: number | null;
+}
+
+/** Kitlenin ortak kararı (eşit ağırlıklı "kitle portföyü"); yalnızca açılıştan sonra */
+export interface PicksCrowd {
+  participants: number;
+  /** Yükselir diyenlerin yüzdesi (0..100) */
+  bullish_pct: number | null;
+  crowd_return_pct: number | null;
+  /** Kitle portföyü katılımcıların yüzde kaçından daha iyi yaptı */
+  beat_pct: number | null;
+  top_assets: PicksCrowdAsset[];
+}
+
+export interface PicksRewardTier {
+  rank: number;
+  coins: number;
+  xp: number;
+}
+
+export interface PicksWeek {
+  week_id: string;
+  phase: PicksPhase;
+  opens_at: string;
+  reveal_at: string;
+  starts_at: string;
+  ends_at: string;
+  participants: number;
+  my_pick: WeeklyPick | null;
+  /** Açılıştan önce her zaman null (başkalarının seçimi gösterilmez) */
+  picks: WeeklyPick[] | null;
+  crowd: PicksCrowd | null;
+  standings_updated_at: string | null;
+  my_rank: number | null;
+  rewards: { top: PicksRewardTier[]; participation_xp: number };
+  /** Tartışmadaki yorum sayısı (açılıştan önce null) */
+  comments_count: number | null;
+}
+
+/** GET /api/picks/current */
+export interface PicksCurrent {
+  server_now: string;
+  /** Sunucu saati − istemci saati (ms); geri sayımlar sunucu saatine göre */
+  clock_offset_ms: number;
+  active: PicksWeek;
+  previous: PicksWeek | null;
+}
+
+export interface PicksWeekSummary {
+  week_id: string;
+  starts_at: string;
+  ends_at: string;
+  phase: PicksPhase;
+  participants: number;
+  winner: { username: string; avatar_id: string | null; return_pct: number | null } | null;
+  crowd_return_pct: number | null;
+  my: { return_pct: number | null; rank: number | null; status: string } | null;
+}
+
+export interface PicksWeekPage {
+  items: PicksWeekSummary[];
+  total: number;
+}
+
+/** GET /api/picks/assets — seçilebilir varlık */
+export interface PicksAsset {
+  asset_type: AssetType;
+  symbol: string;
+  name: string;
+  price: number | null;
+  quote_currency: string;
+  change_24h_pct: number | null;
+}
+
+export interface PickInput {
+  asset_type: AssetType;
+  symbol: string;
+  direction: PickDirection;
+  note?: string;
+}
+
+export interface PicksComment {
+  id: string;
+  username: string;
+  avatar_id: string | null;
+  text: string;
+  created_at: string;
+  is_me: boolean;
+}
+
+export interface PicksCommentPage {
+  items: PicksComment[];
+  has_more: boolean;
+}
