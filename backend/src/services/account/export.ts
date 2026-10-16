@@ -160,6 +160,98 @@ const USER_TABLES: Array<{ key: string; label: string; sql: string; optionalTabl
     sql: 'SELECT week_key, status, created_at, sent_at FROM email_digests WHERE user_id = $1 ORDER BY week_key',
     optionalTable: 'email_digests',
   },
+  {
+    key: 'sandbox_portfolios',
+    label: 'Sanal portföyler (Model Portföy / Portföy Ligi; USD, varsayımsal)',
+    sql: `SELECT id, kind, league_id, team_id, name, base_currency, starting_cash, cash, commission_bps, target_weights, status,
+                 frozen_at, created_at, updated_at
+            FROM sandbox_portfolios WHERE user_id = $1 ORDER BY created_at`,
+    optionalTable: 'sandbox_portfolios',
+  },
+  {
+    key: 'sandbox_holdings',
+    label: 'Sanal portföy pozisyonları',
+    sql: `SELECT h.portfolio_id, h.asset_type, h.symbol, h.name, h.quantity, h.avg_cost_usd, h.created_at, h.updated_at
+            FROM sandbox_holdings h JOIN sandbox_portfolios p ON p.id = h.portfolio_id
+           WHERE p.user_id = $1 ORDER BY h.portfolio_id, h.asset_type, h.symbol`,
+    optionalTable: 'sandbox_holdings',
+  },
+  {
+    key: 'sandbox_trades',
+    label: 'Sanal portföy işlemleri (sahibi olduğun portföyler + senin yaptığın işlemler)',
+    sql: `SELECT t.portfolio_id, (t.actor_user_id = $1) AS by_me, t.side, t.asset_type, t.symbol, t.name, t.quantity, t.price_usd,
+                 t.gross_usd, t.commission_usd, t.reason, t.created_at
+            FROM sandbox_trades t JOIN sandbox_portfolios p ON p.id = t.portfolio_id
+           WHERE p.user_id = $1 OR t.actor_user_id = $1 ORDER BY t.created_at`,
+    optionalTable: 'sandbox_trades',
+  },
+  {
+    key: 'ideas',
+    label: 'Ortak Akıl önerilerin (gerekçe, senaryo, riskler, izleme kriterleri, değerlendirme)',
+    sql: `SELECT id, asset_type, symbol, name, stance, horizon, rationale, scenario, scenario_bull, scenario_base, scenario_bear, risks,
+                 target_price, invalidation_price, review_date, tags, scope, league_id, ref_price, quote_currency, ref_price_at, status,
+                 published_at, closed_at, close_price, close_price_at, outcome, evaluation, lessons, hidden_at, hidden_reason
+            FROM ideas WHERE user_id = $1 ORDER BY published_at`,
+    optionalTable: 'ideas',
+  },
+  {
+    key: 'idea_updates',
+    label: 'Ortak Akıl izleme notların',
+    sql: 'SELECT idea_id, kind, text, price, created_at, hidden_at FROM idea_updates WHERE user_id = $1 ORDER BY created_at',
+    optionalTable: 'idea_updates',
+  },
+  {
+    key: 'idea_responses',
+    label: 'Ortak Akıl yanıtların (Katılıyorum / Katılmıyorum + gerekçe)',
+    sql: 'SELECT idea_id, stance, reason, created_at, updated_at, hidden_at FROM idea_responses WHERE user_id = $1 ORDER BY created_at',
+    optionalTable: 'idea_responses',
+  },
+  {
+    key: 'idea_comments',
+    label: 'Ortak Akıl yorumların',
+    sql: 'SELECT idea_id, text, created_at, deleted_at FROM idea_comments WHERE user_id = $1 ORDER BY created_at',
+    optionalTable: 'idea_comments',
+  },
+  {
+    key: 'idea_bookmarks',
+    label: 'Ortak Akıl izleme listen ("İzlemeye al")',
+    sql: 'SELECT idea_id, created_at FROM idea_bookmarks WHERE user_id = $1 ORDER BY created_at',
+    optionalTable: 'idea_bookmarks',
+  },
+  {
+    key: 'idea_reports',
+    label: 'Ortak Akıl şikâyetlerin',
+    sql: 'SELECT target_type, target_id, idea_id, reason, note, status, created_at, resolved_at FROM idea_reports WHERE reporter_id = $1 ORDER BY created_at',
+    optionalTable: 'idea_reports',
+  },
+  {
+    key: 'portfolio_league_teams',
+    label: 'Portföy Ligi takım üyeliklerin',
+    sql: `SELECT m.league_id, l.name AS league_name, t.id AS team_id, t.name AS team_name, (t.captain_id = $1) AS is_captain, m.joined_at
+            FROM portfolio_league_team_members m
+            JOIN portfolio_league_teams t ON t.id = m.team_id
+            JOIN leagues l ON l.id = m.league_id
+           WHERE m.user_id = $1 ORDER BY m.joined_at`,
+    optionalTable: 'portfolio_league_team_members',
+  },
+  {
+    key: 'portfolio_league_entries',
+    label: 'Portföy Ligi katılımların (strateji beyanı, değerlendirme notu, dondurulmuş sonuçlar)',
+    sql: `SELECT e.league_id, l.name AS league_name, CASE WHEN e.team_id IS NULL THEN 'solo' ELSE 'team' END AS kind, t.name AS team_name,
+                 e.portfolio_id, e.measured_from, e.late_join, e.withdrawn_at,
+                 e.strategy, e.strategy_updated_at, (e.strategy_updated_by = $1) AS strategy_written_by_me,
+                 e.reflection, e.reflection_updated_at, (e.reflection_updated_by = $1) AS reflection_written_by_me,
+                 e.final_rank, e.final_equity_usd, e.final_return_pct, e.final_max_drawdown_pct, e.final_volatility_ann,
+                 e.final_trades, e.final_turnover_pct, e.final_style_tags, e.finalized_at, e.created_at
+            FROM portfolio_league_entries e
+            JOIN leagues l ON l.id = e.league_id
+            LEFT JOIN portfolio_league_teams t ON t.id = e.team_id
+           WHERE e.user_id = $1
+              OR e.strategy_updated_by = $1 OR e.reflection_updated_by = $1
+              OR e.team_id IN (SELECT team_id FROM portfolio_league_team_members WHERE user_id = $1)
+           ORDER BY e.created_at`,
+    optionalTable: 'portfolio_league_entries',
+  },
 ];
 
 export interface AccountExport {

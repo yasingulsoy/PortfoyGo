@@ -6,6 +6,7 @@ import { EQUITY_SQL, generateInviteCode, normalizeInviteCode } from '../utils/co
 import type { LeagueDuration } from '../utils/validation';
 import { NotificationService, NotificationInput } from './notifications';
 import { GameService } from './game/service';
+import { PortfolioLeagueHooks, myStandings } from './portfolioLeagues/core';
 
 /**
  * Ligler (özel: davet kodu; herkese açık: keşfet + tek tıkla katıl).
@@ -39,6 +40,8 @@ export type LeagueRole = 'owner' | 'member';
 export type LeagueVisibility = 'private' | 'public';
 export type LeagueStatus = 'upcoming' | 'active' | 'finished';
 export type LeagueStatusFilter = LeagueStatus | 'open';
+/** 'main': ana TL portföyünün getirisi (varsayılan) · 'portfolio': Portföy Ligi (aynı sermayeli USD sanal portföy; 023) */
+export type LeagueMode = 'main' | 'portfolio';
 
 /** Süre → PostgreSQL interval */
 export const LEAGUE_DURATION_INTERVALS: Record<LeagueDuration, string> = {
@@ -71,6 +74,7 @@ export interface LeagueSummary {
   ends_at: Date | null;
   finalized_at: Date | null;
   created_at: Date;
+  mode: LeagueMode;
 }
 
 export interface LeagueMemberStanding {
@@ -103,6 +107,7 @@ export interface LeaguePreview {
   starts_at: Date;
   ends_at: Date | null;
   already_member: boolean;
+  mode: LeagueMode;
 }
 
 export interface PublicLeagueItem {
@@ -116,6 +121,9 @@ export interface PublicLeagueItem {
   starts_at: Date;
   ends_at: Date | null;
   is_member: boolean;
+  mode: LeagueMode;
+  /** Portföy liginde sabit kurallar (keşfet kartı rozetleri) */
+  portfolio: { starting_capital_usd: number; commission_bps: number; participation: string } | null;
 }
 
 export interface LeagueFeedItem {
@@ -169,7 +177,7 @@ const STATUS_SQL = `(CASE
   END)`;
 
 const LEAGUE_COLUMNS = `l.id, l.name, l.description, l.invite_code, l.owner_id, l.max_members, l.visibility,
-  l.starts_at, l.started_at, l.ends_at, l.finalized_at, l.created_at, ${STATUS_SQL} AS status`;
+  l.starts_at, l.started_at, l.ends_at, l.finalized_at, l.created_at, ${STATUS_SQL} AS status, l.mode`;
 
 /** Lig getirisi (lm = league_members, u = users) */
 const RETURN_SQL = `((${EQUITY_SQL} - lm.baseline_equity) / lm.baseline_equity)`;
@@ -242,6 +250,7 @@ function mapSummary(row: any): LeagueSummary {
     ends_at: row.ends_at ?? null,
     finalized_at: row.finalized_at ?? null,
     created_at: row.created_at,
+    mode: row.mode === 'portfolio' ? 'portfolio' : 'main',
   };
 }
 
@@ -316,10 +325,11 @@ interface LockedLeague {
   max_members: number;
   started: boolean;
   ended: boolean;
+  mode: LeagueMode;
 }
 
 const LOCK_LEAGUE_COLUMNS = `id, name, owner_id, max_members, (started_at IS NOT NULL) AS started,
-  (finalized_at IS NOT NULL OR (ends_at IS NOT NULL AND ends_at <= now())) AS ended`;
+  (finalized_at IS NOT NULL OR (ends_at IS NOT NULL AND ends_at <= now())) AS ended, mode`;
 
 function mapLocked(row: any): LockedLeague {
   return {
@@ -329,6 +339,7 @@ function mapLocked(row: any): LockedLeague {
     max_members: parseInt(row.max_members, 10),
     started: row.started === true,
     ended: row.ended === true,
+    mode: row.mode === 'portfolio' ? 'portfolio' : 'main',
   };
 }
 
@@ -346,11 +357,18 @@ export class LeagueService {
   static async startLeague(leagueId: string): Promise<boolean> {
     return withTx(async (client) => {
       const r = await client.query(
-        `SELECT id, name, started_at, (starts_at <= now()) AS due FROM leagues WHERE id = $1 FOR UPDATE`,
+        `SELECT id, name, started_at, mode, (starts_at <= now()) AS due FROM leagues WHERE id = $1 FOR UPDATE`,
         [leagueId]
       );
       const league = r.rows[0];
       if (!league || league.started_at !== null || league.due !== true) return false;
+
+      // Portföy ligi: TL referansı yerine her katılımcıya aynı sermayeli sanal portföy (services/portfolioLeagues)
+      if (league.mode === 'portfolio') {
+        await PortfolioLeagueHooks.onStart(client, { id: leagueId, name: league.name });
+        await client.query(`UPDATE leagues SET started_at = now() WHERE id = $1`, [leagueId]);
+        return true;
+      }
 
       // Toplam varlığı 0 olan üyenin referansı yazılamaz (baseline > 0 kısıtı) → sıralamaya girmez
       await client.query(
@@ -389,12 +407,19 @@ export class LeagueService {
   static async finalizeLeague(leagueId: string): Promise<boolean> {
     return withTx(async (client) => {
       const r = await client.query(
-        `SELECT id, name, started_at, finalized_at, (ends_at IS NOT NULL AND ends_at <= now()) AS due
+        `SELECT id, name, started_at, finalized_at, ends_at, mode, (ends_at IS NOT NULL AND ends_at <= now()) AS due
            FROM leagues WHERE id = $1 FOR UPDATE`,
         [leagueId]
       );
       const league = r.rows[0];
       if (!league || league.finalized_at !== null || league.started_at === null || league.due !== true) return false;
+
+      // Portföy ligi: portföyler dondurulur, sonuçlar entry'lere yazılır (services/portfolioLeagues)
+      if (league.mode === 'portfolio') {
+        await PortfolioLeagueHooks.onFinalize(client, { id: leagueId, name: league.name, ends_at: league.ends_at });
+        await client.query(`UPDATE leagues SET finalized_at = now() WHERE id = $1`, [leagueId]);
+        return true;
+      }
 
       await client.query(
         `UPDATE league_members lm
@@ -524,21 +549,22 @@ export class LeagueService {
   static async listMine(userId: string): Promise<LeagueSummary[]> {
     await this.refreshDue({ userId });
     const r = await pool.query(`${MY_LEAGUES_SQL} ORDER BY l.created_at DESC`, [userId]);
-    return r.rows.map(mapSummary);
+    return withPortfolioStandings(userId, r.rows.map(mapSummary));
   }
 
   private static async getSummary(leagueId: string, userId: string): Promise<LeagueSummary & { owner_id: string }> {
     await this.refreshDue({ leagueId });
     const r = await pool.query(`${MY_LEAGUES_SQL} WHERE l.id = $2`, [userId, leagueId]);
     if (!r.rows[0]) throw NOT_FOUND();
-    return { ...mapSummary(r.rows[0]), owner_id: r.rows[0].owner_id };
+    const [summary] = await withPortfolioStandings(userId, [mapSummary(r.rows[0])]);
+    return { ...summary, owner_id: r.rows[0].owner_id };
   }
 
   static async preview(userId: string, rawCode: string): Promise<LeaguePreview> {
     const code = normalizeInviteCode(rawCode);
     if (!code) throw INVALID_CODE();
     const r = await pool.query(
-      `SELECT l.name, l.description, l.max_members, l.visibility, l.starts_at, l.ends_at, ${STATUS_SQL} AS status,
+      `SELECT l.name, l.description, l.max_members, l.visibility, l.starts_at, l.ends_at, ${STATUS_SQL} AS status, l.mode,
               ow.username AS owner_username,
               (SELECT COUNT(*)::int FROM league_members m WHERE m.league_id = l.id) AS member_count,
               EXISTS (SELECT 1 FROM league_members m WHERE m.league_id = l.id AND m.user_id = $2) AS already_member
@@ -560,6 +586,7 @@ export class LeagueService {
       starts_at: row.starts_at,
       ends_at: row.ends_at ?? null,
       already_member: row.already_member === true,
+      mode: row.mode === 'portfolio' ? 'portfolio' : 'main',
     };
   }
 
@@ -578,13 +605,15 @@ export class LeagueService {
     const pattern = opts.search ? `%${opts.search.replace(/[\\%_]/g, (c) => `\\${c}`)}%` : null;
     const base = `
       SELECT l.id, l.name, l.description, l.max_members, l.starts_at, l.ends_at, l.finalized_at, l.created_at,
-             ${STATUS_SQL} AS status, ow.username AS owner_username,
+             ${STATUS_SQL} AS status, ow.username AS owner_username, l.mode,
+             plr.starting_capital_usd AS pl_capital, plr.commission_bps AS pl_commission, plr.participation AS pl_participation,
              (SELECT COUNT(*)::int FROM league_members m WHERE m.league_id = l.id) AS member_count,
              ($2::uuid IS NOT NULL AND EXISTS (
                SELECT 1 FROM league_members m WHERE m.league_id = l.id AND m.user_id = $2::uuid
              )) AS is_member
         FROM leagues l
         JOIN users ow ON ow.id = l.owner_id
+        LEFT JOIN portfolio_league_rules plr ON plr.league_id = l.id
        WHERE l.visibility = 'public' AND ($1::text IS NULL OR l.name ILIKE $1::text ESCAPE '\\')`;
     const params = [pattern, opts.userId ?? null, statuses];
     const total = await pool.query(`SELECT COUNT(*)::int AS n FROM (${base}) x WHERE x.status = ANY($3::text[])`, params);
@@ -610,6 +639,11 @@ export class LeagueService {
         starts_at: row.starts_at,
         ends_at: row.ends_at ?? null,
         is_member: row.is_member === true,
+        mode: row.mode === 'portfolio' ? 'portfolio' : 'main',
+        portfolio:
+          row.mode === 'portfolio' && row.pl_capital !== null && row.pl_capital !== undefined
+            ? { starting_capital_usd: num(row.pl_capital), commission_bps: parseInt(row.pl_commission, 10), participation: row.pl_participation }
+            : null,
       })),
       total: parseInt(total.rows[0].n, 10),
       limit: opts.limit,
@@ -664,6 +698,10 @@ export class LeagueService {
           return_pct: finalReturn,
           profit_tl: frozen !== null && baselineSet ? round2(frozen - base) : null,
         };
+      }
+      // Portföy liginde TL varlığı gösterilmez (sıralama /api/portfolio-leagues/:id/standings'ten gelir)
+      if (league.mode === 'portfolio') {
+        return { ...common, rank: null, equity: 0, return_pct: null, profit_tl: null };
       }
       if (upcoming || !baselineSet) {
         return { ...common, rank: null, equity: liveEquity, return_pct: null, profit_tl: null };
@@ -833,13 +871,19 @@ export class LeagueService {
     if (mine.total >= MAX_LEAGUES_PER_USER) {
       throw new AppError(409, `En fazla ${MAX_LEAGUES_PER_USER} ligde yer alabilirsin`, 'LEAGUE_LIMIT');
     }
-    assertPositiveEquity(me.equity);
+    const portfolioMode = league.mode === 'portfolio';
+    if (!portfolioMode) assertPositiveEquity(me.equity);
     // Başlamış lig: referans = katılım anındaki varlık. Başlamamış: lig başlayınca yazılır.
+    // Portföy ligi: TL referansı kullanılmaz (baseline_set_at NULL; referans alanına başlangıç sermayesi yazılır).
     await client.query(
       `INSERT INTO league_members (league_id, user_id, role, baseline_equity, baseline_set_at)
-       VALUES ($1, $2, 'member', $3, CASE WHEN $4::boolean THEN now() END)`,
-      [league.id, userId, me.equity, league.started]
+       VALUES ($1, $2, 'member',
+               CASE WHEN $5::boolean THEN COALESCE((SELECT starting_capital_usd FROM portfolio_league_rules WHERE league_id = $1), 100000) ELSE $3 END,
+               CASE WHEN $4::boolean AND NOT $5::boolean THEN now() END)`,
+      [league.id, userId, me.equity, league.started, portfolioMode]
     );
+    // Portföy ligi: geç katılım süresi kontrolü + (bireysel) entry / geç katılımda portföy
+    if (portfolioMode) await PortfolioLeagueHooks.onJoin(client, league.id, userId);
     // Oyun ekonomisi: lige katılım XP'si (lig başına bir kez; SAVEPOINT içinde, hata fırlatmaz)
     await GameService.onLeagueJoin(userId, league.id, client);
     await notify(
@@ -902,6 +946,7 @@ export class LeagueService {
     if (role === 'owner') {
       throw new AppError(400, 'Lig sahibi ayrılamaz; ligi silebilirsin', 'OWNER_CANNOT_LEAVE');
     }
+    await PortfolioLeagueHooks.onLeave(pool, leagueId, userId);
     await pool.query(`DELETE FROM league_members WHERE league_id = $1 AND user_id = $2 AND role = 'member'`, [leagueId, userId]);
   }
 
@@ -936,6 +981,7 @@ export class LeagueService {
       if (league.finalized_at !== null) {
         throw new AppError(400, 'Biten ligden üye çıkarılamaz; sonuçlar dondu', 'LEAGUE_ENDED');
       }
+      await PortfolioLeagueHooks.onLeave(client, leagueId, targetUserId);
       const r = await client.query(
         `DELETE FROM league_members WHERE league_id = $1 AND user_id = $2 AND role = 'member' RETURNING user_id`,
         [leagueId, targetUserId]
@@ -984,4 +1030,16 @@ export class LeagueService {
       }
     });
   }
+}
+
+/** Portföy liglerinde "sıran / getirin" ana TL portföyünden değil, ligin sanal portföyünden gelir */
+async function withPortfolioStandings<T extends LeagueSummary>(userId: string, list: T[]): Promise<T[]> {
+  const pl = list.filter((l) => l.mode === 'portfolio');
+  if (pl.length === 0) return list;
+  const mine = await myStandings(userId, pl);
+  return list.map((l) => {
+    const m = l.mode === 'portfolio' ? mine.get(l.id) : undefined;
+    if (!m) return l;
+    return { ...l, my_rank: m.rank, my_return_pct: m.return_pct, my_final_rank: l.status === 'finished' ? m.rank : null };
+  });
 }

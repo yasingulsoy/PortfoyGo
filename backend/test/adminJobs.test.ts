@@ -144,6 +144,8 @@ describe('JobRegistry', () => {
       'arena-duels',
       'weekly-picks',
       'weekly-digest',
+      'sandbox-snapshots',
+      'idea-reviews',
     ]);
   });
 });

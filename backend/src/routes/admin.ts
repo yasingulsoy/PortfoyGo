@@ -7,6 +7,7 @@ import { OrderService } from '../services/orders';
 import { NotificationService } from '../services/notifications';
 import { adminArenaRouter, arenaErrorHandler } from './arena';
 import { adminPicksRouter } from './picks';
+import { adminIdeasRouter } from './ideas';
 import { authenticateToken, requireUser } from '../middleware/auth';
 import { isAdmin } from '../middleware/admin';
 import { asyncHandler } from '../utils/errors';
@@ -488,5 +489,11 @@ router.use('/arena', adminArenaRouter, arenaErrorHandler);
 // ---------------------------------------------------------------------------
 
 router.use('/picks', adminPicksRouter);
+
+// ---------------------------------------------------------------------------
+// Ortak Akıl — Öneri Havuzu (/api/admin/ideas/summary, /reports, /ideas, /comments, /:kind/:id/hide|unhide) — bkz. routes/ideas.ts
+// ---------------------------------------------------------------------------
+
+router.use('/ideas', adminIdeasRouter);
 
 export default router;

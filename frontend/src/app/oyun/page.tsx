@@ -17,6 +17,8 @@ import { picksHubBadge, PICKS_PATH } from '@/components/game/picks/model';
 import { PicksArt } from '@/components/game/picks/parts';
 
 const MATCH_DURATIONS = [60, 180, 300] as const;
+/** Masaüstünde mod kutucukları biraz daha yüksek */
+const TILE = 'lg:min-h-[140px]';
 type MatchDuration = (typeof MATCH_DURATIONS)[number];
 
 /** Oyun Merkezi ana ekranı (Kafa Topu tarzı). */
@@ -41,7 +43,7 @@ export default function OyunHubPage() {
   const picksBadge = picksHubBadge(picks.data);
 
   return (
-    <GameScreen topBar back="/" backLabel="Uygulamaya dön">
+    <GameScreen topBar back="/" backLabel="Uygulamaya dön" layout="full">
       <h1 className="sr-only">Oyun Merkezi</h1>
 
       {running && (
@@ -51,56 +53,67 @@ export default function OyunHubPage() {
         />
       )}
 
-      <HubHero profile={profile} username={username} />
+      {/* Telefonda tek sütun (profil → maç → modlar → son maçlar); masaüstünde lobi: solda oyuncu, maç ve son maçlar, sağda modlar. Kod sırası görsel sırayla aynı (klavye / ekran okuyucu). */}
+      <div className="mx-auto flex w-full max-w-2xl flex-col lg:grid lg:max-w-none lg:grid-cols-12 lg:grid-rows-[auto_1fr] lg:gap-x-8 xl:gap-x-10">
+        <div className="lg:col-span-5 lg:row-start-1 xl:col-span-4">
+          <HubHero profile={profile} username={username} />
 
-      <section aria-label="Maç başlat" className="flex flex-col gap-4">
-        <DurationChips label="Maç süresi" value={duration} options={MATCH_DURATIONS} onChange={setDuration} />
-        <GameLinkButton
-          href={`/oyun/hizli-mac?d=${duration}`}
-          variant="green"
-          size="xl"
-          block
-          icon={<BoltIcon aria-hidden="true" />}
-          className="g-anim-pop"
-          aria-label={`Hızlı maç: ${durationLabel(duration)}, bire bir eşleşme`}
+          <section aria-label="Maç başlat" className="flex flex-col gap-4">
+            <DurationChips label="Maç süresi" value={duration} options={MATCH_DURATIONS} onChange={setDuration} />
+            <GameLinkButton
+              href={`/oyun/hizli-mac?d=${duration}`}
+              variant="green"
+              size="xl"
+              block
+              icon={<BoltIcon aria-hidden="true" />}
+              className="g-anim-pop"
+              aria-label={`Hızlı maç: ${durationLabel(duration)}, bire bir eşleşme`}
+            >
+              HIZLI MAÇ
+            </GameLinkButton>
+            <div className="grid grid-cols-2 gap-3">
+              <GameButton variant="blue" size="md" wrap loading={busy === 'invite'} onClick={() => void createInvite(duration)} icon={<UserPlusIcon aria-hidden="true" />}>
+                Arkadaşını Davet Et
+              </GameButton>
+              <GameButton variant="purple" size="md" wrap onClick={() => setSoloOpen(true)} icon={<PlayIcon aria-hidden="true" />}>
+                Solo Tur
+              </GameButton>
+            </div>
+          </section>
+        </div>
+
+        <section
+          aria-labelledby="g-modes"
+          className="mt-8 lg:col-span-7 lg:col-start-6 lg:row-span-2 lg:row-start-1 lg:mt-0 xl:col-span-8 xl:col-start-5"
         >
-          HIZLI MAÇ
-        </GameLinkButton>
-        <div className="grid grid-cols-2 gap-3">
-          <GameButton variant="blue" size="md" wrap loading={busy === 'invite'} onClick={() => void createInvite(duration)} icon={<UserPlusIcon aria-hidden="true" />}>
-            Arkadaşını Davet Et
-          </GameButton>
-          <GameButton variant="purple" size="md" wrap onClick={() => setSoloOpen(true)} icon={<PlayIcon aria-hidden="true" />}>
-            Solo Tur
-          </GameButton>
-        </div>
-      </section>
+          <h2 id="g-modes" className="g-title-sm mb-3 text-xl lg:text-2xl">
+            Oyun Modları
+          </h2>
+          <div className="grid grid-cols-2 gap-3 gap-y-4 sm:grid-cols-3 lg:gap-4 xl:grid-cols-4">
+            <ModeTile title="Arena Turu" subtitle="Solo · 1/3/5/10 dk" art={<ChartArt />} color="blue" onClick={() => setSoloOpen(true)} className={TILE} />
+            <ModeTile
+              title="Meydan Okumalar"
+              subtitle={liveCount ? `${liveCount} canlı · ${upcomingCount} yaklaşan` : upcomingCount ? `${upcomingCount} yaklaşan` : 'Canlı turnuvalar'}
+              art={<FlagArt />}
+              color="orange"
+              badge={liveCount ? 'CANLI' : null}
+              onClick={() => setChallengesOpen(true)}
+              className={TILE}
+            />
+            <ModeTile title="Senaryolar" subtitle="Tarihi anları yeniden oyna" art={<ScrollArt />} color="teal" href="/oyun/senaryolar" className={TILE} />
+            <ModeTile title="Yatırım İmparatorluğu" subtitle="Boşta kazanan şirketini kur" art={<TowerArt />} color="gold" href="/oyun/imparatorluk" className={TILE} />
+            <ModeTile title="Günlük Çark" subtitle={freeSpin ? 'Ücretsiz çevirme hazır!' : 'Her gün ücretsiz'} art={<WheelIcon size={36} />} color="pink" href="/oyun/cark" badge={freeSpin ? '!' : null} className={TILE} />
+            <ModeTile title="Görevler" subtitle={profile ? `${profile.quests.completed_today}/${profile.quests.total_today} tamam` : 'Günlük görevler'} art={<ChecklistArt />} color="green" href="/oyun/gorevler" badge={unclaimed || null} className={TILE} />
+            <ModeTile title="Mağaza" subtitle="Avatar ve çerçeveler" art={<ShopArt />} color="purple" href="/oyun/magaza" className={TILE} />
+            <ModeTile title="Sıralama" subtitle="Puan ve seviye listesi" art={<PodiumArt />} color="red" href="/oyun/siralama" className={TILE} />
+            <ModeTile title="Haftalık Seçim" subtitle="Kitlelerin Bilgeliği" art={<PicksArt />} color="teal" href={PICKS_PATH} badge={picksBadge} wide className="sm:col-span-1 xl:col-span-4" />
+          </div>
+        </section>
 
-      <section aria-labelledby="g-modes" className="mt-8">
-        <h2 id="g-modes" className="g-title-sm mb-3 text-xl">
-          Oyun Modları
-        </h2>
-        <div className="grid grid-cols-2 gap-3 gap-y-4">
-          <ModeTile title="Arena Turu" subtitle="Solo · 1/3/5/10 dk" art={<ChartArt />} color="blue" onClick={() => setSoloOpen(true)} />
-          <ModeTile
-            title="Meydan Okumalar"
-            subtitle={liveCount ? `${liveCount} canlı · ${upcomingCount} yaklaşan` : upcomingCount ? `${upcomingCount} yaklaşan` : 'Canlı turnuvalar'}
-            art={<FlagArt />}
-            color="orange"
-            badge={liveCount ? 'CANLI' : null}
-            onClick={() => setChallengesOpen(true)}
-          />
-          <ModeTile title="Senaryolar" subtitle="Tarihi anları yeniden oyna" art={<ScrollArt />} color="teal" href="/oyun/senaryolar" />
-          <ModeTile title="Yatırım İmparatorluğu" subtitle="Boşta kazanan şirketini kur" art={<TowerArt />} color="gold" href="/oyun/imparatorluk" />
-          <ModeTile title="Günlük Çark" subtitle={freeSpin ? 'Ücretsiz çevirme hazır!' : 'Her gün ücretsiz'} art={<WheelIcon size={36} />} color="pink" href="/oyun/cark" badge={freeSpin ? '!' : null} />
-          <ModeTile title="Görevler" subtitle={profile ? `${profile.quests.completed_today}/${profile.quests.total_today} tamam` : 'Günlük görevler'} art={<ChecklistArt />} color="green" href="/oyun/gorevler" badge={unclaimed || null} />
-          <ModeTile title="Mağaza" subtitle="Avatar ve çerçeveler" art={<ShopArt />} color="purple" href="/oyun/magaza" />
-          <ModeTile title="Sıralama" subtitle="Puan ve seviye listesi" art={<PodiumArt />} color="red" href="/oyun/siralama" />
-          <ModeTile title="Haftalık Seçim" subtitle="Kitlelerin Bilgeliği" art={<PicksArt />} color="teal" href={PICKS_PATH} badge={picksBadge} wide />
+        <div className="lg:col-span-5 lg:row-start-2 lg:self-start xl:col-span-4">
+          <RecentDuels />
         </div>
-      </section>
-
-      <RecentDuels />
+      </div>
 
       <footer className="mt-8 flex justify-center">
         <Link

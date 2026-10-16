@@ -32,6 +32,8 @@ import { AppError } from '../utils/errors';
  *   arena-duels                Arena: süresi dolan düello davetleri + düello durum eşitlemesi (5 sn)
  *   weekly-picks               Haftalık Seçim: hafta satırları, açıklama bildirimi, giriş fiyatları, kapanış + ödüller (5 dk)
  *   weekly-digest              Haftalık e-posta özeti (Pazartesi 09:00; production dışında yalnızca önizleme — EMAIL_DIGEST_SEND)
+ *   sandbox-snapshots          Sanal portföyler (Model Portföy / Portföy Ligi): saatlik + gün sonu değer noktası
+ *   idea-reviews               Ortak Akıl: değerlendirme tarihi gelen öneriler, hedef/geçersizlik seviyesi aşımları, toplu etkileşim bildirimleri (günlük)
  */
 
 export const JOB_NAMES = [
@@ -55,6 +57,8 @@ export const JOB_NAMES = [
   'arena-duels',
   'weekly-picks',
   'weekly-digest',
+  'sandbox-snapshots',
+  'idea-reviews',
 ] as const;
 export type JobName = (typeof JOB_NAMES)[number];
 

@@ -43,7 +43,10 @@ import clientErrorsRoutes, { CLIENT_ERRORS_PATH, clientErrorsBodyParser } from '
 import { httpMetricsMiddleware, metricsToken, startDefaultMetrics } from './observability/metrics';
 import { meRouter as profileVisibilityRoutes, publicRouter as publicProfileRoutes } from './routes/publicProfiles';
 import { devEmailRouter, unsubscribeRouter as emailUnsubscribeRoutes } from './routes/emailDigest';
+import ideasRoutes from './routes/ideas';
+import portfolioLeaguesRoutes, { adminPortfolioLeaguesRouter } from './routes/portfolioLeagues';
 
+import modelPortfoliosRoutes, { sandboxAssetsRouter } from './routes/modelPortfolios';
 /**
  * Express uygulamasını kurar (middleware + route'lar). Sunucuyu BAŞLATMAZ, cron kurmaz.
  *
@@ -206,6 +209,15 @@ export function createApp(): express.Express {
   app.use('/api/email', emailUnsubscribeRoutes);
   // YALNIZCA yerel geliştirme: GET /api/dev/email/digest-preview?username=demo (isDevLoginEnabled() değilse 404)
   app.use('/api/dev/email', devEmailRouter);
+  // Ortak Akıl — Öneri Havuzu: yapılandırılmış yatırım fikirleri, gerekçeli yanıtlar, karşılaştırma (bkz. routes/ideas.ts)
+  app.use('/api/ideas', ideasRoutes);
+  // Portföy Ligi (023): aynı sermaye / dönem / işlem maliyetiyle USD sanal portföy yarışması (bkz. routes/portfolioLeagues.ts)
+  app.use('/api/portfolio-leagues', portfolioLeaguesRoutes);
+  app.use('/api/admin/portfolio-leagues', adminPortfolioLeaguesRouter);
+
+  // Model Portföy (100.000 USD varsayımsal portföy; sanal portföy motoru services/sandbox) + sanal portföy varlık araması
+  app.use('/api/model-portfolios', modelPortfoliosRoutes);
+  app.use('/api/sandbox', sandboxAssetsRouter);
 
   // Proxy /api önekini siliyorsa: /currencies, /commodities, /news için geriye dönük uyumluluk
   app.use(['/commodities', '/currencies', '/news'], globalApiLimiter);

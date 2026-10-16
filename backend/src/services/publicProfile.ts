@@ -7,6 +7,7 @@ import type { TierInfo } from './game/config';
 import { IdleService } from './idle/service';
 import { INITIAL_ACCOUNT_BALANCE, LeaderboardService } from './leaderboard';
 import { SeasonService } from './seasons';
+import { IdeasService } from './ideas/service';
 
 /**
  * Herkese açık oyuncu profili (/u/<kullanıcı-adı>) — GET /api/public/users/:username.
@@ -73,6 +74,8 @@ export interface PublicProfile {
   };
   picks: { weeks_played: number; best_rank: number | null; wins: number; podiums: number };
   idle: { rank: number | null };
+  /** Ortak Akıl başarı kaydı (024): yalnızca sayılar / oranlar; öneri içeriği yok */
+  ideas: PublicIdeasRecord | null;
   season_awards: PublicSeasonAward[];
   badges: PublicBadge[];
   achievements: PublicAchievement[];
@@ -210,6 +213,7 @@ export class PublicProfileService {
       },
       picks,
       idle: { rank: idleMe && idleMe.total_earned > 0 ? idleMe.rank : null },
+      ideas: await ideasRecord(userId),
       season_awards: seasonAwards,
       badges: publicBadges,
       achievements: buildAchievements({ badges: publicBadges, awards: seasonAwards, podiums }),
@@ -286,5 +290,28 @@ export class PublicProfileService {
     const r = await pool.query('UPDATE users SET profile_public = $2 WHERE id = $1 RETURNING username, profile_public', [userId, profilePublic]);
     if (!r.rows[0]) throw new AppError(404, 'Kullanıcı bulunamadı', 'NOT_FOUND');
     return { profile_public: r.rows[0].profile_public === true, username: String(r.rows[0].username) };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Ortak Akıl — Öneri Havuzu (024): sakin başarı kaydı
+// ---------------------------------------------------------------------------
+
+export interface PublicIdeasRecord {
+  published: number;
+  closed: number;
+  /** Kapananlar içinde "Beklendiği gibi" etiketli payı (%); kapanan yoksa null */
+  as_expected_pct: number | null;
+  /** Ortalama kapanma süresi (gün); kapanan yoksa null */
+  avg_days_to_close: number | null;
+}
+
+/** Gizlenmemiş önerilerin sayıları; tablo yoksa / hata olursa null (profil yine döner) */
+async function ideasRecord(userId: string): Promise<PublicIdeasRecord | null> {
+  try {
+    const t = await IdeasService.trackRecord(userId);
+    return { published: t.published, closed: t.closed, as_expected_pct: t.as_expected_pct, avg_days_to_close: t.avg_days_to_close };
+  } catch {
+    return null;
   }
 }

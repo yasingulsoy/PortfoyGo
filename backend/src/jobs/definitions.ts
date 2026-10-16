@@ -12,6 +12,8 @@ import { ArenaDuels } from '../services/arena/duels';
 import { ArenaBot } from '../services/arena/bot';
 import { PicksService } from '../services/picks/service';
 import { DigestService } from '../services/email/digest';
+import { Sandbox } from '../services/sandbox';
+import { IdeasService } from '../services/ideas/service';
 import type { JobRegistry } from '../services/jobs';
 
 /**
@@ -125,6 +127,17 @@ export function registerAllJobs(jobs: JobRegistry): void {
   // Haftalık e-posta özeti: Pazartesi 09:00 (İstanbul). Kullanıcı + hafta başına bir kez (email_digests). Production dışında
   // GERÇEK E-POSTA GÖNDERMEZ (yalnızca önizleme: backend/.localdb/digest-previews); gönderim için EMAIL_DIGEST_SEND=1 gerekir.
   jobs.register('weekly-digest', '0 9 * * 1', () => DigestService.job(), { description: 'Haftalık e-posta özeti' });
+
+  // Sanal portföyler (Model Portföy / Portföy Ligi): her saat xx:03 (xx:01 fiyat yenilemesinden sonra) saatlik nokta + o günün
+  // (İstanbul) günlük satırı güncellenir; 23:58'deki tur gün sonu kapanışıdır. Yalnızca etkin portföyler; idempotent UPSERT.
+  jobs.register('sandbox-snapshots', ['3 * * * *', '58 23 * * *'], () => Sandbox.snapshotJob(), {
+    description: 'Sanal portföy değer geçmişi (saatlik + günlük)',
+  });
+
+  // Ortak Akıl — Öneri Havuzu: günlük 09:05 (İstanbul). Değerlendirme tarihi gelen önerilerin yazarına bir kez bildirim,
+  // hedef / geçersizlik seviyesi yayından bu yana aşıldıysa (fiyat geçmişi + saklanmış güncel fiyat) her biri için bir kez
+  // bildirim, bekleme süresi dolan toplu yanıt/yorum bildirimleri. İdempotent (bayrak kolonları koşullu UPDATE ile).
+  jobs.register('idea-reviews', '5 9 * * *', () => IdeasService.job(), { description: 'Ortak Akıl öneri değerlendirmeleri' });
 }
 
 /** Açılışta ilk doldurma (run() hata fırlatmaz; sonuçlar iş kaydına yazılır). Başka örnek çalıştırıyorsa atlanır. */

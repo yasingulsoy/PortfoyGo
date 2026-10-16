@@ -18,12 +18,15 @@ import { TwoFactorService } from '../security/twoFactor';
  *  - SİLİNEN kişisel veriler: bildirimler, takip listesi, e-posta doğrulama kodları, etkinlik kayıtları
  *    (IP / tarayıcı), kurtarma kodları, Portföy Sihirbazı anketleri ve planları, sorumlu oyun ayarları,
  *    koç raporları, oyun içi seri/görev/çark/envanter, idle oyun durumu, eşleştirme biletleri,
- *    henüz açıklanmamış haftalık seçimler ve (varsa) e-posta özeti kayıtları.
- *  - TEMİZLENEN içerik: Haftalık Seçim notları ve yorum metinleri (yorumlar gizlenir).
+ *    henüz açıklanmamış haftalık seçimler, (varsa) e-posta özeti kayıtları ve Model Portföy'ler (sanal portföy).
+ *  - TEMİZLENEN içerik: Haftalık Seçim notları ve yorum metinleri (yorumlar gizlenir); Portföy Ligi strateji beyanı ve
+ *    değerlendirme notları (kendi yazdıkları).
  *  - KORUNAN (anonim) kayıtlar: işlemler, pozisyonlar, emir geçmişi, portföy geçmişi, sezon / lig / Arena
- *    sonuçları, rozetler, jeton defteri ve reyting geçmişi — diğer oyuncuların sıralamaları ve ligleri tutarlı
+ *    sonuçları, Portföy Ligi portföyleri, rozetler, jeton defteri ve reyting geçmişi — diğer oyuncuların sıralamaları ve ligleri tutarlı
  *    kalsın diye. Silinmiş hesaplar liderlik tablolarından ve herkese açık listelerden çıkarılır.
  *  - Aktif emirler iptal edilir (rezerv bakiyeye döner), bekleyen düello davetleri iptal edilir.
+ *  - Ortak Akıl (024): kendi önerileri (notları, aldıkları yanıt/yorumlarla), yanıtları, izleme listesi ve şikâyetleri silinir;
+ *    başka önerilere yazdığı yorumların metni temizlenir.
  *
  * Doğrulama sırası: şifre → (2FA açıksa) TOTP / kurtarma kodu. Doğrulamalar transaction DIŞINDA yapılır;
  * böylece hatalı 2FA denemeleri geri alınmaz (kilit sayacı).
@@ -149,6 +152,43 @@ export class AccountDeletionService {
           WHERE user_id = $1`,
         [userId]
       );
+
+      // 4b) Sanal portföyler (022): kişisel model portföyler silinir (pozisyon / işlem / geçmiş CASCADE);
+      //     lig portföyleri (kind = 'league') diğer oyuncuların sıralaması için anonim kullanıcıya bağlı kalır.
+      if (await tableExists(client, 'sandbox_portfolios')) {
+        await client.query(`DELETE FROM sandbox_portfolios WHERE user_id = $1 AND kind = 'model'`, [userId]);
+      }
+
+      // 4c) Ortak Akıl (024): öneriler silinir (izleme notları, yanıtlar, yorumlar, izleme listeleri, şikâyetler CASCADE);
+      //     başka önerilere verilen yanıtlar, izleme listesi ve gönderilen şikâyetler silinir; yorumların metni temizlenir (gizlenir).
+      if (await tableExists(client, 'ideas')) {
+        await client.query('DELETE FROM ideas WHERE user_id = $1', [userId]);
+        await client.query('DELETE FROM idea_responses WHERE user_id = $1', [userId]);
+        await client.query('DELETE FROM idea_bookmarks WHERE user_id = $1', [userId]);
+        await client.query('DELETE FROM idea_reports WHERE reporter_id = $1', [userId]);
+        await client.query(
+          `UPDATE idea_comments SET text = '[silindi]', deleted_at = COALESCE(deleted_at, now()), deleted_by = COALESCE(deleted_by, user_id)
+            WHERE user_id = $1`,
+          [userId]
+        );
+      }
+
+      // 4d) Portföy Ligi (023): kişinin yazdığı strateji beyanı / değerlendirme notu metinleri temizlenir (bireysel
+      //     katılımda kendi notları; takımda son düzenleyeni o olan notlar). Takım üyeliği ve sonuçlar anonim olarak kalır.
+      if (await tableExists(client, 'portfolio_league_entries')) {
+        await client.query(
+          `UPDATE portfolio_league_entries
+              SET strategy = NULL, strategy_updated_by = NULL
+            WHERE (user_id = $1 OR strategy_updated_by = $1) AND (strategy IS NOT NULL OR strategy_updated_by IS NOT NULL)`,
+          [userId]
+        );
+        await client.query(
+          `UPDATE portfolio_league_entries
+              SET reflection = NULL, reflection_updated_by = NULL
+            WHERE (user_id = $1 OR reflection_updated_by = $1) AND (reflection IS NOT NULL OR reflection_updated_by IS NOT NULL)`,
+          [userId]
+        );
+      }
 
       // 5) Kullanıcı satırı: anonimleştir + tüm oturumları bitir
       const anon = await uniqueAnonName(client);
