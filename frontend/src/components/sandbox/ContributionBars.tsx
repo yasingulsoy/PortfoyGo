@@ -51,7 +51,10 @@ export default function ContributionBars({ items, totalPct, className }: Props) 
                     style={{ width: `${Math.max(w, r.contribution_pct === 0 ? 0 : 1)}%` }}
                   />
                 </span>
-                <span className={cn('num w-24 text-right text-xs font-semibold', pos ? 'text-up' : 'text-down')} title={formatUSD(r.contribution_usd)}>
+                <span
+                  className={cn('num w-24 text-right text-xs font-semibold', Math.abs(r.contribution_pct) < 0.005 ? 'text-muted' : pos ? 'text-up' : 'text-down')}
+                  title={formatUSD(r.contribution_usd)}
+                >
                   {fmtPoints(r.contribution_pct)}
                 </span>
               </li>

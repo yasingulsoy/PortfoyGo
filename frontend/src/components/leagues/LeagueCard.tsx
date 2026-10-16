@@ -9,6 +9,7 @@ import { formatLeagueDate, leagueTiming } from '@/lib/competition';
 import { RankMedal } from '@/components/season/TitleBadge';
 import type { League } from '@/types';
 import { RoleBadge, StatusBadge, VisibilityBadge } from './shared';
+import PortfolioBadge from './portfolio/PortfolioBadge';
 
 /** "Liglerim" kartı: durum, geri sayım ve sıran (bitmiş ligde dondurulmuş final sıran). */
 export default function LeagueCard({ league, now }: { league: League; now: number }) {
@@ -33,6 +34,7 @@ export default function LeagueCard({ league, now }: { league: League; now: numbe
           </span>
           <div className="flex flex-wrap justify-end gap-1.5">
             <StatusBadge status={league.status} />
+            {league.mode === 'portfolio' && <PortfolioBadge />}
             {league.visibility === 'public' && <VisibilityBadge visibility="public" />}
             <RoleBadge role={league.role} />
           </div>

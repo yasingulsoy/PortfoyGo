@@ -10,6 +10,7 @@ import { useNow } from '@/hooks/useNow';
 import { countdownParts, formatLeagueDate, leagueProgress, type CountdownParts } from '@/lib/competition';
 import type { League } from '@/types';
 import { RoleBadge, StatusBadge, VisibilityBadge } from './shared';
+import PortfolioBadge from './portfolio/PortfolioBadge';
 
 interface Props {
   league: League;
@@ -32,6 +33,7 @@ export default function LeagueHero({ league, onEdit, join, onElapsed }: Props) {
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-5 py-4 sm:px-6">
         <div className="flex flex-wrap items-center gap-1.5">
           <StatusBadge status={status} />
+          {league.mode === 'portfolio' && <PortfolioBadge />}
           <VisibilityBadge visibility={league.visibility} />
           {league.is_member && <RoleBadge role={league.role} />}
         </div>
@@ -65,7 +67,9 @@ export default function LeagueHero({ league, onEdit, join, onElapsed }: Props) {
           {status !== 'upcoming' && <ProgressBar startedAt={startedAt} endsAt={league.ends_at} finished={status === 'finished'} />}
           {status === 'upcoming' && (
             <p className="mt-4 text-sm text-muted">
-              Başlamadan önce katılan herkes başlangıç anındaki varlığından ölçülür; erken katılmanın avantajı ya da dezavantajı yoktur.
+              {league.mode === 'portfolio'
+                ? 'Lig başladığında her katılımcıya (takım liginde her takıma) aynı sermayeli sanal portföy açılır; erken katılmanın avantajı yoktur.'
+                : 'Başlamadan önce katılan herkes başlangıç anındaki varlığından ölçülür; erken katılmanın avantajı ya da dezavantajı yoktur.'}
             </p>
           )}
 

@@ -15,6 +15,7 @@ import { ApiError, leaguesApi } from '@/lib/api';
 import { formatLeagueDate, leagueTiming } from '@/lib/competition';
 import type { League, PublicLeague, PublicLeagueFilter } from '@/types';
 import { MemberBar, StatusBadge, publicLeaguesKey } from './shared';
+import PortfolioBadge from './portfolio/PortfolioBadge';
 
 const PAGE_SIZE = 12;
 
@@ -199,7 +200,10 @@ function PublicLeagueCard({
   return (
     <Card className="flex h-full flex-col p-5 sm:p-6">
       <div className="flex items-start justify-between gap-3">
-        <StatusBadge status={league.status} />
+        <span className="flex flex-wrap items-center gap-1.5">
+          <StatusBadge status={league.status} />
+          {league.mode === 'portfolio' && <PortfolioBadge rules={league.portfolio} />}
+        </span>
         {league.is_member && <Badge tone="brand">Üyesin</Badge>}
       </div>
       <h3 className="mt-4 truncate text-lg font-semibold text-fg">

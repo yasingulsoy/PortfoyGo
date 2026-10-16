@@ -13,6 +13,7 @@ import { INVITE_CODE_LENGTH, formatLeagueDate, leagueTiming, normalizeInviteCode
 import { useNow } from '@/hooks/useNow';
 import type { League, LeaguePreview } from '@/types';
 import { LEAGUES_KEY, MemberBar, StatusBadge, VisibilityBadge, controlClass } from './shared';
+import PortfolioBadge from './portfolio/PortfolioBadge';
 
 const previewKey = (code: string) => ['leagues:preview', code] as const;
 
@@ -160,6 +161,7 @@ function PreviewCard({ preview, now }: { preview: LeaguePreview; now: number }) 
       {preview.description && <p className="mt-3 break-words text-sm leading-relaxed text-muted">{preview.description}</p>}
       <div className="mt-3 flex flex-wrap items-center gap-1.5">
         <StatusBadge status={preview.status} />
+        {preview.mode === 'portfolio' && <PortfolioBadge />}
         <VisibilityBadge visibility={preview.visibility} />
         {preview.status !== 'finished' && <Badge>{timing.label}</Badge>}
       </div>
