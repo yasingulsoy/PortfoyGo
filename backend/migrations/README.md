@@ -312,3 +312,26 @@ Sanal (sandbox) portföy motoru — **Model Portföy** (`kind = 'model'`, kullan
 İş: `sandbox-snapshots` (her saat xx:03 + 23:58 İstanbul; yalnızca etkin portföyler). KVKK: dışa aktarmada yer alır; hesap
 silinince model portföyler silinir, lig portföyleri anonim kalır. Kurallar ve API: `backend/src/services/sandbox/README.md`.
 Veri taşıma yok; yeni backend'i yayına almadan önce çalıştırın.
+
+## 024_idea_pool.sql
+
+**Ortak Akıl — Öneri Havuzu.** Katılımcıların yatırım fikirlerini yapılandırılmış biçimde kaydettiği ortak alan. Yalnızca yeni
+tablo / indeks ekler; mevcut tablolara dokunmaz, veri taşımaz. Kurallar ve sınırlar: `backend/src/services/ideas/config.ts`.
+
+- `ideas`: yazar, varlık (`asset_type`, `symbol`, `name`), duruş (`al` / `sat` / `izle`), vade (`1w` / `1m` / `3m` / `6m` / `1y`),
+  gerekçe (80–2000), beklenen senaryo (+ `scenario_bull` / `_base` / `_bear`), riskler, izleme kriterleri (`target_price`,
+  `invalidation_price`, `review_date` — CHECK: en az biri), `tags` (≤ 5), kapsam (`public` / `league` + `league_id`, lig silinirse
+  `NULL` → yalnızca yazar görür). Yayın anındaki **referans fiyat** (`ref_price`, `quote_currency`, `ref_price_at` = saklanmış
+  fiyatın zamanı). Yaşam döngüsü `acik` → `kapandi` (CHECK: kapalıysa `closed_at`, `outcome`
+  (`beklendigi_gibi` / `kismen` / `beklenmedik`) ve 40–2000 karakter `evaluation` zorunlu; kapanış fiyatı dondurulur).
+  `review_notified_at`, `target_hit_at`, `invalidation_hit_at`: `idea-reviews` işinin "bir kez" bayrakları;
+  `activity_*`: yanıt / yorum bildirimlerinin toplanması; `hidden_*`: yönetici gizlemesi (yumuşak).
+- `idea_updates`: izleme notları zaman çizelgesi (`note` + sistem olayları `target_hit`, `invalidation_hit`, `review_due`, `closed`).
+- `idea_responses`: "Katılıyorum / Katılmıyorum" + 10–280 karakter gerekçe; `(idea_id, user_id)` benzersiz (kullanıcı başına bir).
+- `idea_comments` (yumuşak silme), `idea_bookmarks` ("İzlemeye al"), `idea_reports` (şikâyet; kullanıcı + hedef başına bir,
+  `acik` / `islendi` / `reddedildi`).
+
+Performans fiyatları yalnızca saklanmış verilerden okunur (`market_data_cache`, `currency_rates`, `price_history`); dış API çağrısı
+yoktur. İş: `idea-reviews` (günlük 09:05 İstanbul). KVKK: tüm tablolar dışa aktarmada; hesap silinince kullanıcının önerileri,
+yanıtları, izleme listesi ve şikâyetleri silinir, başka önerilere yazdığı yorumların metni temizlenir.
+Yeni backend'i yayına almadan önce çalıştırın.

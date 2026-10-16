@@ -15,6 +15,8 @@ import { compactMoney, money } from './model';
 const HEIGHT = 260;
 
 const monthLabel = (m: number) => (m === 0 ? 'Bugün' : m % 12 === 0 ? `${m / 12}. yıl` : `${m}. ay`);
+/** Eksen etiketi: 2 yıldan uzun vadede yıl olarak (yuvarlanmış) */
+const tickLabel = (m: number, total: number) => (m === 0 ? 'Bugün' : total > 24 ? `${Math.max(1, Math.round(m / 12))}. yıl` : `${m}. ay`);
 
 /**
  * Monte Carlo yelpazesi (Portföy Sihirbazı FanChart'ının deseni; baz para birimine göre etiketler).
@@ -40,13 +42,15 @@ export default function LabFanChart({ simulation, amount, currency, className }:
       const outer = mixColors(brand, surface, 0.86);
       const inner = mixColors(brand, surface, 0.68);
       const label = (t: Time) => monthLabel(monthFromTime(Number(t)));
+      const total = simulation.months[simulation.months.length - 1] ?? 0;
+      const tick = (t: Time) => tickLabel(monthFromTime(Number(t)), total);
       chart = lc.createChart(el, {
         height: HEIGHT,
         autoSize: true,
         layout: { background: { color: surface }, textColor: cssVar('--muted'), fontFamily: chartFont(), attributionLogo: false },
         grid: { vertLines: { visible: false }, horzLines: { visible: false } },
         rightPriceScale: { borderVisible: false, scaleMargins: { top: 0.08, bottom: 0.04 } },
-        timeScale: { borderVisible: false, fixLeftEdge: true, fixRightEdge: true, tickMarkFormatter: label },
+        timeScale: { borderVisible: false, fixLeftEdge: true, fixRightEdge: true, tickMarkFormatter: tick },
         crosshair: { mode: lc.CrosshairMode.Magnet, horzLine: { visible: false, labelVisible: false } },
         handleScroll: false,
         handleScale: false,
@@ -79,7 +83,7 @@ export default function LabFanChart({ simulation, amount, currency, className }:
       disposed = true;
       chart?.remove();
     };
-  }, [fan, amount, hasData, theme, currency]);
+  }, [fan, amount, hasData, theme, currency, simulation.months]);
 
   const point = useMemo(() => {
     if (hover === null) return end;

@@ -207,7 +207,7 @@ function DiversificationCard({ analysis }: { analysis: Analysis }) {
           <p className="text-muted">
             {hb.tr_share > 0 ? (
               <>
-                Portföyün <strong className="num text-fg">{pct(hb.tr_share)}</strong>’i Türkiye’de; küresel piyasa payının (≈{pct(hb.reference_share)}) yaklaşık{' '}
+                Türkiye payı <strong className="num text-fg">{pct(hb.tr_share)}</strong>: küresel piyasa payının (≈{pct(hb.reference_share)}) yaklaşık{' '}
                 <strong className="num text-fg">{Math.round(hb.ratio ?? 0).toLocaleString('tr-TR')} katı</strong>.
               </>
             ) : (

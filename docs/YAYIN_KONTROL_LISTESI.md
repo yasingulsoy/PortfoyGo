@@ -30,6 +30,7 @@ Bu liste, `feature/platform-v0.4` dalındaki çalışmanın canlıya alınmadan 
   - 019 (herkese açık profiller + haftalık e-posta özeti): `users.profile_public` (varsayılan **açık**) ve `email_digests` (kullanıcı + hafta başına tek gönderim) ekler; veri taşımaz, tablo yeniden yazılmaz. Yeni backend'i yayına almadan önce çalıştırın (profil ve özet uçları bu kolon/tabloyu kullanır).
   - 020 (işlem derinliği): `orders.type` 20 karaktere genişler (metadata; tablo yeniden yazılmaz), takip eden stop (`trail_percent` / `trail_amount` / `high_water_price`) ve açılışta emir (`execute_after`) kolonları + kısıtlar eklenir; mevcut emirler değişmez, veri taşımaz. **Yeni backend'i yayına almadan önce çalıştırın** — emir oluşturma ve listeleme bu kolonları kullanır.
   - 021 (performans indeksleri): yalnızca `transactions (user_id, created_at DESC)` indeksi; veri değişmez. Tek transaction'da kurulur (MVP boyutunda < 1 sn, bu sürede yalnızca `transactions` yazmaları bekler). Tablo çok büyüdüyse önce aynı indeksi elle `CREATE INDEX CONCURRENTLY` ile oluşturun.
+  - 024 (Ortak Akıl — Öneri Havuzu): yalnızca yeni tablolar ekler (`ideas`, `idea_updates`, `idea_responses`, `idea_comments`, `idea_bookmarks`, `idea_reports`); mevcut tablolara dokunmaz, veri taşımaz. Yeni backend'i (`/api/ideas`, `/api/admin/ideas`, `idea-reviews` işi) yayına almadan önce çalıştırın.
 - [ ] Yönetici hesabı: `ADMIN_EMAIL`, `ADMIN_USERNAME`, `ADMIN_PASSWORD` ile `npm run create-admin -w @portfoygo/backend`.
 
 ## 4. Altyapı
@@ -70,6 +71,8 @@ Bu liste, `feature/platform-v0.4` dalındaki çalışmanın canlıya alınmadan 
   - Senaryo modu için yüklenecek tarihsel veriler lisanslı olmalı (kaynak ve lisans notu zorunlu alan).
   - Eşleştirme kuyruğu ve bot işleri (`arena-matchmaking`, `arena-bots`, `arena-duels`, `weekly-picks`) worker'da çalışır; birden çok örnek açılsa da advisory lock aynı işi aynı anda çalıştırmaz (bkz. §4).
   - Haftalık Seçim tartışması kullanıcı içeriğidir: moderasyon sorumlusu belirlenmeli (yönetim paneli → Haftalık Seçim).
+  - **Ortak Akıl (Öneri Havuzu) kullanıcı içeriğidir: moderasyon sorumlusu belirlenmeli** (yönetim paneli → Ortak Akıl: şikâyet kuyruğu, gizle / göster, yorum kaldır; denetim kaydında `ideas.*`). Şikâyet nedenlerinden "Kesin getiri vaadi / yönlendirme" önceliklidir; her ekranda "Önerilerin kayıt altına alınması, tek başına yatırım tavsiyesi veya işlem onayı anlamına gelmez." notu gösterilir — SPK açısından metin hukukça onaylanmalı. Sınırlar: günde 5 öneri, 30 yorum (15 sn aralık), 20 izleme notu, 20 şikâyet; yalnızca e-postası doğrulanmış üyeler yazabilir.
+  - `idea-reviews` işi her gün 09:05'te (İstanbul) değerlendirme tarihi gelen önerilerin yazarına ve hedef / geçersizlik seviyesi aşılan önerilere (her biri bir kez) bildirim gönderir; bildirimler "Rekabet" kategorisindedir (kullanıcı kapatabilir).
   - Haftalık Seçim emtia seçimleri fiyat geçmişine dayanır; emtia verisi düzenli güncellenmiyorsa emtialar seçim listesinde görünmez.
 - [ ] **İşlem derinliği (020):**
   - ABD seans takvimi (`backend/src/services/marketHours.ts`: `NYSE_HOLIDAYS`, `NYSE_EARLY_CLOSES`) yalnızca 2026–2027'yi içerir; 2028 listesi NYSE yayımlayınca eklenmeli (listede olmayan yılda yalnızca hafta sonu kuralı uygulanır). Canlıda `US_MARKET_HOURS` tanımlanmamalı (`off` seans kuralını kapatır; yalnızca testler için).
