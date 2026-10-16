@@ -24,6 +24,7 @@ import Standings, { StandingsSkeleton } from '@/components/leagues/Standings';
 import ConfirmModal from '@/components/leagues/ConfirmModal';
 import { EditLeagueModal } from '@/components/leagues/CreateLeagueModal';
 import { LEAGUES_KEY, LIMITS, isPublicLeaguesKey, leagueKey } from '@/components/leagues/shared';
+import PortfolioLeagueSection from '@/components/leagues/portfolio/PortfolioLeagueSection';
 import type { League, LeagueDetail, LeagueMember, User } from '@/types';
 
 export default function LeaguePage({ params }: { params: Promise<{ id: string }> }) {
@@ -110,6 +111,8 @@ function LeagueView({ id, user }: { id: string; user: User }) {
 
   const { league, members } = data;
   const { status } = league;
+  // Portföy ligi: TL sıralaması / akış yerine aynı sermayeli sanal portföy bölümü
+  const portfolioMode = league.mode === 'portfolio' && league.is_member;
   const member = league.is_member;
   const isOwner = member && league.role === 'owner';
   const full = league.member_count >= league.max_members;
@@ -206,35 +209,46 @@ function LeagueView({ id, user }: { id: string; user: User }) {
       {joinError && <Alert tone="error">{joinError}</Alert>}
       {error && <Alert tone="error">Lig güncellenemedi; son alınan bilgiler gösteriliyor.</Alert>}
 
-      {status === 'finished' && <WinnerPodium members={members} endsAt={league.finalized_at ?? league.ends_at} />}
+      {status === 'finished' && !portfolioMode && <WinnerPodium members={members} endsAt={league.finalized_at ?? league.ends_at} />}
 
-      <div className="grid grid-cols-1 gap-4 md:gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
-        <Card className="min-w-0 self-start overflow-hidden">
-          <CardHeader
-            title={
-              status === 'active' ? (
-                <span className="inline-flex items-center gap-2">
-                  {standingsTitle}
-                  <span className="relative flex h-2 w-2" aria-hidden="true">
-                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-up opacity-60 motion-reduce:animate-none" />
-                    <span className="relative inline-flex h-2 w-2 rounded-full bg-up" />
+      <div className={cn('grid grid-cols-1 gap-4 md:gap-6', !portfolioMode && 'xl:grid-cols-[minmax(0,1fr)_340px]')}>
+        {portfolioMode ? (
+          <div className="min-w-0">
+            <PortfolioLeagueSection league={league} onLeagueChanged={refresh} />
+          </div>
+        ) : (
+          <Card className="min-w-0 self-start overflow-hidden">
+            <CardHeader
+              title={
+                status === 'active' ? (
+                  <span className="inline-flex items-center gap-2">
+                    {standingsTitle}
+                    <span className="relative flex h-2 w-2" aria-hidden="true">
+                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-up opacity-60 motion-reduce:animate-none" />
+                      <span className="relative inline-flex h-2 w-2 rounded-full bg-up" />
+                    </span>
                   </span>
-                </span>
-              ) : (
-                standingsTitle
-              )
-            }
-            description={standingsDescription}
-          />
-          {members.length === 0 ? (
-            <EmptyState className="border-t border-line" icon={<UsersIcon />} title="Henüz oyuncu yok" description="Davet kodunu paylaşarak arkadaşlarını çağır." />
-          ) : (
-            <Standings members={members} status={status} canRemove={isOwner} onRemove={(m) => setPending({ kind: 'remove', member: m })} />
-          )}
-        </Card>
+                ) : (
+                  standingsTitle
+                )
+              }
+              description={standingsDescription}
+            />
+            {members.length === 0 ? (
+              <EmptyState className="border-t border-line" icon={<UsersIcon />} title="Henüz oyuncu yok" description="Davet kodunu paylaşarak arkadaşlarını çağır." />
+            ) : (
+              <Standings members={members} status={status} canRemove={isOwner} onRemove={(m) => setPending({ kind: 'remove', member: m })} />
+            )}
+          </Card>
+        )}
 
         {member && (
-          <aside className={cn('space-y-4 md:space-y-6', status === 'upcoming' && 'order-first xl:order-none')}>
+          <aside
+            className={cn(
+              portfolioMode ? 'grid items-start gap-4 md:grid-cols-2 md:gap-6' : 'space-y-4 md:space-y-6',
+              status === 'upcoming' && !portfolioMode && 'order-first xl:order-none',
+            )}
+          >
             {status !== 'finished' && (
               <InviteCard
                 leagueId={league.id}
@@ -247,7 +261,7 @@ function LeagueView({ id, user }: { id: string; user: User }) {
               />
             )}
 
-            {status !== 'upcoming' && <LeagueFeed leagueId={league.id} live={status === 'active'} />}
+            {status !== 'upcoming' && !portfolioMode && <LeagueFeed leagueId={league.id} live={status === 'active'} />}
 
             <Card>
               <CardHeader title={isOwner ? 'Lig yönetimi' : 'Üyelik'} description={isOwner ? 'Yalnızca kurucu görebilir' : undefined} />
@@ -264,7 +278,9 @@ function LeagueView({ id, user }: { id: string; user: User }) {
                     <p className="text-sm text-muted">
                       {status === 'finished'
                         ? 'Ligden ayrılırsan bu ligin sonuçları listende görünmez.'
-                        : 'Ligden ayrılırsan sıralamadan çıkarsın. Yeniden katılırsan getirin o andan itibaren ölçülür.'}
+                        : portfolioMode
+                          ? 'Ligden ayrılırsan sıralamadan çıkarsın. Geç katılım süresi içinde geri dönersen aynı portföyle devam edersin.'
+                          : 'Ligden ayrılırsan sıralamadan çıkarsın. Yeniden katılırsan getirin o andan itibaren ölçülür.'}
                     </p>
                     <Button
                       variant="down"

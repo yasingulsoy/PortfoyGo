@@ -145,11 +145,11 @@ describe('biçimlendirme', () => {
   it('yüzde ve puan', () => {
     expect(fmtPct(12.345)).toBe('%12,3');
     expect(fmtPct(-0.04)).toBe('%0,0');
-    expect(fmtPct(-3.21, { sign: true })).toBe('−%3,2');
+    expect(fmtPct(-3.21, { sign: true })).toBe('-%3,2');
     expect(fmtPct(2, { sign: true, digits: 2 })).toBe('+%2,00');
     expect(fmtPct(null)).toBe('—');
     expect(fmtPoints(1.234)).toBe('+1,23 puan');
-    expect(fmtPoints(-0.5)).toBe('−0,50 puan');
+    expect(fmtPoints(-0.5)).toBe('-0,50 puan');
   });
 
   it('ondalık ayrıştırma (virgül/nokta)', () => {

@@ -61,7 +61,7 @@ export default function ComparePanel({ ids }: { ids: string[] }) {
       label: 'En büyük düşüş',
       help: METRIC_EDU.max_drawdown,
       values: items.map((it) => risk(it)?.max_drawdown_pct ?? null),
-      fmt: (v) => (v === null ? '—' : v === 0 ? '%0,0' : `−${fmtPct(v)}`),
+      fmt: (v) => (v === null ? '—' : v === 0 ? '%0,0' : `-${fmtPct(v)}`),
       higher: false,
     },
     {

@@ -303,7 +303,7 @@ export function fmtPct(v: number | null | undefined, opts: { digits?: number; si
   const r = Math.round(Math.abs(v) * f + 1e-7) / f;
   const text = `%${r.toLocaleString('tr-TR', { minimumFractionDigits: digits, maximumFractionDigits: digits })}`;
   if (r === 0) return text;
-  if (v < 0) return `−${text}`;
+  if (v < 0) return `-${text}`;
   return opts.sign ? `+${text}` : text;
 }
 
@@ -313,7 +313,7 @@ export function fmtPoints(v: number | null | undefined, digits = 2): string {
   const f = 10 ** digits;
   const r = Math.round(Math.abs(v) * f + 1e-7) / f;
   const text = r.toLocaleString('tr-TR', { minimumFractionDigits: digits, maximumFractionDigits: digits });
-  return `${r === 0 ? '' : v < 0 ? '−' : '+'}${text} puan`;
+  return `${r === 0 ? '' : v < 0 ? '-' : '+'}${text} puan`;
 }
 
 /** Ekseni kalabalıklaştırmayan USD: 125.000 → "$125 bin" */

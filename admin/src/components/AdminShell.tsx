@@ -17,6 +17,7 @@ import {
   Squares2X2Icon,
   TrophyIcon,
   UsersIcon,
+  LightBulbIcon,
 } from '@heroicons/react/24/outline';
 import { ShieldExclamationIcon } from '@heroicons/react/20/solid';
 import SidebarLayout, { type SidebarSection } from '@portfoygo/shared/ui/SidebarLayout';
@@ -42,6 +43,7 @@ const SECTIONS: SidebarSection[] = [
       { href: '/arena', label: 'Arena', icon: BoltIcon, match: (p) => p === '/arena' || (p.startsWith('/arena/') && !p.startsWith('/arena/scenarios')) },
       { href: '/arena/scenarios', label: 'Senaryolar', icon: FilmIcon },
       { href: '/picks', label: 'Haftalık Seçim', icon: EnvelopeIcon },
+      { href: '/ideas', label: 'Ortak Akıl', icon: LightBulbIcon },
     ],
   },
   {

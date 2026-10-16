@@ -32,11 +32,11 @@ export default function MetricsGrid({ metrics: m, showBasis = true, className }:
   const sharpeHint =
     m.sharpe === null ? 'Hesaplanamadı (oynaklık yok ya da veri az)' : m.sharpe >= 1 ? 'Risk iyi ödüllendirilmiş' : m.sharpe >= 0 ? 'Risksiz getirinin üzerinde' : 'Risksiz getirinin altında';
   return (
-    <div className={cn('min-w-0', className)}>
+    <div className={cn('@container min-w-0', className)}>
       {showBasis && m.basis && (
         <p className="mb-3 text-xs leading-relaxed text-muted">{m.basis === 'realized' ? METRIC_EDU.basis_realized : METRIC_EDU.basis_simulated}</p>
       )}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+      <div className="grid grid-cols-2 gap-3 @lg:grid-cols-3">
         <Tile
           label="Yıllık oynaklık"
           value={fmtPct(m.volatility_ann)}
@@ -45,7 +45,7 @@ export default function MetricsGrid({ metrics: m, showBasis = true, className }:
         />
         <Tile
           label="En büyük düşüş"
-          value={m.max_drawdown_pct === null ? '—' : m.max_drawdown_pct === 0 ? '%0,0' : `−${fmtPct(m.max_drawdown_pct)}`}
+          value={m.max_drawdown_pct === null ? '—' : m.max_drawdown_pct === 0 ? '%0,0' : `-${fmtPct(m.max_drawdown_pct)}`}
           tone={m.max_drawdown_pct && m.max_drawdown_pct >= 15 ? 'down' : undefined}
           hint="Tepeden dibe en derin kayıp"
           help={METRIC_EDU.max_drawdown}

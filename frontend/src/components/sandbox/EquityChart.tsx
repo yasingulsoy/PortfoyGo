@@ -52,6 +52,9 @@ export default function EquityChart({
 }: Props) {
   const clean = useMemo(() => series.map((s) => ({ ...s, points: cleanSeries(s.points) })).filter((s) => s.points.length > 0), [series]);
   const hasData = clean.some((s) => s.points.length >= 2);
+  // Kısa aralıkta (≤ 3 gün) eksende saat de gösterilir
+  const allT = clean.flatMap((s) => s.points.map((p) => p.t));
+  const showTime = intraday || (allT.length > 1 && Math.max(...allT) - Math.min(...allT) <= 3 * 86_400);
   const theme = useDocumentTheme();
   const ref = useRef<HTMLDivElement>(null);
   const [hover, setHover] = useState<{ t: number; values: Record<string, number> } | null>(null);
@@ -77,7 +80,7 @@ export default function EquityChart({
         layout: { background: { color: 'transparent' }, textColor: cssVar('--muted'), fontFamily: chartFont(), attributionLogo: false },
         grid: { vertLines: { visible: false }, horzLines: { color: cssVar('--line') } },
         rightPriceScale: { borderVisible: false, scaleMargins: { top: 0.1, bottom: 0.08 } },
-        timeScale: { borderVisible: false, timeVisible: intraday, secondsVisible: false, fixLeftEdge: true, fixRightEdge: true },
+        timeScale: { borderVisible: false, timeVisible: showTime, secondsVisible: false, fixLeftEdge: true, fixRightEdge: true },
         crosshair: { mode: lc.CrosshairMode.Magnet, horzLine: { visible: false, labelVisible: false } },
         handleScroll: false,
         handleScale: false,
@@ -136,7 +139,7 @@ export default function EquityChart({
       chart?.remove();
     };
     // signature: veri değişince yeniden kur (seriler küçük)
-  }, [signature, hasData, height, format, baseline, intraday, theme]);
+  }, [signature, hasData, height, format, baseline, showTime, theme]);
 
   if (!hasData) {
     return <EmptyState className={className} icon={<ChartBarIcon />} title={emptyTitle} description={emptyDescription} />;
@@ -156,7 +159,7 @@ export default function EquityChart({
             </span>
           );
         })}
-        <span className="ml-auto text-[11px] text-subtle">{hover ? (intraday ? formatDateTime(hover.t * 1000) : formatDate(hover.t * 1000)) : ''}</span>
+        <span className="ml-auto text-[11px] text-subtle">{hover ? (showTime ? formatDateTime(hover.t * 1000) : formatDate(hover.t * 1000)) : ''}</span>
       </figcaption>
       <div ref={ref} style={{ height }} className="w-full" />
     </figure>

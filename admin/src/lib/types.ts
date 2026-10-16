@@ -196,7 +196,11 @@ export type AuditAction =
   | 'scenario.delete'
   | 'scenario.publish'
   | 'picks.comment_delete'
-  | 'picks.note_hide';
+  | 'picks.note_hide'
+  | 'ideas.hide'
+  | 'ideas.unhide'
+  | 'ideas.comment_delete'
+  | 'ideas.report_resolve';
 
 export interface AuditEntry {
   id: string;

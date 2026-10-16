@@ -81,7 +81,7 @@ export default function AllocationDonut({
           )}
         </figure>
 
-        <ul className="grid w-full min-w-0 grid-cols-1 gap-x-4 gap-y-2 text-sm min-[440px]:grid-cols-2 md:grid-cols-1 md:pt-2 lg:grid-cols-2">
+        <ul className="grid w-full min-w-0 grid-cols-1 gap-x-4 gap-y-2 text-sm min-[440px]:grid-cols-2 md:grid-cols-1 md:pt-2">
           {slices.map((s, i) => (
             <li key={s.key} className="flex min-w-0 items-center gap-2">
               <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: s.color }} aria-hidden="true" />

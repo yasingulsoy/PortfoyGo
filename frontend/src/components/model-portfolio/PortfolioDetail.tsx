@@ -134,7 +134,7 @@ export default function PortfolioDetail({ portfolio, valuation }: { portfolio: S
         </CardBody>
       </Card>
 
-      {/* Dağılım + ağırlıklar */}
+      {/* Dağılım + sınıfların yeri */}
       <div className="grid gap-4 md:gap-6 xl:grid-cols-12">
         <AllocationDonut
           className="xl:col-span-5"
@@ -143,61 +143,105 @@ export default function PortfolioDetail({ portfolio, valuation }: { portfolio: S
           centerValue={fmtPct(v.return_pct, { sign: true, digits: 2 })}
           centerLabel="toplam getiri"
         />
-        <Card className="min-w-0 overflow-hidden xl:col-span-7">
-          <CardHeader
-            title="Ağırlıklar"
-            description={portfolio.target_weights ? 'Hedef ve güncel ağırlık · sapma (puan)' : 'Güncel ağırlıklar (hedef kaydedilmemiş)'}
-            action={
-              active ? (
-                <Button size="sm" variant="secondary" onClick={() => setRebalanceOpen(true)}>
-                  Dengele
-                </Button>
-              ) : undefined
-            }
-          />
-          <HoldingsTable
-            className="pb-4"
-            holdings={v.holdings}
-            cashUsd={v.cash_usd}
-            cashWeight={v.cash_weight}
-            targetCashWeight={v.target_cash_weight}
-            showTargets={!!portfolio.target_weights}
-            onSelect={active ? selectHolding : undefined}
-          />
-          {portfolio.target_weights && (
-            <p className="px-5 pb-5 text-xs leading-relaxed text-muted sm:px-6">
-              Fiyatlar değiştikçe ağırlıklar hedeften kayar (sapma). Yeniden dengeleme kazananlardan satıp geride kalanlardan alarak dağılımı hedefe
-              geri getirir; her işlem komisyon doğurur.
-            </p>
-          )}
-        </Card>
-      </div>
-
-      {/* Sınıflar + katkı */}
-      <div className="grid gap-4 md:gap-6 xl:grid-cols-2">
-        <Card className="min-w-0">
+        <Card className="min-w-0 xl:col-span-7">
           <CardHeader title="Nakit ve varlık sınıflarının yeri" description="Her sınıfın payı ve portföydeki rolü" />
           <CardBody className="pt-0">
             <ClassPlacementPanel byClass={v.by_class} />
           </CardBody>
         </Card>
+      </div>
+
+      {/* Ağırlıklar (hedef / güncel / sapma) */}
+      <Card className="min-w-0 overflow-hidden">
+        <CardHeader
+          title="Ağırlıklar"
+          description={portfolio.target_weights ? 'Hedef ve güncel ağırlık · sapma (puan)' : 'Güncel ağırlıklar (hedef kaydedilmemiş)'}
+          action={
+            active ? (
+              <Button size="sm" variant="secondary" onClick={() => setRebalanceOpen(true)}>
+                Dengele
+              </Button>
+            ) : undefined
+          }
+        />
+        <HoldingsTable
+          className="pb-4"
+          holdings={v.holdings}
+          cashUsd={v.cash_usd}
+          cashWeight={v.cash_weight}
+          targetCashWeight={v.target_cash_weight}
+          showTargets={!!portfolio.target_weights}
+          onSelect={active ? selectHolding : undefined}
+        />
+        {portfolio.target_weights && (
+          <p className="px-5 pb-5 text-xs leading-relaxed text-muted sm:px-6">
+            Fiyatlar değiştikçe ağırlıklar hedeften kayar (sapma). Yeniden dengeleme kazananlardan satıp geride kalanlardan alarak dağılımı hedefe
+            geri getirir; her işlem komisyon doğurur.
+          </p>
+        )}
+      </Card>
+
+      {/* Katkı + ne olursa */}
+      <div className="grid gap-4 md:gap-6 xl:grid-cols-2">
         <Card className="min-w-0">
           <CardHeader title="Toplam portföye etkisi" description="Her varlığın toplam getiriye katkısı (yüzde puan)" />
           <CardBody className="pt-0">
             <ContributionBars items={contributions} totalPct={v.return_pct} />
           </CardBody>
         </Card>
-      </div>
-
-      {/* Ne olursa + risk */}
-      <div className="grid gap-4 md:gap-6 xl:grid-cols-2">
         <Card className="min-w-0">
           <CardHeader title="Ne olursa?" description="Bir varlık ya da sınıf değişirse portföy ne olur" />
           <CardBody className="pt-0">
             <WhatIfSimulator positions={whatIf} cashUsd={v.cash_usd} />
           </CardBody>
         </Card>
-        <Card className="min-w-0">
+      </div>
+
+      {/* Değer grafiği + risk */}
+      <div className="grid gap-4 md:gap-6 xl:grid-cols-12">
+        <Card className="min-w-0 xl:col-span-7">
+          <CardHeader
+            title="Portföy değeri"
+            description={chartMode === 'actual' ? 'Gerçekleşen değer (saatlik / günlük kayıt)' : 'Bugünkü pozisyonlar 90 gün önce alınsaydı (simülasyon)'}
+            action={
+              <Tabs
+                label="Grafik türü"
+                value={chartMode}
+                onChange={setChartMode}
+                items={[
+                  { value: 'actual', label: 'Gerçekleşen' },
+                  { value: 'sim', label: '90 gün sim.' },
+                ]}
+              />
+            }
+          />
+          <CardBody className="pt-0">
+            {chartMode === 'actual' && (
+              <Tabs label="Aralık" value={range} onChange={setRange} items={RANGES} className="mb-3 w-fit" />
+            )}
+            {chartMode === 'actual' ? (
+              history.data ? (
+                <EquityChart
+                  series={[{ id: 'p', label: portfolio.name, colorVar: (history.data.change_pct ?? 0) >= 0 ? '--up' : '--down', points: history.data.points }]}
+                  baseline={portfolio.starting_cash}
+                  intraday={range === '1W'}
+                />
+              ) : (
+                <Skeleton className="h-[300px] w-full" />
+              )
+            ) : backtest.data ? (
+              <>
+                <EquityChart series={[{ id: 'sim', label: 'Simülasyon', colorVar: '--brand', points: backtest.data.points }]} baseline={null} emptyDescription="Bu varlıklar için yeterli fiyat geçmişi yok." />
+                {backtest.data.missing.length > 0 && (
+                  <p className="mt-2 text-xs text-muted">Geçmişi olmayan varlıklar sabit değerde varsayıldı: {backtest.data.missing.join(', ')}.</p>
+                )}
+              </>
+            ) : (
+              <Skeleton className="h-[300px] w-full" />
+            )}
+          </CardBody>
+        </Card>
+        <Card className="min-w-0 xl:col-span-5">
           <CardHeader title="Risk ve çeşitlendirme" description="Sade dille metrikler" />
           <CardBody className="pt-0">
             {metrics.data ? (
@@ -214,50 +258,6 @@ export default function PortfolioDetail({ portfolio, valuation }: { portfolio: S
           </CardBody>
         </Card>
       </div>
-
-      {/* Değer grafiği */}
-      <Card className="min-w-0">
-        <CardHeader
-          title="Portföy değeri"
-          description={chartMode === 'actual' ? 'Gerçekleşen değer (saatlik / günlük kayıt)' : 'Bugünkü pozisyonlar 90 gün önce alınsaydı (simülasyon)'}
-          action={
-            <Tabs
-              label="Grafik türü"
-              value={chartMode}
-              onChange={setChartMode}
-              items={[
-                { value: 'actual', label: 'Gerçekleşen' },
-                { value: 'sim', label: '90 gün sim.' },
-              ]}
-            />
-          }
-        />
-        <CardBody className="pt-0">
-          {chartMode === 'actual' && (
-            <Tabs label="Aralık" value={range} onChange={setRange} items={RANGES} className="mb-3 w-fit" />
-          )}
-          {chartMode === 'actual' ? (
-            history.data ? (
-              <EquityChart
-                series={[{ id: 'p', label: portfolio.name, colorVar: (history.data.change_pct ?? 0) >= 0 ? '--up' : '--down', points: history.data.points }]}
-                baseline={portfolio.starting_cash}
-                intraday={range === '1W'}
-              />
-            ) : (
-              <Skeleton className="h-[300px] w-full" />
-            )
-          ) : backtest.data ? (
-            <>
-              <EquityChart series={[{ id: 'sim', label: 'Simülasyon', colorVar: '--brand', points: backtest.data.points }]} baseline={null} emptyDescription="Bu varlıklar için yeterli fiyat geçmişi yok." />
-              {backtest.data.missing.length > 0 && (
-                <p className="mt-2 text-xs text-muted">Geçmişi olmayan varlıklar sabit değerde varsayıldı: {backtest.data.missing.join(', ')}.</p>
-              )}
-            </>
-          ) : (
-            <Skeleton className="h-[300px] w-full" />
-          )}
-        </CardBody>
-      </Card>
 
       {/* İşlem + geçmiş */}
       <div className="grid gap-4 md:gap-6 xl:grid-cols-12">
