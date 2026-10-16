@@ -121,6 +121,15 @@ export function normalizePublicProfile(raw: any): PublicProfile | null {
       .map(
         (x): PublicAchievement => ({ kind: x.kind, title: str(x.title), detail: str(x.detail), icon: str(x.icon) || '🏅', at: x.at }),
       ),
+    ideas:
+      raw.ideas && typeof raw.ideas === 'object'
+        ? {
+            published: Math.max(0, Math.trunc(num(raw.ideas.published))),
+            closed: Math.max(0, Math.trunc(num(raw.ideas.closed))),
+            as_expected_pct: numOrNull(raw.ideas.as_expected_pct),
+            avg_days_to_close: numOrNull(raw.ideas.avg_days_to_close),
+          }
+        : null,
   };
 }
 

@@ -38,8 +38,8 @@ async function endNow(leagueId: string) {
 const trade = (user: TestUser, leagueId: string, body: Record<string, unknown>) =>
   api().post(`/api/portfolio-leagues/${leagueId}/portfolio/trades`).set(user.auth).send(body);
 
-const notifications = (userId: string, type: string) =>
-  q(`SELECT * FROM notifications WHERE user_id = $1 AND type = $2 ORDER BY created_at`, [userId, type]);
+const notifications = (userId: string, type: string, leagueId: string) =>
+  q(`SELECT * FROM notifications WHERE user_id = $1 AND type = $2 AND data->>'league_id' = $3 ORDER BY created_at`, [userId, type, leagueId]);
 
 describe('Portföy Ligi (bireysel)', () => {
   let owner: TestUser;
@@ -127,6 +127,8 @@ describe('Portföy Ligi (bireysel)', () => {
     expect(aRowBefore.strategy).toBeNull();
     expect(aRowBefore.strategy_hidden).toBe(true);
 
+    // Katılımlar başlangıçtan 1 saat önce yapılmış olsun (beyan yazmaya fırsat vardı → başlayınca kilitlenir)
+    await q(`UPDATE portfolio_league_entries SET created_at = now() - INTERVAL '1 hour' WHERE league_id = $1`, [pl.id]);
     expect(await startNow(pl.id)).toBe(true);
     expect(await LeagueService.startLeague(pl.id)).toBe(false); // ikinci başlatma etkisiz
 
@@ -142,7 +144,7 @@ describe('Portföy Ligi (bireysel)', () => {
       expect(p.commission_bps).toBe(25);
       expect(p.league_id).toBe(pl.id);
     }
-    const ready = await notifications(a.id, 'league.portfolio_started');
+    const ready = await notifications(a.id, 'league.portfolio_started', pl.id);
     expect(ready).toHaveLength(1);
     expect(ready[0].body).toContain('100.000 USD');
 
@@ -173,7 +175,9 @@ describe('Portföy Ligi (bireysel)', () => {
     expect(late.status).toBe(409);
     expect(late.body.code).toBe('LEAGUE_ENDED');
 
-    expect(await LeagueService.finalizeLeague(pl.id)).toBe(true);
+    // İstek anında tembel geçiş ligi zaten kapattı (cron'u beklemeden); ikinci kapanış etkisiz
+    expect((await q(`SELECT finalized_at FROM leagues WHERE id = $1`, [pl.id]))[0].finalized_at).not.toBeNull();
+    expect(await LeagueService.finalizeLeague(pl.id)).toBe(false);
     const finals = await q(`SELECT * FROM portfolio_league_entries WHERE league_id = $1 ORDER BY final_rank`, [pl.id]);
     expect(finals.map((e) => e.final_rank)).toEqual([1, 2, 3]);
     expect(finals[0].user_id).toBe(a.id);
@@ -190,7 +194,7 @@ describe('Portföy Ligi (bireysel)', () => {
     expect(await LeagueService.finalizeDue()).toBeGreaterThanOrEqual(0);
     const again = await q(`SELECT id, final_rank, final_return_pct FROM portfolio_league_entries WHERE league_id = $1 ORDER BY final_rank`, [pl.id]);
     expect(again.map((e) => [e.final_rank, e.final_return_pct])).toEqual(finals.map((e) => [e.final_rank, e.final_return_pct]));
-    expect(await notifications(a.id, 'league.portfolio_finished')).toHaveLength(1);
+    expect(await notifications(a.id, 'league.portfolio_finished', pl.id)).toHaveLength(1);
     const st2 = await api().get(`/api/portfolio-leagues/${pl.id}/standings`).set(a.auth);
     expect(st2.body.data.status).toBe('finished');
     expect(st2.body.data.rows[0].return_pct).toBe(Number(finals[0].final_return_pct));
@@ -206,7 +210,7 @@ describe('Portföy Ligi (bireysel)', () => {
   });
 
   it('geç katılım: süre içinde aynı sermaye + işaret; süre sonra katılım kapalı', async () => {
-    const pl = await createPL(owner, { starting_capital_usd: 1_000_000 });
+    const pl = await createPL(await createUser(), { starting_capital_usd: 1_000_000 });
     await startNow(pl.id);
     const late = await createUser();
     expect((await join(late, pl.invite_code)).status).toBe(200);
@@ -225,6 +229,7 @@ describe('Portföy Ligi (bireysel)', () => {
   });
 
   it('ayrılan katılımcı sıralamadan çıkar; geri dönerse aynı portföy (sıfırlama yok)', async () => {
+    owner = await createUser();
     const pl = await createPL(owner);
     const x = await createUser();
     await join(x, pl.invite_code);
@@ -315,10 +320,10 @@ describe('Portföy Ligi (takım)', () => {
     // Kapanış: takım üyelerine sıra bildirimi
     await endNow(pl.id);
     expect(await LeagueService.finalizeLeague(pl.id)).toBe(true);
-    const n = await notifications(m2.id, 'league.portfolio_finished');
+    const n = await notifications(m2.id, 'league.portfolio_finished', pl.id);
     expect(n).toHaveLength(1);
     expect(n[0].data.rank).not.toBeNull();
-    expect(await notifications(loner.id, 'league.portfolio_finished')).toHaveLength(1);
+    expect(await notifications(loner.id, 'league.portfolio_finished', pl.id)).toHaveLength(1);
   });
 
   it('KVKK: takım üyeliği ve strateji notları dışa aktarılır', async () => {

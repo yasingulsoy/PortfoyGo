@@ -182,6 +182,16 @@ export async function tickMarket(pool: Pool): Promise<void> {
         SET buying = buying * f, selling = selling * f, updated_at = CURRENT_TIMESTAMP
        FROM (SELECT 1 + (random() - 0.5) * 0.001 AS f) r`
   );
+  // Emtia: yerelde sağlayıcı yok; fiyat geçmişindeki son fiyattan güncel saatlik kova yazılır (Sanal portföy / Haftalık
+  // Seçim / Arena emtiayı price_history'deki taze kayıttan okur — yoksa altın vb. "bayat" görünür).
+  await pool.query(
+    `INSERT INTO price_history (asset_type, symbol, granularity, bucket_start, price, currency, updated_at)
+     SELECT 'commodity', l.symbol, 'hour', date_trunc('hour', CURRENT_TIMESTAMP), l.price * (1 + (random() - 0.5) * 0.004), l.currency, CURRENT_TIMESTAMP
+       FROM (SELECT DISTINCT ON (symbol) symbol, currency, price
+               FROM price_history WHERE asset_type = 'commodity' AND price > 0
+              ORDER BY symbol, bucket_start DESC) l
+     ON CONFLICT (asset_type, symbol, granularity, bucket_start) DO UPDATE SET price = EXCLUDED.price, updated_at = EXCLUDED.updated_at`
+  );
 }
 
 type Position = { symbol: string; asset_type: 'stock' | 'crypto'; quantity: number; /** ortalama maliyet = güncel × (1 − drift) */ drift: number; daysAgo: number };

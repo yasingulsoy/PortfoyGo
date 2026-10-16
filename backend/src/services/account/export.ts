@@ -252,6 +252,29 @@ const USER_TABLES: Array<{ key: string; label: string; sql: string; optionalTabl
            ORDER BY e.created_at`,
     optionalTable: 'portfolio_league_entries',
   },
+  // Abonelikler + Global Portföy Lab (025)
+  {
+    key: 'subscriptions',
+    label: 'Abonelikler (deneme / Premium geçmişi)',
+    sql: `SELECT plan_id, status, source, starts_at, ends_at, canceled_at, note, created_at, updated_at
+            FROM user_subscriptions WHERE user_id = $1 ORDER BY created_at`,
+    optionalTable: 'user_subscriptions',
+  },
+  {
+    key: 'global_lab_research_list',
+    label: 'Global Portföy Lab araştırma listesi',
+    sql: `SELECT i.symbol, i.name, l.created_at
+            FROM global_research_list l JOIN global_instruments i ON i.id = l.instrument_id
+           WHERE l.user_id = $1 ORDER BY l.created_at`,
+    optionalTable: 'global_research_list',
+  },
+  {
+    key: 'global_lab_scenarios',
+    label: 'Global Portföy Lab kayıtlı senaryolar',
+    sql: `SELECT name, mode, base_currency, horizon_years, amount, allocations, created_at, updated_at
+            FROM global_lab_scenarios WHERE user_id = $1 ORDER BY created_at`,
+    optionalTable: 'global_lab_scenarios',
+  },
 ];
 
 export interface AccountExport {

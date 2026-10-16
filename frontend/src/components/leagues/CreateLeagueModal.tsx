@@ -1,7 +1,7 @@
 'use client';
 
 import { useId, useState, type FormEvent, type ReactNode } from 'react';
-import { GlobeAltIcon, LockClosedIcon, ScaleIcon } from '@heroicons/react/20/solid';
+import { BriefcaseIcon, GlobeAltIcon, LockClosedIcon, ScaleIcon, TrophyIcon } from '@heroicons/react/20/solid';
 import Button from '@portfoygo/shared/ui/Button';
 import { Alert } from '@portfoygo/shared/ui/Feedback';
 import { Field } from '@portfoygo/shared/ui/Field';
@@ -12,6 +12,8 @@ import { leaguesApi } from '@/lib/api';
 import { LEAGUE_DURATIONS, formatLeagueDate, inferDuration, isoToLocalInput, leagueEndsAt, localInputToIso } from '@/lib/competition';
 import type { CreateLeagueRequest, League, LeagueDuration, LeagueVisibility, UpdateLeagueRequest } from '@/types';
 import { LIMITS, controlClass } from './shared';
+import { portfolioLeagueApi } from '@/lib/portfolioLeagues';
+import RulesFields, { defaultRulesState, resolvePeriod, rulesError, type RulesState } from './portfolio/RulesFields';
 
 const NAME_MIN = 3;
 const NAME_MAX = 40;
@@ -29,7 +31,7 @@ interface CreateProps {
 
 export default function CreateLeagueModal({ open, onClose, onCreated }: CreateProps) {
   return (
-    <Modal open={open} onClose={onClose} title="Lig oluştur" description="Kısa bir meydan okuma ya da uzun bir maraton: kuralları sen belirle.">
+    <Modal open={open} onClose={onClose} title="Lig oluştur" description="Ana TL portföyünle yarış ya da herkesin aynı sermayeyle başladığı bir portföy ligi kur.">
       <LeagueForm onCancel={onClose} onSaved={onCreated} />
     </Modal>
   );
@@ -63,8 +65,14 @@ function nextFullHour(now: number) {
  */
 function LeagueForm({ league, onCancel, onSaved }: { league?: League; onCancel: () => void; onSaved: (league: League) => void }) {
   const editing = !!league;
-  const datesLocked = editing && league.status !== 'upcoming';
+  // Portföy liginde dönem "Kuralları düzenle"den değişir (aynı doğrulamayla); bu formda tarihler kilitli
+  const portfolioEdit = editing && league.mode === 'portfolio';
+  const datesLocked = editing && (league.status !== 'upcoming' || portfolioEdit);
   const now = useNow(30_000);
+  /** Lig türü (yalnızca oluşturmada seçilir; sonradan değişmez) */
+  const [mode, setMode] = useState<'main' | 'portfolio'>('main');
+  const [rules, setRules] = useState<RulesState>(() => defaultRulesState(Date.now()));
+  const portfolio = !editing && mode === 'portfolio';
 
   const [name, setName] = useState(league?.name ?? '');
   const [description, setDescription] = useState(league?.description ?? '');
@@ -112,12 +120,26 @@ function LeagueForm({ league, onCancel, onSaved }: { league?: League; onCancel: 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     setTouched(true);
-    if (trimmed.length < NAME_MIN || trimmed.length > NAME_MAX || description.length > DESC_MAX || startError) return;
+    if (trimmed.length < NAME_MIN || trimmed.length > NAME_MAX || description.length > DESC_MAX || (!portfolio && startError)) return;
+    if (portfolio && rulesError(rules, Date.now())) return;
     setPending(true);
     setError('');
     try {
       let saved: League;
-      if (league) {
+      if (portfolio) {
+        const { start, end } = resolvePeriod(rules, Date.now());
+        saved = await portfolioLeagueApi.create({
+          name: trimmed,
+          visibility,
+          ...(description.trim() ? { description: description.trim() } : {}),
+          starts_at: new Date(start).toISOString(),
+          ends_at: new Date(end).toISOString(),
+          starting_capital_usd: rules.capital,
+          commission_bps: rules.commission,
+          participation: rules.participation,
+          ...(rules.participation === 'team' ? { team_size: rules.teamSize, max_teams: rules.maxTeams } : {}),
+        });
+      } else if (league) {
         const body: UpdateLeagueRequest = {};
         if (trimmed !== league.name) body.name = trimmed;
         if ((description.trim() || null) !== league.description) body.description = description.trim() || null;
@@ -147,6 +169,36 @@ function LeagueForm({ league, onCancel, onSaved }: { league?: League; onCancel: 
 
   return (
     <form onSubmit={(e) => void submit(e)} noValidate className="space-y-5">
+      {!editing && (
+        <fieldset>
+          <legend className="mb-1.5 text-sm font-medium text-fg/80">Lig türü</legend>
+          <div className="grid gap-2 sm:grid-cols-2">
+            <OptionCard
+              name="mode"
+              checked={mode === 'main'}
+              onChange={() => setMode('main')}
+              icon={<TrophyIcon />}
+              title="Ana lig"
+              description="Ana TL portföyünün katıldığın andan itibaren getirisi"
+            />
+            <OptionCard
+              name="mode"
+              checked={mode === 'portfolio'}
+              onChange={() => setMode('portfolio')}
+              icon={<BriefcaseIcon />}
+              title="Portföy ligi"
+              description="Herkese aynı sermayeli sanal USD portföy; aynı dönem ve işlem maliyeti"
+            />
+          </div>
+          {portfolio && (
+            <p className="mt-2 text-xs leading-relaxed text-muted">
+              Stratejileri adil karşılaştırmak için: herkes aynı başlangıç sermayesi, ölçüm dönemi ve işlem maliyetiyle yarışır. Bireysel ya da takım
+              olarak katılınır; sıralamada getiri, en büyük düşüş, oynaklık, işlem sayısı ve devir hızı görünür. Kurallar lig başlayınca kilitlenir.
+            </p>
+          )}
+        </fieldset>
+      )}
+
       <Field
         label="Lig adı"
         value={name}
@@ -195,70 +247,78 @@ function LeagueForm({ league, onCancel, onSaved }: { league?: League; onCancel: 
         </div>
       </fieldset>
 
-      <fieldset disabled={datesLocked} className="space-y-2">
-        <legend className="mb-1.5 text-sm font-medium text-fg/80">Başlangıç</legend>
-        <div className="grid grid-cols-2 gap-2">
-          <Chip name="start" label="Hemen" checked={startMode === 'now'} onChange={() => changeDates(() => setStartMode('now'))} />
-          <Chip name="start" label="Belirli zaman" checked={startMode === 'scheduled'} onChange={() => changeDates(() => setStartMode('scheduled'))} />
-        </div>
-        {startMode === 'scheduled' && !datesLocked && (
-          <div>
-            <label htmlFor={startId} className="sr-only">
-              Başlangıç zamanı (Türkiye saati)
-            </label>
-            <input
-              id={startId}
-              type="datetime-local"
-              value={startLocal}
-              min={isoToLocalInput(now)}
-              max={isoToLocalInput(now + MAX_LEAD_MS)}
-              onChange={(e) => changeDates(() => setStartLocal(e.target.value))}
-              aria-invalid={startError ? true : undefined}
-              aria-describedby={`${startId}-hint`}
-              className={cn(controlClass, 'h-11', startError && 'border-down/60')}
-            />
-            <p id={`${startId}-hint`} className={cn('mt-1.5 text-xs', startError ? 'text-down' : 'text-subtle')}>
-              {startError ?? 'Türkiye saati (UTC+3) · en fazla 30 gün sonrası'}
+      {portfolio && <RulesFields value={rules} onChange={setRules} now={now} disabled={pending} />}
+
+      {!portfolio && (
+        <>
+          <fieldset disabled={datesLocked} className="space-y-2">
+            <legend className="mb-1.5 text-sm font-medium text-fg/80">Başlangıç</legend>
+            <div className="grid grid-cols-2 gap-2">
+              <Chip name="start" label="Hemen" checked={startMode === 'now'} onChange={() => changeDates(() => setStartMode('now'))} />
+              <Chip name="start" label="Belirli zaman" checked={startMode === 'scheduled'} onChange={() => changeDates(() => setStartMode('scheduled'))} />
+            </div>
+            {startMode === 'scheduled' && !datesLocked && (
+              <div>
+                <label htmlFor={startId} className="sr-only">
+                  Başlangıç zamanı (Türkiye saati)
+                </label>
+                <input
+                  id={startId}
+                  type="datetime-local"
+                  value={startLocal}
+                  min={isoToLocalInput(now)}
+                  max={isoToLocalInput(now + MAX_LEAD_MS)}
+                  onChange={(e) => changeDates(() => setStartLocal(e.target.value))}
+                  aria-invalid={startError ? true : undefined}
+                  aria-describedby={`${startId}-hint`}
+                  className={cn(controlClass, 'h-11', startError && 'border-down/60')}
+                />
+                <p id={`${startId}-hint`} className={cn('mt-1.5 text-xs', startError ? 'text-down' : 'text-subtle')}>
+                  {startError ?? 'Türkiye saati (UTC+3) · en fazla 30 gün sonrası'}
+                </p>
+              </div>
+            )}
+          </fieldset>
+
+          <fieldset disabled={datesLocked}>
+            <legend className="mb-1.5 text-sm font-medium text-fg/80">Süre</legend>
+            <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+              {LEAGUE_DURATIONS.map((d) => (
+                <Chip
+                  key={d.value}
+                  name="duration"
+                  checked={duration === d.value}
+                  // Süreli bir lig sonradan süresize çevrilemez (backend kuralı)
+                  disabled={editing && d.value === 'none' && !!league.ends_at}
+                  onChange={() => changeDates(() => setDuration(d.value))}
+                  label={d.label}
+                />
+              ))}
+            </div>
+          </fieldset>
+
+          <div className="rounded-xl border border-line bg-surface-2 p-3.5 text-sm">
+            <p className="num font-medium text-fg">
+              Başlangıç: {summaryStart ? formatLeagueDate(summaryStart) : datesLocked ? '—' : 'Hemen'}
+              <span className="text-subtle"> · </span>
+              Bitiş: {summaryEnd ? formatLeagueDate(summaryEnd) : 'Süresiz'}
             </p>
+            {portfolioEdit ? (
+              <p className="mt-1.5 text-xs text-muted">Portföy liginde dönem ve kurallar lig sayfasındaki “Kuralları düzenle”den değiştirilir (yalnızca başlamadan).</p>
+            ) : datesLocked ? (
+              <p className="mt-1.5 text-xs text-muted">Lig başladığı için tarihler artık değiştirilemez.</p>
+            ) : (
+              <p className="mt-1.5 flex gap-1.5 text-xs leading-relaxed text-muted">
+                <ScaleIcon className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                <span>
+                  Adil başlangıç: başlamadan önce katılan herkes başlangıç anındaki varlığından ölçülür. Lig başladıktan sonra katılanlar katıldıkları andan
+                  itibaren ölçülür.
+                </span>
+              </p>
+            )}
           </div>
-        )}
-      </fieldset>
-
-      <fieldset disabled={datesLocked}>
-        <legend className="mb-1.5 text-sm font-medium text-fg/80">Süre</legend>
-        <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
-          {LEAGUE_DURATIONS.map((d) => (
-            <Chip
-              key={d.value}
-              name="duration"
-              checked={duration === d.value}
-              // Süreli bir lig sonradan süresize çevrilemez (backend kuralı)
-              disabled={editing && d.value === 'none' && !!league.ends_at}
-              onChange={() => changeDates(() => setDuration(d.value))}
-              label={d.label}
-            />
-          ))}
-        </div>
-      </fieldset>
-
-      <div className="rounded-xl border border-line bg-surface-2 p-3.5 text-sm">
-        <p className="num font-medium text-fg">
-          Başlangıç: {summaryStart ? formatLeagueDate(summaryStart) : datesLocked ? '—' : 'Hemen'}
-          <span className="text-subtle"> · </span>
-          Bitiş: {summaryEnd ? formatLeagueDate(summaryEnd) : 'Süresiz'}
-        </p>
-        {datesLocked ? (
-          <p className="mt-1.5 text-xs text-muted">Lig başladığı için tarihler artık değiştirilemez.</p>
-        ) : (
-          <p className="mt-1.5 flex gap-1.5 text-xs leading-relaxed text-muted">
-            <ScaleIcon className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-            <span>
-              Adil başlangıç: başlamadan önce katılan herkes başlangıç anındaki varlığından ölçülür. Lig başladıktan sonra katılanlar katıldıkları andan
-              itibaren ölçülür.
-            </span>
-          </p>
-        )}
-      </div>
+        </>
+      )}
 
       {!editing && (
         <p className="text-xs leading-relaxed text-muted">

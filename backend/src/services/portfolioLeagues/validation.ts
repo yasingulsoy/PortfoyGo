@@ -152,12 +152,27 @@ export const plTradeSchema = z
       .regex(/^[A-Za-z0-9._\-=^]+$/, 'Geçersiz sembol')
       .transform((s) => s.toUpperCase()),
     amount_usd: z.number({ message: 'Tutar sayı olmalı' }).positive('Tutar 0’dan büyük olmalı').max(1e9, 'Tutar çok büyük').optional(),
-    quantity: z.number({ message: 'Miktar sayı olmalı' }).positive('Miktar 0’dan büyük olmalı').max(1e12, 'Miktar çok büyük').optional(),
+    /** Sayı ya da satışta 'all' (pozisyonun tamamı) */
+    quantity: z
+      .union([z.number({ message: 'Miktar sayı olmalı' }).positive('Miktar 0’dan büyük olmalı').max(1e12, 'Miktar çok büyük'), z.literal('all')])
+      .optional(),
     all: z.boolean().optional(),
   })
   .refine((v) => v.amount_usd !== undefined || v.quantity !== undefined || (v.side === 'sell' && v.all === true), {
     message: 'Tutar (USD) ya da miktar girin',
+  })
+  .refine((v) => v.quantity !== 'all' || v.side === 'sell', { message: '"Tümü" yalnızca satışta kullanılabilir' })
+  .transform((v) => {
+    const all = v.side === 'sell' && (v.all === true || v.quantity === 'all');
+    return {
+      side: v.side,
+      asset_type: v.asset_type,
+      symbol: v.symbol,
+      ...(all ? { quantity: 'all' as const } : v.amount_usd !== undefined ? { amount_usd: v.amount_usd } : { quantity: v.quantity as number }),
+    };
   });
+
+export type PlTradeInput = z.infer<typeof plTradeSchema>;
 
 export const plWeightsSchema = z.object({
   weights: z

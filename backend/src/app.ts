@@ -47,6 +47,10 @@ import ideasRoutes from './routes/ideas';
 import portfolioLeaguesRoutes, { adminPortfolioLeaguesRouter } from './routes/portfolioLeagues';
 
 import modelPortfoliosRoutes, { sandboxAssetsRouter } from './routes/modelPortfolios';
+import subscriptionsRoutes, { meEntitlementsRouter } from './routes/subscriptions';
+import adminSubscriptionsRoutes from './routes/adminSubscriptions';
+import globalLabRoutes from './routes/globalLab';
+import adminGlobalLabRoutes from './routes/adminGlobalLab';
 /**
  * Express uygulamasını kurar (middleware + route'lar). Sunucuyu BAŞLATMAZ, cron kurmaz.
  *
@@ -218,6 +222,14 @@ export function createApp(): express.Express {
   // Model Portföy (100.000 USD varsayımsal portföy; sanal portföy motoru services/sandbox) + sanal portföy varlık araması
   app.use('/api/model-portfolios', modelPortfoliosRoutes);
   app.use('/api/sandbox', sandboxAssetsRouter);
+
+  // Abonelik altyapısı (025; ödeme sağlayıcısı yok): planlar, tek seferlik 14 günlük deneme, GET /api/me/entitlements
+  app.use('/api/subscriptions', subscriptionsRoutes);
+  app.use('/api/me', meEntitlementsRouter);
+  app.use('/api/admin/subscriptions', adminSubscriptionsRoutes);
+  // Global Portföy Lab (025): araştırma kataloğu, sınıflandırma, senaryo laboratuvarı (Premium) + yönetici kataloğu / varsayımlar
+  app.use('/api/global-lab', globalLabRoutes);
+  app.use('/api/admin/global-lab', adminGlobalLabRoutes);
 
   // Proxy /api önekini siliyorsa: /currencies, /commodities, /news için geriye dönük uyumluluk
   app.use(['/commodities', '/currencies', '/news'], globalApiLimiter);

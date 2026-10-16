@@ -11,7 +11,8 @@ import type { AuthenticatedRequest } from '../middleware/auth';
  *   order.cancel, league.delete, job.run, cache.refresh_stocks, cache.refresh_currencies,
  *   announcement.create, arena.challenge_create, arena.challenge_cancel,
  *   picks.comment_delete, picks.note_hide,
- *   ideas.hide, ideas.unhide, ideas.comment_delete, ideas.report_resolve
+ *   ideas.hide, ideas.unhide, ideas.comment_delete, ideas.report_resolve,
+ *   subscription.grant, subscription.revoke, global_lab.* (katalog / notlar / varsayımlar / stres senaryoları)
  */
 
 export const AUDIT_ACTIONS = [
@@ -34,6 +35,21 @@ export const AUDIT_ACTIONS = [
   'ideas.unhide',
   'ideas.comment_delete',
   'ideas.report_resolve',
+  // Abonelikler + Global Portföy Lab (025)
+  'subscription.grant',
+  'subscription.revoke',
+  'global_lab.instrument_create',
+  'global_lab.instrument_update',
+  'global_lab.instrument_delete',
+  'global_lab.instruments_import',
+  'global_lab.note_create',
+  'global_lab.note_update',
+  'global_lab.note_delete',
+  'global_lab.notes_import',
+  'global_lab.assumptions_update',
+  'global_lab.correlations_update',
+  'global_lab.stress_upsert',
+  'global_lab.stress_delete',
 ] as const;
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
 

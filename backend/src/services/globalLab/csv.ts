@@ -173,7 +173,11 @@ function issueMessage(err: { issues: { message: string; path: PropertyKey[] }[] 
   return field && !msg.toLowerCase().includes(field) ? `${field}: ${msg}` : msg;
 }
 
-export function parseInstrumentCsv(text: string, maxRows: number = LIMITS.importMaxRows): CsvParseResult<InstrumentInput> {
+/**
+ * Katalog CSV'si. `columns`: dosyada bulunan sütunlar — mevcut araçlar güncellenirken YALNIZCA bu sütunlar yazılır
+ * (dosyada olmayan alanlar korunur); yeni araçlarda eksik alanlar boş / varsayılan olur.
+ */
+export function parseInstrumentCsv(text: string, maxRows: number = LIMITS.importMaxRows): CsvParseResult<InstrumentInput> & { columns: string[] } {
   const records = parseCsvRecords(text);
   const map = mapHeader(records, INSTRUMENT_CSV_COLUMNS, ['symbol', 'name', 'vehicle', 'asset_class', 'region', 'currency', 'risk_level', 'data_source', 'license_note']);
   const data = records.slice(1);
@@ -196,7 +200,7 @@ export function parseInstrumentCsv(text: string, maxRows: number = LIMITS.import
     if (bySymbol.has(parsed.data.symbol)) duplicates++;
     bySymbol.set(parsed.data.symbol, parsed.data);
   }
-  return { rows: [...bySymbol.values()], errors, total: data.length, duplicates };
+  return { rows: [...bySymbol.values()], errors, total: data.length, duplicates, columns: INSTRUMENT_CSV_COLUMNS.filter((c) => map.has(c)) };
 }
 
 export interface NoteCsvRow {

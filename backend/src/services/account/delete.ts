@@ -27,6 +27,7 @@ import { TwoFactorService } from '../security/twoFactor';
  *  - Aktif emirler iptal edilir (rezerv bakiyeye döner), bekleyen düello davetleri iptal edilir.
  *  - Ortak Akıl (024): kendi önerileri (notları, aldıkları yanıt/yorumlarla), yanıtları, izleme listesi ve şikâyetleri silinir;
  *    başka önerilere yazdığı yorumların metni temizlenir.
+ *  - Global Portföy Lab + abonelikler (025): araştırma listesi, kayıtlı senaryolar ve deneme / yönetici abonelik kayıtları silinir.
  *
  * Doğrulama sırası: şifre → (2FA açıksa) TOTP / kurtarma kodu. Doğrulamalar transaction DIŞINDA yapılır;
  * böylece hatalı 2FA denemeleri geri alınmaz (kilit sayacı).
@@ -186,6 +187,22 @@ export class AccountDeletionService {
           `UPDATE portfolio_league_entries
               SET reflection = NULL, reflection_updated_by = NULL
             WHERE (user_id = $1 OR reflection_updated_by = $1) AND (reflection IS NOT NULL OR reflection_updated_by IS NOT NULL)`,
+          [userId]
+        );
+      }
+
+      // 4e) Abonelikler + Global Portföy Lab (025): araştırma listesi ve kayıtlı senaryolar silinir; deneme / yönetici
+      //     abonelik kayıtları silinir. İleride ödeme kaynaklı ('payment') satırlar fatura / yasal saklama için anonim
+      //     kalır (yalnızca not temizlenir) — bkz. docs/YAYIN_KONTROL_LISTESI.md.
+      for (const table of ['global_research_list', 'global_lab_scenarios']) {
+        if (await tableExists(client, table)) await client.query(`DELETE FROM ${table} WHERE user_id = $1`, [userId]);
+      }
+      if (await tableExists(client, 'user_subscriptions')) {
+        await client.query(`DELETE FROM user_subscriptions WHERE user_id = $1 AND source <> 'payment'`, [userId]);
+        await client.query(
+          `UPDATE user_subscriptions SET note = NULL, status = CASE WHEN status IN ('trial', 'active') THEN 'canceled' ELSE status END,
+                  canceled_at = COALESCE(canceled_at, now()), updated_at = now()
+            WHERE user_id = $1`,
           [userId]
         );
       }

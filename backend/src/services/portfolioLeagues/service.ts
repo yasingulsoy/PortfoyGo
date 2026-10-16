@@ -26,7 +26,7 @@ import {
   type RulesRow,
 } from './core';
 import { DAY_MS, maxMembersFor, periodError, type Participation } from './rules';
-import type { CreatePortfolioLeagueInput, UpdateRulesInput } from './validation';
+import type { CreatePortfolioLeagueInput, PlTradeInput, UpdateRulesInput } from './validation';
 
 /**
  * Portföy Ligi API işlemleri (routes/portfolioLeagues.ts). Yaşam döngüsü kancaları ve sıralama hesabı core.ts'de.
@@ -87,14 +87,22 @@ async function memberContext(leagueId: string, userId: string): Promise<{ league
   return { league, rules, role: m.rows[0].role };
 }
 
-/** Strateji beyanı düzenlenebilir mi: lig başlayana kadar; geç katılan (ya da hemen başlayan ligde herkes) geç katılım süresi bitene kadar */
+/** Katılımla portföyün açılması arasında bundan kısa süre varsa beyan yazmaya fırsat olmamıştır */
+const NO_CHANCE_MS = 2 * 60_000;
+
+/**
+ * Strateji beyanı düzenlenebilir mi: lig başlayana kadar. Beyan yazmaya fırsatı olmayanlar (geç katılanlar,
+ * hemen başlayan ligin kurucusu, başladıktan sonra kurulan takımlar — portföyü katılımdan en geç 2 dk sonra
+ * açılanlar) geç katılım süresi bitene kadar yazabilir.
+ */
 function strategyEditable(league: LeagueRow, entry: EntryRow | null, now = Date.now()): boolean {
   if (!entry || league.finalized_at) return false;
   if (!league.started_at) return true;
   const { cutoff } = periodOf(league);
   if (now >= cutoff.getTime()) return false;
-  const immediate = new Date(league.started_at).getTime() - new Date(league.created_at).getTime() <= 2 * 60_000;
-  return entry.late_join || immediate || !entry.portfolio_id;
+  if (!entry.portfolio_id || entry.late_join) return true;
+  const gap = new Date(entry.measured_from ?? 0).getTime() - new Date(entry.created_at).getTime();
+  return gap <= NO_CHANCE_MS;
 }
 
 function rulesView(league: LeagueRow, rules: RulesRow) {
@@ -436,7 +444,9 @@ export class PortfolioLeagueService {
     if (finished) {
       for (const e of entries) {
         const r = live.get(e.id);
-        if (r && e.final_equity_usd !== null && r.points.length > 0) r.points[r.points.length - 1] = { t: Math.floor(endMs / 1000), v: e.final_equity_usd };
+        if (r && e.final_equity_usd !== null && r.points.length > 0) {
+          r.points[r.points.length - 1] = { t: Math.max(Math.floor(endMs / 1000), r.points[0].t + 1), v: e.final_equity_usd };
+        }
       }
     }
     const ranks = finished ? new Map(entries.filter((e) => e.final_rank !== null).map((e) => [e.id, e.final_rank as number])) : liveRanks(entries, live);
@@ -759,14 +769,9 @@ export class PortfolioLeagueService {
     return Engine.history(entry.portfolio_id, (['1W', '1M', '3M', 'ALL'].includes(range) ? range : 'ALL') as HistoryRange);
   }
 
-  static async trade(leagueId: string, userId: string, input: { side: 'buy' | 'sell'; asset_type: any; symbol: string; amount_usd?: number; quantity?: number; all?: boolean }) {
+  static async trade(leagueId: string, userId: string, input: PlTradeInput) {
     const { portfolioId } = await this.tradeContext(leagueId, userId);
-    const res = await Engine.trade(portfolioId, userId, {
-      side: input.side,
-      asset_type: input.asset_type,
-      symbol: input.symbol,
-      ...(input.side === 'sell' && input.all ? { quantity: 'all' as const } : input.amount_usd !== undefined ? { amount_usd: input.amount_usd } : { quantity: input.quantity }),
-    });
+    const res = await Engine.trade(portfolioId, userId, input);
     invalidateLeague(leagueId);
     return res;
   }

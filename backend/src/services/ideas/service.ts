@@ -740,8 +740,8 @@ export class IdeasService {
       }
     }
     if (lastPrice !== null && lastAt) {
-      const t = Math.floor(lastAt.getTime() / 1000);
-      if (t > points[points.length - 1].t) points.push({ t, v: lastPrice });
+      // Zaman ekseni kesin artan olmalı (yayınla aynı saniyede bile son nokta eklenir)
+      points.push({ t: Math.max(Math.floor(lastAt.getTime() / 1000), points[points.length - 1].t + 1), v: lastPrice });
     }
     return {
       id: row.id,

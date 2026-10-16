@@ -154,6 +154,7 @@ export function toLeague(raw: any): League {
     my_return_pct: numOrNull(raw?.my_return_pct),
     my_final_rank: rankOrNull(raw?.my_final_rank),
     created_at: str(raw?.created_at),
+    mode: raw?.mode === 'portfolio' ? 'portfolio' : 'main',
   };
 }
 
@@ -174,6 +175,7 @@ export function toLeaguePreview(raw: any): LeaguePreview {
     starts_at: strOrNull(raw?.starts_at),
     ends_at: strOrNull(raw?.ends_at),
     already_member: bool(raw?.already_member),
+    mode: raw?.mode === 'portfolio' ? 'portfolio' : 'main',
   };
 }
 
@@ -225,6 +227,15 @@ function toPublicLeague(raw: any): PublicLeague {
     starts_at: strOrNull(raw?.starts_at),
     ends_at: strOrNull(raw?.ends_at),
     is_member: bool(raw?.is_member),
+    mode: raw?.mode === 'portfolio' ? 'portfolio' : 'main',
+    portfolio:
+      raw?.mode === 'portfolio' && raw?.portfolio
+        ? {
+            starting_capital_usd: num(raw.portfolio.starting_capital_usd),
+            commission_bps: num(raw.portfolio.commission_bps),
+            participation: raw.portfolio.participation === 'team' ? 'team' : 'solo',
+          }
+        : null,
   };
 }
 

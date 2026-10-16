@@ -875,3 +875,89 @@ export const marketSessionApi = {
     return toUsMarketSession(body?.data ?? body, Math.round((sent + Date.now()) / 2));
   },
 };
+
+/* ------------------------------------------------------------------ */
+/* Model Portföy (100.000 USD) + sanal portföy varlık araması           */
+/* ------------------------------------------------------------------ */
+
+import type {
+  AdvisorTemplate as SandboxAdvisorTemplate,
+  AssetSearchItem as SandboxAssetSearchItem,
+  CompareItem as SandboxCompareItem,
+  ModelDetail as SandboxModelDetail,
+  ModelList as SandboxModelList,
+  RebalancePlan as SandboxRebalancePlan,
+  SandboxAssetType,
+  SandboxBacktest,
+  SandboxHistory,
+  SandboxHistoryRange,
+  SandboxMetrics,
+  SandboxPortfolio,
+  SandboxTrade,
+  SandboxTradeRequest,
+  SandboxValuation,
+  TargetWeight as SandboxTargetWeight,
+} from '@/components/sandbox/types';
+
+export interface SandboxWeightsBody {
+  weights: SandboxTargetWeight[];
+  cash_weight: number;
+}
+
+const mpPath = (id: string) => `/model-portfolios/${encodeURIComponent(id)}`;
+const sendJson = (method: string, body?: unknown): RequestInit => ({ method, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
+
+/** /api/model-portfolios — hatalar ApiError (code: MODEL_LIMIT, WEIGHTS_INVALID, PRICE_UNAVAILABLE, INSUFFICIENT_CASH …) */
+export const modelPortfolioApi = {
+  listKey: '/model-portfolios',
+  list: () => swrFetcher<SandboxModelList>('/model-portfolios'),
+  detailKey: (id: string) => mpPath(id),
+  detail: (id: string) => swrFetcher<SandboxModelDetail>(mpPath(id)),
+  historyKey: (id: string, range: SandboxHistoryRange) => `${mpPath(id)}/history?range=${range}`,
+  metricsKey: (id: string) => `${mpPath(id)}/metrics`,
+  backtestKey: (id: string, days = 90) => `${mpPath(id)}/backtest?days=${days}`,
+  tradesKey: (id: string, limit = 20, offset = 0) => `${mpPath(id)}/trades?limit=${limit}&offset=${offset}`,
+  compareKey: (ids: string[]) => `/model-portfolios/compare?ids=${ids.map(encodeURIComponent).join(',')}`,
+  advisorTemplateKey: '/model-portfolios/templates/advisor',
+  fetch: <T,>(key: string) => swrFetcher<T>(key),
+  create: async (body: { name: string } & Partial<SandboxWeightsBody>) =>
+    unwrap(await apiFetch(`/model-portfolios`, post(body))) as { portfolio: SandboxPortfolio; rebalance: unknown },
+  preview: async (body: SandboxWeightsBody) => unwrap(await apiFetch('/model-portfolios/preview', post(body))) as SandboxRebalancePlan,
+  rename: async (id: string, name: string) => unwrap(await apiFetch(mpPath(id), sendJson('PATCH', { name }))) as SandboxPortfolio,
+  remove: async (id: string) => {
+    await apiFetch(mpPath(id), sendJson('DELETE'));
+  },
+  setWeights: async (id: string, body: SandboxWeightsBody, dryRun = false) =>
+    unwrap(await apiFetch(`${mpPath(id)}/weights`, sendJson('PUT', { ...body, dry_run: dryRun }))) as {
+      result: { executed: boolean; plan: SandboxRebalancePlan; trades: SandboxTrade[]; cash_usd: number };
+      valuation: SandboxValuation | null;
+    },
+  trade: async (id: string, body: SandboxTradeRequest) =>
+    unwrap(await apiFetch(`${mpPath(id)}/trade`, post(body))) as { result: { trade: SandboxTrade; cash_usd: number }; valuation: SandboxValuation },
+};
+
+export type {
+  SandboxAdvisorTemplate,
+  SandboxBacktest,
+  SandboxCompareItem,
+  SandboxHistory,
+  SandboxMetrics,
+};
+
+/** GET /api/sandbox/assets — yalnızca işlem için taze fiyatı olan varlıklar (USD) */
+export const sandboxApi = {
+  assetsKey: (q: string, type: SandboxAssetType | null) => {
+    const p = new URLSearchParams();
+    if (q.trim()) p.set('q', q.trim());
+    if (type) p.set('type', type);
+    const qs = p.toString();
+    return `/sandbox/assets${qs ? `?${qs}` : ''}`;
+  },
+  assets: (q: string, type: SandboxAssetType | null) => swrFetcher<SandboxAssetSearchItem[]>(sandboxApi.assetsKey(q, type)),
+};
+
+/* ------------------------------------------------------------------ */
+/* Ortak Akıl — Öneri Havuzu (/api/ideas): istemci ve normalleştiriciler src/lib/ideas.ts'te */
+/* ------------------------------------------------------------------ */
+
+export { ideasApi } from './ideas';

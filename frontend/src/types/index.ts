@@ -252,6 +252,8 @@ export interface League {
   my_return_pct: number | null;
   my_final_rank: number | null;
   created_at: string;
+  /** 'portfolio' = Portföy Ligi (aynı sermayeli USD sanal portföy); yoksa ana lig */
+  mode?: 'main' | 'portfolio';
 }
 
 export interface LeaguePreview {
@@ -266,6 +268,7 @@ export interface LeaguePreview {
   starts_at: string | null;
   ends_at: string | null;
   already_member: boolean;
+  mode?: 'main' | 'portfolio';
 }
 
 export interface LeagueMember {
@@ -303,6 +306,9 @@ export interface PublicLeague {
   starts_at: string | null;
   ends_at: string | null;
   is_member: boolean;
+  mode?: 'main' | 'portfolio';
+  /** Portföy ligi kuralları (keşfet rozetleri) */
+  portfolio?: { starting_capital_usd: number; commission_bps: number; participation: 'solo' | 'team' } | null;
 }
 
 export interface PublicLeaguePage {
@@ -1402,6 +1408,8 @@ export interface PublicProfile {
   season_awards: PublicProfileSeasonAward[];
   badges: PublicProfileBadge[];
   achievements: PublicAchievement[];
+  /** Ortak Akıl başarı kaydı (yalnızca sayılar / oranlar); eski API'de yok */
+  ideas?: import('./ideas').PublicIdeasRecord | null;
 }
 
 /** Sunucu tarafı profil isteğinin sonucu (gizli / yok / hata ayrımı) */
@@ -1445,3 +1453,6 @@ export interface LoginResult {
   requires2fa?: boolean;
   challenge?: string;
 }
+
+// Ortak Akıl — Öneri Havuzu (backend /api/ideas, migration 024)
+export type * from './ideas';

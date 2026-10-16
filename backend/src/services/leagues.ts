@@ -107,7 +107,8 @@ export interface LeaguePreview {
   starts_at: Date;
   ends_at: Date | null;
   already_member: boolean;
-  mode: LeagueMode;
+  /** Yalnızca portföy liginde ('portfolio'); ana ligde alan yoktur (yanıt biçimi değişmesin) */
+  mode?: LeagueMode;
 }
 
 export interface PublicLeagueItem {
@@ -121,9 +122,9 @@ export interface PublicLeagueItem {
   starts_at: Date;
   ends_at: Date | null;
   is_member: boolean;
-  mode: LeagueMode;
-  /** Portföy liginde sabit kurallar (keşfet kartı rozetleri) */
-  portfolio: { starting_capital_usd: number; commission_bps: number; participation: string } | null;
+  /** Yalnızca portföy liginde: mod + sabit kurallar (keşfet kartı rozetleri); ana ligde alanlar yoktur */
+  mode?: LeagueMode;
+  portfolio?: { starting_capital_usd: number; commission_bps: number; participation: string };
 }
 
 export interface LeagueFeedItem {
@@ -586,7 +587,7 @@ export class LeagueService {
       starts_at: row.starts_at,
       ends_at: row.ends_at ?? null,
       already_member: row.already_member === true,
-      mode: row.mode === 'portfolio' ? 'portfolio' : 'main',
+      ...(row.mode === 'portfolio' ? { mode: 'portfolio' as const } : {}),
     };
   }
 
@@ -639,11 +640,12 @@ export class LeagueService {
         starts_at: row.starts_at,
         ends_at: row.ends_at ?? null,
         is_member: row.is_member === true,
-        mode: row.mode === 'portfolio' ? 'portfolio' : 'main',
-        portfolio:
-          row.mode === 'portfolio' && row.pl_capital !== null && row.pl_capital !== undefined
-            ? { starting_capital_usd: num(row.pl_capital), commission_bps: parseInt(row.pl_commission, 10), participation: row.pl_participation }
-            : null,
+        ...(row.mode === 'portfolio'
+          ? {
+              mode: 'portfolio' as const,
+              portfolio: { starting_capital_usd: num(row.pl_capital), commission_bps: parseInt(row.pl_commission ?? 0, 10), participation: row.pl_participation ?? 'solo' },
+            }
+          : {}),
       })),
       total: parseInt(total.rows[0].n, 10),
       limit: opts.limit,

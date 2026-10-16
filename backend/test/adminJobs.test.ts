@@ -146,6 +146,7 @@ describe('JobRegistry', () => {
       'weekly-digest',
       'sandbox-snapshots',
       'idea-reviews',
+      'subscriptions-expire',
     ]);
   });
 });

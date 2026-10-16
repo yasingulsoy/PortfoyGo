@@ -21,6 +21,9 @@ import {
   UsersIcon,
   SunIcon,
   ArrowTrendingDownIcon,
+  LightBulbIcon,
+  ChatBubbleLeftRightIcon,
+  CalendarDaysIcon,
 } from '@heroicons/react/24/outline';
 import type { AppNotification, NotificationCategory } from '@/lib/api';
 
@@ -61,6 +64,11 @@ const TYPE_META: Record<string, { icon: Icon; tone?: string }> = {
   'game.tier_up': { icon: TrophyIcon, tone: 'bg-gold-soft text-gold' },
   'picks.revealed': { icon: EnvelopeOpenIcon, tone: 'bg-brand-soft text-brand' },
   'picks.results': { icon: TrophyIcon, tone: 'bg-gold-soft text-gold' },
+  // Ortak Akıl — Öneri Havuzu
+  'ideas.activity': { icon: ChatBubbleLeftRightIcon, tone: 'bg-brand-soft text-brand' },
+  'ideas.review_due': { icon: CalendarDaysIcon, tone: 'bg-gold-soft text-gold' },
+  'ideas.level_crossed': { icon: FlagIcon, tone: 'bg-up-soft text-up' },
+  'ideas.closed': { icon: LightBulbIcon, tone: 'bg-surface-3 text-muted' },
 };
 
 /** Sunucu bağlantı göndermezse türe göre varsayılan uygulama içi yol. */
@@ -71,7 +79,11 @@ const TYPE_LINK: Record<string, string> = {
 
 /** Bildirimin açacağı bağlantı: sunucunun `link`'i, yoksa türün varsayılanı (ör. Haftalık Seçim). */
 export function notificationLink(n: Pick<AppNotification, 'type' | 'link'>): string | null {
-  return n.link ?? TYPE_LINK[n.type] ?? (n.type.startsWith('picks.') ? '/oyun/haftalik-secim' : null);
+  return (
+    n.link ??
+    TYPE_LINK[n.type] ??
+    (n.type.startsWith('picks.') ? '/oyun/haftalik-secim' : n.type.startsWith('ideas.') ? '/ortak-akil' : null)
+  );
 }
 
 /** Diğer oyun bildirimleri (görev, seri bonusu …) */

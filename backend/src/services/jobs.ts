@@ -34,6 +34,7 @@ import { AppError } from '../utils/errors';
  *   weekly-digest              Haftalık e-posta özeti (Pazartesi 09:00; production dışında yalnızca önizleme — EMAIL_DIGEST_SEND)
  *   sandbox-snapshots          Sanal portföyler (Model Portföy / Portföy Ligi): saatlik + gün sonu değer noktası
  *   idea-reviews               Ortak Akıl: değerlendirme tarihi gelen öneriler, hedef/geçersizlik seviyesi aşımları, toplu etkileşim bildirimleri (günlük)
+ *   subscriptions-expire       Abonelikler: süresi dolan deneme / Premium satırları + bitişe 3 gün kala hatırlatma (15 dk)
  */
 
 export const JOB_NAMES = [
@@ -59,6 +60,7 @@ export const JOB_NAMES = [
   'weekly-digest',
   'sandbox-snapshots',
   'idea-reviews',
+  'subscriptions-expire',
 ] as const;
 export type JobName = (typeof JOB_NAMES)[number];
 

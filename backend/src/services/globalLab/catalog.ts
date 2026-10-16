@@ -302,15 +302,26 @@ export class CatalogService {
     return ins;
   }
 
-  /** CSV satırlarını sembole göre ekler / günceller (tek transaction). dryRun → hiçbir şey yazılmaz. */
-  static async importRows(rows: InstrumentInput[], dryRun: boolean): Promise<{ created: string[]; updated: string[]; unchanged: string[] }> {
+  /**
+   * CSV satırlarını sembole göre ekler / günceller (tek transaction). dryRun → hiçbir şey yazılmaz.
+   * `columns` verilirse mevcut araçlarda yalnızca bu sütunlar karşılaştırılır / yazılır (dosyada olmayan alanlar korunur).
+   */
+  static async importRows(
+    rows: InstrumentInput[],
+    dryRun: boolean,
+    columns?: readonly string[]
+  ): Promise<{ created: string[]; updated: string[]; unchanged: string[] }> {
     const existing = await pool.query(`SELECT ${COLS} FROM global_instruments i WHERE i.symbol = ANY($1::text[])`, [rows.map((r) => r.symbol)]);
     const bySymbol = new Map(existing.rows.map((r: any) => [r.symbol as string, toInstrument(r)]));
     const created: string[] = [];
     const updated: string[] = [];
     const unchanged: string[] = [];
+    const keysOf = (row: InstrumentInput) =>
+      (Object.keys(row) as (keyof InstrumentInput)[]).filter((k) => !columns || columns.includes(k));
+    const pick = (row: InstrumentInput): Partial<InstrumentInput> =>
+      Object.fromEntries(keysOf(row).map((k) => [k, row[k]])) as Partial<InstrumentInput>;
     const changed = (cur: Instrument, next: InstrumentInput) =>
-      (Object.keys(next) as (keyof InstrumentInput)[]).some((k) => {
+      keysOf(next).some((k) => {
         const a = (cur as unknown as Record<string, unknown>)[k] ?? null;
         const b = (next as Record<string, unknown>)[k] ?? null;
         return typeof a === 'number' || typeof b === 'number' ? Number(a) !== Number(b) || (a === null) !== (b === null) : a !== b;
@@ -329,7 +340,7 @@ export class CatalogService {
       for (const row of rows) {
         const cur = bySymbol.get(row.symbol);
         if (!cur) await this.create(row, client);
-        else if (updated.includes(row.symbol)) await this.update(cur.id, row, client);
+        else if (updated.includes(row.symbol)) await this.update(cur.id, pick(row), client);
       }
       await client.query('COMMIT');
     } catch (err) {

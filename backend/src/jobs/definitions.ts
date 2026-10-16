@@ -14,6 +14,7 @@ import { PicksService } from '../services/picks/service';
 import { DigestService } from '../services/email/digest';
 import { Sandbox } from '../services/sandbox';
 import { IdeasService } from '../services/ideas/service';
+import { SubscriptionService } from '../services/subscriptions/service';
 import type { JobRegistry } from '../services/jobs';
 
 /**
@@ -138,6 +139,13 @@ export function registerAllJobs(jobs: JobRegistry): void {
   // hedef / geçersizlik seviyesi yayından bu yana aşıldıysa (fiyat geçmişi + saklanmış güncel fiyat) her biri için bir kez
   // bildirim, bekleme süresi dolan toplu yanıt/yorum bildirimleri. İdempotent (bayrak kolonları koşullu UPDATE ile).
   jobs.register('idea-reviews', '5 9 * * *', () => IdeasService.job(), { description: 'Ortak Akıl öneri değerlendirmeleri' });
+
+  // Abonelikler (025): 15 dakikada bir süresi dolan deneme / Premium satırlarını 'expired' yapar ve bildirir; bitişine
+  // ≤ 3 gün kalanlara bir kez hatırlatma gönderir. İdempotent (tek ifadeli UPDATE … RETURNING). Yetki zaten istek anında
+  // ends_at'e göre çözülür; iş yalnızca durum alanını ve bildirimleri günceller.
+  jobs.register('subscriptions-expire', '7,22,37,52 * * * *', () => SubscriptionService.expireJob(), {
+    description: 'Abonelik süre dolumu ve hatırlatmalar',
+  });
 }
 
 /** Açılışta ilk doldurma (run() hata fırlatmaz; sonuçlar iş kaydına yazılır). Başka örnek çalıştırıyorsa atlanır. */

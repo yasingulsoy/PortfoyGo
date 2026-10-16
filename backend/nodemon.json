@@ -2,5 +2,6 @@
   "watch": ["src"],
   "ext": "ts",
   "ignore": ["src/**/*.spec.ts"],
-  "exec": "ts-node src/index.ts"
+  "delay": 2500,
+  "exec": "ts-node --transpile-only src/index.ts"
 }

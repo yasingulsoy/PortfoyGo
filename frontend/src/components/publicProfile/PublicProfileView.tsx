@@ -19,6 +19,7 @@ import TierBadge from '@/components/game/ui/TierBadge';
 import { duelRecordLabel, memberSinceLabel, rankLabel } from '@/lib/publicProfile';
 import type { PublicAchievement, PublicProfile } from '@/types';
 import { GuestCta, ProfileActions } from './ProfileActions';
+import PublicIdeasCard from '@/components/ideas/PublicIdeasCard';
 
 /**
  * Herkese açık oyuncu profili (sunucuda render edilir; oturum gerekmez).
@@ -40,6 +41,7 @@ export default function PublicProfileView({ profile: p }: { profile: PublicProfi
         <Achievements items={p.achievements} />
       </div>
       <BadgesCard profile={p} />
+      {p.ideas && p.ideas.published > 0 && <PublicIdeasCard record={p.ideas} />}
       <GuestCta />
       <p className="text-center text-xs text-subtle">
         PortfoyGo’da herkes sanal para ile oynar; profillerde tutar değil yalnızca yüzde ve sıralar gösterilir. Yatırım tavsiyesi değildir.
