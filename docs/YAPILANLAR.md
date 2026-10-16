@@ -144,3 +144,7 @@ Oyun alanı TailAdmin panelinden ayrıldı: kendi "oyun derisi" (gökyüzü / ge
 
 ### DevOps
 - [x] Docker imajları (backend, worker, site, yönetim) ve `docker compose` (Postgres + Redis) — ⚠️ henüz Docker'lı bir makinede derlenmedi
+
+## Portföy modülleri dalgası ✅
+
+- [x] **100.000 USD Model Portföy** (`/model-portfoy`, `/model-portfoy/yeni`, `/model-portfoy/[id]`): kullanıcı başına en fazla 5 varsayımsal portföy, her biri 100.000 USD ve %0,25 komisyonla başlar. Ağırlıklarla kurulum (varlık arama + tür çipleri, kaydırıcılar, nakit payı, canlı %100 göstergesi) ve şablonlar (eşit ağırlık, dengeli hisse/altın/nakit, tamamı nakit, Portföy Sihirbazı önerisi — TL nakit/USD ve fiyatı olmayanlar nakde), onaydan önce komisyon önizlemesi. Detay: varlık/sınıf halkası, hedef–güncel ağırlık ve sapma + yeniden dengeleme (önce satış, sonra alış), "Nakit ve varlık sınıflarının yeri", her varlığın toplam getiriye katkısı (yüzde puan; kapanan pozisyonlar dahil, toplamı = getiri), "Ne olursa?" şok simülatörü (ağırlık × değişim), gerçekleşen ve 90 günlük simüle değer grafiği, sade dille risk metrikleri (oynaklık, en büyük düşüş, Sharpe, etkin varlık sayısı/HHI, devir hızı), al/sat (USD tutarı ya da miktar) ve işlem geçmişi. Karşılaştırma (≤ 3): 100'e normalleştirilmiş eğriler, getiri/risk/nakit/çeşitlendirme ve sınıf karışımı. Altyapı: USD bazlı **sanal portföy motoru** (`backend/src/services/sandbox/`, migration 022; Portföy Ligi de bunu kullanır), `sandbox-snapshots` işi (saatlik + gün sonu), KVKK dışa aktarma/silme, ortak bileşenler (`frontend/src/components/sandbox/`).

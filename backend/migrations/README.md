@@ -295,3 +295,20 @@ Davranış (backend `services/orders.ts`, `services/marketHours.ts`, `services/p
   (zirve bilgisiyle); diğerleri `order.filled` / `order.expired` / `order.failed` olarak kalır.
 
 Veri taşıma yok. Kod, yeni kolonlar olmadan emir oluşturamaz/listeleyemez: **yeni backend'i yayına almadan önce çalıştırın.**
+
+## 022_sandbox_portfolios.sql
+
+Sanal (sandbox) portföy motoru — **Model Portföy** (`kind = 'model'`, kullanıcı başına en fazla 5, her biri 100.000 USD) ve
+**Portföy Ligi** (`kind = 'league'`, 023) bunun üzerine kurulur. USD bazlıdır; ana uygulamanın TL bakiyesine ve
+`portfolio_items` / `transactions` tablolarına dokunmaz. Yalnızca yeni tablo / indeks ekler.
+
+- `sandbox_portfolios`: tür, sahip (`user_id`), `league_id` / `team_id` (yabancı anahtar yok; 023 ekleyebilir), ad, `starting_cash`,
+  `cash` (≥ 0, kaldıraç yok), `commission_bps` (varsayılan 25 = %0,25), `target_weights` (JSONB, yüzde), `status`
+  (`active` / `frozen` / `archived`), `frozen_at`.
+- `sandbox_holdings` (`portfolio_id, asset_type, symbol` birincil anahtar; kesirli miktar `NUMERIC(30,10)`, `quantity > 0` → açığa
+  satış yok; `avg_cost_usd` komisyon hariç), `sandbox_trades` (alış/satış defteri; `reason`: `manual` / `rebalance` / `initial`),
+  `sandbox_snapshots` (İstanbul günü başına değer) ve `sandbox_snapshots_hourly` (saatlik; 35 günden eskisi budanır).
+
+İş: `sandbox-snapshots` (her saat xx:03 + 23:58 İstanbul; yalnızca etkin portföyler). KVKK: dışa aktarmada yer alır; hesap
+silinince model portföyler silinir, lig portföyleri anonim kalır. Kurallar ve API: `backend/src/services/sandbox/README.md`.
+Veri taşıma yok; yeni backend'i yayına almadan önce çalıştırın.

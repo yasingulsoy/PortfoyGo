@@ -56,8 +56,8 @@ export default function ResearchTab({ onCompare }: { onCompare: () => void }) {
   const loading = list.isLoading && !list.data;
 
   return (
-    <div className="grid grid-cols-1 gap-4 md:gap-6 xl:grid-cols-3">
-      <div className="min-w-0 space-y-4 md:space-y-6 xl:col-span-2">
+    <div className="grid grid-cols-1 gap-4 md:gap-6 2xl:grid-cols-3">
+      <div className="min-w-0 space-y-4 md:space-y-6 2xl:col-span-2">
         <Card className="p-4 sm:p-5">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             <SearchInput value={q} onChange={setQ} placeholder="Sembol, ad, ülke veya alt sınıf ara" label="Katalogda ara" className="sm:col-span-2 lg:col-span-3" />
@@ -276,7 +276,7 @@ function ResearchListCard() {
   const { toggle, busy, research } = useListToggle();
   const items = research.data?.items ?? [];
   return (
-    <Card className="h-fit min-w-0 overflow-hidden">
+    <Card className="order-first h-fit min-w-0 overflow-hidden 2xl:order-last">
       <CardHeader title="Araştırma listem" description={`${items.length} / ${research.data?.limit ?? 50} araç`} icon={<BookmarkIcon />} />
       {research.isLoading && !research.data ? (
         <div className="space-y-2 px-5 pb-5 sm:px-6">
@@ -284,12 +284,9 @@ function ResearchListCard() {
           <Skeleton className="h-10 w-full" />
         </div>
       ) : items.length === 0 ? (
-        <EmptyState
-          className="py-8"
-          icon={<BookmarkIcon />}
-          title="Listen boş"
-          description="Katalogdaki yer imi düğmesiyle izlemek istediğin araçları buraya ekle."
-        />
+        <p className="border-t border-line px-5 py-4 text-sm text-muted sm:px-6">
+          Listen boş. Katalogdaki yer imi düğmesiyle izlemek istediğin araçları buraya ekle.
+        </p>
       ) : (
         <ul className="divide-y divide-line border-t border-line">
           {items.map((i) => (

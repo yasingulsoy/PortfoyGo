@@ -211,6 +211,13 @@ export function formatSigned(n: number, digits = 2): string {
   return `${v > 0 ? '+' : MINUS}${Math.abs(v).toLocaleString('tr-TR', { maximumFractionDigits: digits })}`;
 }
 
+/** İşaretli yüzde (Türkçe yazımı, % önde): −5 → "−%5", 12.34 → "+%12,3", 0 → "%0" */
+export function formatSignedPct(v: number, digits = 1): string {
+  const r = Math.round(v * 10 ** digits) / 10 ** digits;
+  const body = `%${Math.abs(r).toLocaleString('tr-TR', { maximumFractionDigits: digits })}`;
+  return r === 0 ? body : `${r > 0 ? '+' : MINUS}${body}`;
+}
+
 /** Tablo satırının sembolleri: 'three' → 3 sembol; 'pair' / 'none' → null (metinle anlatılır) */
 export function comboSymbols(row: Pick<SlotPaytableRow, 'kind' | 'symbol'>): SlotSymbolId[] | null {
   return row.kind === 'three' && row.symbol ? [row.symbol, row.symbol, row.symbol] : null;
@@ -334,6 +341,14 @@ export function betOptions(bets: number[], limits: Pick<SlotLimits, 'loss_remain
     if (bet > coins) return { bet, disabled: true, reason: 'Yeterli jetonun yok' };
     return { bet, disabled: false, reason: null };
   });
+}
+
+/** Seçili bahis artık yapılamıyorsa: seçimin altındaki en büyük izinli bahis, yoksa en küçük izinli bahis. */
+export function effectiveBet(selected: number, options: BetOption[]): number {
+  const allowed = options.filter((o) => !o.disabled).map((o) => o.bet);
+  if (allowed.includes(selected) || allowed.length === 0) return selected;
+  const below = allowed.filter((b) => b <= selected);
+  return below.length ? Math.max(...below) : Math.min(...allowed);
 }
 
 // ---------------------------------------------------------------------------

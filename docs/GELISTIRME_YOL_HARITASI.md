@@ -21,9 +21,7 @@
 
 ## 1. Şu an yapılıyor 🚧
 
-- [ ] 🚧 **100.000 USD Model Portföy** (`/model-portfoy`): ağırlıklarla dağılım, nakit ve varlık sınıflarının yeri, değer değişimlerinin toplam portföye etkisi ("ya … olursa?"), alternatif dağılımların karşılaştırılması.
 - [ ] 🚧 **Portföy Ligi** (Ligler içinde yeni tür): aynı başlangıç sermayesi, ölçüm dönemi ve işlem maliyeti; bireysel veya takım portföyleri; dönemsel performans; strateji ve sonuç değerlendirmesi.
-- [ ] 🚧 **Ortak Akıl Öneri Havuzu** (`/ortak-akil`): varlık, gerekçe, beklenen senaryo, riskler, izleme kriterleri; yayından beri performans; kapanışta zorunlu değerlendirme.
 - [ ] 🚧 **Global Portföy Lab** (`/global-lab`) ve abonelik altyapısı: küresel araç kataloğu ve sınıflandırma, senaryo ve stres testi (premium), 14 günlük deneme; ödeme sağlayıcısı kararı açık.
 
 ---
@@ -87,9 +85,13 @@ Eylemler: Yasin canlı veri gereksinimleri · Art oyun akışı ve lig/etkinlik 
 - [ ] Varlık sayfalarında kısa, sade açıklamalar ("Bu şirket ne yapar?", "Volatilite nedir?")
 - [ ] Portföy Sihirbazı: H.Burak'ın anket taslağı ve TL nakit getiri varsayımının (`ADVISOR_TRY_CASH_RETURN`) netleşmesi
 - [ ] 💡 Yapay zekâ destekli "portföy koçu": risk dağılımı ve çeşitlendirme önerileri. Yatırım tavsiyesi değil, eğitim amaçlı.
+- [ ] Model Portföy: bir model portföyü kopyalama / bağlantıyla paylaşma (salt okunur) ve Ortak Akıl fikrinden "bu fikirle model portföy kur" kısayolu
+- [ ] 💡 Model Portföy: geçmiş bir tarihte başlatma ("1 Ocak'ta kursaydım") — motor şimdilik yalnızca bugünkü pozisyonların 90 günlük simülasyonunu gösteriyor
 
 ### 3.6 Sosyal
 - [ ] Başarılı yatırımcıları takip etme, işlemlerini gecikmeli görme
+- [ ] Ortak Akıl: oturumsuz (salt okunur) öneri sayfası ve paylaşım kartı; öneri sayfasında aynı varlıktaki diğer öneriler; ayrı "Topluluk" bildirim kategorisi (şimdilik "Rekabet" altında — `notifications.category` CHECK genişletmesi gerekir)
+- [ ] 💡 Ortak Akıl: yanıt / yorum almamış öneriyi yayından kısa süre sonra geri çekme (yayın sonrası düzenleme bilinçli olarak yok); seviye aşımı kontrolünün günlükten saatliğe alınması (`idea-reviews` işi)
 - [ ] Rozetlerin genişletilmesi: seriler (7 gün üst üste giriş), sezon rozetleri
 
 ---

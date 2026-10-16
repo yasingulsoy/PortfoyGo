@@ -15,6 +15,9 @@ import { useGameActions } from '@/components/game/useGameActions';
 import { usePicksCurrent } from '@/hooks/usePicks';
 import { picksHubBadge, PICKS_PATH } from '@/components/game/picks/model';
 import { PicksArt } from '@/components/game/picks/parts';
+import { useSlotInfo } from '@/hooks/useSlot';
+import { SLOT_PATH } from '@/components/game/slot/model';
+import { SlotArt } from '@/components/game/slot/symbols';
 
 const MATCH_DURATIONS = [60, 180, 300] as const;
 /** Masaüstünde mod kutucukları biraz daha yüksek */
@@ -41,6 +44,9 @@ export default function OyunHubPage() {
   const unclaimed = profile?.quests.unclaimed ?? 0;
   const picks = usePicksCurrent();
   const picksBadge = picksHubBadge(picks.data);
+  // Slot Makinesi yalnızca sunucu açık dediğinde görünür (yönetici kapatabilir → 410 SLOT_DISABLED)
+  const slot = useSlotInfo();
+  const showSlot = slot.data?.enabled === true && !slot.disabled;
 
   return (
     <GameScreen topBar back="/" backLabel="Uygulamaya dön" layout="full">
@@ -106,7 +112,18 @@ export default function OyunHubPage() {
             <ModeTile title="Görevler" subtitle={profile ? `${profile.quests.completed_today}/${profile.quests.total_today} tamam` : 'Günlük görevler'} art={<ChecklistArt />} color="green" href="/oyun/gorevler" badge={unclaimed || null} className={TILE} />
             <ModeTile title="Mağaza" subtitle="Avatar ve çerçeveler" art={<ShopArt />} color="purple" href="/oyun/magaza" className={TILE} />
             <ModeTile title="Sıralama" subtitle="Puan ve seviye listesi" art={<PodiumArt />} color="red" href="/oyun/siralama" className={TILE} />
-            <ModeTile title="Haftalık Seçim" subtitle="Kitlelerin Bilgeliği" art={<PicksArt />} color="teal" href={PICKS_PATH} badge={picksBadge} wide className="sm:col-span-1 xl:col-span-4" />
+            {showSlot && <ModeTile title="Slot Makinesi" subtitle="Olasılık dersi" art={<SlotArt />} color="purple" href={SLOT_PATH} className={TILE} />}
+            {/* Satırlar her kırılımda dolu: 9 kutu + geniş kutu (2 sütun: 1 hücre · 3 sütun: tam satır · 4 sütun: kalan 3 hücre); slot kapalıyken 8 kutu */}
+            <ModeTile
+              title="Haftalık Seçim"
+              subtitle="Kitlelerin Bilgeliği"
+              art={<PicksArt />}
+              color="teal"
+              href={PICKS_PATH}
+              badge={picksBadge}
+              wide
+              className={showSlot ? 'max-sm:col-span-1 sm:col-span-3 xl:col-span-3' : 'sm:col-span-1 xl:col-span-4'}
+            />
           </div>
         </section>
 
