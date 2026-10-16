@@ -659,7 +659,10 @@ export class AdminService {
     const total = await pool.query(`SELECT COUNT(*)::int AS n ${from}`, w.params);
     const rows = await pool.query(
       `SELECT l.id, l.name, l.owner_id, u.username AS owner_username, l.invite_code, l.created_at, l.ends_at,
-              (SELECT COUNT(*)::int FROM league_members m WHERE m.league_id = l.id) AS member_count
+              (SELECT COUNT(*)::int FROM league_members m WHERE m.league_id = l.id) AS member_count,
+              l.mode, l.starts_at, l.started_at, l.finalized_at,
+              (SELECT row_to_json(r) FROM (SELECT starting_capital_usd::float8 AS starting_capital_usd, commission_bps, participation, team_size, max_teams
+                                             FROM portfolio_league_rules WHERE league_id = l.id) r) AS portfolio_rules
          ${from}
         ORDER BY l.created_at DESC, l.id DESC
         LIMIT $${w.next} OFFSET $${w.next + 1}`,
@@ -675,6 +678,12 @@ export class AdminService {
         invite_code: r.invite_code,
         created_at: r.created_at,
         ends_at: r.ends_at ?? null,
+        // Portföy Ligi (023): mod, dönem ve sabit kurallar (ana ligde rules = null)
+        mode: r.mode ?? 'main',
+        starts_at: r.starts_at ?? null,
+        started_at: r.started_at ?? null,
+        finalized_at: r.finalized_at ?? null,
+        rules: r.portfolio_rules ?? null,
       })),
       total: num(total.rows[0]?.n),
       limit: f.limit,

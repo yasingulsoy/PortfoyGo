@@ -90,6 +90,8 @@ export const adminKeys = {
     withQuery('/admin/transactions', p),
   orders: (p: { status?: string; type?: string; search?: string; limit: number; offset: number }) => withQuery('/admin/orders', p),
   leagues: (p: { search?: string; limit: number; offset: number }) => withQuery('/admin/leagues', p),
+  /** Lig detayı (mod, kurallar, katılımcılar / takımlar) */
+  leagueDetail: (leagueId: string) => `/admin/portfolio-leagues/${id(leagueId)}`,
   audit: (p: { action?: string; admin_id?: string; limit: number; offset: number }) => withQuery('/admin/audit', p),
   announcements: (p: { limit: number; offset: number }) => withQuery('/admin/announcements', p),
   arenaChallenges: (p: { limit: number; offset: number }) => withQuery('/admin/arena/challenges', p),
@@ -110,6 +112,9 @@ export const adminApi = {
   revokeSessions: (userId: string) => apiFetch(`/admin/users/${id(userId)}/revoke-sessions`, post({})),
   cancelOrder: (orderId: string, reason?: string) => apiFetch(`/admin/orders/${id(orderId)}/cancel`, post(reason ? { reason } : {})),
   deleteLeague: (leagueId: string, reason?: string) => apiFetch(`/admin/leagues/${id(leagueId)}`, del(reason ? { reason } : {})),
+  /** Portföy Ligi: devam eden ligi şimdi bitir (portföyler dondurulur, sonuçlar yazılır) */
+  finalizePortfolioLeague: (leagueId: string, reason?: string) =>
+    apiFetch(`/admin/portfolio-leagues/${id(leagueId)}/finalize`, post(reason ? { reason } : {})),
   runJob: (name: string) => apiFetch(`/admin/jobs/${id(name)}/run`, post({})),
   refreshStocks: () => apiFetch('/stocks/refresh-cache', post({})),
   refreshCurrencies: () => apiFetch('/currencies/refresh', post({})),

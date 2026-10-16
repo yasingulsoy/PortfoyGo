@@ -69,6 +69,7 @@ export const AUDIT_ACTIONS: Record<AuditAction, { label: string; tone: Tone }> =
   'ideas.unhide': { label: 'Ortak Akıl içeriği yeniden gösterildi', tone: 'up' },
   'ideas.comment_delete': { label: 'Ortak Akıl yorumu kaldırıldı', tone: 'down' },
   'ideas.report_resolve': { label: 'Ortak Akıl şikâyeti sonuçlandı', tone: 'neutral' },
+  'league.finalize': { label: 'Portföy ligi erken bitirildi', tone: 'gold' },
 };
 
 /** Listede olmayan senaryo eylemleri (ör. backend'e sonradan eklenen 'scenario.*') için okunur yedek etiket */

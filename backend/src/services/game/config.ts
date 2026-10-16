@@ -331,3 +331,77 @@ export const LINKS = {
   arena: '/arena',
   quests: '/arena',
 } as const;
+
+// ---------------------------------------------------------------------------
+// Slot Makinesi — "Olasılık dersi" (migration 026)
+//
+// Eğitsel olasılık oyunu: yalnızca oyun içi jetonla oynanır (jeton satın alınamaz, paraya çevrilemez).
+// Her makara BAĞIMSIZ olarak ağırlığa göre (crypto.randomInt) seçilir; ödeme tablosu ilk eşleşen kuraldır.
+// Olasılıklar, RTP ve kasa avantajı bu tablodan TAM sayım (8³ sonuç) ile hesaplanır ve oyuncuya aynen gösterilir
+// (bkz. services/game/slot.ts → slotMath()). Ağırlık/çarpan değiştirirseniz RTP testi yeni değeri doğrular;
+// hedef RTP'yi (targetRtpPct) de güncelleyin.
+// ---------------------------------------------------------------------------
+
+export const SLOT_SYMBOL_IDS = ['ayi', 'dolar', 'petrol', 'boga', 'altin', 'bitcoin', 'roket', 'yildiz'] as const;
+export type SlotSymbolId = (typeof SLOT_SYMBOL_IDS)[number];
+
+export const SLOT_SYMBOL_LABELS: Record<SlotSymbolId, string> = {
+  ayi: 'Ayı',
+  dolar: 'Dolar',
+  petrol: 'Petrol varili',
+  boga: 'Boğa',
+  altin: 'Altın külçe',
+  bitcoin: 'Bitcoin',
+  roket: 'Roket',
+  yildiz: 'Yıldız',
+};
+
+/** Makara başına tam sayı ağırlıklar (3 makara; toplam 20 → her sonuç 1/8000'in katı). */
+const SLOT_REEL: Record<SlotSymbolId, number> = { ayi: 5, dolar: 4, petrol: 3, boga: 3, altin: 2, bitcoin: 1, roket: 1, yildiz: 1 };
+export const SLOT_REEL_WEIGHTS: Record<SlotSymbolId, number>[] = [SLOT_REEL, SLOT_REEL, SLOT_REEL];
+
+export type SlotRule =
+  | { id: string; kind: 'three'; symbol: SlotSymbolId; multiplier: number }
+  | { id: string; kind: 'pair'; multiplier: number }
+  | { id: string; kind: 'none'; multiplier: 0 };
+
+/** Ödeme tablosu (kazanç = bahis × çarpan). Sıra önemlidir: ilk eşleşen kural uygulanır; son kural "kazanç yok". */
+export const SLOT_PAYTABLE: SlotRule[] = [
+  { id: 'three-yildiz', kind: 'three', symbol: 'yildiz', multiplier: 100 },
+  { id: 'three-roket', kind: 'three', symbol: 'roket', multiplier: 50 },
+  { id: 'three-bitcoin', kind: 'three', symbol: 'bitcoin', multiplier: 30 },
+  { id: 'three-altin', kind: 'three', symbol: 'altin', multiplier: 12 },
+  { id: 'three-boga', kind: 'three', symbol: 'boga', multiplier: 6 },
+  { id: 'three-petrol', kind: 'three', symbol: 'petrol', multiplier: 5 },
+  { id: 'three-dolar', kind: 'three', symbol: 'dolar', multiplier: 4 },
+  { id: 'three-ayi', kind: 'three', symbol: 'ayi', multiplier: 3 },
+  { id: 'pair', kind: 'pair', multiplier: 2 },
+  { id: 'none', kind: 'none', multiplier: 0 },
+];
+
+export const SLOT = {
+  /** İzin verilen bahisler (jeton) */
+  bets: [5, 10, 25] as readonly number[],
+  /** İstanbul günü başına en fazla çevirme */
+  maxSpinsPerDay: 100,
+  /** İstanbul günü başına en fazla NET kayıp (jeton); bir bahis bu sınırı aşacaksa reddedilir */
+  dailyLossCap: 250,
+  /** İki çevirme arasında en az süre (sunucuda zorlanır → 429 SLOT_COOLDOWN) */
+  minIntervalMs: 1500,
+  /** Oturumda her N çevirmede bir durum özeti (onaylanmadan sonraki çevirme 409 SLOT_REALITY_CHECK) */
+  realityCheckEvery: 25,
+  /** Bu süreden uzun ara verilirse yeni oturum başlar */
+  sessionGapMs: 30 * 60 * 1000,
+  /** Tasarım hedefi; gerçek değer ödeme tablosundan hesaplanır (test eşitliği doğrular) */
+  targetRtpPct: 95,
+  /** Net kazanç ≥ bahis × bu katsayı ise istemci konfeti gösterebilir */
+  celebrateNetMultiple: 5,
+  /** game_ledger sebepleri (bahis: negatif jeton, kazanç: pozitif jeton; ref = ('slot', request_id)) */
+  ledger: { bet: 'slot_bet', win: 'slot_win' },
+  /** app_settings anahtarı (yönetici aç/kapat) */
+  settingKey: 'slot_enabled',
+  disclaimer:
+    'Slot Makinesi bir olasılık dersidir: yalnızca oyun içi jetonla oynanır; jeton gerçek parayla satın alınamaz ve gerçek paraya çevrilemez. ' +
+    'Her makara bağımsız döner; her sonucun olasılığı, geri ödeme oranı (RTP) ve kasa avantajı tabloda tam olarak gösterilir. ' +
+    'Uzun vadede kasa her zaman kazanır.',
+} as const;

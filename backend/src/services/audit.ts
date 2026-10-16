@@ -50,6 +50,8 @@ export const AUDIT_ACTIONS = [
   'global_lab.correlations_update',
   'global_lab.stress_upsert',
   'global_lab.stress_delete',
+  // Portföy Ligi (023): devam eden ligi erken bitir
+  'league.finalize',
 ] as const;
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
 

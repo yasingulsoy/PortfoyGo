@@ -171,6 +171,53 @@ export interface AdminLeague {
   invite_code: string;
   created_at: string;
   ends_at: string | null;
+  /** 'portfolio' = Portföy Ligi (023) */
+  mode?: 'main' | 'portfolio';
+  starts_at?: string | null;
+  started_at?: string | null;
+  finalized_at?: string | null;
+  rules?: { starting_capital_usd: number; commission_bps: number; participation: 'solo' | 'team'; team_size: number | null; max_teams: number | null } | null;
+}
+
+/** GET /api/admin/portfolio-leagues/:id */
+export interface AdminLeagueDetail {
+  id: string;
+  name: string;
+  mode: 'main' | 'portfolio';
+  visibility: string;
+  owner_username: string | null;
+  status: 'upcoming' | 'active' | 'finished';
+  starts_at: string | null;
+  started_at: string | null;
+  ends_at: string | null;
+  finalized_at: string | null;
+  rules: {
+    starting_capital_usd: number;
+    commission_bps: number;
+    participation: 'solo' | 'team';
+    team_size: number | null;
+    max_teams: number | null;
+    starts_at: string;
+    ends_at: string;
+    late_join_until: string;
+    locked: boolean;
+  } | null;
+  members: { user_id: string; username: string; role: string; joined_at: string; final_rank?: number | null; final_return_pct?: string | number | null }[];
+  entries: {
+    entry_id: string;
+    kind: 'solo' | 'team';
+    label: string;
+    members: string[];
+    has_portfolio: boolean;
+    late_join: boolean;
+    withdrawn: boolean;
+    rank: number | null;
+    equity_usd: number | null;
+    return_pct: number | null;
+    max_drawdown_pct: number | null;
+    trades_count: number | null;
+    has_strategy: boolean;
+  }[];
 }
 
 export type AuditAction =
@@ -200,7 +247,8 @@ export type AuditAction =
   | 'ideas.hide'
   | 'ideas.unhide'
   | 'ideas.comment_delete'
-  | 'ideas.report_resolve';
+  | 'ideas.report_resolve'
+  | 'league.finalize';
 
 export interface AuditEntry {
   id: string;
