@@ -87,19 +87,18 @@ export default function ComparePanel({ ids }: { ids: string[] }) {
         <CardHeader
           title="Değer eğrileri (başlangıç = 100)"
           description={basis === 'sim' ? 'Bugünkü dağılımlar son 90 günde tutulsaydı' : 'Oluşturulduklarından bu yana gerçekleşen'}
-          action={
-            <Tabs
-              label="Karşılaştırma tabanı"
-              value={basis}
-              onChange={setBasis}
-              items={[
-                { value: 'sim', label: '90 gün sim.' },
-                { value: 'actual', label: 'Gerçekleşen' },
-              ]}
-            />
-          }
         />
         <CardBody className="pt-0">
+          <Tabs
+            className="mb-3 w-fit"
+            label="Karşılaştırma tabanı"
+            value={basis}
+            onChange={setBasis}
+            items={[
+              { value: 'sim', label: '90 gün sim.' },
+              { value: 'actual', label: 'Gerçekleşen' },
+            ]}
+          />
           <EquityChart
             series={series}
             format="index"

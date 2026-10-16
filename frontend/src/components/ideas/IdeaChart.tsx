@@ -62,12 +62,22 @@ function ChartCanvas({ data }: { data: IdeaChartData }) {
       });
       const last = data.points[data.points.length - 1].v;
       const lineColor = last >= data.ref_price ? up : down;
+      const levels = [data.ref_price, data.target_price, data.invalidation_price].filter((v): v is number => v !== null && v > 0);
       const series = chart.addSeries(lc.AreaSeries, {
         lineWidth: 2,
         lineColor,
         topColor: withAlpha(lineColor, 0.2),
         bottomColor: withAlpha(lineColor, 0),
         priceLineVisible: false,
+        // Hedef / geçersizlik seviyeleri de görünür aralıkta kalsın (fiyatın seviyelere uzaklığı okunabilsin)
+        autoscaleInfoProvider: (base: () => { priceRange: { minValue: number; maxValue: number } } | null) => {
+          const res = base();
+          if (!res) return res;
+          return {
+            ...res,
+            priceRange: { minValue: Math.min(res.priceRange.minValue, ...levels), maxValue: Math.max(res.priceRange.maxValue, ...levels) },
+          };
+        },
       });
       series.setData(data.points.map((p) => ({ time: toChartTime(p.t) as never, value: p.v })));
       series.createPriceLine({ price: data.ref_price, color: brand, lineWidth: 1, lineStyle: lc.LineStyle.Dashed, axisLabelVisible: true, title: 'Referans' });

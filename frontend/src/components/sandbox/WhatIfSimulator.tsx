@@ -46,8 +46,8 @@ export default function WhatIfSimulator({ positions, cashUsd, className }: Props
   }
 
   return (
-    <div className={cn('min-w-0 space-y-4', className)}>
-      <div className="grid gap-3 sm:grid-cols-2">
+    <div className={cn('@container min-w-0 space-y-4', className)}>
+      <div className="grid gap-3 @md:grid-cols-2">
         <div>
           <label htmlFor={selectId} className="mb-1.5 block text-xs font-medium text-muted">
             Ne değişsin?
@@ -109,7 +109,7 @@ export default function WhatIfSimulator({ positions, cashUsd, className }: Props
       </div>
 
       {r && (
-        <div className="grid gap-3 sm:grid-cols-3" aria-live="polite">
+        <div className="grid grid-cols-2 gap-3 @xl:grid-cols-3" aria-live="polite">
           <div className="rounded-xl border border-line p-3">
             <p className="text-xs text-muted">Yeni portföy değeri</p>
             <p className="num mt-1 text-lg font-semibold text-fg">{formatUSD(r.new_equity_usd)}</p>
@@ -122,7 +122,7 @@ export default function WhatIfSimulator({ positions, cashUsd, className }: Props
             </p>
             <p className={cn('num text-[11px]', r.delta_usd >= 0 ? 'text-up' : 'text-down')}>{formatUSD(r.delta_usd)}</p>
           </div>
-          <div className="rounded-xl bg-surface-2 p-3 text-xs leading-relaxed text-muted">
+          <div className="col-span-2 rounded-xl bg-surface-2 p-3 text-xs leading-relaxed text-muted @xl:col-span-1">
             <p className="font-medium text-fg">Ağırlık × değişim</p>
             <p className="num mt-1">
               {fmtPct(r.weight_pct)} × {fmtPct(change, { sign: true, digits: 0 })} ≈ {fmtPct(r.impact_pct, { sign: true, digits: 2 })}

@@ -203,7 +203,9 @@ export default function PortfolioDetail({ portfolio, valuation }: { portfolio: S
           <CardHeader
             title="Portföy değeri"
             description={chartMode === 'actual' ? 'Gerçekleşen değer (saatlik / günlük kayıt)' : 'Bugünkü pozisyonlar 90 gün önce alınsaydı (simülasyon)'}
-            action={
+          />
+          <CardBody className="pt-0">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <Tabs
                 label="Grafik türü"
                 value={chartMode}
@@ -213,12 +215,8 @@ export default function PortfolioDetail({ portfolio, valuation }: { portfolio: S
                   { value: 'sim', label: '90 gün sim.' },
                 ]}
               />
-            }
-          />
-          <CardBody className="pt-0">
-            {chartMode === 'actual' && (
-              <Tabs label="Aralık" value={range} onChange={setRange} items={RANGES} className="mb-3 w-fit" />
-            )}
+              {chartMode === 'actual' && <Tabs label="Aralık" value={range} onChange={setRange} items={RANGES} />}
+            </div>
             {chartMode === 'actual' ? (
               history.data ? (
                 <EquityChart

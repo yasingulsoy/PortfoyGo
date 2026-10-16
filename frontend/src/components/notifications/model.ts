@@ -24,6 +24,7 @@ import {
   LightBulbIcon,
   ChatBubbleLeftRightIcon,
   CalendarDaysIcon,
+  BriefcaseIcon,
 } from '@heroicons/react/24/outline';
 import type { AppNotification, NotificationCategory } from '@/lib/api';
 
@@ -55,6 +56,10 @@ const TYPE_META: Record<string, { icon: Icon; tone?: string }> = {
   'league.member_joined': { icon: UserPlusIcon },
   'league.removed': { icon: UserMinusIcon, tone: 'bg-down-soft text-down' },
   'league.deleted': { icon: TrashIcon, tone: 'bg-down-soft text-down' },
+  // Portföy Ligi (023): portföy hazır (başlangıç / geç katılım), bitiş + sıra, takıma yeni üye
+  'league.portfolio_started': { icon: BriefcaseIcon, tone: 'bg-brand-soft text-brand' },
+  'league.portfolio_finished': { icon: TrophyIcon },
+  'league.team_member_joined': { icon: UserPlusIcon },
   'account.email_verified': { icon: CheckBadgeIcon },
   'system.announcement': { icon: MegaphoneIcon, tone: 'bg-brand-soft text-brand' },
   'arena.challenge_started': { icon: BoltIcon, tone: 'bg-up-soft text-up' },

@@ -35,13 +35,13 @@ export default function IdeaFilters({
   const set = <K extends keyof FilterState>(k: K, v: FilterState[K]) => onChange({ ...value, [k]: v });
   const statusLocked = view === 'review_due' || view === 'closed';
   return (
-    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6" role="group" aria-label="Filtreler">
+    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6" role="group" aria-label="Filtreler">
       <SearchInput
         value={value.q}
         onChange={(v) => set('q', v.slice(0, 40))}
         placeholder="Sembol ara (ör. BTC)"
         label="Sembole göre ara"
-        className="col-span-2 sm:col-span-3 lg:col-span-2"
+        className="col-span-2 sm:col-span-3 xl:col-span-1"
       />
       <Select
         label="Varlık türü"

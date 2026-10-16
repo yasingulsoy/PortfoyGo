@@ -79,11 +79,11 @@ export default function RebalanceModal({ open, onClose, portfolio, valuation, on
       title="Yeniden dengele"
       description="Hedef ağırlıkları belirle. Önce fazla olanlar satılır, sonra eksikler alınır; komisyon dahil, artan nakitte kalır."
       footer={
-        <div className="flex w-full flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-          <Button variant="secondary" onClick={() => run(true)} loading={busy === 'preview'} disabled={!ready || !!busy}>
+        <div className="flex w-full gap-2 sm:justify-end">
+          <Button variant="secondary" className="flex-1 sm:flex-none" onClick={() => run(true)} loading={busy === 'preview'} disabled={!ready || !!busy}>
             Önizle
           </Button>
-          <Button onClick={() => run(false)} loading={busy === 'apply'} disabled={!ready || !!busy || !plan}>
+          <Button className="flex-1 sm:flex-none" onClick={() => run(false)} loading={busy === 'apply'} disabled={!ready || !!busy || !plan}>
             Uygula
           </Button>
         </div>
