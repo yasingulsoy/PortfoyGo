@@ -26,6 +26,7 @@ import { Select, ToolbarButton } from '@/components/common/controls';
 import { DataTable, TBody, THead, Td, Th, Tr } from '@/components/common/Table';
 import RowMenu from '@/components/common/RowMenu';
 import { holdingKey, orderLabel, type OrderRow } from './useOrders';
+import { CLOSE_FRACTIONS, fractionLabel } from '@/components/trade/orderInput';
 
 type Filter = 'all' | AssetType;
 type SortKey = 'value' | 'pl' | 'plPercent' | 'day' | 'symbol';
@@ -183,6 +184,9 @@ export default function HoldingsCard({ holdings, loaded, ordersByHolding, onOrde
               <Th align="right" aria-sort={ariaSort('day')} className="hidden lg:table-cell">
                 Günlük
               </Th>
+              <Th align="right" className="hidden xl:table-cell">
+                Hızlı kapat
+              </Th>
               <Th align="right" className="w-12">
                 <span className="sr-only">İşlemler</span>
               </Th>
@@ -201,11 +205,14 @@ export default function HoldingsCard({ holdings, loaded, ordersByHolding, onOrde
 
 /* ------------------------------------------------------------------ */
 
-/** Rozetler için: en yakın zarar durdur (en yüksek tetikleme) ve en yakın kâr al / limit satış (en düşük tetikleme) */
+/**
+ * Rozetler için: en yakın zarar durdur / takip eden stop (en yüksek tetikleme) ve en yakın kâr al / limit satış
+ * (en düşük tetikleme). Açılışta emirlerinin fiyat tetiklemesi yoktur (referans fiyat) → rozet gösterilmez.
+ */
 function nearestOrders(orders: OrderRow[] | undefined) {
   if (!orders?.length) return { stop: undefined, upper: undefined };
-  const stops = orders.filter((o) => o.type === 'stop_loss');
-  const uppers = orders.filter((o) => o.type !== 'stop_loss');
+  const stops = orders.filter((o) => o.type === 'stop_loss' || o.type === 'trailing_stop');
+  const uppers = orders.filter((o) => o.type === 'limit' || o.type === 'take_profit');
   return {
     stop: stops.reduce<OrderRow | undefined>((best, o) => (!best || o.triggerPrice > best.triggerPrice ? o : best), undefined),
     upper: uppers.reduce<OrderRow | undefined>((best, o) => (!best || o.triggerPrice < best.triggerPrice ? o : best), undefined),
@@ -248,8 +255,33 @@ function useHoldingActions(h: LiveHolding, orders: OrderRow[] | undefined, onOrd
     count,
     buy: () => openTrade(target, 'buy'),
     sell: () => openTrade(target, 'sell'),
+    /** Kısmi kapatma: satış penceresi pozisyonun bu oranıyla (miktar) dolu açılır; %100 = eldeki miktarın tamamı */
+    close: (fraction: number) => openTrade(target, 'sell', { sellFraction: fraction }),
     orders: () => onOrders(h),
   };
+}
+
+const closeLabel = (symbol: string, f: number) =>
+  f >= 1 ? `${symbol} pozisyonunun tamamını sat` : `${symbol} pozisyonunun ${fractionLabel(f)} kadarını sat`;
+
+/** "%25 · %50 · %100" kısmi kapatma çipleri */
+function CloseChips({ h, onClose, className }: { h: LiveHolding; onClose: (f: number) => void; className?: string }) {
+  return (
+    <div className={cn('flex items-center gap-1', className)} role="group" aria-label={`${h.symbol} pozisyonunu kapat`}>
+      {CLOSE_FRACTIONS.map((f) => (
+        <button
+          key={f}
+          type="button"
+          onClick={() => onClose(f)}
+          aria-label={closeLabel(h.symbol, f)}
+          title={closeLabel(h.symbol, f)}
+          className="num h-7 min-w-11 rounded-md border border-line px-2 text-[11px] font-medium text-muted transition-colors hover:border-down/40 hover:bg-down-soft hover:text-down"
+        >
+          {fractionLabel(f)}
+        </button>
+      ))}
+    </div>
+  );
 }
 
 function plTone(v: number) {
@@ -284,6 +316,9 @@ function TableRow({ h, orders, onOrders }: { h: LiveHolding; orders?: OrderRow[]
       <Td align="right" className="hidden lg:table-cell">
         {h.dayChangePercent != null ? <Delta value={h.dayChangePercent} /> : <span className="text-subtle">—</span>}
       </Td>
+      <Td align="right" className="hidden xl:table-cell">
+        <CloseChips h={h} onClose={act.close} className="justify-end" />
+      </Td>
       <Td align="right">
         <RowMenu
           label={`${h.symbol} işlemleri`}
@@ -291,6 +326,8 @@ function TableRow({ h, orders, onOrders }: { h: LiveHolding; orders?: OrderRow[]
           items={[
             { label: 'Al', icon: <ArrowUpRightIcon />, tone: 'up', onSelect: act.buy },
             { label: 'Sat', icon: <ArrowDownRightIcon />, tone: 'down', onSelect: act.sell },
+            { label: 'Yarısını sat', icon: <ArrowDownRightIcon />, tone: 'down', onSelect: () => act.close(0.5) },
+            { label: 'Pozisyonu kapat', icon: <ArrowDownRightIcon />, tone: 'down', onSelect: () => act.close(1) },
             {
               label: act.count ? `Emir (${act.count} aktif)` : 'Zarar durdur / kâr al',
               icon: <ShieldExclamationIcon />,
@@ -321,6 +358,10 @@ function MobileRow({ h, orders, onOrders }: { h: LiveHolding; orders?: OrderRow[
         <MiniStat label="Güncel fiyat" value={formatTRY(h.livePrice, { precise: true })} />
         <MiniStat label="Günlük" value={h.dayChangePercent != null ? <Delta value={h.dayChangePercent} variant="text" /> : '—'} />
       </dl>
+      <div className="mt-3 flex items-center justify-between gap-3">
+        <span className="text-xs text-muted">Pozisyonu kapat</span>
+        <CloseChips h={h} onClose={act.close} />
+      </div>
       <div className="mt-3 grid grid-cols-3 gap-2">
         <Button size="sm" variant="up" onClick={act.buy} aria-label={`${h.symbol} al`}>
           Al

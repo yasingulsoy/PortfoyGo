@@ -369,6 +369,7 @@ export class IdleService {
         WHERE s.total_earned > 0
           AND u.email_verified = true
           AND (u.is_banned IS NULL OR u.is_banned = false)
+          AND COALESCE(u.is_deleted, false) = false
         ORDER BY s.total_earned DESC, s.prestige_shares DESC, u.username ASC
         LIMIT $1`,
       [lim]
@@ -388,7 +389,8 @@ export class IdleService {
                    JOIN users ou ON ou.id = o.user_id
                   WHERE o.total_earned > s.total_earned
                     AND ou.email_verified = true
-                    AND (ou.is_banned IS NULL OR ou.is_banned = false)) AS rank
+                    AND (ou.is_banned IS NULL OR ou.is_banned = false)
+                    AND COALESCE(ou.is_deleted, false) = false) AS rank
            FROM idle_states s
            JOIN users u ON u.id = s.user_id
           WHERE s.user_id = $1`,

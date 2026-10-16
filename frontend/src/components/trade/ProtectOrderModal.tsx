@@ -15,9 +15,21 @@ import { COMMISSION_RATE } from '@/lib/constants';
 import { cn, formatPercent, formatQuantity, formatTRY } from '@portfoygo/shared/format';
 import { ASSET_TYPE_LABELS } from '@/types';
 import { orderLabel, refreshOrders, type OrderRow } from '@/components/portfolio/useOrders';
-import { EXPIRY_OPTIONS, parseDecimal, priceToInput, roundQty, sanitizeDecimal, toInput, type ExpiryValue } from './orderInput';
+import {
+  EXPIRY_OPTIONS,
+  TRAIL_PERCENT_MAX,
+  TRAIL_PERCENT_MIN,
+  parseDecimal,
+  priceToInput,
+  roundQty,
+  sanitizeDecimal,
+  toInput,
+  trailingTrigger,
+  type ExpiryValue,
+} from './orderInput';
 
-type ProtectType = 'stop_loss' | 'take_profit';
+type ProtectType = 'stop_loss' | 'take_profit' | 'trailing_stop';
+type TrailMode = 'percent' | 'amount';
 
 interface Props {
   holding: LiveHolding | null;
@@ -70,6 +82,13 @@ const COPY: Record<ProtectType, { tab: string; field: string; suggestion: string
     button: 'Kâr al emri ver',
     footnote: 'Fiyat tetikleme seviyesine çıktığında o anki piyasa fiyatından satılır; gösterilen tutarlar tahminidir.',
   },
+  trailing_stop: {
+    tab: 'Takip eden',
+    field: 'Takip mesafesi',
+    suggestion: 'Fiyat yükseldikçe stop seviyesi de yükselir; fiyat zirveden bu kadar geri çekilince satılır.',
+    button: 'Takip eden stop emri ver',
+    footnote: 'Zirve yalnızca güncel fiyatlarla (hisselerde borsa açıkken) güncellenir; tetiklenince o anki piyasa fiyatından satılır.',
+  },
 };
 
 function ProtectForm({
@@ -89,22 +108,41 @@ function ProtectForm({
   const held = holding.quantity;
   const [type, setType] = useState<ProtectType>(initialType);
   // Her sekmenin kendi tetikleme girişi (sekme değişince değer korunur)
-  const [triggers, setTriggers] = useState<Record<ProtectType, string>>(() => ({
+  const [triggers, setTriggers] = useState<Record<Exclude<ProtectType, 'trailing_stop'>, string>>(() => ({
     stop_loss: priceToInput(price * 0.95),
     take_profit: priceToInput(price * 1.05),
   }));
+  // Takip eden stop: yüzde (varsayılan %5) VEYA TL mesafe
+  const [trailMode, setTrailMode] = useState<TrailMode>('percent');
+  const [trailInputs, setTrailInputs] = useState<Record<TrailMode, string>>(() => ({ percent: '5', amount: priceToInput(price * 0.05) }));
   const [qtyInput, setQtyInput] = useState(() => toInput(roundQty(held)));
   const [expiry, setExpiry] = useState<ExpiryValue>('30');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const [done, setDone] = useState<{ type: ProtectType; trigger: number; quantity: number } | null>(null);
+  const [done, setDone] = useState<{ type: ProtectType; trigger: number; quantity: number; trail?: string } | null>(null);
 
-  const trigger = triggers[type];
-  const triggerValue = parseDecimal(trigger);
+  const isTrailing = type === 'trailing_stop';
+  const trailInput = trailInputs[trailMode];
+  const trailValue = parseDecimal(trailInput);
+  const trigger = isTrailing ? '' : triggers[type];
+  // Takip edende tetikleme, güncel fiyat (başlangıç zirvesi) ve mesafeden türetilir
+  const triggerValue = isTrailing
+    ? trailValue > 0 && price > 0
+      ? trailingTrigger(price, trailMode === 'percent' ? { percent: trailValue } : { amount: trailValue })
+      : NaN
+    : parseDecimal(trigger);
   const qtyValue = parseDecimal(qtyInput);
   const copy = COPY[type];
+  const trailText = trailMode === 'percent' ? `%${trailInput}` : `₺${trailInput}`;
 
   const triggerError = (() => {
+    if (isTrailing) {
+      if (trailInput.trim() === '') return 'Takip mesafesi girin.';
+      if (!(trailValue > 0)) return 'Takip mesafesi 0’dan büyük olmalı.';
+      if (trailMode === 'percent' && (trailValue < TRAIL_PERCENT_MIN || trailValue > TRAIL_PERCENT_MAX)) return `Takip yüzdesi %${TRAIL_PERCENT_MIN} ile %${TRAIL_PERCENT_MAX} arasında olmalı.`;
+      if (trailMode === 'amount' && price > 0 && trailValue >= price) return 'Takip tutarı güncel fiyattan küçük olmalı.';
+      return undefined;
+    }
     if (trigger.trim() === '') return 'Tetikleme fiyatı girin.';
     if (!(triggerValue > 0)) return 'Tetikleme fiyatı 0’dan büyük olmalı.';
     if (price > 0 && type === 'stop_loss' && triggerValue >= price) return 'Zarar durdur fiyatı güncel fiyatın altında olmalı; aksi halde emir hemen tetiklenir.';
@@ -140,11 +178,11 @@ function ProtectForm({
         side: 'sell',
         type,
         quantity,
-        trigger_price: triggerValue,
+        ...(isTrailing ? (trailMode === 'percent' ? { trail_percent: trailValue } : { trail_amount: trailValue }) : { trigger_price: triggerValue }),
         expires_in_days: Number(expiry),
       });
       if (res && res.success === false) throw new Error(res.message || 'Emir oluşturulamadı.');
-      setDone({ type, trigger: triggerValue, quantity });
+      setDone({ type, trigger: Number(res?.order?.trigger_price ?? triggerValue), quantity, trail: isTrailing ? trailText : undefined });
       void refreshOrders();
       onCreated?.();
     } catch (err) {
@@ -159,11 +197,19 @@ function ProtectForm({
       <div className="flex flex-col items-center pt-2 text-center">
         <CheckCircleIcon className="h-12 w-12 text-up" aria-hidden="true" />
         <p className="mt-3 text-base font-semibold">Emir oluşturuldu</p>
-        <p className="mt-1 text-sm text-muted">
-          {holding.symbol} fiyatı <span className="num text-fg">{formatTRY(done.trigger, { precise: true })}</span>{' '}
-          {done.type === 'stop_loss' ? 'seviyesine indiğinde' : 'seviyesine çıktığında'}{' '}
-          <span className="num text-fg">{formatQuantity(done.quantity)}</span> adet otomatik olarak satılacak.
-        </p>
+        {done.type === 'trailing_stop' ? (
+          <p className="mt-1 text-sm text-muted">
+            {holding.symbol} fiyatı zirvesinden <span className="num text-fg">{done.trail}</span> geri çekildiğinde{' '}
+            <span className="num text-fg">{formatQuantity(done.quantity)}</span> adet otomatik olarak satılacak. Başlangıç tetikleme seviyesi{' '}
+            <span className="num text-fg">{formatTRY(done.trigger, { precise: true })}</span>; fiyat yükseldikçe yukarı taşınır.
+          </p>
+        ) : (
+          <p className="mt-1 text-sm text-muted">
+            {holding.symbol} fiyatı <span className="num text-fg">{formatTRY(done.trigger, { precise: true })}</span>{' '}
+            {done.type === 'stop_loss' ? 'seviyesine indiğinde' : 'seviyesine çıktığında'}{' '}
+            <span className="num text-fg">{formatQuantity(done.quantity)}</span> adet otomatik olarak satılacak.
+          </p>
+        )}
         <Button onClick={onClose} className="mt-5 w-full">Tamam</Button>
       </div>
     );
@@ -202,6 +248,7 @@ function ProtectForm({
         items={[
           { value: 'stop_loss', label: COPY.stop_loss.tab },
           { value: 'take_profit', label: COPY.take_profit.tab },
+          { value: 'trailing_stop', label: COPY.trailing_stop.tab },
         ]}
       />
 
@@ -218,26 +265,67 @@ function ProtectForm({
         </Alert>
       )}
 
-      <Field
-        data-autofocus
-        className="mt-5"
-        label={copy.field}
-        suffix="₺"
-        inputMode="decimal"
-        autoComplete="off"
-        placeholder="0,00"
-        value={trigger}
-        onChange={(e) => {
-          const v = sanitizeDecimal(e.target.value);
-          setTriggers((t) => ({ ...t, [type]: v }));
-        }}
-        error={trigger.trim() !== '' || error ? triggerError : undefined}
-        hint={
-          distancePct != null && !triggerError
-            ? `Güncel fiyatın ${formatPercent(Math.abs(distancePct), { sign: false })} ${distancePct < 0 ? 'altında' : 'üstünde'}. Fiyat bu seviyeye ${type === 'stop_loss' ? 'inerse' : 'çıkarsa'} satış yapılır.`
-            : copy.suggestion
-        }
-      />
+      {isTrailing ? (
+        <>
+          <div className="mt-5 flex items-center justify-between gap-3">
+            <span className="text-sm font-medium text-fg/80">{copy.field}</span>
+            <Tabs
+              label="Takip mesafesi birimi"
+              value={trailMode}
+              onChange={(m) => {
+                setTrailMode(m);
+                setError('');
+              }}
+              items={[
+                { value: 'percent', label: '%' },
+                { value: 'amount', label: '₺' },
+              ]}
+              className="[&_button]:h-7 [&_button]:px-3 [&_button]:text-xs"
+            />
+          </div>
+          <Field
+            data-autofocus
+            className="mt-2"
+            label={trailMode === 'percent' ? 'Takip yüzdesi' : 'Takip tutarı'}
+            suffix={trailMode === 'percent' ? '%' : '₺'}
+            inputMode="decimal"
+            autoComplete="off"
+            placeholder={trailMode === 'percent' ? '5' : '0,00'}
+            value={trailInput}
+            onChange={(e) => {
+              const v = sanitizeDecimal(e.target.value);
+              setTrailInputs((t) => ({ ...t, [trailMode]: v }));
+            }}
+            error={trailInput.trim() !== '' || error ? triggerError : undefined}
+            hint={
+              !triggerError && triggerValue > 0
+                ? `Başlangıç tetikleme: ${formatTRY(triggerValue, { precise: true })} (güncel fiyatın ${formatPercent(Math.abs(distancePct ?? 0), { sign: false })} altı). ${copy.suggestion}`
+                : copy.suggestion
+            }
+          />
+        </>
+      ) : (
+        <Field
+          data-autofocus
+          className="mt-5"
+          label={copy.field}
+          suffix="₺"
+          inputMode="decimal"
+          autoComplete="off"
+          placeholder="0,00"
+          value={trigger}
+          onChange={(e) => {
+            const v = sanitizeDecimal(e.target.value);
+            setTriggers((t) => ({ ...t, [type]: v }));
+          }}
+          error={trigger.trim() !== '' || error ? triggerError : undefined}
+          hint={
+            distancePct != null && !triggerError
+              ? `Güncel fiyatın ${formatPercent(Math.abs(distancePct), { sign: false })} ${distancePct < 0 ? 'altında' : 'üstünde'}. Fiyat bu seviyeye ${type === 'stop_loss' ? 'inerse' : 'çıkarsa'} satış yapılır.`
+              : copy.suggestion
+          }
+        />
+      )}
 
       <Field
         className="mt-4"
@@ -300,7 +388,7 @@ function ProtectForm({
         </Alert>
       )}
 
-      <Button type="submit" size="lg" variant={type === 'stop_loss' ? 'sell' : 'buy'} loading={submitting} disabled={!valid} className="mt-5 w-full">
+      <Button type="submit" size="lg" variant={type === 'take_profit' ? 'buy' : 'sell'} loading={submitting} disabled={!valid} className="mt-5 w-full">
         {copy.button}
       </Button>
       <p className="mt-3 text-center text-[11px] leading-relaxed text-subtle">{copy.footnote}</p>

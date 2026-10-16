@@ -1,9 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, type FormEvent } from 'react';
 import { ArrowPathIcon, QueueListIcon } from '@heroicons/react/20/solid';
 import { ordersApi } from '@/lib/api';
 import { useMarket } from '@/hooks/useMarketData';
+import { useNow } from '@/hooks/useNow';
+import { formatCountdown, formatTrDayTime } from '@/lib/marketHours';
 import { cn, formatDateTime, formatPercent, formatQuantity, formatRelative, formatTRY } from '@portfoygo/shared/format';
 import { Card } from '@portfoygo/shared/ui/Card';
 import { DataTable, TBody, THead, Td, Th, Tr } from '@/components/common/Table';
@@ -11,24 +13,25 @@ import Button from '@portfoygo/shared/ui/Button';
 import AssetAvatar from '@portfoygo/shared/ui/AssetAvatar';
 import Modal from '@portfoygo/shared/ui/Modal';
 import Tabs from '@portfoygo/shared/ui/Tabs';
+import { Field } from '@portfoygo/shared/ui/Field';
 import { Alert, Badge, EmptyState, Skeleton } from '@portfoygo/shared/ui/Feedback';
 import { useToast } from '@portfoygo/shared/ui/Toast';
-import { formatTimeLeft } from '@/components/trade/orderInput';
-import { ORDER_STATUS, distanceToTrigger, orderLabel, type OrderRow } from './useOrders';
+import { TRAIL_PERCENT_MAX, TRAIL_PERCENT_MIN, formatTimeLeft, parseDecimal, sanitizeDecimal, toInput, trailingTrigger } from '@/components/trade/orderInput';
+import { ORDER_STATUS, distanceToTrigger, isMarketOnOpen, isTrailing, orderLabel, trailLabel, type OrderRow } from './useOrders';
 
 type View = 'active' | 'history';
 
-/** Emir tipi rozet tonu: alış yeşil, zarar durdur kırmızı, satış/kâr al marka */
+/** Emir tipi rozet tonu: alış yeşil, zarar durdur / takip eden stop kırmızı, kâr al altın, diğer satışlar marka */
 export function orderTone(o: Pick<OrderRow, 'side' | 'type'>): 'up' | 'down' | 'brand' | 'gold' {
   if (o.side === 'buy') return 'up';
-  if (o.type === 'stop_loss') return 'down';
+  if (o.type === 'stop_loss' || o.type === 'trailing_stop') return 'down';
   if (o.type === 'take_profit') return 'gold';
   return 'brand';
 }
 
 export function OrderTypeBadge({ order, className }: { order: Pick<OrderRow, 'side' | 'type'>; className?: string }) {
   return (
-    <Badge tone={orderTone(order)} className={className}>
+    <Badge tone={orderTone(order)} className={cn('whitespace-nowrap', className)}>
       {orderLabel(order)}
     </Badge>
   );
@@ -49,6 +52,7 @@ interface Props {
 export default function OrdersCard({ active, history, loading, error, onRetry, onChanged, className, id }: Props) {
   const [view, setView] = useState<View>('active');
   const [pending, setPending] = useState<OrderRow | null>(null);
+  const [editing, setEditing] = useState<OrderRow | null>(null);
   const { find } = useMarket();
 
   const rows = view === 'active' ? active : history.slice(0, 30);
@@ -122,6 +126,7 @@ export default function OrdersCard({ active, history, loading, error, onRetry, o
                   livePrice={asset?.priceTRY ?? null}
                   image={asset?.image}
                   onCancel={view === 'active' ? () => setPending(o) : undefined}
+                  onEdit={view === 'active' && isTrailing(o) ? () => setEditing(o) : undefined}
                 />
               );
             })}
@@ -148,6 +153,7 @@ export default function OrdersCard({ active, history, loading, error, onRetry, o
                     livePrice={asset?.priceTRY ?? null}
                     image={asset?.image}
                     onCancel={view === 'active' ? () => setPending(o) : undefined}
+                    onEdit={view === 'active' && isTrailing(o) ? () => setEditing(o) : undefined}
                   />
                 );
               })}
@@ -164,14 +170,30 @@ export default function OrdersCard({ active, history, loading, error, onRetry, o
           await onChanged();
         }}
       />
+      <EditTrailingDialog
+        order={editing}
+        livePrice={editing ? (find(editing.assetType, editing.symbol)?.priceTRY ?? null) : null}
+        onClose={() => setEditing(null)}
+        onSaved={async () => {
+          setEditing(null);
+          await onChanged();
+        }}
+      />
     </Card>
   );
 }
 
-/** Emir satırının alt bilgi metni (miktar, ayrılan nakit, kalan süre ya da sonuç). */
+/** Emir satırının alt bilgi metni (miktar, ayrılan nakit, takip, kalan süre ya da sonuç). */
 function orderDetail(order: OrderRow) {
   if (order.status === 'active') {
-    return [`${formatQuantity(order.quantity)} adet`, order.reservedCash > 0 ? `${formatTRY(order.reservedCash)} ayrıldı` : null, formatTimeLeft(order.expiresAt)]
+    const trail = isTrailing(order) ? trailLabel(order) : null;
+    return [
+      `${formatQuantity(order.quantity)} adet`,
+      order.reservedCash > 0 ? `${formatTRY(order.reservedCash)} ayrıldı` : null,
+      trail ? `${trail} takip` : null,
+      isTrailing(order) && order.highWater ? `zirve ${formatTRY(order.highWater, { precise: true })}` : null,
+      isMarketOnOpen(order) && order.executeAfter ? `açılış ${formatTrDayTime(new Date(order.executeAfter))}` : formatTimeLeft(order.expiresAt),
+    ]
       .filter(Boolean)
       .join(' · ');
   }
@@ -195,17 +217,50 @@ function CancelButton({ order, onCancel }: { order: OrderRow; onCancel: () => vo
   );
 }
 
+function EditButton({ order, onEdit }: { order: OrderRow; onEdit: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onEdit}
+      aria-label={`${order.symbol} takip eden stop emrini düzenle`}
+      className="inline-flex h-8 shrink-0 items-center rounded-lg px-2.5 text-xs font-medium text-brand transition-colors hover:bg-brand-soft"
+    >
+      Düzenle
+    </button>
+  );
+}
+
+/** Açılışta emri: "Açılışta" + kalan süre (aktifken) */
+function MooTriggerCell({ order }: { order: OrderRow }) {
+  const now = useNow(30_000);
+  const at = order.executeAfter ? Date.parse(order.executeAfter) : NaN;
+  const waiting = order.status === 'active' && Number.isFinite(at);
+  return (
+    <>
+      <p className="whitespace-nowrap text-sm font-semibold text-fg">Açılışta</p>
+      <p className="num mt-0.5 whitespace-nowrap text-xs text-muted" title={`Referans fiyat: ${formatTRY(order.triggerPrice, { precise: true })}`}>
+        {waiting ? (at > now ? `açılışa ${formatCountdown(at - now)}` : 'ilk taze fiyat bekleniyor') : `ref. ${formatTRY(order.triggerPrice, { precise: true })}`}
+      </p>
+    </>
+  );
+}
+
 function TriggerCell({ order, livePrice }: { order: OrderRow; livePrice: number | null }) {
+  if (isMarketOnOpen(order)) return <MooTriggerCell order={order} />;
   const isActive = order.status === 'active';
   const distance = isActive ? distanceToTrigger(order, livePrice) : null;
   return (
     <>
-      <p className="num whitespace-nowrap text-sm font-semibold text-fg">{formatTRY(order.triggerPrice, { precise: true })}</p>
+      <p className="num whitespace-nowrap text-sm font-semibold text-fg">
+        {isActive && isTrailing(order) && <span className="sr-only">Güncel tetikleme fiyatı: </span>}
+        {formatTRY(order.triggerPrice, { precise: true })}
+      </p>
       <p className="num mt-0.5 whitespace-nowrap text-xs text-muted">
         {isActive && distance != null ? (
           <>
             <span className="sr-only">Güncel fiyata uzaklık: </span>
             {formatPercent(distance)}
+            {isTrailing(order) && <span> · güncel</span>}
           </>
         ) : (
           'tetikleme'
@@ -215,7 +270,19 @@ function TriggerCell({ order, livePrice }: { order: OrderRow; livePrice: number 
   );
 }
 
-function OrderTableRow({ order, livePrice, image, onCancel }: { order: OrderRow; livePrice: number | null; image?: string; onCancel?: () => void }) {
+function OrderTableRow({
+  order,
+  livePrice,
+  image,
+  onCancel,
+  onEdit,
+}: {
+  order: OrderRow;
+  livePrice: number | null;
+  image?: string;
+  onCancel?: () => void;
+  onEdit?: () => void;
+}) {
   const isActive = order.status === 'active';
   const status = ORDER_STATUS[order.status] ?? { label: order.status, tone: 'neutral' as const };
   const detail = orderDetail(order);
@@ -227,7 +294,7 @@ function OrderTableRow({ order, livePrice, image, onCancel }: { order: OrderRow;
           <div className="min-w-0">
             <p className="font-medium text-fg">{order.symbol}</p>
             <p
-              className="num mt-0.5 max-w-[14rem] truncate text-xs text-muted"
+              className="num mt-0.5 line-clamp-2 max-w-[14rem] min-w-[6rem] text-xs text-muted"
               title={order.expiresAt && isActive ? `Son geçerlilik: ${formatDateTime(order.expiresAt)}` : undefined}
             >
               {detail || '—'}
@@ -246,7 +313,10 @@ function OrderTableRow({ order, livePrice, image, onCancel }: { order: OrderRow;
       </Td>
       {onCancel && (
         <Td align="right">
-          <CancelButton order={order} onCancel={onCancel} />
+          <span className="flex flex-col items-end">
+            {onEdit && <EditButton order={order} onEdit={onEdit} />}
+            <CancelButton order={order} onCancel={onCancel} />
+          </span>
         </Td>
       )}
     </Tr>
@@ -259,12 +329,14 @@ export function OrderListRow({
   livePrice,
   image,
   onCancel,
+  onEdit,
   showAvatar = true,
 }: {
   order: OrderRow;
   livePrice: number | null;
   image?: string;
   onCancel?: () => void;
+  onEdit?: () => void;
   showAvatar?: boolean;
 }) {
   const isActive = order.status === 'active';
@@ -287,7 +359,12 @@ export function OrderListRow({
       <div className="shrink-0 text-right">
         <TriggerCell order={order} livePrice={livePrice} />
       </div>
-      {onCancel && <CancelButton order={order} onCancel={onCancel} />}
+      {(onEdit || onCancel) && (
+        <div className="flex shrink-0 flex-col items-end">
+          {onEdit && <EditButton order={order} onEdit={onEdit} />}
+          {onCancel && <CancelButton order={order} onCancel={onCancel} />}
+        </div>
+      )}
     </li>
   );
 }
@@ -369,5 +446,128 @@ export function CancelOrderDialog({
       )}
       {error && <Alert tone="error" className="mt-4">{error}</Alert>}
     </Modal>
+  );
+}
+
+type TrailMode = 'percent' | 'amount';
+
+/**
+ * Takip eden stop düzenleme: mesafe (yüzde VEYA TL). Zirve korunur; yeni tetikleme = zirve × (1 − %) ya da
+ * zirve − TL ve güncel fiyatın altında olmalı (aksi halde emir hemen tetiklenirdi).
+ */
+export function EditTrailingDialog({
+  order,
+  livePrice,
+  onClose,
+  onSaved,
+}: {
+  order: OrderRow | null;
+  livePrice: number | null;
+  onClose: () => void;
+  onSaved: () => void | Promise<void>;
+}) {
+  return (
+    <Modal open={!!order} onClose={onClose} size="sm" title="Takip eden stopu düzenle" description={order ? `${order.symbol} · ${formatQuantity(order.quantity)} adet` : undefined}>
+      {order && <EditTrailingForm key={order.id} order={order} livePrice={livePrice} onClose={onClose} onSaved={onSaved} />}
+    </Modal>
+  );
+}
+
+function EditTrailingForm({ order, livePrice, onClose, onSaved }: { order: OrderRow; livePrice: number | null; onClose: () => void; onSaved: () => void | Promise<void> }) {
+  const toast = useToast();
+  const [mode, setMode] = useState<TrailMode>(order.trailAmount != null ? 'amount' : 'percent');
+  const [input, setInput] = useState(() => toInput(order.trailAmount ?? order.trailPercent ?? 5));
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  const highWater = order.highWater ?? order.triggerPrice;
+  const value = parseDecimal(input);
+  const trigger = value > 0 ? trailingTrigger(highWater, mode === 'percent' ? { percent: value } : { amount: value }) : NaN;
+  const inputError = (() => {
+    if (input.trim() === '') return 'Takip mesafesi girin.';
+    if (!(value > 0)) return 'Takip mesafesi 0’dan büyük olmalı.';
+    if (mode === 'percent' && (value < TRAIL_PERCENT_MIN || value > TRAIL_PERCENT_MAX)) return `%${TRAIL_PERCENT_MIN} ile %${TRAIL_PERCENT_MAX} arasında olmalı.`;
+    if (mode === 'amount' && value >= highWater) return 'Takip tutarı zirve fiyattan küçük olmalı.';
+    if (livePrice && trigger >= livePrice) return 'Yeni tetikleme güncel fiyatın altında olmalı; aksi halde emir hemen tetiklenir.';
+    return undefined;
+  })();
+
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (inputError || busy) return;
+    setBusy(true);
+    setError('');
+    try {
+      const res = await ordersApi.update(order.id, mode === 'percent' ? { trail_percent: value } : { trail_amount: value });
+      if (res && res.success === false) throw new Error(res.message || 'Emir güncellenemedi.');
+      toast.success('Emir güncellendi', { description: `${order.symbol} yeni tetikleme: ${formatTRY(Number(res?.order?.trigger_price ?? trigger), { precise: true })}` });
+      await onSaved();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Emir güncellenemedi.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <form onSubmit={submit} noValidate>
+      <dl className="space-y-2.5 rounded-xl border border-line bg-surface-2 p-4 text-sm">
+        <div className="flex justify-between gap-4">
+          <dt className="text-muted">Zirve fiyat</dt>
+          <dd className="num font-medium">{formatTRY(highWater, { precise: true })}</dd>
+        </div>
+        <div className="flex justify-between gap-4">
+          <dt className="text-muted">Güncel tetikleme</dt>
+          <dd className="num font-medium">{formatTRY(order.triggerPrice, { precise: true })}</dd>
+        </div>
+        {livePrice != null && (
+          <div className="flex justify-between gap-4">
+            <dt className="text-muted">Güncel fiyat</dt>
+            <dd className="num font-medium">{formatTRY(livePrice, { precise: true })}</dd>
+          </div>
+        )}
+      </dl>
+      <div className="mt-4 flex items-center justify-between gap-3">
+        <span className="text-sm font-medium text-fg/80">Mesafe</span>
+        <Tabs
+          label="Takip mesafesi birimi"
+          value={mode}
+          onChange={(m) => {
+            setMode(m);
+            setError('');
+          }}
+          items={[
+            { value: 'percent', label: '%' },
+            { value: 'amount', label: '₺' },
+          ]}
+          className="[&_button]:h-7 [&_button]:px-3 [&_button]:text-xs"
+        />
+      </div>
+      <Field
+        data-autofocus
+        className="mt-3"
+        label={mode === 'percent' ? 'Takip yüzdesi' : 'Takip tutarı'}
+        suffix={mode === 'percent' ? '%' : '₺'}
+        inputMode="decimal"
+        autoComplete="off"
+        value={input}
+        onChange={(e) => setInput(sanitizeDecimal(e.target.value))}
+        error={inputError}
+        hint={!inputError && Number.isFinite(trigger) ? `Yeni tetikleme: ${formatTRY(trigger, { precise: true })}` : undefined}
+      />
+      {error && (
+        <Alert tone="error" className="mt-4">
+          {error}
+        </Alert>
+      )}
+      <div className="mt-5 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+        <Button variant="secondary" onClick={onClose} disabled={busy}>
+          Vazgeç
+        </Button>
+        <Button type="submit" loading={busy} disabled={!!inputError}>
+          Kaydet
+        </Button>
+      </div>
+    </form>
   );
 }

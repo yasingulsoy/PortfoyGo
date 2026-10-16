@@ -7,6 +7,7 @@ import Avatar from '@/components/game/ui/Avatar';
 import GamePanel from '@/components/game/ui/GamePanel';
 import GameScreen from '@/components/game/ui/GameScreen';
 import TierBadge from '@/components/game/ui/TierBadge';
+import ProfileLink from '@/components/profile/ProfileLink';
 import { useAuth } from '@/context/AuthContext';
 import { useGameProfile } from '@/hooks/useGameProfile';
 import { useGameLeaderboard } from '@/hooks/useGameEconomy';
@@ -212,7 +213,7 @@ function Row({ row, type, me }: { row: Omit<GameLeaderboardRow, 'rank'> & { rank
       <Avatar avatarId={row.avatar_id} seed={row.username} frameId={row.frame_id} size="sm" />
       <div className="min-w-0 flex-1">
         <p className="truncate font-extrabold leading-tight">
-          {row.username}
+          <ProfileLink username={row.username} />
           {me && <span className="ml-1.5 rounded-full bg-(--g-blue) px-1.5 py-0.5 text-[10px] font-extrabold uppercase text-(--g-on-color)">Sen</span>}
         </p>
         {row.tier && <TierBadge tier={row.tier} size="sm" className="mt-0.5" />}

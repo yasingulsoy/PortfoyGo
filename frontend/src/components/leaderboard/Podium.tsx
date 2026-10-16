@@ -3,6 +3,7 @@ import { Card } from '@portfoygo/shared/ui/Card';
 import { Delta, Money } from '@portfoygo/shared/ui/Delta';
 import { Badge, Skeleton } from '@portfoygo/shared/ui/Feedback';
 import UserInitial from '@portfoygo/shared/ui/UserInitial';
+import ProfileLink from '@/components/profile/ProfileLink';
 import { cn, formatTRY } from '@portfoygo/shared/format';
 import type { Leader } from './model';
 
@@ -39,7 +40,9 @@ export default function Podium({ leaders, currentUsername }: { leaders: Leader[]
 
               <div className="mt-5 flex min-w-0 items-center gap-2.5">
                 <UserInitial name={l.username} size={32} tone={isMe ? 'brand' : p.avatar} />
-                <p className="min-w-0 truncate text-sm font-medium text-fg">{l.username}</p>
+                <p className="min-w-0 truncate text-sm font-medium text-fg">
+                  <ProfileLink username={l.username} />
+                </p>
                 {isMe && <Badge tone="brand">Sen</Badge>}
               </div>
 

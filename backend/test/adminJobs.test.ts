@@ -143,6 +143,7 @@ describe('JobRegistry', () => {
       'arena-bots',
       'arena-duels',
       'weekly-picks',
+      'weekly-digest',
     ]);
   });
 });

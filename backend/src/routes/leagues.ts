@@ -1,5 +1,5 @@
 import express from 'express';
-import rateLimit from 'express-rate-limit';
+import { createRateLimiter } from '../infra/rateLimitStore';
 import { authenticateToken, optionalAuth, optionalUserId, requireUser } from '../middleware/auth';
 import { leagueCodeLimiter } from '../middleware/rateLimits';
 import { asyncHandler } from '../utils/errors';
@@ -19,7 +19,7 @@ import { LeagueService } from '../services/leagues';
 const router = express.Router();
 
 /** Herkese açık lig listesi: IP başına dakikada 60 */
-const publicLeaguesLimiter = rateLimit({
+const publicLeaguesLimiter = createRateLimiter('leagues-public', {
   windowMs: 60 * 1000,
   limit: 60,
   standardHeaders: 'draft-7',

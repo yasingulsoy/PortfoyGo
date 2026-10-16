@@ -34,9 +34,15 @@ import gameRoutes from './routes/game';
 import idleRoutes from './routes/idle';
 import picksRoutes, { devPicksRouter } from './routes/picks';
 import healthRoutes from './routes/health';
+import meRoutes from './routes/me';
 import { globalApiLimiter } from './middleware/rateLimits';
 import { errorHandler, notFoundHandler } from './utils/errors';
 import { httpLogger, logger } from './utils/logger';
+import { createMetricsRouter } from './routes/metrics';
+import clientErrorsRoutes, { CLIENT_ERRORS_PATH, clientErrorsBodyParser } from './routes/clientErrors';
+import { httpMetricsMiddleware, metricsToken, startDefaultMetrics } from './observability/metrics';
+import { meRouter as profileVisibilityRoutes, publicRouter as publicProfileRoutes } from './routes/publicProfiles';
+import { devEmailRouter, unsubscribeRouter as emailUnsubscribeRoutes } from './routes/emailDigest';
 
 /**
  * Express uygulamasını kurar (middleware + route'lar). Sunucuyu BAŞLATMAZ, cron kurmaz.
@@ -75,6 +81,12 @@ export function createApp(): express.Express {
   // İstek kimliği (X-Request-Id) + yapılandırılmış istek logu (pino-http). Bkz. utils/logger.ts
   app.use(httpLogger);
 
+  // Prometheus istek süresi histogramı + süreç metrikleri (yalnızca METRICS_TOKEN tanımlıyken; bkz. routes/metrics.ts)
+  if (metricsToken()) {
+    startDefaultMetrics();
+    app.use(httpMetricsMiddleware());
+  }
+
   // ---------------------------------------------------------------------------
   // CORS
   // ---------------------------------------------------------------------------
@@ -108,6 +120,8 @@ export function createApp(): express.Express {
   // Senaryo serisi içe aktarma (yönetici, büyük CSV): önce yönetici doğrulaması, sonra 10 MB'a kadar JSON.
   // Genel 50 KB ayrıştırıcıdan ÖNCE olmalı (gövde bir kez ayrıştırılır).
   app.use(SERIES_IMPORT_PATH, ...seriesImportBodyParser);
+  // Tarayıcı hata raporları: en fazla 8 KB JSON (genel ayrıştırıcıdan önce; bkz. routes/clientErrors.ts)
+  app.use(CLIENT_ERRORS_PATH, clientErrorsBodyParser);
   app.use(express.json({ limit: '50kb' }));
   app.use(express.urlencoded({ extended: false, limit: '50kb' }));
   // Oturum çerezi (pg_session) için. CORS credentials: true + ALLOWED_ORIGINS listesi (asla '*').
@@ -134,8 +148,12 @@ export function createApp(): express.Express {
 
   // Sağlık uçları: /healthz (canlılık), /readyz (DB hazır mı) — rate limit dışında
   app.use(healthRoutes);
+  // GET /metrics (Prometheus, Bearer METRICS_TOKEN; tanımsızsa 404) — /api ve genel rate limit dışında
+  app.use(createMetricsRouter());
 
   app.use('/api', globalApiLimiter);
+  // Tarayıcı hata raporları (oturum gerekmez; kendi sınırlayıcısı + boyut sınırı)
+  app.use(CLIENT_ERRORS_PATH, clientErrorsRoutes);
   // Yalnızca yerel geliştirme veritabanında etkin (bkz. routes/devLogin.ts); aksi halde 404
   app.use('/api/auth/dev-login', devLoginRoutes);
   app.use('/api/auth', authRoutes);
@@ -177,6 +195,17 @@ export function createApp(): express.Express {
   app.use('/api/picks', picksRoutes);
   // YALNIZCA yerel geliştirme: Haftalık Seçim saatini kaydırma (isDevLoginEnabled() değilse 404)
   app.use('/api/dev/picks', devPicksRouter);
+  // KVKK self-servis: GET /api/me/export (verilerimi indir), POST /api/me/delete (hesabımı sil)
+  app.use('/api/me', meRoutes);
+
+  // Herkese açık profiller: GET /api/public/users/:username (oturum gerekmez; yalnızca yüzdeler/sıralar)
+  app.use('/api/public', publicProfileRoutes);
+  // Profil görünürlüğü: GET/PATCH /api/me/profile-visibility (uç başına authenticateToken)
+  app.use('/api/me', profileVisibilityRoutes);
+  // Haftalık e-posta özeti: GET/POST /api/email/unsubscribe?token=… (imzalı token; oturum gerekmez)
+  app.use('/api/email', emailUnsubscribeRoutes);
+  // YALNIZCA yerel geliştirme: GET /api/dev/email/digest-preview?username=demo (isDevLoginEnabled() değilse 404)
+  app.use('/api/dev/email', devEmailRouter);
 
   // Proxy /api önekini siliyorsa: /currencies, /commodities, /news için geriye dönük uyumluluk
   app.use(['/commodities', '/currencies', '/news'], globalApiLimiter);

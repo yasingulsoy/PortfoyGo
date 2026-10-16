@@ -35,7 +35,7 @@ describe('NotificationService', () => {
     expect(await countFor(b.id)).toBe(1);
 
     await NotificationService.setPrefs(a.id, { orders: false });
-    expect(await NotificationService.getPrefs(a.id)).toEqual({ orders: false, competition: true, account: true, system: true });
+    expect(await NotificationService.getPrefs(a.id)).toEqual({ orders: false, competition: true, account: true, system: true, email_digest: true });
 
     const order = { type: 'order.filled', category: 'orders' as const, title: 'Emir', body: 'x' };
     expect(await NotificationService.notify([a.id, b.id], order)).toBe(1); // a kapattı
@@ -196,12 +196,14 @@ describe('/api/notifications', () => {
 
   it('tercihler: GET varsayılan, PUT kısmi güncelleme + doğrulama', async () => {
     const get = await api().get('/api/notifications/prefs').set(other.auth).expect(200);
-    expect(get.body.data).toEqual({ orders: true, competition: true, account: true, system: true });
+    expect(get.body.data).toEqual({ orders: true, competition: true, account: true, system: true, email_digest: true });
 
     const put = await api().put('/api/notifications/prefs').set(other.auth).send({ competition: false }).expect(200);
-    expect(put.body.data).toEqual({ orders: true, competition: false, account: true, system: true });
+    expect(put.body.data).toEqual({ orders: true, competition: false, account: true, system: true, email_digest: true });
     const put2 = await api().put('/api/notifications/prefs').set(other.auth).send({ orders: false }).expect(200);
-    expect(put2.body.data).toEqual({ orders: false, competition: false, account: true, system: true });
+    expect(put2.body.data).toEqual({ orders: false, competition: false, account: true, system: true, email_digest: true });
+    const put3 = await api().put('/api/notifications/prefs').set(other.auth).send({ email_digest: false }).expect(200);
+    expect(put3.body.data).toEqual({ orders: false, competition: false, account: true, system: true, email_digest: false });
 
     await api().put('/api/notifications/prefs').set(other.auth).send({}).expect(400);
     await api().put('/api/notifications/prefs').set(other.auth).send({ orders: 'no' }).expect(400);

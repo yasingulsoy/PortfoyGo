@@ -6,6 +6,9 @@ import { GameLoader } from '@/components/game/ui/bits';
 import { useIdleLeaderboard } from '@/hooks/useIdle';
 import type { IdleLeaderboardRow } from '@/types';
 import { formatCoins } from './model';
+import { GameShareButton } from '@/components/common/ShareButton';
+import { profileUrl } from '@/lib/publicProfile';
+import { idleShareText } from '@/lib/share';
 
 const MEDAL = ['var(--g-tier-gold)', 'var(--g-tier-silver)', 'var(--g-tier-bronze)'];
 const MEDAL_EDGE = ['var(--g-tier-gold-edge)', 'var(--g-tier-silver-edge)', 'var(--g-tier-bronze-edge)'];
@@ -36,6 +39,16 @@ export default function IdleLeaderboard({ me }: { me?: string | null }) {
         </div>
       )}
       <p className="px-2 pb-1 pt-2 text-[11px] font-semibold text-(--g-ink-faint)">Sıralama ömür boyu toplam kazanca göredir; halka arz sıranı düşürmez.</p>
+      {mine && mine.rank > 0 && (
+        <div className="px-2 pb-1 pt-2">
+          <GameShareButton
+            variant="purple"
+            size="sm"
+            label="Sıramı paylaş"
+            payload={() => ({ title: 'PortfoyGo Yatırım İmparatorluğu', text: idleShareText(mine.rank), url: profileUrl(mine.username, window.location.origin) })}
+          />
+        </div>
+      )}
     </div>
   );
 }

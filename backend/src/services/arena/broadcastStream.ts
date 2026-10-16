@@ -1,5 +1,6 @@
 import type { Request, Response } from 'express';
 import { logger } from '../../utils/logger';
+import { trackSseConnection } from '../../observability/metrics';
 import { arenaBus, type ArenaBusEvent } from './bus';
 import { ArenaService } from './service';
 import { ArenaSocial } from './social';
@@ -66,6 +67,7 @@ export async function openBroadcastStream(req: Request, res: Response, token: st
   res.setHeader('Connection', 'keep-alive');
   res.setHeader('X-Accel-Buffering', 'no');
   res.flushHeaders();
+  const untrack = trackSseConnection('broadcast');
   req.socket.setTimeout(0);
   req.socket.setNoDelay(true);
   req.socket.setKeepAlive(true);
@@ -153,6 +155,7 @@ export async function openBroadcastStream(req: Request, res: Response, token: st
     clearInterval(interval);
     clearInterval(heartbeat);
     unsubscribe();
+    untrack();
     inc(byIp, ip, -1);
     inc(byToken, token, -1);
     total = Math.max(0, total - 1);

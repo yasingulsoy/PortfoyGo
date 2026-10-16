@@ -1,11 +1,15 @@
 # =============================================================================
-# PortfoyGo — production derlemeleriyle yerel tam yığın (PostgreSQL + API + site + admin)
+# PortfoyGo — production derlemeleriyle yerel tam yığın
+#   (PostgreSQL + Redis + API + worker + site + admin)
 #
 #   cp .env.docker.example .env.docker          # JWT_SECRET ve POSTGRES_PASSWORD'ü değiştirin
 #   docker compose --env-file .env.docker up --build
 #
 # Adresler: site http://localhost:3000 · admin http://localhost:3001 · API http://localhost:5001/api
-# Sağlık:   http://localhost:5001/healthz · http://localhost:5001/readyz
+# Sağlık:   http://localhost:5001/healthz · http://localhost:5001/readyz · worker: http://localhost:5002/healthz
+# Ölçekleme: API örnekleri RUN_JOBS=0 (cron işleri yalnızca `worker`da), canlı olaylar + rate limit + iş durumları
+#            Redis üzerinden paylaşılır. Birden çok API örneği: `docker compose ... up --scale api=2` için önce
+#            api.ports satırını bir yük dengeleyiciyle değiştirin (aynı host portu iki kez bağlanamaz).
 # İlk yönetici: README → "Docker ile çalıştırma".
 # =============================================================================
 name: portfoygo
@@ -17,6 +21,39 @@ x-api-build: &api-build
 x-db-env: &db-env
   DATABASE_URL: postgres://${POSTGRES_USER:-portfoygo}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD tanımlayın (.env.docker)}@postgres:5432/${POSTGRES_DB:-portfoygo}
   DB_SSL: "false"
+
+# API ve worker'ın ortak ortamı (veritabanı, sırlar, veri sağlayıcıları, e-posta, Redis, gözlemlenebilirlik)
+x-backend-env: &backend-env
+  <<: *db-env
+  NODE_ENV: production
+  JWT_SECRET: ${JWT_SECRET:?JWT_SECRET tanımlayın (.env.docker)}
+  LOG_LEVEL: ${LOG_LEVEL:-info}
+  # Örnekler arası canlı olaylar (SSE), rate limit sayaçları ve admin iş durumları
+  REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+  # İsteğe bağlı: hata takibi ve Prometheus (boşsa kapalı; /metrics 404)
+  SENTRY_DSN: ${SENTRY_DSN:-}
+  SENTRY_ENVIRONMENT: ${SENTRY_ENVIRONMENT:-}
+  SENTRY_RELEASE: ${SENTRY_RELEASE:-}
+  METRICS_TOKEN: ${METRICS_TOKEN:-}
+  # Piyasa verisi / e-posta (isteğe bağlı; boşsa ilgili özellikler önbellekle sınırlı çalışır)
+  DISABLE_MARKET_REFRESH: ${DISABLE_MARKET_REFRESH:-}
+  FINNHUB_API_KEY: ${FINNHUB_API_KEY:-}
+  FINNHUB_API_KEYS: ${FINNHUB_API_KEYS:-}
+  COINGECKO_API_KEY: ${COINGECKO_API_KEY:-}
+  DOVIZ: ${DOVIZ:-}
+  EMTIA: ${EMTIA:-}
+  DEFAULT_USD_TRY: ${DEFAULT_USD_TRY:-}
+  SMTP_HOST: ${SMTP_HOST:-}
+  SMTP_PORT: ${SMTP_PORT:-}
+  SMTP_USER: ${SMTP_USER:-}
+  SMTP_PASS: ${SMTP_PASS:-}
+  SMTP_FROM: ${SMTP_FROM:-}
+  # Haftalık e-posta özeti (iş: weekly-digest, Pzt 09:00). Yerel compose yığını da NODE_ENV=production çalıştığından
+  # varsayılan KAPALI (0 = yalnızca log); canlıda EMAIL_DIGEST_SEND=1 verin. Bağlantılar için herkese açık adresler:
+  EMAIL_DIGEST_SEND: ${EMAIL_DIGEST_SEND:-0}
+  EMAIL_UNSUBSCRIBE_SECRET: ${EMAIL_UNSUBSCRIBE_SECRET:-}
+  PUBLIC_SITE_URL: ${PUBLIC_SITE_URL:-http://localhost:3000}
+  PUBLIC_API_URL: ${PUBLIC_API_URL:-http://localhost:5001/api}
 
 services:
   postgres:
@@ -38,6 +75,17 @@ services:
     # ports:
     #   - "127.0.0.1:55432:5432"
 
+  # Örnekler arası pub/sub (bildirim + Arena SSE), paylaşılan rate limit ve iş durumları. Kalıcılık gerekmez.
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--save", "", "--appendonly", "no", "--maxmemory", "128mb", "--maxmemory-policy", "volatile-lru"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
   # Tek seferlik: bekleyen migration'ları uygular ve çıkar (api bunu bekler)
   migrate:
     image: portfoygo-api:local
@@ -57,10 +105,10 @@ services:
     init: true
     restart: unless-stopped
     environment:
-      <<: *db-env
-      NODE_ENV: production
+      <<: *backend-env
       PORT: "5001"
-      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET tanımlayın (.env.docker)}
+      # Cron işleri bu örnekte ÇALIŞMAZ; `worker` servisi çalıştırır (advisory lock yine de çift çalışmayı engeller)
+      RUN_JOBS: "0"
       # Site ve admin origin'leri. Production modunda localhost origin'leri varsayılan olarak reddedilir;
       # yerel compose yığını için CORS_ALLOW_LOCALHOST=1 ile açıkça izin verilir.
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:3001}
@@ -69,24 +117,46 @@ services:
       # güvenli bağlam saydığı için yerelde çalışır. Ortak alan adı gerekmez (boş).
       COOKIE_DOMAIN: ${COOKIE_DOMAIN:-}
       TRUST_PROXY: ${TRUST_PROXY:-}
-      LOG_LEVEL: ${LOG_LEVEL:-info}
-      # Piyasa verisi / e-posta (isteğe bağlı; boşsa ilgili özellikler önbellekle sınırlı çalışır)
-      DISABLE_MARKET_REFRESH: ${DISABLE_MARKET_REFRESH:-}
-      FINNHUB_API_KEY: ${FINNHUB_API_KEY:-}
-      FINNHUB_API_KEYS: ${FINNHUB_API_KEYS:-}
-      COINGECKO_API_KEY: ${COINGECKO_API_KEY:-}
-      DOVIZ: ${DOVIZ:-}
-      EMTIA: ${EMTIA:-}
-      DEFAULT_USD_TRY: ${DEFAULT_USD_TRY:-}
-      SMTP_HOST: ${SMTP_HOST:-}
-      SMTP_PORT: ${SMTP_PORT:-}
-      SMTP_USER: ${SMTP_USER:-}
-      SMTP_PASS: ${SMTP_PASS:-}
-      SMTP_FROM: ${SMTP_FROM:-}
+      # İki adımlı doğrulama (TOTP): anahtarları şifreleyen 32 baytlık anahtar (`openssl rand -hex 32`). Production'da
+      # zorunlu — boşsa 2FA kurulamaz. ADMIN_REQUIRE_2FA boşsa production varsayılanı AÇIK: 2FA'sız yöneticiler panele
+      # giremez (yerel compose için .env.docker'da ADMIN_REQUIRE_2FA=0 verilebilir).
+      TOTP_ENC_KEY: ${TOTP_ENC_KEY:-}
+      ADMIN_REQUIRE_2FA: ${ADMIN_REQUIRE_2FA:-}
     ports:
       - "5001:5001"
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+  # Zamanlanmış işler (emirler, fiyat yenileme, Arena turları, Haftalık Seçim, e-posta özeti …).
+  # Aynı imaj, farklı giriş noktası; HTTP API sunmaz (yalnızca /healthz, /readyz, /metrics, /jobs).
+  worker:
+    image: portfoygo-api:local
+    build: *api-build
+    init: true
+    restart: unless-stopped
+    command: ["node", "dist/worker.js"]
+    environment:
+      <<: *backend-env
+      WORKER_PORT: "5002"
+    # docker stop → SIGTERM: süren işler en fazla 25 sn beklenir (WORKER_SHUTDOWN_GRACE_MS)
+    stop_grace_period: 30s
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:5002/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
+    ports:
+      - "127.0.0.1:5002:5002"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
       migrate:
         condition: service_completed_successfully
@@ -105,6 +175,8 @@ services:
     environment:
       FINNHUB_API_KEY: ${FINNHUB_API_KEY:-}
       COINGECKO_API_KEY: ${COINGECKO_API_KEY:-}
+      # Sunucu tarafı render (herkese açık profil /u/…, OG görseli) API'ye konteyner ağından ulaşır
+      API_INTERNAL_URL: ${API_INTERNAL_URL:-http://api:5001/api}
     ports:
       - "3000:3000"
     depends_on:

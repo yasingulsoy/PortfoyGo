@@ -45,6 +45,11 @@ export interface Job {
   last_status: JobStatus;
   last_error: string | null;
   run_count: number;
+  /** Başka bir örnek (API / worker) aynı işi çalıştırırken atlanan turlar — "skipped (locked)", hata değil */
+  skip_count?: number;
+  last_skipped_at?: string | null;
+  /** Son çalışmayı yapan örnek (host:pid:…) */
+  last_instance?: string | null;
 }
 
 export type DataSource = 'stock' | 'crypto' | 'fx' | 'price_history';
@@ -58,6 +63,8 @@ export interface Health {
   db: { ok: boolean; latency_ms: number | null };
   migrations: { applied: string[]; latest: string | null; pending: string[] };
   jobs: Job[];
+  /** scheduling_here: bu API örneği cron çalıştırıyor mu (RUN_JOBS); shared_status: durumlar Redis'ten mi */
+  jobs_runtime?: { scheduling_here: boolean; shared_status: boolean };
   data: {
     stock_cache_at: string | null;
     crypto_cache_at: string | null;
@@ -135,6 +142,10 @@ export interface UserDetail {
     email_verified: boolean;
     is_admin: boolean;
     is_banned: boolean;
+    /** KVKK: kullanıcı hesabını sildi (anonimleştirildi) */
+    is_deleted?: boolean;
+    deleted_at?: string | null;
+    is_bot?: boolean;
     balance: number;
     reserved_cash: number;
     portfolio_value: number;

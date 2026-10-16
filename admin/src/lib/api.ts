@@ -77,7 +77,7 @@ export const ARENA_LIMITS = {
   cashDefault: 10_000,
 } as const;
 
-export type UserStatusFilter = 'all' | 'banned' | 'admins' | 'unverified';
+export type UserStatusFilter = 'all' | 'banned' | 'admins' | 'unverified' | 'deleted';
 
 /** SWR anahtarları (aynı zamanda GET uç noktaları; swrFetcher `data` zarfını açar). */
 export const adminKeys = {
@@ -198,3 +198,25 @@ export const picksAdminApi = {
   /** Seçimin notunu gizler (denetim kaydı: picks.note_hide) */
   hideNote: (pickId: string) => apiFetch(`/admin/picks/picks/${id(pickId)}/hide-note`, post({})),
 };
+
+/* ------------------------------------------------------------------ */
+/* İki adımlı doğrulama (giriş ikinci adımı + yönetici zorunluluğu)      */
+/* ------------------------------------------------------------------ */
+
+export interface AdminTwoFactorStatus {
+  enabled: boolean;
+  /** ADMIN_REQUIRE_2FA açık ve hesap yönetici: yönetim API'si 2FA olmadan 403 ADMIN_2FA_REQUIRED döner */
+  admin_required: boolean;
+  available: boolean;
+}
+
+export const twoFactorApi = {
+  status: async (): Promise<AdminTwoFactorStatus> =>
+    (await apiFetch<{ data: AdminTwoFactorStatus }>('/auth/2fa/status', { silent401: true })).data,
+  /** Girişin ikinci adımı: 6 haneli kod ya da kurtarma kodu */
+  completeLogin: (challenge: string, input: { code?: string; recovery_code?: string }) =>
+    apiFetch('/auth/login/2fa', { ...post({ challenge, ...input }), silent401: true }),
+};
+
+/** Sitedeki Profil → Güvenlik kartı (2FA burada açılır) */
+export const SECURITY_SETTINGS_URL = `${APP_URL}/profile#guvenlik`;

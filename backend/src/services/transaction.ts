@@ -3,6 +3,7 @@ import pool from '../config/database';
 import { AssetType, PortfolioItem, Transaction, mapPortfolioRow, mapTransactionRow, toNumber } from '../types';
 import { AppError } from '../utils/errors';
 import { ExecutionPrice, PricingService } from './pricing';
+import { assertMarketOpenFor } from './marketHours';
 
 export const COMMISSION_RATE = 0.0025; // %0.25 komisyon
 /** Bu miktarın altındaki kalan pozisyon "sıfır" kabul edilir (NUMERIC(20,8) çözünürlüğü) */
@@ -39,7 +40,7 @@ export interface TradeResult {
 /** Bekleyen emirden (orders) tetiklenen işlemler için bağlam (aktivite logu / metadata). */
 export interface OrderContext {
   id: string;
-  type: 'limit' | 'stop_loss' | 'take_profit';
+  type: 'limit' | 'stop_loss' | 'take_profit' | 'trailing_stop' | 'market_on_open';
   /** Örn. "Limit alış emri gerçekleşti" */
   label: string;
 }
@@ -150,6 +151,10 @@ export class TransactionService {
     const quantity = floorQty(data.quantity);
     if (!(quantity > 0)) {
       throw insufficient('Miktar çok küçük');
+    }
+    // ABD borsası kapalıyken hisse piyasa emri → 409 MARKET_CLOSED (bekleyen emirler seansı kendisi denetler)
+    if (!opts.order) {
+      assertMarketOpenFor(data.asset_type);
     }
 
     // Fiyatı transaction dışında al (ağ çağrısı olabilir); kilitleri kısa tut
@@ -292,8 +297,12 @@ export class TransactionService {
       assetType = matches.rows[0].asset_type as AssetType;
     }
     const resolvedType: AssetType = assetType;
+    if (!opts.order) {
+      assertMarketOpenFor(resolvedType);
+    }
 
-    const quote = opts.quote ?? (await PricingService.getExecutionPriceTRY(symbol, resolvedType));
+    // Satış fiyatı: dövizde alış kuru (makas), diğerlerinde alışla aynı kaynak
+    const quote = opts.quote ?? (await PricingService.getExecutionPriceTRY(symbol, resolvedType, 'sell'));
     const price = quote.priceTRY;
 
     const result = await withTransaction(opts.client, async (client) => {

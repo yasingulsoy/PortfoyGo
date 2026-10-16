@@ -1,7 +1,9 @@
 import type { Metadata, Viewport } from 'next';
+import { headers } from 'next/headers';
 import { Geist, Geist_Mono, Outfit } from 'next/font/google';
 import './globals.css';
 import Providers from '@/components/Providers';
+import ClientErrorReporter from '@portfoygo/shared/ui/ClientErrorReporter';
 import AppShell from '@/components/layout/AppShell';
 
 const geistSans = Geist({ variable: '--font-geist-sans', subsets: ['latin', 'latin-ext'] });
@@ -34,13 +36,19 @@ export const viewport: Viewport = {
   ],
 };
 
-export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+  // CSP nonce'u (src/proxy.ts her istekte üretir): next-themes'in tema betiği (karanlık mod yanıp sönmesin diye
+  // boyamadan önce çalışır) bu nonce ile işaretlenir. headers() okumak sayfaları dinamik render eder — nonce'lu
+  // CSP için gerekli (Next kendi betiklerine de nonce'u render sırasında ekler).
+  const nonce = (await headers()).get('x-nonce') ?? undefined;
   return (
     <html lang="tr" suppressHydrationWarning>
       <body className={`${outfit.variable} ${geistSans.variable} ${geistMono.variable} min-h-dvh bg-canvas text-fg antialiased`}>
-        <Providers>
+        <Providers nonce={nonce}>
           <AppShell>{children}</AppShell>
         </Providers>
+        {/* Yakalanmamış tarayıcı hatalarını POST /api/client-errors'a bildirir (kişisel veri yok) */}
+        <ClientErrorReporter app="web" />
       </body>
     </html>
   );

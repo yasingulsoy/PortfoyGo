@@ -29,6 +29,17 @@ export function validateServerEnv(): void {
     warnings.push('FINNHUB_API_KEY(S) tanımlı değil; hisse verileri sadece mevcut cache\'ten sunulacak.');
   }
 
+  // İki adımlı doğrulama (TOTP) anahtarı: production'da yoksa 2FA kurulamaz ve 2FA'lı hesaplar giriş yapamaz
+  const totpRaw = process.env.TOTP_ENC_KEY;
+  if (totpRaw && totpRaw.trim() !== '' && !parseTotpEncKey(totpRaw)) {
+    warnings.push('TOTP_ENC_KEY geçersiz: 32 baytlık anahtar bekleniyor (64 hex karakter veya base64; örn. `openssl rand -hex 32`).');
+  } else if (isProduction() && !parseTotpEncKey(totpRaw)) {
+    warnings.push(
+      'TOTP_ENC_KEY tanımlı değil: iki adımlı doğrulama etkinleştirilemez' +
+        (isAdmin2faRequired() ? ' ve ADMIN_REQUIRE_2FA açık olduğu için yönetim API\'si kullanılamaz.' : '.')
+    );
+  }
+
   for (const w of warnings) {
     console.warn(`[env] UYARI: ${w}`);
   }
@@ -59,4 +70,31 @@ export function envList(name: string): string[] {
     .split(/[,\n\r]+/)
     .map((s) => s.trim())
     .filter((s) => s.length > 0);
+}
+
+/**
+ * TOTP_ENC_KEY: 32 baytlık AES-256 anahtarı — 64 hex karakter veya base64 (44 karakter).
+ * Geçersiz / boşsa null.
+ */
+export function parseTotpEncKey(raw: string | undefined): Buffer | null {
+  const v = (raw || '').trim();
+  if (!v) return null;
+  if (/^[0-9a-fA-F]{64}$/.test(v)) return Buffer.from(v, 'hex');
+  if (/^[A-Za-z0-9+/_-]{43}=?$/.test(v)) {
+    const buf = Buffer.from(v.replace(/-/g, '+').replace(/_/g, '/'), 'base64');
+    return buf.length === 32 ? buf : null;
+  }
+  return null;
+}
+
+/**
+ * ADMIN_REQUIRE_2FA: yönetim API'si yalnızca iki adımlı doğrulaması açık yöneticilere açık mı?
+ * 1/true/on → açık, 0/false/off → kapalı; tanımsızsa production'da AÇIK, diğer ortamlarda kapalı.
+ * (Her çağrıda okunur; testler ortam değişkeniyle açıp kapatabilir.)
+ */
+export function isAdmin2faRequired(): boolean {
+  const v = (process.env.ADMIN_REQUIRE_2FA || '').trim().toLowerCase();
+  if (['1', 'true', 'yes', 'on'].includes(v)) return true;
+  if (['0', 'false', 'no', 'off'].includes(v)) return false;
+  return isProduction();
 }

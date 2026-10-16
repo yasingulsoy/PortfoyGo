@@ -151,26 +151,26 @@ Eylemler: Yasin canlı veri gereksinimleri · Art oyun akışı ve lig/etkinlik 
 
 ### 4.2 İşlem deneyimi
 - [x] Piyasa emri, limit alış/satış, zarar durdur ve kâr al emirleri (limit alışta nakit bloke edilir)
-- [ ] Takip eden stop (trailing stop)
-- [ ] Kısmi pozisyon kapatma kısayolları (%25/%50/%100) ve "pozisyonu kapat" tek tıkla
-- [ ] Döviz için gerçekçi alış/satış makası (şu an iki yönde de satış kuru kullanılıyor)
+- [x] Takip eden stop (trailing stop): % veya TL mesafe, zirve yalnızca taze fiyatlarla (hisselerde seans içinde) yukarı taşınır; emirler listesinde güncel tetikleme, düzenleme ve iptal (020).
+- [x] Kısmi pozisyon kapatma kısayolları (%25/%50/%100) — pozisyonlar tablosu ve Al/Sat penceresi; %100 eldeki miktarın tamamını (kalıntısız) satar. Satır menüsünde "Pozisyonu kapat".
+- [x] Döviz için gerçekçi alış/satış makası: alırken satış, satarken alış kuru; Al/Sat penceresinde iki kur. Değerleme sezon ortasında sıçrama olmasın diye satış kurunda bırakıldı (bkz. `backend/migrations/README.md`, 020).
 - [ ] 💡 Açığa satış (short) ve kaldıraç. Oyunu derinleştirir ama risk eğitimiyle birlikte sunulmalı.
 
 ### 4.3 Piyasa kapsamı
 - [ ] **BIST hisseleri:** Türk kullanıcı için en doğal piyasa. Gecikmeli veri lisansı ve sağlayıcı (ör. Matriks, Foreks veya ücretli API) araştırılmalı.
 - [ ] Daha geniş ABD hisse listesi (şu an 10 sabit sembol; `STOCK_SYMBOLS` ile genişletilebilir ama kota planı gerekir).
-- [ ] Piyasa saatleri: borsa kapalıyken hisse emirleri sıraya alınsın, açılışta işlensin.
+- [x] Piyasa saatleri: NYSE seansı (yaz saati, 2026–2027 tatilleri ve erken kapanışlar); borsa kapalıyken hisse piyasa emri `409 MARKET_CLOSED`, "Açılışta gerçekleştir" ile sıraya alınır (alışta %5 tamponlu rezerv) ve açılıştan sonraki ilk taze fiyatla işlenir; "Piyasa kapalı · açılışa 3 sa 12 dk" rozeti (020). Takvim her yıl güncellenmeli.
 - [ ] Fonlar ve ETF'ler.
 
 ### 4.4 Öğrenme
 - [x] Arena turları için işlem sonrası analiz (Koç Kemal karnesi) ve tarihsel olay senaryoları — ana portföy işlemleri için mini analiz hâlâ açık.
 - [ ] İşlem sonrası mini analiz: "Bu işlemde %X kazandın; ortalama maliyetin şuydu…"
-- [ ] Haftalık e-posta raporu: performans, en iyi ve en kötü işlem, sıralama değişimi.
+- [x] Haftalık e-posta raporu: her Pazartesi 09:00 (İstanbul) geçen haftanın portföy değişimi (%), genel sıralama değişimi, en iyi ve en zorlu satış (ortalama maliyete göre %), Arena turları, Haftalık Seçim sonucu ve kısa bir eğitim notu. TL tutarı yok; tek tıkla abonelikten çıkma (imzalı bağlantı + `List-Unsubscribe`), profilde "Haftalık e-posta özeti" tercihi, kullanıcı + hafta başına tek gönderim (`email_digests`, 019). Geliştirmede gerçek e-posta gitmez (yalnızca önizleme; `EMAIL_DIGEST_SEND=1` ile açılır); önizleme: `GET /api/dev/email/digest-preview?username=demo`.
 - [ ] Varlık sayfalarında kısa, sade açıklamalar ("Bu şirket ne yapar?", "Volatilite nedir?").
 - [ ] 💡 Yapay zekâ destekli "portföy koçu": risk dağılımı ve çeşitlendirme önerileri. Yatırım tavsiyesi değil, eğitim amaçlı.
 
 ### 4.5 Sosyal
-- [ ] Herkese açık profil sayfası (`/u/kullaniciadi`) ve paylaşılabilir performans kartı (OG görseli)
+- [x] Herkese açık profil sayfası (`/u/kullaniciadi`; oturumsuz açılır, sunucuda render) ve paylaşılabilir performans kartı (sayfaya özel OG görseli). Yalnızca yüzde ve sıralar: başlangıçtan beri getiri, genel sıra, Arena kademe/reyting/düello kaydı/seviye, Haftalık Seçim özeti, İmparatorluk sırası, sezon unvanları, rozetler ve son başarılar. Profil → "Profil görünürlüğü" ile gizlenebilir (`users.profile_public`, 019). Liderlik, lig, Haftalık Seçim ve Arena sıralamalarındaki kullanıcı adları profile bağlanır; Arena sonucu, Haftalık Seçim sonucu ve İmparatorluk sırası "Paylaş" düğmesiyle (Web Share → panoya kopyalama) profil bağlantısıyla paylaşılır.
 - [ ] Başarılı yatırımcıları takip etme, işlemlerini gecikmeli görme
 - [x] Oyun içi günlük seri (7. gün bonusu) ve kozmetik ödüller; herkese açık oyun profili uç noktası (`/api/game/public-profile/:username`)
 - [ ] Rozetlerin genişletilmesi: seriler (7 gün üst üste giriş), sezon rozetleri
@@ -181,9 +181,9 @@ Eylemler: Yasin canlı veri gereksinimleri · Art oyun akışı ve lig/etkinlik 
 
 - [x] Token tabanlı tasarım sistemi, açık ve koyu tema, mobil alt menü
 - [ ] 🔜 **Bileşen kataloğu** (Storybook veya `/dev/ui` sayfası): Button, Card, Modal, Tabs vb. tek yerde dokümante edilsin.
-- [ ] 🔜 Varlık tablolarında **sparkline** (mini 7 günlük grafik). Bunun için backend'de fiyat geçmişi tablosu gerekiyor.
+- [x] Varlık tablolarında **sparkline** (mini 7 günlük grafik; `price_history` tablosundan)
 - [ ] Gerçek zamanlı his: SSE veya WebSocket ile fiyat akışı (polling yerine)
-- [ ] Bildirim merkezi: emir gerçekleşti, rozet kazanıldı, sıralama değişti
+- [x] Bildirim merkezi: emir gerçekleşti, rozet kazanıldı, sıralama değişti (SSE ile canlı; bkz. 3.6.1)
 - [ ] Boş, hata ve yükleme durumlarının tüm sayfalarda tutarlı olduğu bir UX denetimi
 - [ ] Erişilebilirlik denetimi (axe/Lighthouse ≥ 95), ekran okuyucu ile uçtan uca test
 - [ ] Mikro etkileşimler: işlem sonrası konfeti yerine sade "başarılı" animasyonu, sayı geçişleri
@@ -195,20 +195,22 @@ Eylemler: Yasin canlı veri gereksinimleri · Art oyun akışı ve lig/etkinlik 
 
 ### 6.1 Test
 - [x] Backend entegrasyon testleri (para mantığı, emirler, geçmiş, izleme listesi, sağlayıcılar: 75 test)
-- [ ] 🔜 Frontend bileşen testleri ve **Playwright uçtan uca testleri** (kayıt → doğrulama → alım → satış → liderlik)
+- [x] **Playwright uçtan uca testleri** (14 test, CI'da her push'ta) ve frontend birim testleri (vitest, 300+ test)
+- [ ] Kayıt → e-posta doğrulama akışının uçtan uca testi (yerelde e-posta kutusu taklidi gerekir)
 - [ ] Kapsama hedefi: para ile ilgili servislerde %90 ve üzeri
 
 ### 6.2 Backend mimarisi
 - [ ] Katmanların netleşmesi: route → controller → service → repository. SQL tek katmanda kalsın.
-- [ ] Cron işlerinin API'den ayrılması: ayrı bir **worker** süreci (emir işleme, fiyat yenileme, anlık görüntüler). Birden çok API örneği çalıştırıldığında işlerin iki kez yapılmaması için PG advisory lock.
-- [ ] Önbellek katmanı: Redis (fiyatlar, liderlik tablosu, rate limit sayaçları). Rate limit şu an bellek içinde, çoklu örnekte çalışmaz.
+- [x] Cron işlerinin API'den ayrılması: ayrı **worker** süreci (`src/worker.ts`, `RUN_JOBS`) ve her iş için PG advisory lock (iki örnek aynı işi aynı anda çalıştırmaz)
+- [x] İsteğe bağlı Redis (`REDIS_URL`): canlı akış olaylarının örnekler arası dağıtımı, rate limit sayaçları, iş durumu. Liderlik ve piyasa listesi kısa süreli bellek önbelleğinde (örnek başına).
 - [ ] OpenAPI (Swagger) dokümantasyonu: zod şemalarından otomatik üretilsin.
-- [ ] Yapılandırılmış loglama (pino) ve istek kimliği (request-id).
+- [x] Yapılandırılmış loglama (pino) ve istek kimliği (request-id).
 
 ### 6.3 Gözlemlenebilirlik
-- [ ] Hata takibi: Sentry (frontend ve backend)
-- [ ] Sağlık uçları: `/healthz` ve `/readyz` (DB, fiyat tazeliği, cron son çalışma zamanı)
-- [ ] Metrikler: istek süresi, emir işleme gecikmesi, harici API hata oranı, kota kullanımı
+- [x] Hata takibi: Sentry (backend, `SENTRY_DSN`) + tarayıcı hata raporlayıcı (site ve yönetim paneli → `/api/client-errors`)
+- [x] Sağlık uçları: `/healthz` ve `/readyz` (DB, fiyat tazeliği, cron son çalışma zamanı)
+- [x] Metrikler: Prometheus `/metrics` (`METRICS_TOKEN`): istek süresi, iş süreleri/atlamaları, açık canlı akış bağlantıları, sağlayıcı hataları
+- [x] Yük testi (`scripts/load/`): 1.000 kullanıcılık veriyle gerçek Postgres'te ~1.400 istek/sn, p99 141 ms; liderlik ve piyasa listesi önbelleği + işlem geçmişi indeksi (migration 021)
 
 ### 6.4 Performans
 - [ ] Sunucu bileşenleri (RSC) ile ilk yüklemede veri: landing, haberler, liderlik
@@ -222,11 +224,12 @@ Eylemler: Yasin canlı veri gereksinimleri · Art oyun akışı ve lig/etkinlik 
 
 - [x] httpOnly çerez oturumu, CSRF koruması, tüm cihazlardan çıkış
 - [ ] 🔜 Git geçmişinin temizlenmesi (`git filter-repo`) ve **sızmış Finnhub anahtarının yenilenmesi**
-- [ ] İki faktörlü doğrulama (TOTP), özellikle admin hesapları için zorunlu
+- [x] İki faktörlü doğrulama (TOTP): Profil → Güvenlik (QR, tek kullanımlık kurtarma kodları, şifreli anahtar — `TOTP_ENC_KEY`), girişte "Doğrulama kodu" adımı; yöneticiler için `ADMIN_REQUIRE_2FA` (production'da varsayılan açık) — migration 018
 - [ ] Bot ve çoklu hesap tespiti: kayıtta Cloudflare Turnstile, aynı cihaz veya IP'den çoklu hesap uyarısı (liderlik adaleti için)
-- [ ] Admin işlemleri için denetim kaydı (kim, kimi, ne zaman banladı)
-- [ ] Content-Security-Policy başlığı (frontend)
-- [ ] KVKK: hesap silme ve veri indirme (self-servis), çerez politikası
+- [x] Admin işlemleri için denetim kaydı (kim, kimi, ne zaman banladı) — migration 008
+- [x] Content-Security-Policy başlığı (site + yönetim paneli): istek başına nonce + `strict-dynamic` (`proxy.ts`), `frame-ancestors 'none'` (OBS katmanı `/yayin/**` hariç), Referrer-Policy, nosniff, Permissions-Policy
+- [x] KVKK: hesap silme (anonimleştirme) ve veri indirme (JSON) self-servis — Profil → Hesap ve veriler; çerez politikası (`/cerez-politikasi`, yalnızca zorunlu çerezler)
+- [ ] KVKK metinleri ve "anonimleştirerek saklama" yaklaşımının hukuk onayı (bkz. YAYIN_KONTROL_LISTESI.md §5)
 
 ---
 
@@ -236,7 +239,7 @@ Eylemler: Yasin canlı veri gereksinimleri · Art oyun akışı ve lig/etkinlik 
 - [ ] Ortamlar: `development` (yerel PGlite) → `staging` → `production`; her PR için önizleme ortamı
 - [ ] Otomatik migration: deploy adımında `npm run migrate`, öncesinde otomatik yedek
 - [ ] Gizli değişkenler yalnızca platformun secret yöneticisinde
-- [ ] Docker imajları (backend ve worker) ve `docker compose` ile tam yerel ortam alternatifi
+- [x] Docker imajları (backend, worker, site, yönetim) ve `docker compose` (Postgres + Redis) — ⚠️ henüz Docker'lı bir makinede derlenmedi
 - [ ] Günlük DB yedekleri ve geri yükleme provası
 
 **Yayına hazır kontrol listesi:** migration'lar uygulandı · secret'lar yenilendi · CI yeşil · E2E testleri geçiyor · Sentry bağlı · yedekleme açık · rate limit'ler Redis'te · KVKK metinleri hukukçu onaylı.
@@ -292,3 +295,5 @@ Eylemler: Yasin canlı veri gereksinimleri · Art oyun akışı ve lig/etkinlik 
 8. **Kapsam:** BIST, piyasa saatleri, gerçek zamanlı fiyat akışı.
 9. **Büyüme:** herkese açık profiller, paylaşılabilir kartlar, haftalık e-posta raporu, kurumsal paket.
 10. ✅ **Oyun Merkezi:** düello, ilerleme ve çark, idle oyun, koç ve senaryolar, yayın modu, sorumlu oyun (bkz. 3.6.3).
+11. ✅ **Yayına hazırlık dalgası:** worker + iş kilitleri, isteğe bağlı Redis, Sentry ve metrikler, yük testi · KVKK self-servis, 2FA, CSP · herkese açık profiller ve haftalık e-posta · takip eden stop, kısmi kapatma, ABD piyasa saatleri, döviz alış/satış farkı.
+12. **Sıradaki:** staging ortamı ve ilk Docker derlemesi, hukuk onayları (KVKK, İYS, çark), veri sağlayıcı kararı, kayıt akışının E2E testi, bileşen kataloğu, erişilebilirlik denetimi.

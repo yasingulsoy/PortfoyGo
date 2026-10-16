@@ -29,12 +29,21 @@ export default defineConfig({
       DOVIZ: '',
       EMTIA: '',
       DEFAULT_USD_TRY: '',
+      // ABD seans kuralı kapalı: testler günün saatinden bağımsız hisse alıp satabilsin.
+      // Seans testleri (test/marketHours*.test.ts, tradingDepth) kuralı kendisi açar ve saati enjekte eder.
+      US_MARKET_HOURS: 'off',
       SMTP_HOST: '',
       SMTP_USER: '',
       SMTP_PASS: '',
       ALLOWED_ORIGINS: 'http://localhost:3000',
       COOKIE_SECURE: 'false',
       COOKIE_DOMAIN: '',
+      // Ölçeklenme / gözlemlenebilirlik: testler Redis / Sentry / metrik belirteci olmadan çalışır (gerekirse test içinde açılır)
+      REDIS_URL: '',
+      SENTRY_DSN: '',
+      METRICS_TOKEN: '',
+      RUN_JOBS: '',
+      JOB_LOCK_DATABASE_URL: '',
     },
   },
 });

@@ -13,6 +13,7 @@ import { PageLoader } from '@portfoygo/shared/ui/Spinner';
 import Tabs from '@portfoygo/shared/ui/Tabs';
 import PageTitle from '@/components/dashboard/PageTitle';
 import MarketTable from '@/components/market/MarketTable';
+import MarketStatus from '@/components/asset/MarketStatus';
 import TopAssetCards, { type AssetRef } from '@/components/market/TopAssetCards';
 import { useWatchlistAssets } from '@/components/market/WatchlistPanel';
 import type { AssetType, MarketAsset } from '@/types';
@@ -121,8 +122,9 @@ function MarketsCard() {
           />
         </label>
       </div>
-      <div className="px-5 pb-4 sm:px-6">
+      <div className="flex flex-col gap-3 px-5 pb-4 sm:px-6 xl:flex-row xl:items-center xl:justify-between">
         <Tabs label="Piyasa türü" value={tab} onChange={setPicked} items={tabs} className="w-fit max-w-full" />
+        {tab === 'stock' && <MarketStatus type="stock" showCountdown className="rounded-full border border-line bg-surface-2 px-3 py-1.5 xl:shrink-0" />}
       </div>
 
       <MarketTable

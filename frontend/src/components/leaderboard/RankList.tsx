@@ -4,6 +4,7 @@ import UserInitial from '@portfoygo/shared/ui/UserInitial';
 import { cn, formatTRY } from '@portfoygo/shared/format';
 import { DataTable, TBody, THead, Td, Th, Tr } from '@/components/common/Table';
 import { RankMedal } from '@/components/season/TitleBadge';
+import ProfileLink from '@/components/profile/ProfileLink';
 import type { Leader } from './model';
 
 /** Sabit sütun genişlikleri: sayfalı parçalar (ayrı tablolar) alt alta hizalı kalır. */
@@ -55,7 +56,7 @@ export default function RankList({
                   <UserInitial name={l.username} size={36} tone={isMe ? 'brand' : 'neutral'} className="max-sm:hidden" />
                   <div className="min-w-0">
                     <p className="flex min-w-0 items-center gap-1.5">
-                      <span className="truncate font-medium text-fg">{l.username}</span>
+                      <ProfileLink username={l.username} className="truncate font-medium text-fg" />
                       {isMe && <Badge tone="brand">Sen</Badge>}
                     </p>
                     <p className="num truncate text-xs text-muted md:hidden">{formatTRY(l.totalValue)}</p>

@@ -175,7 +175,7 @@ export default function SystemStatus() {
         </InfoCard>
       </div>
 
-      <JobsTable jobs={h.jobs ?? []} onChanged={() => void mutate()} />
+      <JobsTable jobs={h.jobs ?? []} runtime={h.jobs_runtime} onChanged={() => void mutate()} />
 
       <Card className="flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between md:p-6">
         <div className="flex min-w-0 items-start gap-3">
@@ -221,7 +221,7 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-function JobsTable({ jobs, onChanged }: { jobs: Job[]; onChanged: () => void }) {
+function JobsTable({ jobs, runtime, onChanged }: { jobs: Job[]; runtime?: Health['jobs_runtime']; onChanged: () => void }) {
   const toast = useToast();
   const [starting, setStarting] = useState<string | null>(null);
 
@@ -242,7 +242,16 @@ function JobsTable({ jobs, onChanged }: { jobs: Job[]; onChanged: () => void }) 
 
   return (
     <Card className="min-w-0 overflow-hidden">
-      <TableCardHeader title="Zamanlanmış işler" description="Arka plan işleri · her 15 saniyede bir yenilenir" />
+      <TableCardHeader
+        title="Zamanlanmış işler"
+        description={
+          runtime && !runtime.scheduling_here
+            ? runtime.shared_status
+              ? "İşler ayrı worker sürecinde çalışıyor (durumlar Redis üzerinden) · 15 sn'de bir yenilenir"
+              : 'Bu API örneği işleri çalıştırmıyor (RUN_JOBS=0) ve Redis yok: worker durumları burada görünmez'
+            : 'Arka plan işleri · her 15 saniyede bir yenilenir'
+        }
+      />
       {jobs.length === 0 ? (
         <EmptyState icon={<ClockIcon />} title="Kayıtlı iş yok" className="border-t border-line" />
       ) : (
@@ -296,7 +305,17 @@ function JobsTable({ jobs, onChanged }: { jobs: Job[]; onChanged: () => void }) 
                         </p>
                       )}
                     </td>
-                    <td className={cn(table.td, 'num hidden text-right lg:table-cell')}>{formatNumber(num(j.run_count), 0)}</td>
+                    <td className={cn(table.td, 'num hidden text-right lg:table-cell')}>
+                      {formatNumber(num(j.run_count), 0)}
+                      {num(j.skip_count) > 0 && (
+                        <span
+                          className="block text-xs text-muted"
+                          title="Başka bir örnek (API / worker) aynı işi çalıştırırken atlanan turlar — hata değil"
+                        >
+                          {formatNumber(num(j.skip_count), 0)} atlandı (kilitli)
+                        </span>
+                      )}
+                    </td>
                     <td className={cn(table.td, 'hidden max-w-[16rem] 2xl:table-cell')}>
                       {j.last_error ? (
                         <span className="block truncate text-down" title={j.last_error}>

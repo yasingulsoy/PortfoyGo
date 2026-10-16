@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import LegalDocument, { List, Note, P, Strong, type LegalSection } from '@/components/legal/LegalDocument';
 
 export const metadata: Metadata = {
@@ -136,11 +137,18 @@ const sections: LegalSection[] = [
         <P>Reklam veya izleme çerezi kullanmayız. Tarayıcında yalnızca platformun çalışması için gerekenler saklanır:</P>
         <List
           items={[
-            'Oturum anahtarı (token): Giriş yaptığında yerel depolamada ve aynı adlı birinci taraf bir çerezde tutulur; çıkış yaptığında silinir.',
-            'Hesap özeti: Sayfaların hızlı açılması için kullanıcı adı ve bakiye gibi bilgilerin geçici bir kopyası',
-            'Tema tercihi: Açık veya koyu tema seçimin',
+            <><Strong>pg_session</Strong> (zorunlu çerez): Giriş yaptığında yazılan, JavaScript&apos;in okuyamadığı (httpOnly) süreli oturum anahtarı; çıkış yaptığında silinir.</>,
+            <><Strong>pg_auth</Strong> (zorunlu çerez): Kişisel veri içermeyen oturum ipucu; giriş gerektiren sayfalara yönlendirme için.</>,
+            'Tema ve arayüz tercihleri: Açık / koyu tema seçimin ve benzeri ayarlar yalnızca tarayıcının yerel depolamasında tutulur.',
           ]}
         />
+        <P>
+          Ayrıntılar için{' '}
+          <Link href="/cerez-politikasi" className="font-medium text-brand hover:underline">
+            Çerez Politikası
+          </Link>
+          &apos;na bakabilirsin. Yalnızca zorunlu çerezler kullanıldığı için çerez onay bandı gösterilmez.
+        </P>
       </>
     ),
   },
@@ -150,12 +158,15 @@ const sections: LegalSection[] = [
     content: (
       <>
         <P>
-          Hesap ve oyun verilerin hesabın açık kaldığı sürece saklanır. Hesabını kapattığında, yasal saklama yükümlülükleri saklı kalmak kaydıyla verilerin silinir
-          veya anonim hale getirilir. Etkinlik kayıtları güvenlik amacıyla makul bir süre tutulduktan sonra silinir.
+          Hesap ve oyun verilerin hesabın açık kaldığı sürece saklanır. Hesabını <Strong>Profil → Hesap ve veriler</Strong> bölümünden sildiğinde kullanıcı adın,
+          e-posta adresin, bildirimlerin, takip listen, etkinlik kayıtların (IP ve tarayıcı bilgisi dahil), Portföy Sihirbazı cevapların ve oyun ayarların hemen
+          silinir; diğer oyuncuların sıralamaları bozulmasın diye işlem ve yarışma sonuçların kimliksiz (anonim) olarak kalır ve liderlik tablolarında
+          gösterilmez. Etkinlik kayıtları güvenlik amacıyla makul bir süre tutulduktan sonra silinir.
         </P>
         <P>
           Bağlantılar şifreli (HTTPS) yapılır, oturumlar süreli imzalı anahtarlarla yönetilir ve giriş, kayıt ve kod doğrulama uç noktalarında deneme sınırları
-          uygulanır. Hiçbir sistem tamamen risksiz değildir; bir güvenlik ihlali olması halinde etkilenen kullanıcıları ve ilgili kurumları mevzuata uygun
+          uygulanır. İsteğe bağlı <Strong>iki adımlı doğrulama</Strong> (doğrulama uygulaması kodu) açabilirsin; bunun gizli anahtarı veritabanında şifreli,
+          kurtarma kodların ise yalnızca geri döndürülemez özetleriyle saklanır. Hiçbir sistem tamamen risksiz değildir; bir güvenlik ihlali olması halinde etkilenen kullanıcıları ve ilgili kurumları mevzuata uygun
           şekilde bilgilendiririz.
         </P>
       </>
@@ -178,7 +189,12 @@ const sections: LegalSection[] = [
           ]}
         />
         <P>
-          Taleplerini <Strong>{CONTACT}</Strong> adresine iletebilirsin; en geç 30 gün içinde yanıt veririz.
+          Verilerinin bir kopyasını (JSON) indirmek ve hesabını silmek için giriş yaptıktan sonra{' '}
+          <Link href="/profile#hesap-ve-veriler" className="font-medium text-brand hover:underline">
+            Profil → Hesap ve veriler
+          </Link>{' '}
+          bölümünü kullanabilirsin; bu işlemler anında gerçekleşir. Diğer taleplerini <Strong>{CONTACT}</Strong> adresine iletebilirsin; en geç 30 gün
+          içinde yanıt veririz.
         </P>
       </>
     ),
@@ -200,7 +216,7 @@ export default function PrivacyPage() {
     <LegalDocument
       title="Gizlilik Politikası"
       description="Hangi verileri neden topladığımızı ve onları nasıl koruduğumuzu açık bir dille anlatıyoruz."
-      updated="8 Ekim 2026"
+      updated="15 Ekim 2026"
       sections={sections}
       related={{ href: '/terms', label: 'Kullanım Şartları' }}
     />

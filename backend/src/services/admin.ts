@@ -4,6 +4,7 @@ import { AppError } from '../utils/errors';
 import { listMigrationFiles } from '../db/migrator';
 import { activeProviders } from '../providers';
 import { jobs as defaultJobs, JobInfo, JobRegistry } from './jobs';
+import { isRedisEnabled } from '../infra/redis';
 import { AuthService } from './auth';
 import { mapOrderRow } from './orders';
 
@@ -23,7 +24,7 @@ export interface AdminStats {
   topUsers: User[];
 }
 
-export type UserStatusFilter = 'all' | 'banned' | 'admins' | 'unverified';
+export type UserStatusFilter = 'all' | 'banned' | 'admins' | 'unverified' | 'deleted';
 
 export interface Paged<T> {
   items: T[];
@@ -104,6 +105,10 @@ function mapUserListRow(row: any) {
     last_login: row.last_login ?? null,
     is_banned: row.is_banned || false,
     is_admin: row.is_admin || false,
+    // KVKK: kullanıcı kendi hesabını sildiyse (anonimleştirildi) ve sistem botları
+    is_deleted: row.is_deleted || false,
+    deleted_at: row.deleted_at ?? null,
+    is_bot: row.is_bot || false,
   };
 }
 
@@ -296,7 +301,8 @@ export class AdminService {
       stale[k] = !d || now.getTime() - d.getTime() > STALE_THRESHOLDS_S[k] * 1000;
     }
 
-    const jobList = registry.list().map((j) => ({
+    // listAll: bu süreç + (Redis varsa) worker / diğer örneklerin son çalışması (API'de RUN_JOBS=0 iken de dolu)
+    const jobList = (await registry.listAll()).map((j) => ({
       name: j.name,
       schedule: j.schedule,
       enabled: j.enabled,
@@ -305,6 +311,9 @@ export class AdminService {
       last_status: j.last_status,
       last_error: j.last_error,
       run_count: j.run_count,
+      skip_count: j.skip_count,
+      last_skipped_at: j.last_skipped_at,
+      last_instance: j.last_instance,
     }));
 
     let providers: Record<string, string> = {};
@@ -323,6 +332,8 @@ export class AdminService {
       db: { ok: dbOk, latency_ms: latencyMs },
       migrations: { applied, latest: applied.length ? applied[applied.length - 1] : null, pending },
       jobs: jobList,
+      // scheduling_here: bu API örneği cron çalıştırıyor mu (RUN_JOBS); shared_status: durumlar Redis'ten birleştiriliyor mu
+      jobs_runtime: { scheduling_here: registry.isScheduling(), shared_status: isRedisEnabled() },
       data: {
         stock_cache_at: isoOrNull(at.stock),
         crypto_cache_at: isoOrNull(at.crypto),
@@ -448,10 +459,12 @@ export class AdminService {
       if (filters.status === 'banned') w.raw('is_banned = true');
       if (filters.status === 'admins') w.raw('is_admin = true');
       if (filters.status === 'unverified') w.raw('COALESCE(email_verified, false) = false');
+      if (filters.status === 'deleted') w.raw('COALESCE(is_deleted, false) = true');
 
       const usersResult = await pool.query(
         `SELECT id, username, email, email_verified, balance, reserved_cash, portfolio_value, total_profit_loss,
-                rank, created_at, last_login, is_banned, is_admin
+                rank, created_at, last_login, is_banned, is_admin,
+                COALESCE(is_deleted, false) AS is_deleted, deleted_at, COALESCE(is_bot, false) AS is_bot
          FROM users
          ${w.sql}
          ORDER BY created_at DESC, id DESC
@@ -476,6 +489,7 @@ export class AdminService {
     const u = await pool.query(
       `SELECT u.id, u.username, u.email, u.email_verified, u.is_admin, u.is_banned, u.balance, u.reserved_cash,
               u.rank, u.created_at, u.last_login,
+              COALESCE(u.is_deleted, false) AS is_deleted, u.deleted_at, COALESCE(u.is_bot, false) AS is_bot,
               COALESCE((SELECT SUM(pi.total_value) FROM portfolio_items pi WHERE pi.user_id = u.id), 0) AS portfolio_value
          FROM users u WHERE u.id = $1`,
       [userId]
@@ -529,6 +543,9 @@ export class AdminService {
         email_verified: row.email_verified ?? false,
         is_admin: row.is_admin ?? false,
         is_banned: row.is_banned ?? false,
+        is_deleted: row.is_deleted ?? false,
+        deleted_at: row.deleted_at ?? null,
+        is_bot: row.is_bot ?? false,
         balance,
         reserved_cash: reserved,
         portfolio_value: portfolio,

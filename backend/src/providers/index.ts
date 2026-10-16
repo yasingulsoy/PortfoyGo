@@ -15,6 +15,7 @@ import { coingeckoCryptoProvider } from './adapters/coingecko';
 import { nosyFxProvider } from './adapters/nosyCurrency';
 import { nosyCommodityProvider } from './adapters/nosyCommodity';
 import { rssNewsProvider } from './adapters/rssNews';
+import { instrumentProvider } from '../observability/providerMetrics';
 
 const registry = {
   stocks: { finnhub: finnhubStockProvider } as Record<string, StockProvider>,
@@ -46,13 +47,16 @@ function select<K extends Kind>(kind: K): (typeof registry)[K][string] {
   return provider as (typeof registry)[K][string];
 }
 
-/** Uygulama genelinde kullanılan, seçili sağlayıcılar */
+/**
+ * Uygulama genelinde kullanılan, seçili sağlayıcılar. Her biri yalnızca ölçüm için sarılır (davranış aynı):
+ * portfoygo_provider_calls_total{kind,provider,method,outcome} (bkz. observability/providerMetrics.ts).
+ */
 export const providers = {
-  stocks: select('stocks'),
-  crypto: select('crypto'),
-  fx: select('fx'),
-  commodities: select('commodities'),
-  news: select('news'),
+  stocks: instrumentProvider('stocks', select('stocks')),
+  crypto: instrumentProvider('crypto', select('crypto')),
+  fx: instrumentProvider('fx', select('fx')),
+  commodities: instrumentProvider('commodities', select('commodities')),
+  news: instrumentProvider('news', select('news')),
 };
 
 /** Sağlık/teşhis için: hangi veri türünde hangi sağlayıcı aktif */

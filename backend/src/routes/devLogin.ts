@@ -48,6 +48,7 @@ router.get(
          FROM users
         WHERE COALESCE(is_banned, false) = false
           AND COALESCE(is_bot, false) = false
+          AND COALESCE(is_deleted, false) = false
         ORDER BY is_admin DESC, email_verified DESC, created_at ASC
         LIMIT 12`
     );
@@ -67,12 +68,13 @@ router.post(
     }
     const { username } = parseOrThrow(devLoginSchema, req.body);
     const r = await pool.query(
-      `SELECT id, token_version, is_banned, COALESCE(is_bot, false) AS is_bot
+      `SELECT id, token_version, is_banned, COALESCE(is_bot, false) AS is_bot, COALESCE(is_deleted, false) AS is_deleted
          FROM users WHERE LOWER(username) = LOWER($1) LIMIT 1`,
       [username]
     );
     const row = r.rows[0];
-    if (!row || row.is_banned || row.is_bot) throw new AppError(404, 'Kullanıcı bulunamadı', 'NOT_FOUND');
+    // Yerel hızlı giriş 2FA'yı atlar (yalnızca yerel DB'de açık; bkz. isDevLoginEnabled). Silinmiş hesaplar asla.
+    if (!row || row.is_banned || row.is_bot || row.is_deleted) throw new AppError(404, 'Kullanıcı bulunamadı', 'NOT_FOUND');
 
     setSessionCookies(res, AuthService.signSessionToken(row.id, row.token_version));
     await pool.query('UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = $1', [row.id]);

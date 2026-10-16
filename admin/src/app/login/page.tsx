@@ -10,6 +10,7 @@ import { Field } from '@portfoygo/shared/ui/Field';
 import { PageLoader } from '@portfoygo/shared/ui/Spinner';
 import { safeRedirect } from '@portfoygo/shared/url';
 import DevQuickLogin from '@portfoygo/shared/ui/DevQuickLogin';
+import TwoFactorStep from '@portfoygo/shared/ui/TwoFactorStep';
 import { useAdminAuth } from '@/lib/auth';
 import { APP_URL } from '@/lib/api';
 
@@ -22,7 +23,7 @@ export default function AdminLoginPage() {
 }
 
 function LoginForm() {
-  const { status, login, devLogin } = useAdminAuth();
+  const { status, login, completeLogin2fa, devLogin } = useAdminAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirectTo = safeRedirect(searchParams.get('redirect'));
@@ -30,10 +31,13 @@ function LoginForm() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  // İki adımlı doğrulama: şifre doğrulandıktan sonra kısa ömürlü challenge
+  const [challenge, setChallenge] = useState<string | null>(null);
 
   // Zaten yönetici oturumu varsa panele geç
   useEffect(() => {
-    if (status === 'admin') router.replace(redirectTo);
+    // 2fa_required: kabuk, güvenlik ayarlarına yönlendiren ekranı gösterir
+    if (status === 'admin' || status === '2fa_required') router.replace(redirectTo);
   }, [status, router, redirectTo]);
 
   const submit = async (e: FormEvent) => {
@@ -47,7 +51,10 @@ function LoginForm() {
     const res = await login(email, password);
     setSubmitting(false);
     if (res.success) router.replace(redirectTo);
-    else setError(res.message || 'Giriş başarısız.');
+    else if (res.requires2fa && res.challenge) {
+      setChallenge(res.challenge);
+      setPassword('');
+    } else setError(res.message || 'Giriş başarısız.');
   };
 
   return (
@@ -65,29 +72,42 @@ function LoginForm() {
       }
       legal={<span>© {new Date().getFullYear()} PortfoyGo · Yönetim paneli</span>}
     >
-      {status === 'forbidden' && !error && (
-        <Alert tone="error" className="mb-5">
-          Oturum açık olan hesabın yönetici yetkisi yok. Yönetici hesabıyla giriş yapın.
-        </Alert>
+      {challenge ? (
+        <TwoFactorStep
+          onBack={() => setChallenge(null)}
+          onSubmit={async (input) => {
+            const res = await completeLogin2fa(challenge, input);
+            if (res.success) router.replace(redirectTo);
+            return res;
+          }}
+        />
+      ) : (
+        <>
+          {status === 'forbidden' && !error && (
+            <Alert tone="error" className="mb-5">
+              Oturum açık olan hesabın yönetici yetkisi yok. Yönetici hesabıyla giriş yapın.
+            </Alert>
+          )}
+
+          <DevQuickLogin
+            adminOnly
+            onLogin={async (username) => {
+              const res = await devLogin(username);
+              if (res.success) router.replace(redirectTo);
+              return res;
+            }}
+          />
+
+          <form onSubmit={submit} noValidate className="mt-5 space-y-5">
+            <Field label="E-posta" type="email" autoComplete="username" inputMode="email" placeholder="yonetici@eposta.com" value={email} onChange={(e) => setEmail(e.target.value)} autoFocus />
+            <Field label="Şifre" type="password" autoComplete="current-password" placeholder="Şifren" value={password} onChange={(e) => setPassword(e.target.value)} />
+            {error && <Alert tone="error">{error}</Alert>}
+            <Button type="submit" size="lg" className="w-full" loading={submitting}>
+              {submitting ? 'Giriş yapılıyor…' : 'Giriş yap'}
+            </Button>
+          </form>
+        </>
       )}
-
-      <DevQuickLogin
-        adminOnly
-        onLogin={async (username) => {
-          const res = await devLogin(username);
-          if (res.success) router.replace(redirectTo);
-          return res;
-        }}
-      />
-
-      <form onSubmit={submit} noValidate className="mt-5 space-y-5">
-        <Field label="E-posta" type="email" autoComplete="username" inputMode="email" placeholder="yonetici@eposta.com" value={email} onChange={(e) => setEmail(e.target.value)} autoFocus />
-        <Field label="Şifre" type="password" autoComplete="current-password" placeholder="Şifren" value={password} onChange={(e) => setPassword(e.target.value)} />
-        {error && <Alert tone="error">{error}</Alert>}
-        <Button type="submit" size="lg" className="w-full" loading={submitting}>
-          {submitting ? 'Giriş yapılıyor…' : 'Giriş yap'}
-        </Button>
-      </form>
     </AuthSplitLayout>
   );
 }

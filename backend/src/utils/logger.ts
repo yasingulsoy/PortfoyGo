@@ -62,7 +62,8 @@ const REDACT_PATHS = [
 
 const options: LoggerOptions = {
   level: resolveLevel(),
-  base: { service: 'portfoygo-api' },
+  // src/worker.ts APP_ROLE=worker yapar → 'portfoygo-worker'
+  base: { service: process.env.APP_ROLE?.trim().toLowerCase() === 'worker' ? 'portfoygo-worker' : 'portfoygo-api' },
   redact: { paths: REDACT_PATHS, censor: '[REDACTED]' },
   timestamp: pino.stdTimeFunctions.isoTime,
 };
@@ -95,7 +96,7 @@ function pathOf(req: IncomingMessage): string {
 
 /**
  * İstek logu + istek kimliği. req.id ve X-Request-Id yanıt başlığı her istekte ayarlanır.
- * Sağlık uçları (/healthz, /readyz) loglanmaz (orkestratör yoklamaları gürültü üretmesin).
+ * Sağlık uçları (/healthz, /readyz) ve /metrics loglanmaz (orkestratör / Prometheus yoklamaları gürültü üretmesin).
  */
 export const httpLogger = pinoHttp({
   logger,
@@ -107,7 +108,8 @@ export const httpLogger = pinoHttp({
   autoLogging: {
     ignore: (req) => {
       const url = req.url || '';
-      return url === '/healthz' || url === '/readyz' || url.startsWith('/healthz?') || url.startsWith('/readyz?');
+      const path = url.split('?')[0];
+      return path === '/healthz' || path === '/readyz' || path === '/metrics';
     },
   },
   customLogLevel: (_req, res, err) => {

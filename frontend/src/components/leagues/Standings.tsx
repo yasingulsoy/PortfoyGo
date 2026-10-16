@@ -5,6 +5,7 @@ import { StarIcon, UserMinusIcon } from '@heroicons/react/20/solid';
 import { Delta, Money } from '@portfoygo/shared/ui/Delta';
 import { Badge, Skeleton } from '@portfoygo/shared/ui/Feedback';
 import UserInitial from '@portfoygo/shared/ui/UserInitial';
+import ProfileLink from '@/components/profile/ProfileLink';
 import { cn, formatDate } from '@portfoygo/shared/format';
 import { DataTable, TBody, THead, Td, Th } from '@/components/common/Table';
 import { RankMedal } from '@/components/season/TitleBadge';
@@ -161,7 +162,7 @@ export default function Standings({ members, status, canRemove, onRemove }: Prop
                 />
                 <div className="min-w-0">
                   <p className="flex min-w-0 items-center gap-1.5">
-                    <span className="min-w-[2.5rem] truncate font-medium text-fg">{m.username}</span>
+                    <ProfileLink username={m.username} className="min-w-[2.5rem] truncate font-medium text-fg" />
                     {m.is_me && (
                       <Badge tone="brand" className="shrink-0">
                         Sen

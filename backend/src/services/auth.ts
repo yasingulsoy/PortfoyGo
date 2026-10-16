@@ -4,6 +4,7 @@ import pool from '../config/database';
 import { getJwtSecret } from '../config/env';
 import { User, LoginRequest, RegisterRequest, AuthResponse, mapUserRow } from '../types';
 import { LeaderboardService } from './leaderboard';
+import { TwoFactorService } from './security/twoFactor';
 
 const BCRYPT_ROUNDS = 10;
 const JWT_ALGORITHM = 'HS256' as const;
@@ -13,7 +14,10 @@ const JWT_EXPIRES_IN = '7d';
 const DUMMY_HASH = bcrypt.hashSync('timing-equalizer-not-a-real-password', BCRYPT_ROUNDS);
 
 const USER_COLUMNS = `id, username, email, email_verified, balance, portfolio_value, total_profit_loss,
-                      rank, created_at, is_admin, is_banned`;
+                      rank, created_at, is_admin, is_banned, COALESCE(is_deleted, false) AS is_deleted`;
+
+/** Silinmiş (KVKK anonimleştirilmiş) hesaplar için kullanılamayan kullanıcı adı öneki */
+export const DELETED_USERNAME_PREFIX = 'silinmis_';
 
 export class AuthService {
   // Kullanıcı kayıt (girdi route katmanında zod ile doğrulanır ve normalize edilir)
@@ -61,14 +65,16 @@ export class AuthService {
   static async login(data: LoginRequest): Promise<AuthResponse & { status: number }> {
     const email = data.email.trim().toLowerCase();
     const result = await pool.query(
-      `SELECT ${USER_COLUMNS}, password_hash, token_version FROM users WHERE LOWER(email) = $1 LIMIT 1`,
+      `SELECT ${USER_COLUMNS}, password_hash, token_version, totp_enabled_at FROM users WHERE LOWER(email) = $1 LIMIT 1`,
       [email]
     );
     const user = result.rows[0];
 
-    // Önce şifre (kullanıcı yoksa sahte hash ile) — yasaklı durumu şifre doğrulanmadan açıklanmaz
-    const isValidPassword = await bcrypt.compare(data.password, user?.password_hash || DUMMY_HASH);
-    if (!user || !isValidPassword) {
+    // Önce şifre (kullanıcı yoksa sahte hash ile) — yasaklı durumu şifre doğrulanmadan açıklanmaz.
+    // Silinmiş hesabın şifresi kullanılamaz (bcrypt özeti değil); yine de açıkça reddedilir.
+    const hash = typeof user?.password_hash === 'string' && user.password_hash.startsWith('$2') ? user.password_hash : DUMMY_HASH;
+    const isValidPassword = await bcrypt.compare(data.password, hash);
+    if (!user || !isValidPassword || hash === DUMMY_HASH || user.is_deleted) {
       return { success: false, status: 401, message: 'Email veya şifre hatalı' };
     }
 
@@ -77,6 +83,17 @@ export class AuthService {
         success: false,
         status: 403,
         message: 'Hesabınız yasaklanmış. Lütfen yönetici ile iletişime geçin.',
+      };
+    }
+
+    // İki adımlı doğrulama açık: oturum çerezi YERİNE kısa ömürlü challenge (POST /api/auth/login/2fa)
+    if (user.totp_enabled_at) {
+      return {
+        success: true,
+        status: 200,
+        requires_2fa: true,
+        challenge: TwoFactorService.createLoginChallenge(user.id, user.token_version),
+        message: 'Doğrulama kodu gerekli',
       };
     }
 
@@ -92,9 +109,20 @@ export class AuthService {
   static async getProfile(userId: string): Promise<User | null> {
     const result = await pool.query(`SELECT ${USER_COLUMNS} FROM users WHERE id = $1`, [userId]);
     const row = result.rows[0];
-    if (!row || row.is_banned) return null;
+    if (!row || row.is_banned || row.is_deleted) return null;
     const rank = await LeaderboardService.getAllTimeRank(userId);
     return mapUserRow(row, rank);
+  }
+
+  /**
+   * 2FA'lı girişin ikinci adımı başarılı olduktan sonra (TwoFactorService.completeLogin):
+   * oturum token'ı + profil (normal girişle aynı yan etkiler: last_login).
+   */
+  static async finishLogin(userId: string, tokenVersion: number): Promise<{ token: string; user: User } | null> {
+    const user = await AuthService.getProfile(userId);
+    if (!user) return null;
+    await pool.query('UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = $1', [userId]);
+    return { token: AuthService.signSessionToken(userId, tokenVersion), user };
   }
 
   /**
@@ -141,7 +169,7 @@ export class AuthService {
 
     const result = await pool.query(`SELECT ${USER_COLUMNS}, token_version FROM users WHERE id = $1`, [userId]);
     const row = result.rows[0];
-    if (!row || row.is_banned || Number(row.token_version) !== tv) {
+    if (!row || row.is_banned || row.is_deleted || Number(row.token_version) !== tv) {
       return null;
     }
     return mapUserRow(row);

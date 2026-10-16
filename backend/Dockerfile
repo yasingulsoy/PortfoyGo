@@ -3,7 +3,9 @@
 # PortfoyGo API (Express) — üretim imajı
 # Build bağlamı REPO KÖKÜDÜR (npm workspaces + kökteki package-lock.json):
 #   docker build -f backend/Dockerfile -t portfoygo-api .
-# Çalıştırma:   node dist/index.js   (port 5001, GET /healthz)
+# Çalıştırma:   node dist/index.js   (API, port 5001, GET /healthz)
+# Worker:       node dist/worker.js  (zamanlanmış işler, WORKER_PORT 5002, GET /healthz; API'de RUN_JOBS=0)
+#               aynı imaj: docker run ... portfoygo-api node dist/worker.js  (HEALTHCHECK için HEALTH_PORT=5002)
 # Migration:    docker run --rm -e DATABASE_URL=... portfoygo-api node dist/scripts/migrate.js
 # =============================================================================
 ARG NODE_IMAGE=node:22-alpine
@@ -46,6 +48,6 @@ USER node
 EXPOSE 5001
 
 HEALTHCHECK --interval=15s --timeout=5s --start-period=20s --retries=3 \
-  CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||5001)+'/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+  CMD node -e "fetch('http://127.0.0.1:'+(process.env.HEALTH_PORT||process.env.PORT||5001)+'/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 
 CMD ["node", "dist/index.js"]

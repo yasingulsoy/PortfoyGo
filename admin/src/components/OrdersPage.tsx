@@ -25,6 +25,8 @@ const TYPE_OPTIONS = [
   { value: 'limit', label: 'Limit' },
   { value: 'stop_loss', label: 'Zarar durdur' },
   { value: 'take_profit', label: 'Kâr al' },
+  { value: 'trailing_stop', label: 'Takip eden stop' },
+  { value: 'market_on_open', label: 'Açılışta' },
 ];
 
 const EMPTY_TITLE: Record<StatusFilter, string> = {

@@ -2,14 +2,20 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
-import { ApiError, authApi, session } from '@/lib/api';
-import type { User } from '@/types';
+import { ApiError, authApi, session, twoFactorApi } from '@/lib/api';
+import type { LoginResult, User } from '@/types';
 
 interface AuthContextType {
   user: User | null;
   /** İlk açılışta oturum (çerez) backend'e sorulurken true. */
   loading: boolean;
-  login: (email: string, password: string) => Promise<{ success: boolean; message?: string }>;
+  /** 2FA açıksa oturum açılmaz: `requires2fa` + `challenge` döner (ikinci adım: completeLogin2fa). */
+  login: (email: string, password: string) => Promise<LoginResult>;
+  /** Girişin ikinci adımı: 6 haneli doğrulama kodu ya da kurtarma kodu */
+  completeLogin2fa: (
+    challenge: string,
+    input: { code?: string; recovery_code?: string },
+  ) => Promise<{ success: boolean; message?: string; code?: string; recoveryCodesRemaining?: number }>;
   /** Yalnızca yerel geliştirme: seçilen hesapla şifresiz giriş */
   devLogin: (username: string) => Promise<{ success: boolean; message?: string }>;
   register: (username: string, email: string, password: string) => Promise<{ success: boolean; message?: string }>;
@@ -19,6 +25,8 @@ interface AuthContextType {
   logoutAll: () => Promise<{ success: boolean; message?: string }>;
   /** Bakiye, sıralama vb. değerleri backend'den tazeler. */
   refreshUser: () => Promise<void>;
+  /** Hesap silindikten sonra (backend çerezleri sildi): istemci oturumunu kapatır ve giriş sayfasına gönderir. */
+  afterAccountDeleted: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -64,6 +72,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [endSession]);
 
+  const afterAccountDeleted = useCallback(() => {
+    session.setActive(false);
+    // Tam sayfa geçişi: bellekteki tüm istemci durumu (SWR önbellekleri, canlı akışlar) silinir. setUser(null)
+    // yapılmaz — korumalı sayfanın "oturum yok" yönlendirmesi (/login?redirect=…) silme bildirimini ezmesin.
+    window.location.replace('/login?deleted=1');
+  }, []);
+
   const refreshUser = useCallback(async () => {
     if (!session.isActive()) return;
     try {
@@ -103,15 +118,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener('auth:logout', onLogout);
   }, []);
 
-  const login = useCallback(async (email: string, password: string) => {
+  const login = useCallback(async (email: string, password: string): Promise<LoginResult> => {
     try {
       const data = await authApi.login(email.trim().toLowerCase(), password);
+      if (data?.success && data.requires_2fa && typeof data.challenge === 'string') {
+        return { success: false, requires2fa: true, challenge: data.challenge };
+      }
       if (!data?.success || !data.user) return { success: false, message: data?.message || 'Giriş başarısız.' };
       session.setActive(true);
       setUser(normalizeUser(data.user));
       return { success: true };
     } catch (err) {
       return { success: false, message: err instanceof Error ? err.message : 'Giriş başarısız.' };
+    }
+  }, []);
+
+  const completeLogin2fa = useCallback(async (challenge: string, input: { code?: string; recovery_code?: string }) => {
+    try {
+      const data = await twoFactorApi.completeLogin(challenge, input);
+      if (!data?.success || !data.user) return { success: false, message: data?.message || 'Doğrulama başarısız.' };
+      session.setActive(true);
+      setUser(normalizeUser(data.user));
+      const remaining = Number(data.recovery_codes_remaining);
+      return { success: true, recoveryCodesRemaining: Number.isFinite(remaining) ? remaining : undefined };
+    } catch (err) {
+      return {
+        success: false,
+        message: err instanceof Error ? err.message : 'Doğrulama başarısız.',
+        code: err instanceof ApiError ? (err.code ?? undefined) : undefined,
+      };
     }
   }, []);
 
@@ -137,8 +172,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ user, loading, login, devLogin, register, logout, logoutAll, refreshUser }),
-    [user, loading, login, devLogin, register, logout, logoutAll, refreshUser],
+    () => ({ user, loading, login, completeLogin2fa, devLogin, register, logout, logoutAll, refreshUser, afterAccountDeleted }),
+    [user, loading, login, completeLogin2fa, devLogin, register, logout, logoutAll, refreshUser, afterAccountDeleted],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

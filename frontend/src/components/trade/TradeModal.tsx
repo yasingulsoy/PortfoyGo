@@ -2,7 +2,7 @@
 
 import { useState, type FormEvent } from 'react';
 import Link from 'next/link';
-import { CheckCircleIcon } from '@heroicons/react/24/solid';
+import { CheckCircleIcon, ClockIcon } from '@heroicons/react/24/solid';
 import Modal from '@portfoygo/shared/ui/Modal';
 import Button from '@portfoygo/shared/ui/Button';
 import Tabs from '@portfoygo/shared/ui/Tabs';
@@ -12,23 +12,44 @@ import { Alert } from '@portfoygo/shared/ui/Feedback';
 import { Delta } from '@portfoygo/shared/ui/Delta';
 import { useLivePortfolio } from '@/context/PortfolioContext';
 import { useAuth } from '@/context/AuthContext';
-import { ordersApi, transactionApi } from '@/lib/api';
+import { useCurrencies } from '@/hooks/useMarketData';
+import { useStockSessionStatus, useUsMarketSession } from '@/hooks/useUsMarketSession';
+import { TradeApiError, isMarketClosedError, ordersApi, tradeApi } from '@/lib/api';
 import { COMMISSION_RATE } from '@/lib/constants';
+import { formatTrDayTime } from '@/lib/marketHours';
 import { cn, formatPercent, formatQuantity, formatTRY } from '@portfoygo/shared/format';
-import { ASSET_TYPE_LABELS } from '@/types';
+import { ASSET_TYPE_LABELS, type RateQuote } from '@/types';
 import { refreshOrders } from '@/components/portfolio/useOrders';
 import { toolbarButtonClass } from '@/components/common/controls';
-import { EXPIRY_OPTIONS, parseDecimal, priceToInput, reserveForBuy, roundQty, sanitizeDecimal, type ExpiryValue } from './orderInput';
-import type { TradeSide, TradeTarget } from './TradeProvider';
+import MarketStatus from '@/components/asset/MarketStatus';
+import {
+  CLOSE_FRACTIONS,
+  EXPIRY_OPTIONS,
+  MOO_BUY_BUFFER,
+  QUANTITY_DECIMALS,
+  fractionLabel,
+  parseDecimal,
+  partialQuantity,
+  priceToInput,
+  reserveForBuy,
+  reserveForMooBuy,
+  roundQty,
+  sanitizeDecimal,
+  type ExpiryValue,
+} from './orderInput';
+import type { TradePreset, TradeSide, TradeTarget } from './TradeProvider';
 
 interface Props {
   target: TradeTarget | null;
   side: TradeSide;
+  preset?: TradePreset;
+  /** Her açılışta artar: form durumu sıfırlansın */
+  openId?: number;
   onSideChange: (side: TradeSide) => void;
   onClose: () => void;
 }
 
-export default function TradeModal({ target, side, onSideChange, onClose }: Props) {
+export default function TradeModal({ target, side, preset, openId = 0, onSideChange, onClose }: Props) {
   return (
     <Modal
       open={!!target}
@@ -36,8 +57,17 @@ export default function TradeModal({ target, side, onSideChange, onClose }: Prop
       title={side === 'buy' ? 'Al' : 'Sat'}
       description={target ? `${target.name} · ${ASSET_TYPE_LABELS[target.type]}` : undefined}
     >
-      {/* key: başka bir varlık açıldığında form durumu sıfırlanır */}
-      {target && <TradeForm key={`${target.type}:${target.symbol}`} target={target} side={side} onSideChange={onSideChange} onClose={onClose} />}
+      {/* key: başka bir varlık / kısayol açıldığında form durumu sıfırlanır */}
+      {target && (
+        <TradeForm
+          key={`${target.type}:${target.symbol}:${openId}`}
+          target={target}
+          side={side}
+          preset={preset}
+          onSideChange={onSideChange}
+          onClose={onClose}
+        />
+      )}
     </Modal>
   );
 }
@@ -50,28 +80,66 @@ const LIMIT_OFFSET = 0.02;
 
 type Receipt =
   | { kind: 'market'; side: TradeSide; quantity: number; price: number; total: number }
-  | { kind: 'limit'; side: TradeSide; quantity: number; trigger: number; reserved: number; expiryDays: number };
+  | { kind: 'limit'; side: TradeSide; quantity: number; trigger: number; reserved: number; expiryDays: number }
+  | { kind: 'moo'; side: TradeSide; quantity: number; reference: number; reserved: number; executeAt: number | null };
 
-function TradeForm({ target, side, onSideChange, onClose }: Required<Omit<Props, 'target'>> & { target: TradeTarget }) {
+const positive = (n: unknown) => (typeof n === 'number' && Number.isFinite(n) && n > 0 ? n : null);
+
+/** Döviz: alırken satış kuru, satarken alış kuru (en fazla satış kuru — backend ile aynı kural). */
+function currencySides(rate: RateQuote | undefined): { bid: number | null; ask: number | null } {
+  const ask = positive(rate?.selling) ?? positive(rate?.price) ?? null;
+  const buying = positive(rate?.buying);
+  return { ask, bid: ask == null ? buying : buying != null ? Math.min(buying, ask) : ask };
+}
+
+const trimQty = (q: number) => String(roundQty(q));
+
+function TradeForm({
+  target,
+  side,
+  preset,
+  onSideChange,
+  onClose,
+}: Required<Omit<Props, 'target' | 'preset' | 'openId'>> & { target: TradeTarget; preset?: TradePreset }) {
   const { balance, holdings, refresh, market } = useLivePortfolio();
   const { refreshUser } = useAuth();
+  const { currencies } = useCurrencies();
+  const stock = useStockSessionStatus();
+  const { refresh: refreshSession } = useUsMarketSession();
+
+  const holding = holdings.find((h) => h.assetType === target.type && h.symbol === target.symbol.toUpperCase());
+  const held = holding?.quantity ?? 0;
+  const decimals = QUANTITY_DECIMALS[target.type];
+  const presetFraction = side === 'sell' && preset?.sellFraction && held > 0 ? preset.sellFraction : null;
+
   const [kind, setKind] = useState<OrderKind>('market');
-  const [mode, setMode] = useState<InputMode>('amount');
-  const [input, setInput] = useState('');
-  // Satışta "Tümü" seçildiyse tutar yuvarlamasından bağımsız olarak eldeki miktarın tamamı satılır
-  const [sellAll, setSellAll] = useState(false);
+  const [mode, setMode] = useState<InputMode>(presetFraction ? 'quantity' : 'amount');
+  const [input, setInput] = useState(() => (presetFraction ? trimQty(partialQuantity(held, presetFraction, decimals)) : ''));
+  // Satışta %100 seçildiyse yuvarlamadan bağımsız olarak eldeki miktarın TAMAMI satılır
+  const [sellAll, setSellAll] = useState(presetFraction === 1);
   // null → canlı fiyattan türetilen varsayılan limit fiyatı kullanılır (kullanıcı düzenleyene kadar)
   const [limitInput, setLimitInput] = useState<string | null>(null);
   const [expiry, setExpiry] = useState<ExpiryValue>('30');
   const [error, setError] = useState('');
+  // Sunucu 409 MARKET_CLOSED döndürdüyse (oturum bilgisi eski olabilir) açılış zamanı
+  const [serverClosed, setServerClosed] = useState<{ nextOpenAt: number | null } | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [receipt, setReceipt] = useState<Receipt | null>(null);
 
   const asset = market.find(target.type, target.symbol);
-  const holding = holdings.find((h) => h.assetType === target.type && h.symbol === target.symbol.toUpperCase());
-  const price = asset?.priceTRY ?? holding?.livePrice ?? null;
+  const rate = target.type === 'currency' ? currencies.find((c) => c.code.toUpperCase() === target.symbol.toUpperCase()) : undefined;
+  const fx = currencySides(rate);
+  const livePrice = asset?.priceTRY ?? holding?.livePrice ?? null;
+  // İşlem fiyatı: dövizde yöne göre (alış/satış kuru), diğerlerinde canlı fiyat
+  const price = target.type === 'currency' && (fx.ask || fx.bid) ? (side === 'buy' ? fx.ask : fx.bid) : livePrice;
+
+  const isStock = target.type === 'stock';
+  const marketClosed = isStock && (serverClosed !== null || !stock.open);
+  const nextOpenAt = serverClosed?.nextOpenAt ?? (isStock ? (stock.session?.nextOpenAt ?? null) : null);
 
   const isLimit = kind === 'limit';
+  // Borsa kapalıyken piyasa emri → açılışta gerçekleşen emir (market_on_open)
+  const isMoo = !isLimit && marketClosed;
   const limitText = limitInput ?? (price ? priceToInput(side === 'buy' ? price * (1 - LIMIT_OFFSET) : price * (1 + LIMIT_OFFSET)) : '');
   const limitValue = parseDecimal(limitText);
   const limitError = (() => {
@@ -84,50 +152,57 @@ function TradeForm({ target, side, onSideChange, onClose }: Required<Omit<Props,
   })();
   const limitDistance = isLimit && price && limitValue > 0 ? ((limitValue - price) / price) * 100 : null;
 
-  // Hesaplamalarda kullanılan birim fiyat: piyasa emrinde canlı fiyat, limit emrinde limit fiyatı
+  // Hesaplamalarda kullanılan birim fiyat: piyasa / açılış emrinde güncel fiyat, limit emrinde limit fiyatı
   const unitPrice = isLimit ? (limitValue > 0 ? limitValue : null) : price;
 
   const parsed = parseFloat(input.replace(',', '.'));
   const value = Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
 
-  const held = holding?.quantity ?? 0;
   const fullSell = side === 'sell' && sellAll && held > 0;
   const quantity = fullSell ? held : !unitPrice ? 0 : mode === 'quantity' ? value : value / unitPrice;
   const gross = !unitPrice ? 0 : fullSell ? held * unitPrice : mode === 'quantity' ? value * unitPrice : value;
+  // Gönderilecek miktar: %100'de eldeki miktarın tamamı (kalıntı bırakmaz), diğerlerinde 8 ondalığa aşağı
+  const orderQty = fullSell ? held : roundQty(quantity);
 
   const commission = gross * COMMISSION_RATE;
-  const reserved = isLimit && side === 'buy' && unitPrice && quantity > 0 ? reserveForBuy(roundQty(quantity), unitPrice) : 0;
-  const total = side === 'buy' ? (isLimit ? reserved : gross + commission) : gross - commission;
+  const reserved =
+    side === 'buy' && unitPrice && quantity > 0 ? (isLimit ? reserveForBuy(orderQty, unitPrice) : isMoo ? reserveForMooBuy(orderQty, unitPrice) : 0) : 0;
+  const total = side === 'buy' ? (isLimit || isMoo ? reserved : gross + commission) : gross - commission;
 
   const validation = (() => {
     if (!price) return 'Bu varlık için şu an fiyat verisi yok.';
     if (isLimit && limitError) return null; // alanın altında gösterilir
-    if (!value) return null;
+    if (!value && !fullSell) return null;
     if (side === 'buy' && total > balance) return 'Kullanılabilir nakit yetersiz.';
     if (side === 'sell' && quantity > held + 1e-9) return `En fazla ${formatQuantity(held)} adet satabilirsiniz.`;
     return null;
   })();
-  const blocked = !quantity || !!validation || (isLimit && !!limitError);
+  const blocked = !orderQty || !!validation || (isLimit && !!limitError);
 
   const changeSide = (s: TradeSide) => {
     // Limit fiyatı yöne göre varsayılana döner (alış: altı, satış: üstü)
     setLimitInput(null);
     setError('');
+    setSellAll(false);
     onSideChange(s);
   };
 
-  const setFraction = (f: number) => {
+  /** Alış: kullanılabilir nakdin oranı */
+  const setBuyFraction = (f: number) => {
     if (!unitPrice) return;
-    setSellAll(side === 'sell' && f === 1);
-    if (side === 'buy') {
-      let spend = (balance * f) / (1 + COMMISSION_RATE);
-      // Limit rezervi kuruşa yukarı yuvarlanır; tamamında 1 kuruş pay bırak
-      if (isLimit) spend = Math.max(0, Math.floor((spend - 0.01) * 100) / 100);
-      setInput(mode === 'amount' ? spend.toFixed(2) : trimQty(spend / unitPrice));
-    } else {
-      const qty = held * f;
-      setInput(mode === 'quantity' ? trimQty(qty) : (qty * unitPrice).toFixed(2));
-    }
+    setSellAll(false);
+    let spend = (balance * f) / (1 + COMMISSION_RATE);
+    if (isMoo) spend /= 1 + MOO_BUY_BUFFER;
+    // Limit / açılış rezervi kuruşa yukarı yuvarlanır; 1 kuruş pay bırak
+    if (isLimit || isMoo) spend = Math.max(0, Math.floor((spend - 0.01) * 100) / 100);
+    setInput(mode === 'amount' ? spend.toFixed(2) : trimQty(spend / unitPrice));
+  };
+
+  /** Satış: pozisyonun %25 / %50 / %100'ü (miktar olarak; %100 tam olarak eldeki miktar) */
+  const setSellFraction = (f: number) => {
+    setSellAll(f >= 1);
+    setMode('quantity');
+    setInput(trimQty(partialQuantity(held, f, decimals)));
   };
 
   const switchMode = (m: InputMode) => {
@@ -137,27 +212,39 @@ function TradeForm({ target, side, onSideChange, onClose }: Required<Omit<Props,
   };
 
   const submitMarket = async () => {
-    const payload = { symbol: target.symbol.toUpperCase(), asset_type: target.type, quantity: roundQty(quantity) };
-    const res = side === 'buy' ? await transactionApi.buy(payload) : await transactionApi.sell(payload);
-    if (!res?.success) throw new Error(res?.message || 'İşlem gerçekleştirilemedi.');
+    const payload = { symbol: target.symbol.toUpperCase(), asset_type: target.type, quantity: orderQty };
+    const res = await tradeApi.market(side, payload);
     const executed = Number(res.executedPrice ?? res.transaction?.price ?? price);
     setReceipt({
       kind: 'market',
       side,
-      quantity: payload.quantity,
+      quantity: Number(res.transaction?.quantity ?? payload.quantity),
       price: executed,
       total: Number(res.transaction?.net_amount ?? res.transaction?.total_amount ?? total),
     });
   };
 
+  const submitMoo = async () => {
+    const res = await tradeApi.createOrder({ asset_type: target.type, symbol: target.symbol.toUpperCase(), side, type: 'market_on_open', quantity: orderQty });
+    const exec = Date.parse(String(res.order?.execute_after ?? ''));
+    setReceipt({
+      kind: 'moo',
+      side,
+      quantity: orderQty,
+      reference: Number(res.order?.trigger_price ?? price),
+      reserved: Number(res.order?.reserved_cash ?? reserved),
+      executeAt: nextOpenAt ?? (Number.isFinite(exec) ? exec : null),
+    });
+    void refreshOrders();
+  };
+
   const submitLimit = async () => {
-    const qty = roundQty(quantity);
     const res = await ordersApi.create({
       asset_type: target.type,
       symbol: target.symbol.toUpperCase(),
       side,
       type: 'limit',
-      quantity: qty,
+      quantity: orderQty,
       trigger_price: limitValue,
       expires_in_days: Number(expiry),
     });
@@ -165,7 +252,7 @@ function TradeForm({ target, side, onSideChange, onClose }: Required<Omit<Props,
     setReceipt({
       kind: 'limit',
       side,
-      quantity: qty,
+      quantity: orderQty,
       trigger: Number(res.order?.trigger_price ?? limitValue),
       reserved: Number(res.order?.reserved_cash ?? reserved),
       expiryDays: Number(expiry),
@@ -180,10 +267,24 @@ function TradeForm({ target, side, onSideChange, onClose }: Required<Omit<Props,
     setError('');
     try {
       if (isLimit) await submitLimit();
+      else if (isMoo) await submitMoo();
       else await submitMarket();
       await Promise.all([refresh(), refreshUser()]);
     } catch (err) {
-      setError(err instanceof Error ? err.message : isLimit ? 'Emir oluşturulamadı.' : 'İşlem gerçekleştirilemedi.');
+      if (isMarketClosedError(err)) {
+        // Borsa kapandı (oturum bilgisi eskiydi): açılışta gerçekleştirme önerilir
+        const next = Date.parse(String(err.data?.next_open_at ?? ''));
+        setServerClosed({ nextOpenAt: Number.isFinite(next) ? next : null });
+        void refreshSession();
+        setError(err.message);
+      } else if (err instanceof TradeApiError && err.code === 'MARKET_OPEN') {
+        // Borsa açıldı: piyasa emrine dön
+        setServerClosed(null);
+        void refreshSession();
+        setError('Borsa açıldı; emrini piyasa fiyatından verebilirsin.');
+      } else {
+        setError(err instanceof Error ? err.message : isLimit ? 'Emir oluşturulamadı.' : 'İşlem gerçekleştirilemedi.');
+      }
     } finally {
       setSubmitting(false);
     }
@@ -193,18 +294,33 @@ function TradeForm({ target, side, onSideChange, onClose }: Required<Omit<Props,
     return <ReceiptView receipt={receipt} symbol={target.symbol} onClose={onClose} />;
   }
 
+  const fractions = side === 'sell' ? [...CLOSE_FRACTIONS] : [0.25, 0.5, 0.75, 1];
+
   return (
     <form onSubmit={submit} noValidate>
-      <div className="flex items-center gap-3 rounded-xl border border-line bg-surface-2 p-3.5">
-        <AssetAvatar symbol={target.symbol} type={target.type} image={target.image ?? asset?.image} size={40} />
-        <div className="min-w-0 flex-1">
-          <p className="font-mono text-sm font-semibold">{target.symbol}</p>
-          <p className="truncate text-xs text-muted">{target.name}</p>
+      <div className="rounded-xl border border-line bg-surface-2 p-3.5">
+        <div className="flex items-center gap-3">
+          <AssetAvatar symbol={target.symbol} type={target.type} image={target.image ?? asset?.image} size={40} />
+          <div className="min-w-0 flex-1">
+            <p className="font-mono text-sm font-semibold">{target.symbol}</p>
+            <p className="truncate text-xs text-muted">{target.name}</p>
+          </div>
+          <div className="text-right">
+            <p className="num text-sm font-semibold">{price ? formatTRY(price, { precise: true }) : '—'}</p>
+            {asset && <Delta value={asset.changePercent} variant="text" className="text-xs" />}
+          </div>
         </div>
-        <div className="text-right">
-          <p className="num text-sm font-semibold">{price ? formatTRY(price, { precise: true }) : '—'}</p>
-          {asset && <Delta value={asset.changePercent} variant="text" className="text-xs" />}
-        </div>
+        {isStock && (
+          <div className="mt-2.5 border-t border-line pt-2.5">
+            <MarketStatus type="stock" />
+          </div>
+        )}
+        {target.type === 'currency' && (fx.bid || fx.ask) && (
+          <dl className="mt-2.5 grid grid-cols-2 gap-2 border-t border-line pt-2.5 text-xs" aria-label="Döviz kurları">
+            <RateBox label="Alış" hint="satarken" value={fx.bid} active={side === 'sell'} />
+            <RateBox label="Satış" hint="alırken" value={fx.ask} active={side === 'buy'} />
+          </dl>
+        )}
       </div>
 
       <div className="mt-4 grid grid-cols-2 gap-1 rounded-lg bg-surface-3 p-1" role="radiogroup" aria-label="İşlem yönü">
@@ -235,12 +351,22 @@ function TradeForm({ target, side, onSideChange, onClose }: Required<Omit<Props,
             setError('');
           }}
           items={[
-            { value: 'market', label: 'Piyasa' },
+            { value: 'market', label: marketClosed ? 'Açılışta' : 'Piyasa' },
             { value: 'limit', label: 'Limit' },
           ]}
           className="[&_button]:h-7 [&_button]:px-3 [&_button]:text-xs"
         />
       </div>
+
+      {isMoo && (
+        <Alert tone="info" className="mt-4">
+          <span className="font-medium">ABD borsası şu an kapalı.</span> Emrin{nextOpenAt ? ` ${formatTrDayTime(nextOpenAt)} (TSİ) açılışından` : ' açılıştan'} sonraki
+          ilk güncel fiyattan gerçekleşir.
+          {side === 'buy' && (
+            <> Fiyat farkına karşı %{Math.round(MOO_BUY_BUFFER * 100)} tampon ayrılır; açılış fiyatı bunu da aşarsa ayrılan tutarın karşıladığı kadar alınır, artan iade edilir.</>
+          )}
+        </Alert>
+      )}
 
       {isLimit && (
         <Field
@@ -258,6 +384,7 @@ function TradeForm({ target, side, onSideChange, onClose }: Required<Omit<Props,
               <>
                 Fiyat <span className="num text-fg">{formatTRY(limitValue, { precise: true })}</span> seviyesine gelince otomatik gerçekleşir
                 {limitDistance != null && <span className="num"> · güncel fiyatın {formatPercent(Math.abs(limitDistance), { sign: false })} {limitDistance < 0 ? 'altı' : 'üstü'}</span>}
+                {isStock && marketClosed && <span> · borsa açıkken</span>}
               </>
             ) : undefined
           }
@@ -293,18 +420,30 @@ function TradeForm({ target, side, onSideChange, onClose }: Required<Omit<Props,
         aria-invalid={!!validation}
         className="num mt-2 h-14 w-full rounded-lg border border-line bg-transparent px-4 text-2xl font-semibold text-fg shadow-card placeholder:text-subtle transition-[border-color,box-shadow] hover:border-line-strong focus:border-brand/50 focus:outline-none focus:ring-[3px] focus:ring-brand/10"
       />
-      <div className="mt-2 grid grid-cols-4 gap-1.5">
-        {[0.25, 0.5, 0.75, 1].map((f) => (
-          <button
-            key={f}
-            type="button"
-            onClick={() => setFraction(f)}
-            disabled={!unitPrice || (side === 'sell' && !held)}
-            className="h-9 rounded-lg border border-line text-xs font-medium text-muted transition-colors hover:bg-surface-2 hover:text-fg disabled:opacity-40"
-          >
-            {f === 1 ? 'Tümü' : `%${f * 100}`}
-          </button>
-        ))}
+      <div
+        className={cn('mt-2 grid gap-1.5', fractions.length === 3 ? 'grid-cols-3' : 'grid-cols-4')}
+        role="group"
+        aria-label={side === 'sell' ? 'Pozisyonun bir kısmını sat' : 'Nakdin bir kısmıyla al'}
+      >
+        {fractions.map((f) => {
+          const selected =
+            side === 'sell' && held > 0 && (f >= 1 ? fullSell : !sellAll && mode === 'quantity' && Math.abs(value - partialQuantity(held, f, decimals)) < 1e-9);
+          return (
+            <button
+              key={f}
+              type="button"
+              onClick={() => (side === 'sell' ? setSellFraction(f) : setBuyFraction(f))}
+              disabled={side === 'sell' ? !held : !unitPrice}
+              aria-pressed={side === 'sell' ? selected : undefined}
+              className={cn(
+                'h-9 rounded-lg border text-xs font-medium transition-colors disabled:opacity-40',
+                selected ? 'border-brand bg-brand-soft text-brand' : 'border-line text-muted hover:bg-surface-2 hover:text-fg',
+              )}
+            >
+              {side === 'buy' && f === 1 ? 'Tümü' : fractionLabel(f)}
+            </button>
+          );
+        })}
       </div>
 
       {isLimit && (
@@ -322,11 +461,21 @@ function TradeForm({ target, side, onSideChange, onClose }: Required<Omit<Props,
 
       <dl className="mt-5 space-y-2.5 rounded-xl border border-line bg-surface-2 p-4 text-sm">
         <Row label={side === 'buy' ? 'Kullanılabilir nakit' : 'Elinizdeki miktar'} value={side === 'buy' ? formatTRY(balance) : `${formatQuantity(held)} ${target.symbol}`} />
-        <Row label={mode === 'amount' ? 'Tahmini miktar' : 'Tahmini tutar'} value={mode === 'amount' ? `${formatQuantity(roundQty(quantity))} ${target.symbol}` : formatTRY(gross)} />
+        <Row label={mode === 'amount' ? 'Tahmini miktar' : 'Tahmini tutar'} value={mode === 'amount' ? `${formatQuantity(orderQty)} ${target.symbol}` : formatTRY(gross)} />
         <Row label={`Komisyon (%${(COMMISSION_RATE * 100).toLocaleString('tr-TR')})`} value={formatTRY(commission)} />
         <div className="border-t border-line pt-2.5">
           <Row
-            label={side === 'buy' ? (isLimit ? 'Ayrılacak nakit' : 'Toplam maliyet') : isLimit ? 'Tahmini net gelir' : 'Net gelir'}
+            label={
+              side === 'buy'
+                ? isLimit
+                  ? 'Ayrılacak nakit'
+                  : isMoo
+                    ? `Ayrılacak nakit (%${Math.round(MOO_BUY_BUFFER * 100)} tampon dahil)`
+                    : 'Toplam maliyet'
+                : isLimit || isMoo
+                  ? 'Tahmini net gelir'
+                  : 'Net gelir'
+            }
             value={formatTRY(total)}
             strong
           />
@@ -346,23 +495,50 @@ function TradeForm({ target, side, onSideChange, onClose }: Required<Omit<Props,
       )}
 
       <Button type="submit" size="lg" variant={side === 'buy' ? 'buy' : 'sell'} loading={submitting} disabled={blocked} className="mt-5 w-full">
-        {isLimit ? (side === 'buy' ? 'Limit alış emri ver' : 'Limit satış emri ver') : side === 'buy' ? `${target.symbol} al` : `${target.symbol} sat`}
+        {isLimit
+          ? side === 'buy'
+            ? 'Limit alış emri ver'
+            : 'Limit satış emri ver'
+          : isMoo
+            ? 'Açılışta gerçekleştir'
+            : side === 'buy'
+              ? `${target.symbol} al`
+              : `${target.symbol} sat`}
       </Button>
       <p className="mt-3 text-center text-[11px] leading-relaxed text-subtle">
         {isLimit
-          ? 'Emir, fiyat limit seviyesine ulaştığında o anki piyasa fiyatından gerçekleşir; gösterilen değerler tahminidir.'
-          : 'Gerçekleşen fiyat, işlem anında sunucudaki güncel piyasa fiyatıdır; gösterilen değerler tahminidir.'}
+          ? isStock
+            ? 'Emir, borsa açıkken fiyat limit seviyesine ulaştığında o anki piyasa fiyatından gerçekleşir; gösterilen değerler tahminidir.'
+            : 'Emir, fiyat limit seviyesine ulaştığında o anki piyasa fiyatından gerçekleşir; gösterilen değerler tahminidir.'
+          : isMoo
+            ? 'Emir, borsa açıldıktan sonraki ilk güncel fiyattan gerçekleşir; açılışa kadar iptal edebilirsin. Gösterilen değerler tahminidir.'
+            : target.type === 'currency'
+              ? 'Alırken satış kuru, satarken alış kuru uygulanır; gerçekleşen fiyat işlem anındaki sunucu kurudur.'
+              : 'Gerçekleşen fiyat, işlem anında sunucudaki güncel piyasa fiyatıdır; gösterilen değerler tahminidir.'}
       </p>
     </form>
   );
 }
 
+function RateBox({ label, hint, value, active }: { label: string; hint: string; value: number | null; active: boolean }) {
+  return (
+    <div className={cn('rounded-lg border px-2.5 py-1.5', active ? 'border-brand/40 bg-brand-soft' : 'border-line')}>
+      <dt className={cn('flex items-center justify-between gap-2', active ? 'text-brand' : 'text-muted')}>
+        <span className="font-medium">{label}</span>
+        <span className="text-[11px]">{hint}</span>
+      </dt>
+      <dd className="num mt-0.5 text-sm font-semibold text-fg">{value ? formatTRY(value, { precise: true }) : '—'}</dd>
+    </div>
+  );
+}
+
 function ReceiptView({ receipt, symbol, onClose }: { receipt: Receipt; symbol: string; onClose: () => void }) {
   const isBuy = receipt.side === 'buy';
+  const Icon = receipt.kind === 'moo' ? ClockIcon : CheckCircleIcon;
   return (
     <div className="flex flex-col items-center pt-2 text-center">
-      <CheckCircleIcon className={cn('h-12 w-12', isBuy ? 'text-up' : 'text-brand')} aria-hidden="true" />
-      {receipt.kind === 'market' ? (
+      <Icon className={cn('h-12 w-12', isBuy ? 'text-up' : 'text-brand')} aria-hidden="true" />
+      {receipt.kind === 'market' && (
         <>
           <p className="mt-3 text-base font-semibold">{isBuy ? 'Alım gerçekleşti' : 'Satış gerçekleşti'}</p>
           <p className="mt-1 text-sm text-muted">
@@ -373,7 +549,8 @@ function ReceiptView({ receipt, symbol, onClose }: { receipt: Receipt; symbol: s
             <Row label={isBuy ? 'Ödenen toplam' : 'Hesaba geçen'} value={formatTRY(receipt.total)} strong />
           </dl>
         </>
-      ) : (
+      )}
+      {receipt.kind === 'limit' && (
         <>
           <p className="mt-3 text-base font-semibold">Emir oluşturuldu</p>
           <p className="mt-1 text-sm text-muted">
@@ -387,13 +564,28 @@ function ReceiptView({ receipt, symbol, onClose }: { receipt: Receipt; symbol: s
           </dl>
         </>
       )}
+      {receipt.kind === 'moo' && (
+        <>
+          <p className="mt-3 text-base font-semibold">Emir sıraya alındı</p>
+          <p className="mt-1 text-sm text-muted">
+            <span className="num text-fg">{formatQuantity(receipt.quantity)}</span> {symbol} borsa açılışında
+            {receipt.executeAt ? <> (<span className="num text-fg">{formatTrDayTime(receipt.executeAt)}</span> TSİ)</> : null} ilk güncel fiyattan{' '}
+            {isBuy ? 'alınır' : 'satılır'}.
+          </p>
+          <dl className="mt-5 w-full space-y-2.5 rounded-xl border border-line bg-surface-2 p-4 text-sm">
+            <Row label="Emir tipi" value={isBuy ? 'Açılışta alış' : 'Açılışta satış'} />
+            <Row label="Referans fiyat" value={formatTRY(receipt.reference, { precise: true })} />
+            {isBuy && <Row label="Ayrılan nakit" value={formatTRY(receipt.reserved)} strong />}
+          </dl>
+        </>
+      )}
       <div className="mt-6 grid w-full grid-cols-2 gap-3">
         <Link
-          href={receipt.kind === 'limit' ? '/portfolio#bekleyen-emirler' : '/portfolio'}
+          href={receipt.kind === 'market' ? '/portfolio' : '/portfolio#bekleyen-emirler'}
           onClick={onClose}
           className={cn(toolbarButtonClass, 'h-11')}
         >
-          {receipt.kind === 'limit' ? 'Emirlerim' : 'Portföye git'}
+          {receipt.kind === 'market' ? 'Portföye git' : 'Emirlerim'}
         </Link>
         <Button onClick={onClose}>Tamam</Button>
       </div>
@@ -408,8 +600,4 @@ function Row({ label, value, strong }: { label: string; value: string; strong?: 
       <dd className={cn('num text-right', strong ? 'font-semibold text-fg' : 'text-fg')}>{value}</dd>
     </div>
   );
-}
-
-function trimQty(q: number) {
-  return String(roundQty(q));
 }

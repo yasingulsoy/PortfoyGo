@@ -1578,7 +1578,7 @@ export class ArenaService {
          SELECT s.user_id, s.best, s.rounds, u.username,
                 ROW_NUMBER() OVER (ORDER BY s.best DESC, s.rounds ASC, u.username ASC) AS rank
            FROM s JOIN users u ON u.id = s.user_id
-          WHERE COALESCE(u.is_banned, FALSE) = FALSE AND COALESCE(u.is_bot, FALSE) = FALSE
+          WHERE COALESCE(u.is_banned, FALSE) = FALSE AND COALESCE(u.is_bot, FALSE) = FALSE AND COALESCE(u.is_deleted, FALSE) = FALSE
        )
        SELECT * FROM ranked WHERE rank <= ${LEADERBOARD_TOP} OR user_id = $1 ORDER BY rank`,
       [viewerId ?? null]

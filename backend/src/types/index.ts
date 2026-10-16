@@ -33,6 +33,9 @@ export interface AuthResponse {
   user?: User;
   token?: string;
   message?: string;
+  /** İki adımlı doğrulama açık: oturum açılmadı, `challenge` ile POST /api/auth/login/2fa gerekli */
+  requires_2fa?: boolean;
+  challenge?: string;
 }
 
 export interface PortfolioItem {

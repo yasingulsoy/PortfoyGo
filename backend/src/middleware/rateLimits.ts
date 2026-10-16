@@ -1,9 +1,15 @@
-import rateLimit, { Options } from 'express-rate-limit';
+import type { Request } from 'express';
+import { Options, ipKeyGenerator } from 'express-rate-limit';
+import { autoLimiterName, createRateLimiter } from '../infra/rateLimitStore';
 
 const MINUTE = 60 * 1000;
 
+/**
+ * Sayaçlar REDIS_URL tanımlıysa Redis'te (tüm API örnekleri ortak), değilse bellekte (örnek başına) tutulur;
+ * bkz. infra/rateLimitStore.ts. Rota dosyalarında yeni sınırlayıcı: createRateLimiter('benzersiz-ad', {...}).
+ */
 const make = (windowMs: number, limit: number, message: string, extra: Partial<Options> = {}) =>
-  rateLimit({
+  createRateLimiter(autoLimiterName(windowMs, limit, message), {
     windowMs,
     limit,
     standardHeaders: 'draft-7',
@@ -40,3 +46,47 @@ export const leagueCodeLimiter = make(
 
 /** Fiyat geçmişi / performans / sparkline (herkese açık, önbellekli): IP başına dakikada 120. */
 export const marketDataLimiter = make(MINUTE, 120, 'Çok fazla piyasa verisi isteği. Lütfen biraz sonra tekrar deneyin.');
+
+// ---------------------------------------------------------------------------
+// Hesap güvenliği (2FA) ve KVKK self-servis uçları
+// ---------------------------------------------------------------------------
+
+/** Oturum açmış kullanıcıya göre sayaç (authenticateToken'dan SONRA kullanılmalı); yoksa IP. */
+const perUserKey = (req: Request) => {
+  const userId = (req as Request & { user?: { id?: string } }).user?.id;
+  return userId ? `u:${userId}` : ipKeyGenerator(req.ip || '');
+};
+
+/**
+ * 2FA girişinin ikinci adımı (POST /api/auth/login/2fa): IP başına 15 dakikada 10 deneme.
+ * Ayrıca hesap başına kilit vardır (art arda 5 hatalı kod → 15 dk; bkz. services/security/twoFactor.ts).
+ */
+export const twoFactorLoginLimiter = make(
+  15 * MINUTE,
+  10,
+  'Çok fazla doğrulama kodu denemesi. Lütfen 15 dakika sonra tekrar deneyin.'
+);
+
+/** 2FA kurulum / kapatma / kurtarma kodu yenileme: kullanıcı başına 15 dakikada 10. */
+export const twoFactorManageLimiter = make(
+  15 * MINUTE,
+  10,
+  'Çok fazla iki adımlı doğrulama isteği. Lütfen 15 dakika sonra tekrar deneyin.',
+  { keyGenerator: perUserKey }
+);
+
+/** "Verilerimi indir" (GET /api/me/export): kullanıcı başına saatte 3. */
+export const accountExportLimiter = make(
+  60 * MINUTE,
+  3,
+  'Verilerini saatte en fazla 3 kez indirebilirsin. Lütfen daha sonra tekrar dene.',
+  { keyGenerator: perUserKey }
+);
+
+/** "Hesabımı sil" (POST /api/me/delete): kullanıcı başına 15 dakikada 5 (şifre tahminini engeller). */
+export const accountDeleteLimiter = make(
+  15 * MINUTE,
+  5,
+  'Çok fazla hesap silme denemesi. Lütfen 15 dakika sonra tekrar dene.',
+  { keyGenerator: perUserKey }
+);

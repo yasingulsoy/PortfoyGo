@@ -1,6 +1,7 @@
 import pool from '../config/database';
 import { providers } from '../providers';
 import type { StockQuote } from '../providers/types';
+import { TtlCache, ttlFromEnv } from '../utils/ttlCache';
 
 export interface CachedMarketData {
   id: string;
@@ -48,9 +49,24 @@ const toStockCacheData = (stocks: StockQuote[]): CacheInput[] =>
 
 let refreshInFlight: Promise<void> | null = null;
 
+/**
+ * Liste okuma önbelleği (GET /api/stocks, /api/cryptos): her açık piyasa sekmesi 15 sn'de bir yokladığı için
+ * aynı satırlar saniyede onlarca kez okunuyordu; veri 2 dk'da bir yenilenir. MARKET_LIST_CACHE_MS (varsayılan
+ * 5 sn; 0 → kapalı; NODE_ENV=test'te kapalı). Bu süreçte saveToCache çağrılınca temizlenir; başka örnek
+ * (worker) yazdıysa en geç TTL sonunda görünür. Boş sonuç önbelleklenmez.
+ */
+const listCache = new TtlCache<CachedMarketData[]>(ttlFromEnv('MARKET_LIST_CACHE_MS', 5_000), 4);
+
 export class MarketCacheService {
   // Cache'den veri al (süresi dolmamış kayıtlar)
   static async getFromCache(assetType: 'stock' | 'crypto', symbol?: string): Promise<CachedMarketData[]> {
+    if (symbol) return MarketCacheService.readCache(assetType, symbol);
+    const rows = await listCache.get(assetType, () => MarketCacheService.readCache(assetType));
+    if (rows.length === 0) listCache.clear();
+    return rows;
+  }
+
+  private static async readCache(assetType: 'stock' | 'crypto', symbol?: string): Promise<CachedMarketData[]> {
     let query = `
       SELECT * FROM market_data_cache
       WHERE asset_type = $1 AND expires_at > CURRENT_TIMESTAMP
@@ -88,6 +104,7 @@ export class MarketCacheService {
   // Cache'e veri kaydet
   static async saveToCache(data: CacheInput[]): Promise<void> {
     if (data.length === 0) return;
+    listCache.clear();
     const client = await pool.connect();
 
     try {
@@ -141,6 +158,8 @@ export class MarketCacheService {
       throw error;
     } finally {
       client.release();
+      // Okuyucu, COMMIT'ten önce eski satırları yeniden önbelleklemiş olabilir
+      listCache.clear();
     }
   }
 

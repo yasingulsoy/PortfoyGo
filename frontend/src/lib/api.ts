@@ -107,7 +107,8 @@ export const watchlistApi = {
 // ---------------------------------------------------------------------------
 
 export type OrderSide = 'buy' | 'sell';
-export type OrderType = 'limit' | 'stop_loss' | 'take_profit';
+/** trailing_stop: takip eden stop (satış) · market_on_open: ABD borsası kapalıyken açılışta gerçekleşen hisse emri */
+export type OrderType = 'limit' | 'stop_loss' | 'take_profit' | 'trailing_stop' | 'market_on_open';
 
 export interface CreateOrderRequest {
   asset_type: AssetType;
@@ -115,8 +116,12 @@ export interface CreateOrderRequest {
   side: OrderSide;
   type: OrderType;
   quantity: number;
-  trigger_price: number;
-  /** 1–90 gün; varsayılan 30 */
+  /** limit / stop_loss / take_profit için zorunlu */
+  trigger_price?: number;
+  /** trailing_stop: yüzde VEYA TL mesafe */
+  trail_percent?: number;
+  trail_amount?: number;
+  /** 1–90 gün; varsayılan 30 (market_on_open'da yok sayılır) */
   expires_in_days?: number;
 }
 
@@ -124,6 +129,9 @@ export const ordersApi = {
   create: (data: CreateOrderRequest) => apiFetch('/orders', { method: 'POST', body: JSON.stringify(data) }),
   list: (status: 'active' | 'history' | 'all' = 'active') => apiFetch(`/orders?status=${status}`),
   cancel: (id: string) => apiFetch(`/orders/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  /** Yalnızca takip eden stop: mesafe (yüzde VEYA TL) */
+  update: (id: string, data: { trail_percent?: number; trail_amount?: number }) =>
+    apiFetch(`/orders/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(data) }),
 };
 
 // ---------------------------------------------------------------------------
@@ -270,6 +278,8 @@ export interface NotificationPrefs {
   /** Her zaman açık (kapatılamaz) */
   account: boolean;
   system: boolean;
+  /** Haftalık e-posta özeti (bildirim kategorisi değil; varsayılan açık) */
+  email_digest: boolean;
 }
 
 export interface NotificationListParams {
@@ -324,9 +334,9 @@ export const notificationsApi = {
   prefsPath: '/notifications/prefs',
   prefs: async (): Promise<NotificationPrefs> => {
     const raw = await swrFetcher<Partial<NotificationPrefs> | null>('/notifications/prefs');
-    return { orders: raw?.orders !== false, competition: raw?.competition !== false, account: true, system: true };
+    return { orders: raw?.orders !== false, competition: raw?.competition !== false, account: true, system: true, email_digest: raw?.email_digest !== false };
   },
-  updatePrefs: (prefs: Partial<Pick<NotificationPrefs, 'orders' | 'competition'>>) =>
+  updatePrefs: (prefs: Partial<Pick<NotificationPrefs, 'orders' | 'competition' | 'email_digest'>>) =>
     apiFetch('/notifications/prefs', { method: 'PUT', body: JSON.stringify(prefs) }),
   /** SSE akışının yolu (API_BASE_URL'e eklenir) */
   streamPath: '/notifications/stream',
@@ -726,4 +736,142 @@ export const picksApi = {
     return toPicksComment(raw?.comment ?? raw);
   },
   deleteComment: (commentId: string) => gameRequest(`/picks/comments/${gid(commentId)}`, { method: 'DELETE' }),
+};
+
+/* ------------------------------------------------------------------ */
+/* Hesap güvenliği: iki adımlı doğrulama (TOTP) + KVKK self-servis      */
+/* ------------------------------------------------------------------ */
+
+import type { TwoFactorSetup, TwoFactorStatus } from '@/types';
+import { API_BASE_URL as ACCOUNT_API_BASE } from '@portfoygo/shared/api';
+
+/**
+ * /auth/2fa/* ve girişin ikinci adımı. Yeniden doğrulama hataları (yanlış şifre / kod) backend'de 400'dür;
+ * yine de bu çağrılar silent401 ile yapılır: oturum düşmüşse hata mesajı gösterilir, sayfa aniden yönlenmez.
+ */
+export const twoFactorApi = {
+  statusKey: '/auth/2fa/status',
+  status: async (): Promise<TwoFactorStatus> => (await apiFetch<{ data: TwoFactorStatus }>('/auth/2fa/status')).data,
+  setup: async (): Promise<TwoFactorSetup> =>
+    (await apiFetch<{ data: TwoFactorSetup }>('/auth/2fa/setup', { ...post({}), silent401: true })).data,
+  /** Başarılıysa kurtarma kodları (yalnızca bu yanıtta). Diğer cihazlardaki oturumlar kapanır. */
+  enable: async (code: string): Promise<string[]> =>
+    (await apiFetch<{ data: { recovery_codes: string[] } }>('/auth/2fa/enable', { ...post({ code }), silent401: true })).data
+      .recovery_codes,
+  /** code: 6 haneli kod ya da kurtarma kodu */
+  disable: (password: string, code: string) => apiFetch('/auth/2fa/disable', { ...post({ password, code }), silent401: true }),
+  regenerateRecoveryCodes: async (code: string): Promise<string[]> =>
+    (await apiFetch<{ data: { recovery_codes: string[] } }>('/auth/2fa/recovery-codes', { ...post({ code }), silent401: true }))
+      .data.recovery_codes,
+  /** Girişin ikinci adımı: 6 haneli kod ya da kurtarma kodu */
+  completeLogin: (challenge: string, input: { code?: string; recovery_code?: string }) =>
+    apiFetch('/auth/login/2fa', { ...post({ challenge, ...input }), silent401: true }),
+};
+
+/** KVKK: verilerimi indir / hesabımı sil */
+export const accountApi = {
+  /** Kişisel verilerin JSON kopyası (Blob). Kullanıcı başına saatte 3 indirme. */
+  exportData: async (): Promise<Blob> => {
+    let res: Response;
+    try {
+      res = await fetch(`${ACCOUNT_API_BASE}/me/export`, {
+        credentials: 'include',
+        headers: { 'X-Requested-With': 'PortfoyGo', Accept: 'application/json' },
+      });
+    } catch {
+      throw new ApiError('Sunucuya ulaşılamadı. Bağlantınızı kontrol edip tekrar deneyin.', 0);
+    }
+    if (!res.ok) {
+      const body = await res.json().catch(() => null);
+      throw new ApiError(body?.message || 'Veriler indirilemedi.', res.status, body?.code);
+    }
+    return res.blob();
+  },
+  deleteAccount: (input: { password: string; totp?: string; confirm_username: string }) =>
+    apiFetch('/me/delete', { ...post(input), silent401: true }),
+};
+
+/* ------------------------------------------------------------------ */
+/* Herkese açık profil görünürlüğü (/u/<kullanıcı-adı>)                  */
+/* ------------------------------------------------------------------ */
+
+export interface ProfileVisibility {
+  profile_public: boolean;
+  username: string;
+}
+
+export const profileVisibilityApi = {
+  key: '/me/profile-visibility',
+  get: async (): Promise<ProfileVisibility> => {
+    const raw = await swrFetcher<Partial<ProfileVisibility> | null>('/me/profile-visibility');
+    return { profile_public: raw?.profile_public !== false, username: String(raw?.username ?? '') };
+  },
+  set: async (profile_public: boolean): Promise<ProfileVisibility> => {
+    const raw = unwrap<Partial<ProfileVisibility> | null>(
+      await apiFetch('/me/profile-visibility', { method: 'PATCH', body: JSON.stringify({ profile_public }) }),
+    );
+    return { profile_public: raw?.profile_public !== false, username: String(raw?.username ?? '') };
+  },
+};
+
+// ---------------------------------------------------------------------------
+// İşlem derinliği (020): piyasa emirleri hata koduyla (MARKET_CLOSED → next_open_at), açılışta (MOO) emir,
+// ABD seans durumu. apiFetch yalnızca mesajı taşıdığı için gövdeyi koruyan ayrı istek.
+// ---------------------------------------------------------------------------
+
+import { API_BASE_URL as TRADE_API_BASE } from '@portfoygo/shared/api';
+import { toUsMarketSession, type UsMarketSession } from '@/lib/marketHours';
+
+/** İşlem uç noktası hatası: `code` (ör. MARKET_CLOSED, MARKET_OPEN, TRADE_REJECTED) ve gövdedeki ek alanlar. */
+export class TradeApiError extends ApiError {
+  constructor(
+    message: string,
+    status: number,
+    public code: string | null,
+    public data: Record<string, any> | null,
+  ) {
+    super(message, status);
+    this.name = 'TradeApiError';
+  }
+}
+
+async function tradeRequest(endpoint: string, init: RequestInit = {}): Promise<any> {
+  let res: Response;
+  try {
+    res = await fetch(`${TRADE_API_BASE}${endpoint}`, {
+      ...init,
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'PortfoyGo' },
+    });
+  } catch {
+    throw new TradeApiError('Sunucuya ulaşılamadı. Bağlantınızı kontrol edip tekrar deneyin.', 0, null, null);
+  }
+  const body = await res.json().catch(() => null);
+  if (!res.ok) {
+    if (res.status === 401 && typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('auth:logout'));
+    const code = typeof body?.code === 'string' ? body.code : null;
+    throw new TradeApiError((body && (body.message || body.error)) || 'Beklenmeyen bir hata oluştu.', res.status, code, body && typeof body === 'object' ? body : null);
+  }
+  return body;
+}
+
+/** ABD borsası kapalıyken hisse piyasa emri 409 MARKET_CLOSED döner (`data.next_open_at`). */
+export const isMarketClosedError = (err: unknown): err is TradeApiError => err instanceof TradeApiError && err.code === 'MARKET_CLOSED';
+
+export const tradeApi = {
+  /** Piyasa emri (alış/satış). Hatalar TradeApiError (409 MARKET_CLOSED, 400 TRADE_REJECTED, 503 PRICE_UNAVAILABLE). */
+  market: (side: OrderSide, data: TradeRequest) => tradeRequest(`/transactions/${side}`, { method: 'POST', body: JSON.stringify(data) }),
+  /** Bekleyen emir (tüm tipler); açılışta emri borsa açıkken 409 MARKET_OPEN döner. */
+  createOrder: (data: CreateOrderRequest) => tradeRequest('/orders', { method: 'POST', body: JSON.stringify(data) }),
+};
+
+export const MARKET_SESSION_KEY = '/market/session';
+
+export const marketSessionApi = {
+  /** ABD hisse seansı; geri sayım için sunucu saati farkı ölçülür. */
+  get: async (): Promise<UsMarketSession | null> => {
+    const sent = Date.now();
+    const body = await apiFetch('/market/session', { silent401: true });
+    return toUsMarketSession(body?.data ?? body, Math.round((sent + Date.now()) / 2));
+  },
 };

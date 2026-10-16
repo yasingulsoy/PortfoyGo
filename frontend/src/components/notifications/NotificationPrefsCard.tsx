@@ -2,7 +2,7 @@
 
 import { useId, useState } from 'react';
 import useSWR from 'swr';
-import { BellAlertIcon } from '@heroicons/react/24/outline';
+import { BellAlertIcon, EnvelopeIcon } from '@heroicons/react/24/outline';
 import { cn } from '@portfoygo/shared/format';
 import { Card, CardHeader } from '@portfoygo/shared/ui/Card';
 import { Alert, Skeleton } from '@portfoygo/shared/ui/Feedback';
@@ -26,9 +26,9 @@ export default function NotificationPrefsCard() {
     revalidateOnFocus: false,
     shouldRetryOnError: false,
   });
-  const [saving, setSaving] = useState<NotificationCategory | null>(null);
+  const [saving, setSaving] = useState<NotificationCategory | 'email_digest' | null>(null);
 
-  const update = async (key: 'orders' | 'competition', value: boolean) => {
+  const update = async (key: 'orders' | 'competition' | 'email_digest', value: boolean) => {
     if (!data) return;
     const previous = data;
     setSaving(key);
@@ -37,7 +37,10 @@ export default function NotificationPrefsCard() {
     try {
       await notificationsApi.updatePrefs({ [key]: value });
       toast.success('Bildirim tercihlerin kaydedildi', {
-        description: `${CATEGORY_META[key].label} bildirimleri ${value ? 'açıldı' : 'kapatıldı'}.`,
+        description:
+          key === 'email_digest'
+            ? `Haftalık e-posta özeti ${value ? 'açıldı' : 'kapatıldı'}.`
+            : `${CATEGORY_META[key].label} bildirimleri ${value ? 'açıldı' : 'kapatıldı'}.`,
       });
     } catch (err) {
       void mutate(previous, { revalidate: false });
@@ -70,6 +73,15 @@ export default function NotificationPrefsCard() {
               />
             ))}
           </ul>
+        )}
+        {!(error && !data) && (
+          <EmailDigestRow
+            loading={isLoading && !data}
+            checked={data?.email_digest ?? true}
+            busy={saving === 'email_digest'}
+            verified={!!user?.email_verified}
+            onChange={(v) => void update('email_digest', v)}
+          />
         )}
         <p className="border-t border-line px-5 py-4 text-xs text-subtle sm:px-6">
           Kapattığın kategorilerde yeni bildirim oluşturulmaz. Hesap ve sistem bildirimleri güvenliğin için her zaman açıktır.
@@ -129,7 +141,7 @@ function PrefRow({
 }
 
 /** Erişilebilir anahtar (role="switch"). */
-function Switch({
+export function Switch({
   checked,
   disabled,
   onChange,
@@ -161,5 +173,47 @@ function Switch({
         className={cn('inline-block h-5 w-5 rounded-full bg-brand-fg shadow-card transition-transform duration-200', checked ? 'translate-x-[22px]' : 'translate-x-0.5')}
       />
     </button>
+  );
+}
+
+/** Haftalık e-posta özeti (bildirim kategorisi değil; users.notification_prefs.email_digest). */
+function EmailDigestRow({
+  loading,
+  checked,
+  busy,
+  verified,
+  onChange,
+}: {
+  loading: boolean;
+  checked: boolean;
+  busy: boolean;
+  verified: boolean;
+  onChange: (value: boolean) => void;
+}) {
+  const id = useId();
+  return (
+    <div className="border-t border-line">
+      <p className="px-5 pt-4 text-xs font-medium uppercase tracking-wide text-subtle sm:px-6">E-posta</p>
+      <div className="flex items-center gap-4 px-5 py-4 sm:px-6">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-soft text-brand" aria-hidden="true">
+          <EnvelopeIcon className="h-5 w-5" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p id={`${id}-label`} className="text-sm font-medium text-fg">
+            Haftalık e-posta özeti
+          </p>
+          <p id={`${id}-desc`} className="mt-0.5 text-sm text-muted">
+            Her Pazartesi sabahı geçen haftanın kısa özeti: portföy değişimi, sıralaman, en iyi ve en zorlu işlemin.
+            E-postadaki bağlantıyla da tek tıkla kapatabilirsin.
+            {!verified && ' E-posta adresini doğrulayana kadar özet gönderilmez.'}
+          </p>
+        </div>
+        {loading ? (
+          <Skeleton className="h-6 w-11 rounded-full" />
+        ) : (
+          <Switch checked={checked} disabled={busy} onChange={onChange} labelledBy={`${id}-label`} describedBy={`${id}-desc`} />
+        )}
+      </div>
+    </div>
   );
 }

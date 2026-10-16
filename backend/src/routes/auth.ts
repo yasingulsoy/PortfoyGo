@@ -8,30 +8,14 @@ import {
   hasCsrfHeader,
   SESSION_COOKIE,
 } from '../middleware/auth';
-import { loginLimiter, registerLimiter } from '../middleware/rateLimits';
-import { asyncHandler } from '../utils/errors';
-import { parseOrThrow, registerSchema, loginSchema } from '../utils/validation';
+import { loginLimiter, registerLimiter, twoFactorLoginLimiter } from '../middleware/rateLimits';
+import { TwoFactorService } from '../services/security/twoFactor';
+import { AppError, asyncHandler } from '../utils/errors';
+import { parseOrThrow, registerSchema, loginSchema, loginTwoFactorSchema } from '../utils/validation';
+import { logAuthActivity as logActivity } from './authActivity';
+import twoFactorRoutes from './twoFactor';
 
 const router = express.Router();
-
-/** Aktivite kaydını yanıtı geciktirmeden arka planda yazar. */
-function logActivity(req: express.Request, userId: string, activity_type: string, description: string, metadata?: Record<string, unknown>) {
-  setImmediate(async () => {
-    try {
-      const { ActivityLogService } = await import('../services/activityLog');
-      await ActivityLogService.createLog({
-        user_id: userId,
-        activity_type,
-        description,
-        metadata,
-        ip_address: req.ip,
-        user_agent: req.headers['user-agent']?.slice(0, 500),
-      });
-    } catch (error: any) {
-      console.error('[auth] Activity log error:', error?.message);
-    }
-  });
-}
 
 // Kayıt
 router.post(
@@ -60,10 +44,46 @@ router.post(
       setSessionCookies(res, token);
       logActivity(req, result.user.id, 'login', 'Kullanıcı giriş yaptı', { username: result.user.username });
     }
+    // requires_2fa: çerez YOK; gövdede yalnızca { success, requires_2fa, challenge, message }
+    if (result.requires_2fa) res.setHeader('Cache-Control', 'no-store');
 
     res.status(status).json(result);
   })
 );
+
+// Girişin ikinci adımı (2FA açık hesaplar): challenge + 6 haneli kod ya da kurtarma kodu → oturum çerezi
+router.post(
+  '/login/2fa',
+  twoFactorLoginLimiter,
+  asyncHandler(async (req, res) => {
+    if (!req.is('application/json')) {
+      return res.status(415).json({ success: false, message: 'İstek gövdesi application/json olmalı' });
+    }
+    const body = parseOrThrow(loginTwoFactorSchema, req.body);
+    const done = await TwoFactorService.completeLogin(body.challenge, { code: body.code, recovery_code: body.recovery_code });
+    const session = await AuthService.finishLogin(done.userId, done.tokenVersion);
+    if (!session) throw new AppError(401, 'Doğrulama süresi doldu. Lütfen yeniden giriş yap.', 'CHALLENGE_INVALID');
+
+    setSessionCookies(res, session.token);
+    logActivity(req, done.userId, 'login', 'Kullanıcı iki adımlı doğrulamayla giriş yaptı', {
+      username: session.user.username,
+      second_factor: done.method,
+    });
+    res.json({
+      success: true,
+      user: session.user,
+      ...(done.method === 'recovery'
+        ? {
+            recovery_codes_remaining: done.recovery_remaining ?? 0,
+            message: 'Kurtarma kodu kullanıldı. Kalan kodlarını Profil → Güvenlik bölümünden yenileyebilirsin.',
+          }
+        : {}),
+    });
+  })
+);
+
+// İki adımlı doğrulama yönetimi: /api/auth/2fa/* (bkz. routes/twoFactor.ts)
+router.use('/2fa', twoFactorRoutes);
 
 // Çıkış — bu tarayıcıdaki oturum çerezlerini siler. (Bearer token'lar durumsuzdur; iptal için /logout-all.)
 router.post('/logout', (req, res) => {

@@ -164,7 +164,7 @@ interface PickRow {
 }
 
 /** Yasaklı ve bot hesaplar hariç */
-const HUMAN_SQL = `COALESCE(u.is_banned, FALSE) = FALSE AND COALESCE(u.is_bot, FALSE) = FALSE`;
+const HUMAN_SQL = `COALESCE(u.is_banned, FALSE) = FALSE AND COALESCE(u.is_bot, FALSE) = FALSE AND COALESCE(u.is_deleted, FALSE) = FALSE`;
 
 const PICK_COLUMNS = `p.id, p.week_id, p.user_id, u.username, u.avatar_id, u.frame_id, p.asset_type, p.symbol, p.name,
   p.direction, p.note, p.note_hidden_at, p.quote_currency, p.submitted_at, p.entry_price, p.exit_price, p.status,

@@ -1341,3 +1341,107 @@ export interface PicksCommentPage {
   items: PicksComment[];
   has_more: boolean;
 }
+
+/* ------------------------------------------------------------------ */
+/* Herkese açık oyuncu profili (/u/[username]) — GET /api/public/users/:username */
+/* Yalnızca yüzdeler ve sıralar: bakiye, varlık, nakit veya jeton tutarı yoktur.  */
+/* ------------------------------------------------------------------ */
+
+export interface PublicProfileSeasonAward {
+  season_slug: string;
+  season_name: string;
+  rank: number;
+  title: string;
+  /** Sezon getirisi, % */
+  return_pct: number;
+  awarded_at: string | null;
+}
+
+export interface PublicProfileBadge {
+  name: string;
+  description: string;
+  icon: string;
+  category: string;
+  earned_at: string | null;
+}
+
+export type PublicAchievementKind = 'badge' | 'season' | 'picks';
+
+export interface PublicAchievement {
+  kind: PublicAchievementKind;
+  title: string;
+  detail: string;
+  icon: string;
+  at: string;
+}
+
+export interface PublicProfile {
+  username: string;
+  member_since: string | null;
+  avatar_id: string;
+  frame_id: string | null;
+  /** Oyun içi unvan (kozmetik) */
+  title: string | null;
+  portfolio: {
+    /** Başlangıçtan beri getiri, % */
+    return_pct: number;
+    /** Genel liderlik sırası (e-postası doğrulanmamışsa null) */
+    rank: number | null;
+    ranked_players: number;
+  };
+  arena: {
+    tier: GameTier;
+    rating: number;
+    level: number;
+    duel_record: { wins: number; losses: number; draws: number } | null;
+    rounds_played: number;
+    best_return_pct: number | null;
+  };
+  picks: { weeks_played: number; best_rank: number | null; wins: number; podiums: number };
+  idle: { rank: number | null };
+  season_awards: PublicProfileSeasonAward[];
+  badges: PublicProfileBadge[];
+  achievements: PublicAchievement[];
+}
+
+/** Sunucu tarafı profil isteğinin sonucu (gizli / yok / hata ayrımı) */
+export type PublicProfileResult =
+  | { status: 'ok'; profile: PublicProfile }
+  | { status: 'private' }
+  | { status: 'not_found' }
+  | { status: 'error' };
+
+/* ---------- Hesap güvenliği (2FA) ve KVKK ---------- */
+
+/** GET /auth/2fa/status */
+export interface TwoFactorStatus {
+  enabled: boolean;
+  enabled_at: string | null;
+  recovery_codes_remaining: number;
+  /** Sunucuda şifreleme anahtarı tanımlı mı (değilse 2FA kurulamaz) */
+  available: boolean;
+  /** Yönetici hesabı ve yönetim paneli için 2FA zorunlu */
+  admin_required: boolean;
+}
+
+/** POST /auth/2fa/setup */
+export interface TwoFactorSetup {
+  otpauth_url: string;
+  /** data:image/svg+xml;base64,… */
+  qr_svg: string;
+  /** Uygulamaya elle girmek için 4'lü gruplar halinde anahtar */
+  manual_key: string;
+  secret_masked: string;
+  /** Kurulumun yapıldığı hesap (sunucudaki oturum sahibi) */
+  account: string;
+  expires_at: string;
+}
+
+/** POST /auth/login yanıtı: 2FA açıksa oturum yerine challenge */
+export interface LoginResult {
+  success: boolean;
+  message?: string;
+  /** İkinci adım gerekli: challenge ile POST /auth/login/2fa */
+  requires2fa?: boolean;
+  challenge?: string;
+}

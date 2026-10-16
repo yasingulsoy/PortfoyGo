@@ -4,12 +4,14 @@ import { useState } from 'react';
 import useSWR from 'swr';
 import {
   ArrowDownRightIcon,
+  ArrowDownTrayIcon,
   ArrowLeftEndOnRectangleIcon,
   ArrowRightStartOnRectangleIcon,
   ArrowUpRightIcon,
   ClockIcon,
   EnvelopeIcon,
   KeyIcon,
+  ShieldCheckIcon,
   UserPlusIcon,
 } from '@heroicons/react/20/solid';
 import { Card, CardHeader } from '@portfoygo/shared/ui/Card';
@@ -35,6 +37,10 @@ const TYPE_META: Record<string, { label: string; icon: typeof ClockIcon; tone: s
   register: { label: 'Kayıt', icon: UserPlusIcon, tone: 'bg-brand-soft text-brand' },
   email_verified: { label: 'E-posta doğrulama', icon: EnvelopeIcon, tone: 'bg-up-soft text-up' },
   password_reset: { label: 'Şifre sıfırlama', icon: KeyIcon, tone: 'bg-gold-soft text-gold' },
+  two_factor_enabled: { label: 'İki adımlı doğrulama açıldı', icon: ShieldCheckIcon, tone: 'bg-up-soft text-up' },
+  two_factor_disabled: { label: 'İki adımlı doğrulama kapatıldı', icon: ShieldCheckIcon, tone: 'bg-gold-soft text-gold' },
+  recovery_codes_regenerated: { label: 'Kurtarma kodları yenilendi', icon: KeyIcon, tone: 'bg-brand-soft text-brand' },
+  data_export: { label: 'Veriler indirildi', icon: ArrowDownTrayIcon, tone: 'bg-surface-3 text-muted' },
 };
 
 function typeMeta(type: string) {

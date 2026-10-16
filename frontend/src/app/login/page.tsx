@@ -12,12 +12,15 @@ import Button from '@portfoygo/shared/ui/Button';
 import { Alert } from '@portfoygo/shared/ui/Feedback';
 import { Field } from '@portfoygo/shared/ui/Field';
 import { PageLoader } from '@portfoygo/shared/ui/Spinner';
+import TwoFactorStep from '@portfoygo/shared/ui/TwoFactorStep';
+import { useToast } from '@portfoygo/shared/ui/Toast';
 
 /** Yalnızca sabit metinler gösterilir; URL'den gelen serbest metin asla basılmaz. */
 const NOTICES: Record<string, string> = {
   registered: 'Hesabın oluşturuldu. Şimdi giriş yapabilirsin.',
   verified: 'E-posta adresin doğrulandı. Giriş yaparak devam edebilirsin.',
   reset: 'Şifren güncellendi. Yeni şifrenle giriş yapabilirsin.',
+  deleted: 'Hesabın silindi. Kişisel verilerin kaldırıldı ve tüm oturumların kapatıldı.',
 };
 
 export default function LoginPage() {
@@ -31,7 +34,8 @@ export default function LoginPage() {
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { user, loading: authLoading, login, devLogin } = useAuth();
+  const toast = useToast();
+  const { user, loading: authLoading, login, completeLogin2fa, devLogin } = useAuth();
   const redirectTo = safeRedirect(searchParams.get('redirect'));
   const notice = Object.keys(NOTICES).find((key) => searchParams.get(key) === '1');
 
@@ -40,11 +44,13 @@ function LoginForm() {
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
   const [formError, setFormError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  // İki adımlı doğrulama: şifre doğrulandıktan sonra backend'in verdiği kısa ömürlü challenge
+  const [challenge, setChallenge] = useState<string | null>(null);
 
   // Zaten oturum açıksa doğrudan hedefe gönder (form gönderimi kendi yönlendirmesini yapar)
   useEffect(() => {
-    if (!authLoading && user && !submitting) router.replace(redirectTo);
-  }, [authLoading, user, submitting, redirectTo, router]);
+    if (!authLoading && user && !submitting && !challenge) router.replace(redirectTo);
+  }, [authLoading, user, submitting, challenge, redirectTo, router]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -62,11 +68,40 @@ function LoginForm() {
       router.replace(redirectTo);
       return;
     }
+    if (result.requires2fa && result.challenge) {
+      setChallenge(result.challenge);
+      setPassword('');
+      setSubmitting(false);
+      return;
+    }
     setFormError(result.message || 'E-posta veya şifre hatalı.');
     setSubmitting(false);
   };
 
-  if (authLoading || (user && !submitting)) return <PageLoader label={user ? 'Yönlendiriliyorsun…' : 'Yükleniyor…'} />;
+  if (authLoading || (user && !submitting && !challenge)) return <PageLoader label={user ? 'Yönlendiriliyorsun…' : 'Yükleniyor…'} />;
+
+  if (challenge) {
+    return (
+      <AuthLayout title="Doğrulama kodu" description="Giriş yapmak için iki adımlı doğrulamayı tamamla.">
+        <TwoFactorStep
+          onBack={() => {
+            setChallenge(null);
+            setFormError('');
+          }}
+          onSubmit={async (input) => {
+            const res = await completeLogin2fa(challenge, input);
+            if (res.success) {
+              if (res.recoveryCodesRemaining !== undefined) {
+                toast.info(`Kurtarma kodu kullanıldı; ${res.recoveryCodesRemaining} kod kaldı. Profil → Güvenlik bölümünden yenileyebilirsin.`);
+              }
+              router.replace(redirectTo);
+            }
+            return res;
+          }}
+        />
+      </AuthLayout>
+    );
+  }
 
   return (
     <AuthLayout

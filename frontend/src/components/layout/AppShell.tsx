@@ -33,7 +33,7 @@ import NotificationBell from '@/components/notifications/NotificationBell';
 import { BARE_ROUTES, isGameRoute } from './nav';
 
 /** Herkese açık sayfalar: misafirler bu sayfalarda menüsüz, sade üst çubukla gezer. */
-const PUBLIC_ROUTES = ['/', '/terms', '/privacy'];
+const PUBLIC_ROUTES = ['/', '/terms', '/privacy', '/cerez-politikasi'];
 
 export default function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
@@ -44,7 +44,8 @@ export default function AppShell({ children }: { children: ReactNode }) {
   if (isGameRoute(pathname)) return <>{children}</>;
 
   // Ziyaretçi (veya oturum kontrol edilirken herkese açık sayfa): sade üst çubuk + footer
-  if (!user && (loading ? PUBLIC_ROUTES.includes(pathname) : true)) {
+  // /u/** herkese açık oyuncu profilleri de (sunucuda render edilir; misafir için sade düzen)
+  if (!user && (loading ? PUBLIC_ROUTES.includes(pathname) || pathname.startsWith('/u/') : true)) {
     return (
       <div className="flex min-h-dvh flex-col">
         <TopBar />

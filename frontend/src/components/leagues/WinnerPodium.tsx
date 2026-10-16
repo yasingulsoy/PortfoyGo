@@ -2,6 +2,7 @@ import { TrophyIcon } from '@heroicons/react/20/solid';
 import { Card } from '@portfoygo/shared/ui/Card';
 import { Delta } from '@portfoygo/shared/ui/Delta';
 import UserInitial from '@portfoygo/shared/ui/UserInitial';
+import ProfileLink from '@/components/profile/ProfileLink';
 import { cn } from '@portfoygo/shared/format';
 import { formatLeagueDate } from '@/lib/competition';
 import type { LeagueMember } from '@/types';
@@ -44,7 +45,9 @@ export default function WinnerPodium({ members, endsAt }: { members: LeagueMembe
           return (
             <li key={m.user_id} className={cn('flex min-w-0 flex-col items-center', rank === 1 ? 'order-2' : rank === 2 ? 'order-1' : 'order-3')}>
               <UserInitial name={m.username} size={rank === 1 ? 44 : 36} tone={rank === 1 ? 'gold' : m.is_me ? 'brand' : 'neutral'} />
-              <p className={cn('mt-1.5 w-full truncate text-center text-xs font-medium sm:text-sm', m.is_me ? 'text-brand' : 'text-fg')}>{m.username}</p>
+              <p className={cn('mt-1.5 w-full truncate text-center text-xs font-medium sm:text-sm', m.is_me ? 'text-brand' : 'text-fg')}>
+                <ProfileLink username={m.username} />
+              </p>
               {m.return_pct != null && <Delta value={m.return_pct} variant="text" className="text-xs" />}
               <div
                 className={cn('animate-enter mt-2 flex w-full flex-col items-center justify-start rounded-t-xl border border-b-0 pt-2.5', place.bar)}

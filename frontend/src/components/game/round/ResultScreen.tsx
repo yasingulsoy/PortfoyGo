@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useId, useRef, useState } from 'react';
-import { ArrowPathIcon, BoltIcon, ClipboardDocumentIcon, HomeIcon, XMarkIcon } from '@heroicons/react/20/solid';
+import { useEffect, useId, useRef } from 'react';
+import { ArrowPathIcon, BoltIcon, HomeIcon, XMarkIcon } from '@heroicons/react/20/solid';
 import { cn, formatUSD } from '@portfoygo/shared/format';
 import CoachReport from '@/components/arena/coach/CoachReport';
 import { LossStreakNotice } from '@/components/game/responsible';
@@ -11,6 +11,8 @@ import { BOT_LABEL } from '@/components/game/ui/VsScreen';
 import { duelOutcome, outcomeCopy, PCT_TONE_CLASS, pctTone, signedPct, soloCopy } from '@/components/game/model';
 import type { ArenaFinal, ArenaPosition, ArenaRound, ArenaRoundDuel, ArenaRoundScenario } from '@/types';
 import { PnlValue } from './TradePad';
+import { GameShareButton } from '@/components/common/ShareButton';
+import { profileUrl } from '@/lib/publicProfile';
 
 interface Props {
   roundId: string;
@@ -33,7 +35,6 @@ interface Props {
 export default function ResultScreen({ roundId, round, final, closed, duel, scenario, me, participants, rewards, onClose, onReplay, replaying, onRematch, rematching }: Props) {
   const titleId = useId();
   const primaryRef = useRef<HTMLButtonElement>(null);
-  const [copied, setCopied] = useState(false);
   const challenge = round.kind === 'challenge';
   const result = duel ? duelOutcome(final.return_pct, duel.opponent_return_pct, duel.result) : null;
   const copy = round.cancelled
@@ -58,15 +59,12 @@ export default function ResultScreen({ roundId, round, final, closed, duel, scen
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
 
-  const share = async () => {
+  // Paylaşım: sonuç metni (yalnızca yüzde; sanal para) + oyuncunun herkese açık profil bağlantısı
+  const sharePayload = () => {
     const what = duel ? `PortfoyGo düellosunda ${copy.title.replace('!', '').toLocaleLowerCase('tr')}` : `${durationLabel(round.duration_s)}lık PortfoyGo turunda`;
-    const text = `${what}: getirim ${signedPct(final.return_pct)} (sanal para). ${typeof window !== 'undefined' ? window.location.origin : ''}/oyun`;
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopied(true);
-    } catch {
-      setCopied(false);
-    }
+    const origin = typeof window !== 'undefined' ? window.location.origin : '';
+    const url = me.username ? profileUrl(me.username, origin) : `${origin}/oyun`;
+    return { title: 'PortfoyGo Arena', text: `${what}: getirim ${signedPct(final.return_pct)} (sanal para).`, url };
   };
 
   const coins = rewards.find((r) => r.kind === 'coins')?.amount;
@@ -165,9 +163,7 @@ export default function ResultScreen({ roundId, round, final, closed, duel, scen
             <GameLinkButton href="/oyun" variant="blue" size="md" block icon={<HomeIcon aria-hidden="true" />}>
               Ana Menü
             </GameLinkButton>
-            <GameButton variant="purple" size="md" block onClick={() => void share()} icon={<ClipboardDocumentIcon aria-hidden="true" />}>
-              {copied ? 'Kopyalandı' : 'Paylaş'}
-            </GameButton>
+            <GameShareButton variant="purple" size="md" block payload={sharePayload} />
           </div>
         </div>
 

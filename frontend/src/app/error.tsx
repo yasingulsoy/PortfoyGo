@@ -5,11 +5,13 @@ import { ArrowPathIcon, ExclamationTriangleIcon, HomeIcon } from '@heroicons/rea
 import Button, { LinkButton } from '@portfoygo/shared/ui/Button';
 import { Card } from '@portfoygo/shared/ui/Card';
 import { Alert } from '@portfoygo/shared/ui/Feedback';
+import { reportClientError } from '@portfoygo/shared/errors';
 
 /** Rota düzeyinde beklenmeyen hatalar için yakalayıcı. */
 export default function RouteError({ error, retry }: { error: Error & { digest?: string }; retry: () => void }) {
   useEffect(() => {
     console.error(error);
+    reportClientError('web', 'boundary', error, { digest: error.digest });
   }, [error]);
 
   return (

@@ -212,3 +212,86 @@ Yatırım İmparatorluğu (idle oyun): kullanıcı başına tek satırlık `idle
 ## 017_weekly_picks.sql
 
 Haftalık Seçim ("Kitlelerin Bilgeliği"): `weekly_pick_weeks` (hafta başına tek satır, `week_id` = yarışma Pazartesisinin ISO haftası, ör. `2026-W43`; Cumartesi 00:00 açılış → Pazar 15:00 açıklama → Pazartesi 00:00 başlangıç → Cumartesi 00:00 bitiş, Europe/Istanbul; iş adımı bayrakları ve kapanışta dondurulan kitle istatistikleri), `weekly_picks` (kullanıcı + hafta başına tek kör seçim: varlık, yön, en fazla 280 karakterlik not; giriş/çıkış fiyatı varlığın kendi kote para biriminde, getiri, sıra, `void`) ve `weekly_pick_comments` (açıklamadan sonra tartışma; yumuşak silme). Sadece yeni tablo ekler. Haftalar istek / `weekly-picks` işi (5 dk) ile kendiliğinden oluşturulur; ek veri taşıma gerekmez. Kurallar: `backend/src/services/picks/{config,timeline,scoring}.ts`.
+
+## 018_account_security.sql
+
+Hesap güvenliği (iki adımlı doğrulama) ve KVKK self-servis hesap silme. Yalnızca kolon/tablo **ekler**; mevcut veriye
+dokunmaz, tablo yeniden yazılmaz (sabit varsayılanlı `ADD COLUMN`).
+
+- `users`: `totp_secret_enc` (etkin TOTP anahtarı, **AES-256-GCM ile şifreli**, kullanıcı kimliği ek doğrulama verisi),
+  `totp_enabled_at`, `totp_pending_enc` / `totp_pending_at` (kurulumu süren anahtar, 15 dk), `totp_last_step` (aynı kodun
+  tekrar kullanılmasını engeller), `totp_failed_attempts` / `totp_locked_until` (art arda 5 hatalı kod → 15 dk kilit),
+  `is_deleted` / `deleted_at` (anonimleştirilmiş hesap). Kısıt: `totp_enabled_at` doluysa `totp_secret_enc` dolu olmalı.
+- `user_recovery_codes`: tek kullanımlık kurtarma kodları; kodun kendisi değil, sunucu anahtarıyla HMAC-SHA256 özeti saklanır.
+
+**Ortam:** `TOTP_ENC_KEY` (32 bayt; `openssl rand -hex 32`) production'da zorunludur — yoksa 2FA kurulamaz ve 2FA'lı hesaplar
+girişi tamamlayamaz. Anahtar değişirse mevcut 2FA kayıtları çözülemez. `ADMIN_REQUIRE_2FA` (production'da varsayılan açık):
+2FA'sı kapalı yöneticiler yönetim API'sinden `403 ADMIN_2FA_REQUIRED` alır.
+
+**Hesap silme** (`POST /api/me/delete`) kullanıcı satırını silmez, anonimleştirir: kullanıcı adı `silinmis_<rastgele>`, e-posta
+`…@silinmis.invalid`, şifre kullanılamaz, `token_version + 1`; bildirimler, takip listesi, etkinlik kayıtları, Sihirbaz anketleri
+gibi kişisel veriler silinir; işlem / sezon / lig / Arena sonuçları anonim kalır. Silinmiş hesaplar giriş yapamaz ve liderlik
+tablolarında / herkese açık listelerde görünmez (`COALESCE(u.is_deleted, false) = false`). Yeni kod bu kolonları okuduğu için
+**backend'i yayına almadan önce çalıştırın.**
+
+## 019_public_profiles.sql
+
+Herkese açık profiller ve haftalık e-posta özeti:
+
+- `users.profile_public BOOLEAN NOT NULL DEFAULT TRUE` — `/u/<kullanıcı-adı>` profili herkese açık mı (varsayılan açık). Kullanıcı
+  Profil → "Profil görünürlüğü" kartından değiştirir (`PATCH /api/me/profile-visibility`). Kapalıyken
+  `GET /api/public/users/:username` 404 `PROFILE_PRIVATE` döner ve site "Bu profil gizli" gösterir; oyun profili
+  (`/api/game/public-profile/:username`) de gizlenir. Profil yalnızca yüzde ve sıra içerir (tutar yok).
+- `email_digests (user_id, week_key)` — haftalık özet gönderim kaydı (`weekly-digest` işi, Pazartesi 09:00 İstanbul).
+  Kullanıcı + hafta başına tek satır: aynı hafta ikinci kez gönderilmez. Durumlar: `sending`, `sent`, `preview`
+  (geliştirmede yalnızca önizleme; gerçek gönderimi engellemez), `failed` (en fazla 3 deneme), `skipped`.
+- `portfolio_snapshots (taken_at, user_id)` kısmi indeksi (`day` / `start` satırları): özetin haftalık sıralama değişimi
+  sorgusu için.
+
+Özet tercihi ayrı kolon değildir: `users.notification_prefs.email_digest` (009'daki JSONB; yoksa açık sayılır).
+E-postadaki imzalı bağlantı (`GET/POST /api/email/unsubscribe?token=…`, RFC 8058 tek tık) bu alanı `false` yapar.
+Sadece kolon/tablo/indeks ekler; tablo yeniden yazılmaz, veri taşıma gerekmez. Yeni backend'i yayına almadan önce çalıştırın.
+
+## 020_trading_depth.sql
+
+İşlem derinliği: takip eden stop, açılışta gerçekleşen hisse emirleri (market-on-open), ABD seans kuralı ve döviz makası.
+Yalnızca `orders` tablosuna dokunur; mevcut satırlar değişmez ve eski backend kodu bu şemayla çalışmaya devam eder.
+
+- `orders.type` `VARCHAR(12)` → `VARCHAR(20)` (metadata değişikliği, tablo yeniden yazılmaz) ve yeni tipler:
+  `trailing_stop` (yalnızca satış) ve `market_on_open` (yalnızca hisse; alış/satış). `orders_type_check` /
+  `orders_side_type_check` yeniden oluşturulur (alışta `limit` veya `market_on_open`).
+- Yeni kolonlar: `trail_percent NUMERIC(9,4)`, `trail_amount NUMERIC(24,8)` (biri dolu), `high_water_price NUMERIC(24,8)`,
+  `high_water_at`, `execute_after` (MOO: seans açılışı). `orders_trailing_params_check` ve `orders_moo_check` kısıtları.
+
+Davranış (backend `services/orders.ts`, `services/marketHours.ts`, `services/pricing.ts`):
+
+- **Takip eden stop:** emir anındaki fiyat zirvedir; `orders` işi (dakikada bir) yalnızca **taze** fiyatlarla zirveyi yukarı
+  taşır (tek ifadeli, monoton `UPDATE … WHERE high_water_price < fiyat`) ve `trigger_price`'ı
+  `zirve × (1 − %/100)` ya da `zirve − TL` olarak günceller. Fiyat `trigger_price`'a inince piyasa fiyatından satılır
+  (eldeki miktara indirilir). Bayat fiyat ne zirveyi ne tetiklemeyi etkiler. `PATCH /api/orders/:id`
+  (`trail_percent` | `trail_amount`) mesafeyi değiştirir; zirve korunur, yeni tetikleme güncel fiyatın altında olmalı.
+- **ABD seansı:** NYSE 09:30–16:00 America/New_York (yaz saati Intl ile), hafta sonu + 2026–2027 NYSE tatilleri kapalı,
+  erken kapanışlar 13:00 (`NYSE_HOLIDAYS` / `NYSE_EARLY_CLOSES` — **her yıl güncellenmeli**; listede olmayan yıllarda
+  yalnızca hafta sonu kuralı). Borsa kapalıyken hisse piyasa alış/satışı `409 MARKET_CLOSED` (`next_open_at`) döner;
+  hisse limit / zarar durdur / kâr al / takip eden emirler yalnızca seans içinde ve fiyat **açılıştan sonra** alınmışsa
+  tetiklenir (açılıştan önce çekilen fiyat bir önceki kapanıştır). Kripto 7/24; döviz ve emtia değişmedi.
+  `GET /api/market/session` seans durumunu verir. `US_MARKET_HOURS=off` kuralı kapatır (backend testleri böyle çalışır).
+- **Açılışta (MOO) emir:** yalnızca borsa kapalıyken (açıkken `409 MARKET_OPEN`). `trigger_price` = referans (son) fiyat,
+  `execute_after` = bir sonraki açılış, `expires_at` = o seansın kapanışı. Alışta rezerv =
+  `computeBuyCost(miktar, referans × 1,05)` (limit alıştaki gibi `users.reserved_cash`'e taşınır). İş, açılıştan sonraki
+  ilk taze fiyatta gerçekleştirir. **Gap kararı:** açılış fiyatı %5 tamponu da aşarsa emir iptal edilmez, **yalnızca
+  ayrılan tutarın karşıladığı miktar** alınır (serbest bakiyeye asla dokunulmaz), artan rezerv iade edilir ve bildirimde
+  kısmi gerçekleşme yazar (`data.partial`, `requested_quantity`); hiç miktar alınamıyorsa emir `failed` olur ve rezervin
+  tamamı iade edilir. Gerekçe: kullanıcının niyeti "açılışta al"dır; kısmi gerçekleşme bu niyete iptalden daha yakındır
+  ve sanal para hiçbir koşulda rezervin ötesine geçmez. Seans içinde fiyat gelmezse kapanışta süresi dolar (iade).
+- **Döviz makası:** alışta satış kuru (önceki gibi), satışta **alış kuru** (`currencyTradePrice`: `min(alış, satış)`; alış
+  kuru yoksa satış kuru — ters/bozuk veride al-sat ile para yaratılamaz). Döviz satış emirleri (zarar durdur, kâr al, limit
+  satış, takip eden) alış kuruyla değerlendirilir. **Değerleme satış kurunda bırakıldı:** değerlemeyi alış kuruna çevirmek
+  döviz tutan herkesin varlığını bir anda makas kadar (USD ~%0,3, EUR ~%0,4, JPY ~%0,45) düşürür; bu, süren sezon/lig
+  getirilerini ve sıralamaları gerçek bir işlem olmadan bozar (referans varlıklar satış kuruyla alınmıştı). Yalnızca
+  işlem fiyatı değişti; makas maliyeti satışta gerçekleşir. Değerlemeyi alış kuruna (tasfiye değeri) geçirmek
+  istenirse bunu bir sezon başında (ayın 1'i) yapın.
+- **Bildirimler:** `order.moo_filled` (açılışta gerçekleşti, kısmi bilgisiyle) ve `order.trailing_triggered`
+  (zirve bilgisiyle); diğerleri `order.filled` / `order.expired` / `order.failed` olarak kalır.
+
+Veri taşıma yok. Kod, yeni kolonlar olmadan emir oluşturamaz/listeleyemez: **yeni backend'i yayına almadan önce çalıştırın.**

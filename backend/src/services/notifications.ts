@@ -49,7 +49,13 @@ export interface NotificationPrefs {
   competition: boolean;
   account: true;
   system: true;
+  /** Haftalık e-posta özeti (019; bildirim kategorisi değildir). Varsayılan açık; e-postadaki bağlantıyla da kapatılır. */
+  email_digest: boolean;
 }
+
+/** Bildirim kategorisi olmayan, kullanıcının açıp kapatabildiği e-posta tercihleri */
+export const EMAIL_PREF_KEYS = ['email_digest'] as const;
+export type EmailPrefKey = (typeof EMAIL_PREF_KEYS)[number];
 
 export interface ListOptions {
   limit: number;
@@ -272,6 +278,7 @@ export class NotificationService {
        SELECT u.id, $1::text, $2::text, $3::text, $4::text, $5::text, $6::jsonb, clock_timestamp()
          FROM users u
         WHERE COALESCE(u.is_banned, FALSE) = FALSE
+          AND COALESCE(u.is_deleted, FALSE) = FALSE
           AND ($2::text IN ('account', 'system') OR (u.notification_prefs -> $2::text) IS DISTINCT FROM 'false'::jsonb)
        RETURNING ${ITEM_COLUMNS}`,
       [v.type, v.category, v.title, v.body, v.link, v.data]
@@ -355,9 +362,9 @@ export class NotificationService {
     return NotificationService.toPrefs(r.rows[0]?.notification_prefs);
   }
 
-  static async setPrefs(userId: string, patch: Partial<Record<OptionalCategory, boolean>>): Promise<NotificationPrefs> {
+  static async setPrefs(userId: string, patch: Partial<Record<OptionalCategory | EmailPrefKey, boolean>>): Promise<NotificationPrefs> {
     const clean: Record<string, boolean> = {};
-    for (const key of OPTIONAL_CATEGORIES) {
+    for (const key of [...OPTIONAL_CATEGORIES, ...EMAIL_PREF_KEYS]) {
       if (typeof patch[key] === 'boolean') clean[key] = patch[key] as boolean;
     }
     const r = await pool.query(
@@ -370,7 +377,13 @@ export class NotificationService {
 
   static toPrefs(raw: unknown): NotificationPrefs {
     const p = (parseData(raw) ?? {}) as Record<string, unknown>;
-    return { orders: p.orders !== false, competition: p.competition !== false, account: true, system: true };
+    return {
+      orders: p.orders !== false,
+      competition: p.competition !== false,
+      account: true,
+      system: true,
+      email_digest: p.email_digest !== false,
+    };
   }
 
   // -------------------------------------------------------------------------

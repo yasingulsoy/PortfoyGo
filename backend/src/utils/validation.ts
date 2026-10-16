@@ -85,7 +85,9 @@ export const registerSchema = z.object({
     .trim()
     .min(3, 'Kullanıcı adı en az 3 karakter olmalı')
     .max(20, 'Kullanıcı adı en fazla 20 karakter olabilir')
-    .regex(/^[a-zA-Z0-9_]+$/, 'Kullanıcı adı sadece harf, rakam ve alt çizgi içerebilir'),
+    .regex(/^[a-zA-Z0-9_]+$/, 'Kullanıcı adı sadece harf, rakam ve alt çizgi içerebilir')
+    // Silinmiş (anonimleştirilmiş) hesapların öneki: yeni hesaplar bu adları alamaz
+    .refine((s) => !/^silinmis_/i.test(s), 'Bu kullanıcı adı kullanılamaz'),
   email: emailField,
   password: passwordField,
 });
@@ -341,3 +343,46 @@ export const leagueMemberParamsSchema = z.object({
   userId: uuidField('kullanıcı ID'),
 });
 export const leagueIdParamSchema = z.object({ id: uuidField('lig ID') });
+
+// ---------------------------------------------------------------------------
+// Hesap güvenliği (2FA) ve KVKK
+// ---------------------------------------------------------------------------
+
+/** 6 haneli TOTP kodu (boşluklar yok sayılır) */
+const totpCodeField = z
+  .string({ message: 'Doğrulama kodu gerekli' })
+  .transform((s) => s.replace(/\s+/g, ''))
+  .pipe(z.string().regex(/^\d{6}$/, 'Doğrulama kodu 6 haneli olmalı'));
+
+/** TOTP kodu ya da kurtarma kodu (XXXXX-XXXXX); biçim servis katmanında ayrıştırılır */
+const secondFactorField = z
+  .string({ message: 'Doğrulama kodu gerekli' })
+  .trim()
+  .min(6, 'Doğrulama kodu gerekli')
+  .max(32, 'Doğrulama kodu geçersiz');
+
+/** Girişte şifre gibi: yalnızca üst sınır (eski kısa şifreler kilitlenmesin) */
+const currentPasswordField = z
+  .string({ message: 'Şifre gerekli' })
+  .min(1, 'Şifre gerekli')
+  .max(72, 'Şifre en fazla 72 karakter olabilir');
+
+export const twoFactorEnableSchema = z.object({ code: totpCodeField });
+export const twoFactorDisableSchema = z.object({ password: currentPasswordField, code: secondFactorField });
+export const twoFactorRecoveryRegenSchema = z.object({ code: secondFactorField });
+
+export const loginTwoFactorSchema = z
+  .object({
+    challenge: z.string({ message: 'Doğrulama oturumu gerekli' }).min(16, 'Doğrulama oturumu geçersiz').max(2048, 'Doğrulama oturumu geçersiz'),
+    code: secondFactorField.optional(),
+    recovery_code: secondFactorField.optional(),
+  })
+  .refine((v) => !!(v.code || v.recovery_code), { message: 'Doğrulama kodu gerekli' });
+
+export const deleteAccountSchema = z.object({
+  password: currentPasswordField,
+  /** 2FA açıksa zorunlu: TOTP kodu ya da kurtarma kodu */
+  totp: secondFactorField.optional(),
+  /** Onay kutusuna yazılan kullanıcı adı (verilirse hesabın adıyla eşleşmeli) */
+  confirm_username: z.string().trim().max(50).optional(),
+});

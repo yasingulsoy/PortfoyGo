@@ -9,6 +9,8 @@
   ],
   "exports": {
     "./api": "./src/api/client.ts",
+    "./csp": "./src/csp.ts",
+    "./errors": "./src/errors.ts",
     "./format": "./src/format.ts",
     "./types": "./src/types.ts",
     "./url": "./src/url.ts",

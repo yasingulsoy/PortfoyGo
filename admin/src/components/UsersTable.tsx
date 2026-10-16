@@ -27,6 +27,7 @@ const STATUS_TABS: { value: UserStatusFilter; label: string }[] = [
   { value: 'banned', label: 'Yasaklı' },
   { value: 'admins', label: 'Yöneticiler' },
   { value: 'unverified', label: 'Doğrulanmamış' },
+  { value: 'deleted', label: 'Silinmiş' },
 ];
 
 export const userHref = (id: string) => `/users/${encodeURIComponent(id)}`;
@@ -217,9 +218,11 @@ export default function UsersTable({ currentUserId }: { currentUserId: string })
   );
 }
 
-export function StatusBadges({ user }: { user: Pick<AdminUser, 'isBanned' | 'isAdmin' | 'emailVerified'> }) {
+export function StatusBadges({ user }: { user: Pick<AdminUser, 'isBanned' | 'isAdmin' | 'emailVerified' | 'isDeleted' | 'isBot'> }) {
   return (
     <span className="flex flex-wrap gap-1">
+      {user.isDeleted && <Badge>Silindi (KVKK)</Badge>}
+      {user.isBot && <Badge>Bot</Badge>}
       {user.isBanned && <Badge tone="down">Yasaklı</Badge>}
       {user.isAdmin && <Badge tone="brand">Yönetici</Badge>}
       {user.emailVerified ? <Badge tone="up">Doğrulanmış</Badge> : <Badge>Doğrulanmamış</Badge>}

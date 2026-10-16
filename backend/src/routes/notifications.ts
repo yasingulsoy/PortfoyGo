@@ -6,6 +6,7 @@ import { parseOrThrow } from '../utils/validation';
 import { logger } from '../utils/logger';
 import { NOTIFICATION_CATEGORIES, NotificationService } from '../services/notifications';
 import { notificationBus } from '../services/notificationBus';
+import { trackSseConnection } from '../observability/metrics';
 
 /**
  * Bildirimler (/api/notifications) — tümü oturum gerektirir.
@@ -15,8 +16,8 @@ import { notificationBus } from '../services/notificationBus';
  *  POST   /:id/read                                                   → { id, read_at }
  *  POST   /read-all         { category? }                             → { updated }
  *  DELETE /:id                                                        → { id }
- *  GET    /prefs                                                      → { orders, competition, account: true, system: true }
- *  PUT    /prefs            { orders?, competition? }                 → aynı şekil
+ *  GET    /prefs                                                      → { orders, competition, account: true, system: true, email_digest }
+ *  PUT    /prefs            { orders?, competition?, email_digest? }  → aynı şekil
  *  GET    /stream           SSE: `event: unread` {count}, `event: notification` <item>, `: ping` (25 sn)
  */
 
@@ -69,10 +70,15 @@ const prefsSchema = z
     {
       orders: z.boolean({ message: 'orders true/false olmalı' }).optional(),
       competition: z.boolean({ message: 'competition true/false olmalı' }).optional(),
+      // Haftalık e-posta özeti (bildirim kategorisi değil; 019)
+      email_digest: z.boolean({ message: 'email_digest true/false olmalı' }).optional(),
     },
-    { error: 'Yalnızca "orders" ve "competition" tercihleri (true/false) değiştirilebilir' }
+    { error: 'Yalnızca "orders", "competition" ve "email_digest" tercihleri (true/false) değiştirilebilir' }
   )
-  .refine((v) => v.orders !== undefined || v.competition !== undefined, 'En az bir tercih gönderin (orders, competition)');
+  .refine(
+    (v) => v.orders !== undefined || v.competition !== undefined || v.email_digest !== undefined,
+    'En az bir tercih gönderin (orders, competition, email_digest)'
+  );
 
 const notFound = () => new AppError(404, 'Bildirim bulunamadı', 'NOT_FOUND');
 
@@ -140,6 +146,7 @@ router.get('/stream', (req: Request, res: Response) => {
   res.setHeader('Connection', 'keep-alive');
   res.setHeader('X-Accel-Buffering', 'no');
   res.flushHeaders();
+  const untrack = trackSseConnection('notifications');
   req.socket.setTimeout(0);
   req.socket.setNoDelay(true);
   req.socket.setKeepAlive(true);
@@ -183,6 +190,7 @@ router.get('/stream', (req: Request, res: Response) => {
     closed = true;
     clearInterval(heartbeat);
     unsubscribe();
+    untrack();
   }
   res.on('close', cleanup);
   res.on('error', cleanup);

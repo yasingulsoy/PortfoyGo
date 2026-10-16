@@ -6,8 +6,8 @@ import { useLivePortfolio } from '@/context/PortfolioContext';
 import { useAuth } from '@/context/AuthContext';
 import { Card, CardHeader } from '@portfoygo/shared/ui/Card';
 import { toolbarButtonClass } from '@/components/common/controls';
-import { CancelOrderDialog, OrderListRow } from '@/components/portfolio/OrdersCard';
-import { useOrders, type OrderRow } from '@/components/portfolio/useOrders';
+import { CancelOrderDialog, EditTrailingDialog, OrderListRow } from '@/components/portfolio/OrdersCard';
+import { isTrailing, useOrders, type OrderRow } from '@/components/portfolio/useOrders';
 import type { AssetType } from '@/types';
 
 /** Varlık sayfası: bu sembol için aktif bekleyen emirler (yoksa hiçbir şey göstermez). */
@@ -16,6 +16,7 @@ export default function SymbolOrdersCard({ type, symbol, livePrice }: { type: As
   const { refresh: refreshPortfolio } = useLivePortfolio();
   const { refreshUser } = useAuth();
   const [pending, setPending] = useState<OrderRow | null>(null);
+  const [editing, setEditing] = useState<OrderRow | null>(null);
 
   const rows = useMemo(() => active.filter((o) => o.assetType === type && o.symbol === symbol.toUpperCase()), [active, type, symbol]);
   if (rows.length === 0) return null;
@@ -33,7 +34,14 @@ export default function SymbolOrdersCard({ type, symbol, livePrice }: { type: As
       />
       <ul className="divide-y divide-line border-t border-line">
         {rows.map((o) => (
-          <OrderListRow key={o.id} order={o} livePrice={livePrice} showAvatar={false} onCancel={() => setPending(o)} />
+          <OrderListRow
+            key={o.id}
+            order={o}
+            livePrice={livePrice}
+            showAvatar={false}
+            onCancel={() => setPending(o)}
+            onEdit={isTrailing(o) ? () => setEditing(o) : undefined}
+          />
         ))}
       </ul>
       <CancelOrderDialog
@@ -42,6 +50,15 @@ export default function SymbolOrdersCard({ type, symbol, livePrice }: { type: As
         onCancelled={async () => {
           setPending(null);
           await Promise.all([refresh(), refreshPortfolio(), refreshUser()]);
+        }}
+      />
+      <EditTrailingDialog
+        order={editing}
+        livePrice={livePrice}
+        onClose={() => setEditing(null)}
+        onSaved={async () => {
+          setEditing(null);
+          await refresh();
         }}
       />
     </Card>

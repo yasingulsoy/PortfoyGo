@@ -15,6 +15,7 @@ import GameRoundScreen from '@/components/game/round/GameRoundScreen';
 import ProblemDialog from '@/components/game/ProblemDialog';
 import { toProblem, type GameProblem } from '@/components/game/useGameActions';
 import type { ArenaChallenge, ArenaLeaderboardRow } from '@/types';
+import ProfileLink from '@/components/profile/ProfileLink';
 
 /** Katılan oyuncu için tur ekranı başlangıçtan bu kadar önce açılır (geri sayım tur ekranında akar). */
 const OPEN_ROUND_BEFORE_MS = 2 * 60_000;
@@ -190,7 +191,9 @@ function Standings({ c }: { c: ArenaChallenge }) {
               <li key={`${r.rank}-${r.username}`} className={cn('flex items-center gap-2 rounded-xl px-2 py-1.5', r.is_me ? 'bg-(--g-gold-top) text-(--g-gold-ink)' : 'bg-(--g-panel-2)')}>
                 <span className="g-num w-7 text-center text-sm font-extrabold">{r.rank}</span>
                 <Avatar seed={r.username} size={28} ring={false} />
-                <span className="min-w-0 flex-1 truncate text-sm font-extrabold">{r.is_me ? `${r.username} (sen)` : r.username}</span>
+                <span className="min-w-0 flex-1 truncate text-sm font-extrabold">
+                  <ProfileLink username={r.username}>{r.is_me ? `${r.username} (sen)` : r.username}</ProfileLink>
+                </span>
                 <span className={cn('g-num text-sm font-extrabold', PCT_TONE_CLASS[pctTone(r.return_pct)])}>{signedPct(r.return_pct)}</span>
               </li>
             ))}
@@ -224,7 +227,9 @@ function Podium({ rows }: { rows: ArenaLeaderboardRow[] }) {
                   )}
                   <Avatar seed={r.username} size={p.place === 1 ? 64 : 52} />
                 </span>
-                <span className="w-full truncate text-center text-xs font-extrabold">{r.username}</span>
+                <span className="w-full truncate text-center text-xs font-extrabold">
+                  <ProfileLink username={r.username} />
+                </span>
                 <span className={cn('g-num text-xs font-extrabold', PCT_TONE_CLASS[pctTone(r.return_pct)])}>{signedPct(r.return_pct)}</span>
               </>
             ) : (

@@ -5,6 +5,9 @@ export interface AdminUser {
   emailVerified: boolean;
   isAdmin: boolean;
   isBanned: boolean;
+  /** KVKK: kullanıcı hesabını sildi (anonimleştirildi) */
+  isDeleted: boolean;
+  isBot: boolean;
   balance: number;
   portfolioValue: number;
   totalValue: number;
@@ -32,6 +35,8 @@ export function toAdminUser(r: any): AdminUser {
     emailVerified: bool(r?.email_verified ?? r?.emailVerified),
     isAdmin: bool(r?.is_admin ?? r?.isAdmin),
     isBanned: bool(r?.is_banned ?? r?.isBanned),
+    isDeleted: bool(r?.is_deleted ?? r?.isDeleted),
+    isBot: bool(r?.is_bot ?? r?.isBot),
     balance,
     portfolioValue,
     // Bekleyen limit alışlarda bloke edilen nakit de varlığa dahildir

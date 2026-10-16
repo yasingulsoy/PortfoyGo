@@ -169,13 +169,23 @@ Her iki uç da `/api` önekisizdir, rate limit dışındadır ve istek logunda g
 - `Authorization`, `Cookie`, `Set-Cookie` başlıkları ve `password` alanları loglara `[REDACTED]` olarak yazılır;
   sorgu dizeleri loglanmaz.
 
-**Güvenlik başlıkları (site ve admin):** `next.config.ts` her sayfaya Content-Security-Policy
-(`default-src 'self'`, `connect-src` = kendi origin + API origin'i + `https://api.coingecko.com`, `img-src https:`,
-`frame-ancestors 'none'`, …), `Referrer-Policy: strict-origin-when-cross-origin`, `X-Content-Type-Options: nosniff`,
-`X-Frame-Options: DENY` ve `Permissions-Policy` ekler. Next hidrasyonu satır içi betik kullandığı için
-`script-src 'unsafe-inline'` vardır; `'unsafe-eval'` ve HMR websocket'i (`ws:`) yalnızca geliştirmededir.
-`Strict-Transport-Security` yalnızca production derlemesinde gönderilir. Yeni bir dış alan adına tarayıcıdan istek
-atılacaksa `connect-src`'ye eklenmelidir.
+**Güvenlik başlıkları (site ve admin):** Content-Security-Policy her sayfa isteğinde `src/proxy.ts` tarafından
+**istek başına nonce** ile üretilir (ortak kurallar: `packages/shared/src/csp.ts`): `script-src 'self' 'nonce-…'
+'strict-dynamic'` (satır içi betik yalnızca nonce'luysa çalışır; Next kendi betiklerine nonce'u otomatik ekler, kök
+layout next-themes tema betiğine verir), `style-src 'self' 'unsafe-inline'` (React `style` öznitelikleri / grafikler),
+`connect-src` = kendi origin + API origin'i (fetch + SSE), `img-src 'self' data: blob: https:` (haber görselleri),
+`font-src 'self'` (next/font kendi sunucumuzdan), `frame-ancestors 'none'` + `X-Frame-Options: DENY` — OBS yayın
+katmanı `/yayin/**` hariç (`frame-ancestors *`, çerçevelenebilir). `'unsafe-eval'` ve HMR websocket'i (`ws:`) yalnızca
+geliştirmededir. Nonce'lu CSP nedeniyle tüm sayfalar dinamik render edilir. `next.config.ts` ayrıca
+`Referrer-Policy: strict-origin-when-cross-origin`, `X-Content-Type-Options: nosniff`, `Permissions-Policy` ve
+(production'da) `Strict-Transport-Security` ekler. Yeni bir dış alan adına tarayıcıdan istek atılacak / betik
+yüklenecekse `packages/shared/src/csp.ts`'e eklenmelidir.
+
+**İki adımlı doğrulama ve KVKK:** Kullanıcılar Profil → Güvenlik'ten TOTP 2FA açar (QR + 10 kurtarma kodu);
+girişte ikinci adım `POST /api/auth/login/2fa`. Anahtarlar `TOTP_ENC_KEY` ile şifreli saklanır (production'da zorunlu);
+`ADMIN_REQUIRE_2FA` (production'da varsayılan açık) yönetim API'sini 2FA'lı yöneticilere sınırlar. Profil → Hesap ve
+veriler: `GET /api/me/export` (JSON veri kopyası, saatte 3) ve `POST /api/me/delete` (anonimleştirerek silme). Yerel
+hızlı giriş (`/api/auth/dev-login`, yalnızca yerel DB) 2FA adımını atlar.
 
 ## Uçtan uca testler (Playwright)
 

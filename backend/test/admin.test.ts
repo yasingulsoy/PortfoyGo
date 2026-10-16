@@ -450,6 +450,16 @@ describe('Admin API (PGlite)', () => {
     res = await request(app).get('/api/admin/users?status=unverified&search=zz').set(admin.auth);
     expect(res.body.users.map((u: any) => u.id)).toEqual([unv.id]);
     expect((await request(app).get('/api/admin/users?status=vip').set(admin.auth)).status).toBe(400);
+
+    // KVKK: kendi hesabını silen kullanıcı işaretlenir ve ayrı filtrelenir
+    const gone = await newUser({ prefix: 'zzGone' });
+    await q(`UPDATE users SET is_deleted = true, deleted_at = now() WHERE id = $1`, [gone.id]);
+    res = await request(app).get('/api/admin/users?status=deleted&search=zzgone').set(admin.auth);
+    expect(res.body.users).toHaveLength(1);
+    expect(res.body.users[0]).toMatchObject({ id: gone.id, is_deleted: true, is_bot: false });
+    expect(res.body.users[0].deleted_at).toBeTruthy();
+    res = await request(app).get(`/api/admin/users/${gone.id}`).set(admin.auth);
+    expect(res.body.data?.user ?? res.body.user).toMatchObject({ is_deleted: true });
   });
 
   it('GET /admin/users/:id: detay (varlıklar, işlemler, emirler, aktivite, ligler, ödüller)', async () => {

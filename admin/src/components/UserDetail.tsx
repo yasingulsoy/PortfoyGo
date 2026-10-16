@@ -17,7 +17,7 @@ import {
   UserGroupIcon,
 } from '@heroicons/react/20/solid';
 import { Card } from '@portfoygo/shared/ui/Card';
-import { Badge, EmptyState, Skeleton } from '@portfoygo/shared/ui/Feedback';
+import { Alert, Badge, EmptyState, Skeleton } from '@portfoygo/shared/ui/Feedback';
 import Button, { LinkButton } from '@portfoygo/shared/ui/Button';
 import Tabs from '@portfoygo/shared/ui/Tabs';
 import UserInitial from '@portfoygo/shared/ui/UserInitial';
@@ -106,6 +106,8 @@ export default function UserDetail({ userId }: { userId: string }) {
   const u = data.user;
   const isAdmin = bool(u.is_admin);
   const isBanned = bool(u.is_banned);
+  const isDeleted = bool(u.is_deleted);
+  const isBot = bool(u.is_bot);
   const verified = bool(u.email_verified);
   const self = String(me?.id ?? '') === String(u.id);
   const balance = num(u.balance);
@@ -187,6 +189,12 @@ export default function UserDetail({ userId }: { userId: string }) {
       <PageBreadcrumb title={u.username} crumbs={crumbs} />
 
       <div className="space-y-4 md:space-y-6">
+        {isDeleted && (
+          <Alert tone="info">
+            Bu hesap{u.deleted_at ? ` ${formatDateTime(u.deleted_at)} tarihinde` : ''} kullanıcı tarafından silindi. Kişisel veriler
+            anonimleştirildi; kalan işlem kayıtları yalnızca sıralama ve lig tutarlılığı için tutuluyor.
+          </Alert>
+        )}
         {/* Profil başlık kartı (TailAdmin profil düzeni) */}
         <Card className="p-5 lg:p-6">
           <div className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
@@ -196,6 +204,8 @@ export default function UserDetail({ userId }: { userId: string }) {
                 <h2 className="truncate text-lg font-semibold text-fg">{u.username}</h2>
                 <p className="mt-0.5 truncate text-sm text-muted">{u.email}</p>
                 <div className="mt-2 flex flex-wrap justify-center gap-1.5 sm:justify-start">
+                  {isDeleted && <Badge>Silindi (KVKK)</Badge>}
+                  {isBot && <Badge>Bot</Badge>}
                   {isBanned && <Badge tone="down">Yasaklı</Badge>}
                   {isAdmin && <Badge tone="brand">Yönetici</Badge>}
                   {verified ? <Badge tone="up">E-posta doğrulanmış</Badge> : <Badge tone="gold">E-posta doğrulanmamış</Badge>}

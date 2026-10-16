@@ -7,6 +7,7 @@ const PAGES: { path: string; priority: number; changeFrequency: MetadataRoute.Si
   { path: '/login', priority: 0.5, changeFrequency: 'monthly' },
   { path: '/terms', priority: 0.3, changeFrequency: 'yearly' },
   { path: '/privacy', priority: 0.3, changeFrequency: 'yearly' },
+  { path: '/cerez-politikasi', priority: 0.2, changeFrequency: 'yearly' },
 ];
 
 export default function sitemap(): MetadataRoute.Sitemap {

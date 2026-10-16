@@ -1,5 +1,5 @@
 import express, { Request } from 'express';
-import rateLimit from 'express-rate-limit';
+import { createRateLimiter } from '../infra/rateLimitStore';
 import { z } from 'zod';
 import { authenticateToken, requireUser } from '../middleware/auth';
 import { PROFILE_IDS, questionnaireView } from '../services/advisor/questionnaire';
@@ -100,7 +100,7 @@ const listQuery = z.object({
 const userKey = (prefix: string) => (req: Request) => `${prefix}:${(req as Request & { user?: { id: string } }).user?.id ?? 'anon'}`;
 
 /** Plan üretimi (CPU yoğun): kullanıcı başına saatte 20 */
-const planLimiter = rateLimit({
+const planLimiter = createRateLimiter('advisor-plan', {
   windowMs: 60 * 60 * 1000,
   limit: 20,
   standardHeaders: 'draft-7',
@@ -110,7 +110,7 @@ const planLimiter = rateLimit({
 });
 
 /** Anket kaydı / plan uygulama: kullanıcı başına saatte 60 */
-const writeLimiter = rateLimit({
+const writeLimiter = createRateLimiter('advisor-write', {
   windowMs: 60 * 60 * 1000,
   limit: 60,
   standardHeaders: 'draft-7',

@@ -1,5 +1,5 @@
 import express, { NextFunction, Request, Response } from 'express';
-import rateLimit from 'express-rate-limit';
+import { createRateLimiter } from '../infra/rateLimitStore';
 import { z } from 'zod';
 import { authenticateToken, optionalAuth, optionalUserId, requireUser } from '../middleware/auth';
 import { GameError } from '../services/game/common';
@@ -137,7 +137,7 @@ const usernameParams = z.object({
 // ---------------------------------------------------------------------------
 
 /** Oyun yazma işlemleri: kullanıcı başına dakikada 60 */
-const gameWriteLimiter = rateLimit({
+const gameWriteLimiter = createRateLimiter('game-write', {
   windowMs: 60_000,
   limit: 60,
   standardHeaders: 'draft-7',

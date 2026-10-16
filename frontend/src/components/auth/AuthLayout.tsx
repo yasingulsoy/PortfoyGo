@@ -21,6 +21,7 @@ export default function AuthLayout({ title, description, children, footer }: Aut
         <>
           <Link href="/terms" className="hover:text-fg">Kullanım şartları</Link>
           <Link href="/privacy" className="hover:text-fg">Gizlilik politikası</Link>
+          <Link href="/cerez-politikasi" className="hover:text-fg">Çerezler</Link>
           <span>© {new Date().getFullYear()} PortfoyGo</span>
         </>
       }

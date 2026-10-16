@@ -15,7 +15,13 @@ export const ASSET_TYPE_OPTIONS = [
 export const sideLabel = (s: string) => (s === 'buy' ? 'Alış' : s === 'sell' ? 'Satış' : s);
 export const sideTone = (s: string): Tone => (s === 'buy' ? 'up' : s === 'sell' ? 'down' : 'neutral');
 
-const ORDER_TYPE: Record<string, string> = { limit: 'Limit', stop_loss: 'Zarar durdur', take_profit: 'Kâr al' };
+const ORDER_TYPE: Record<string, string> = {
+  limit: 'Limit',
+  stop_loss: 'Zarar durdur',
+  take_profit: 'Kâr al',
+  trailing_stop: 'Takip eden stop',
+  market_on_open: 'Açılışta',
+};
 export const orderTypeLabel = (t: string) => ORDER_TYPE[t] ?? t;
 
 export const ORDER_STATUS: Record<OrderStatus, { label: string; tone: Tone }> = {

@@ -1,5 +1,5 @@
 import express, { NextFunction, Request, Response } from 'express';
-import rateLimit from 'express-rate-limit';
+import { createRateLimiter } from '../infra/rateLimitStore';
 import { z } from 'zod';
 import { authenticateToken, optionalAuth, optionalUserId, requireUser } from '../middleware/auth';
 import { AuditService } from '../services/audit';
@@ -125,7 +125,7 @@ const assetsQuery = z.object({
 // ---------------------------------------------------------------------------
 
 /** Seçim / yorum yazma: kullanıcı başına dakikada 30 (yorumlar ayrıca 15 sn + günlük 40 ile sınırlı) */
-const picksWriteLimiter = rateLimit({
+const picksWriteLimiter = createRateLimiter('picks-write', {
   windowMs: 60_000,
   limit: 30,
   standardHeaders: 'draft-7',

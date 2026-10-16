@@ -95,7 +95,7 @@ const metricsQuerySchema = z.object({
 
 const usersQuerySchema = paginationSchema.extend({
   search: optionalText(100),
-  status: optionalEnum(['all', 'banned', 'admins', 'unverified'] as const, 'Geçersiz kullanıcı durumu'),
+  status: optionalEnum(['all', 'banned', 'admins', 'unverified', 'deleted'] as const, 'Geçersiz kullanıcı durumu'),
 });
 
 const transactionsQuerySchema = paginationSchema.extend({
@@ -109,7 +109,7 @@ const transactionsQuerySchema = paginationSchema.extend({
 const ORDER_STATUSES = ['active', 'filled', 'cancelled', 'expired', 'failed', 'all'] as const;
 const ordersQuerySchema = paginationSchema.extend({
   status: optionalEnum(ORDER_STATUSES, 'Geçersiz emir durumu').transform((s) => s ?? 'all'),
-  type: optionalEnum(['limit', 'stop_loss', 'take_profit'] as const, 'Geçersiz emir tipi'),
+  type: optionalEnum(['limit', 'stop_loss', 'take_profit', 'trailing_stop', 'market_on_open'] as const, 'Geçersiz emir tipi'),
   search: optionalText(100),
 });
 
@@ -237,7 +237,7 @@ router.post(
 // Kullanıcılar
 // ---------------------------------------------------------------------------
 
-// ?limit=1..100&offset>=0&search=&status=all|banned|admins|unverified
+// ?limit=1..100&offset>=0&search=&status=all|banned|admins|unverified|deleted
 // Yanıt: { success, users, total } (eski şekil) + data: { items, total, limit, offset }
 router.get(
   '/users',
@@ -407,7 +407,8 @@ router.get(
 router.get(
   '/jobs',
   asyncHandler(async (_req, res) => {
-    res.json({ success: true, data: jobs.list() });
+    // Bu süreç + (Redis varsa) worker / diğer örneklerin paylaştığı son çalışma durumu
+    res.json({ success: true, data: await jobs.listAll() });
   })
 );
 

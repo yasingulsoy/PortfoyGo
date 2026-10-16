@@ -1,7 +1,9 @@
 import type { Metadata } from 'next';
+import { headers } from 'next/headers';
 import { Geist, Geist_Mono, Outfit } from 'next/font/google';
 import './globals.css';
 import Providers from '@/components/Providers';
+import ClientErrorReporter from '@portfoygo/shared/ui/ClientErrorReporter';
 import AdminShell from '@/components/AdminShell';
 
 const geistSans = Geist({ variable: '--font-geist-sans', subsets: ['latin', 'latin-ext'] });
@@ -15,13 +17,17 @@ export const metadata: Metadata = {
   icons: { icon: '/fav.ico' },
 };
 
-export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+  // CSP nonce'u (src/proxy.ts): next-themes tema betiği için; headers() sayfaları dinamik render eder
+  const nonce = (await headers()).get('x-nonce') ?? undefined;
   return (
     <html lang="tr" suppressHydrationWarning>
       <body className={`${outfit.variable} ${geistSans.variable} ${geistMono.variable} min-h-dvh bg-canvas text-fg antialiased`}>
-        <Providers>
+        <Providers nonce={nonce}>
           <AdminShell>{children}</AdminShell>
         </Providers>
+        {/* Yakalanmamış tarayıcı hatalarını POST /api/client-errors'a bildirir (kişisel veri yok) */}
+        <ClientErrorReporter app="admin" />
       </body>
     </html>
   );

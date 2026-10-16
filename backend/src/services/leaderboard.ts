@@ -1,4 +1,5 @@
 import pool from '../config/database';
+import { TtlCache, ttlFromEnv } from '../utils/ttlCache';
 
 /** Yeni hesaplara verilen başlangıç sanal bakiyesi (kümülatif getiri buna göre) */
 export const INITIAL_ACCOUNT_BALANCE = 100_000;
@@ -18,6 +19,40 @@ export interface LeaderboardEntry {
   /** week: toplam varlık − hafta başı referans (o haftanın TL getirisi) */
   week_profit_loss_tl?: number;
 }
+
+type LeaderboardResult = { success: boolean; board?: LeaderboardBoard; leaderboard?: LeaderboardEntry[] };
+
+/**
+ * Sıralama önbelleği (yük testiyle ölçüldü: her /api/auth/profile ve liderlik isteği users + portfolio_items
+ * üzerinde tam tarama + pencere fonksiyonu çalıştırıyordu; 1.000 kullanıcıda ~8 ms/sorgu). Sıralar fiyatlarla
+ * (2 dk'da bir) değiştiği için kısa TTL yeterli: LEADERBOARD_CACHE_MS (varsayılan 15 sn; 0 → kapalı;
+ * NODE_ENV=test'te kapalı). Çoklu örnekte her örnek kendi kopyasını tutar (TTL kadar tutarsızlık olabilir).
+ */
+const leaderboardTtl = ttlFromEnv('LEADERBOARD_CACHE_MS', 15_000);
+const leaderboardCache = new TtlCache<LeaderboardResult>(leaderboardTtl, 32);
+const rankMapCache = new TtlCache<Map<string, number>>(leaderboardTtl, 1);
+
+/** Kümülatif sıralama ($1 = başlangıç bakiyesi): `ranked(id, rn)` CTE'si */
+const ALLTIME_RANKED_CTE = `WITH inv AS (
+         SELECT user_id, SUM(profit_loss) AS total_profit_loss, COALESCE(SUM(total_value), 0) AS portfolio_value
+           FROM portfolio_items
+          GROUP BY user_id
+       ),
+       ranked AS (
+         SELECT u.id,
+                ROW_NUMBER() OVER (
+                  ORDER BY
+                    (u.balance + u.reserved_cash + COALESCE(inv.portfolio_value, 0) - $1) / $1 * 100 DESC NULLS LAST,
+                    COALESCE(inv.total_profit_loss, 0) DESC,
+                    u.created_at ASC
+                ) AS rn
+           FROM users u
+           LEFT JOIN inv ON u.id = inv.user_id
+          WHERE u.email_verified = true
+            AND (u.is_banned IS NULL OR u.is_banned = false)
+        AND COALESCE(u.is_bot, false) = false AND COALESCE(u.is_deleted, false) = false
+       )
+`;
 
 export class LeaderboardService {
   private static currentIsoWeekKeyQuery = `
@@ -84,12 +119,11 @@ export class LeaderboardService {
     board?: LeaderboardBoard;
     leaderboard?: LeaderboardEntry[];
   }> {
-    // Not: Sıralama sorgu anında hesaplanır; users tablosu bu istekte YAZILMAZ.
-    // Hafta başı referansları cron (ve sunucu açılışı) ile güncellenir.
-    if (board === 'week') {
-      return this.getWeeklyLeaderboardInner(limit);
-    }
-    return this.getAllTimeLeaderboardInner(limit);
+    // Not: Sıralama sorgu anında hesaplanır (LEADERBOARD_CACHE_MS kadar önbellekli); users tablosu bu istekte
+    // YAZILMAZ. Hafta başı referansları cron (ve sunucu açılışı) ile güncellenir.
+    return leaderboardCache.get(`${board}:${limit}`, () =>
+      board === 'week' ? this.getWeeklyLeaderboardInner(limit) : this.getAllTimeLeaderboardInner(limit)
+    );
   }
 
   private static async getAllTimeLeaderboardInner(
@@ -115,7 +149,7 @@ export class LeaderboardService {
       LEFT JOIN inv ON u.id = inv.user_id
       WHERE u.email_verified = true
         AND (u.is_banned IS NULL OR u.is_banned = false)
-        AND COALESCE(u.is_bot, false) = false
+        AND COALESCE(u.is_bot, false) = false AND COALESCE(u.is_deleted, false) = false
       ORDER BY
         (u.balance + u.reserved_cash + COALESCE(inv.portfolio_value, 0) - $1) / $1 * 100 DESC NULLS LAST,
         COALESCE(inv.total_profit_loss, 0) DESC,
@@ -171,7 +205,7 @@ export class LeaderboardService {
       LEFT JOIN inv ON u.id = inv.user_id
       WHERE u.email_verified = true
         AND (u.is_banned IS NULL OR u.is_banned = false)
-        AND COALESCE(u.is_bot, false) = false
+        AND COALESCE(u.is_bot, false) = false AND COALESCE(u.is_deleted, false) = false
       ORDER BY
         CASE
           WHEN COALESCE(u.week_baseline_equity, 0) > 0
@@ -205,34 +239,23 @@ export class LeaderboardService {
   }
 
   /**
-   * Tek kullanıcının kümülatif sırası (sorgu anında window function ile; tabloya yazmaz).
-   * Doğrulanmamış / yasaklı kullanıcılar için null.
+   * Tek kullanıcının kümülatif sırası (window function ile; tabloya yazmaz). Doğrulanmamış / yasaklı kullanıcılar
+   * için null. Önbellek açıkken (LEADERBOARD_CACHE_MS) tüm sıralama haritası TTL başına BİR kez hesaplanır ve
+   * her profil isteği haritadan okunur; kapalıyken (testler) eskisi gibi tek kullanıcı sorgusu çalışır.
    */
   static async getAllTimeRank(userId: string): Promise<number | null> {
-    const r = await pool.query(
-      `WITH inv AS (
-         SELECT user_id, SUM(profit_loss) AS total_profit_loss, COALESCE(SUM(total_value), 0) AS portfolio_value
-           FROM portfolio_items
-          GROUP BY user_id
-       ),
-       ranked AS (
-         SELECT u.id,
-                ROW_NUMBER() OVER (
-                  ORDER BY
-                    (u.balance + u.reserved_cash + COALESCE(inv.portfolio_value, 0) - $1) / $1 * 100 DESC NULLS LAST,
-                    COALESCE(inv.total_profit_loss, 0) DESC,
-                    u.created_at ASC
-                ) AS rn
-           FROM users u
-           LEFT JOIN inv ON u.id = inv.user_id
-          WHERE u.email_verified = true
-            AND (u.is_banned IS NULL OR u.is_banned = false)
-        AND COALESCE(u.is_bot, false) = false
-       )
-       SELECT rn FROM ranked WHERE id = $2`,
-      [INITIAL_ACCOUNT_BALANCE, userId]
-    );
+    if (leaderboardTtl() > 0) {
+      const ranks = await rankMapCache.get('alltime', () => LeaderboardService.computeAllTimeRanks());
+      return ranks.get(userId) ?? null;
+    }
+    const r = await pool.query(`${ALLTIME_RANKED_CTE} SELECT rn FROM ranked WHERE id = $2`, [INITIAL_ACCOUNT_BALANCE, userId]);
     return r.rows[0] ? parseInt(r.rows[0].rn, 10) : null;
+  }
+
+  /** Tüm kullanıcıların kümülatif sırası (id → sıra); getAllTimeRank önbelleği için. */
+  static async computeAllTimeRanks(): Promise<Map<string, number>> {
+    const r = await pool.query(`${ALLTIME_RANKED_CTE} SELECT id, rn FROM ranked`, [INITIAL_ACCOUNT_BALANCE]);
+    return new Map(r.rows.map((row: { id: string; rn: string | number }) => [row.id, Number(row.rn)]));
   }
 
   /**
@@ -244,7 +267,7 @@ export class LeaderboardService {
       await pool.query(`
         UPDATE users
         SET rank = NULL
-        WHERE (email_verified = false OR (is_banned IS NOT NULL AND is_banned = true) OR COALESCE(is_bot, false) = true)
+        WHERE (email_verified = false OR (is_banned IS NOT NULL AND is_banned = true) OR COALESCE(is_bot, false) = true OR COALESCE(is_deleted, false) = true)
           AND rank IS NOT NULL
       `);
 
@@ -271,7 +294,7 @@ export class LeaderboardService {
            ) inv ON u2.id = inv.user_id
            WHERE u2.email_verified = true
              AND (u2.is_banned IS NULL OR u2.is_banned = false)
-             AND COALESCE(u2.is_bot, false) = false
+             AND COALESCE(u2.is_bot, false) = false AND COALESCE(u2.is_deleted, false) = false
          ) ranked
          WHERE u.id = ranked.id
            AND u.rank IS DISTINCT FROM ranked.rn`,
@@ -309,7 +332,7 @@ export class LeaderboardService {
           FROM users u2
           WHERE u2.email_verified = true
             AND (u2.is_banned IS NULL OR u2.is_banned = false)
-             AND COALESCE(u2.is_bot, false) = false
+             AND COALESCE(u2.is_bot, false) = false AND COALESCE(u2.is_deleted, false) = false
         ),
         w AS (
           SELECT id, RANK() OVER (ORDER BY wret DESC NULLS LAST) AS wk

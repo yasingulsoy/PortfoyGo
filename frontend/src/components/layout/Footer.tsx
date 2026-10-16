@@ -17,6 +17,7 @@ export default function Footer() {
         <nav aria-label="Alt bağlantılar" className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-muted">
           <Link href="/terms" className="transition-colors hover:text-fg">Kullanım şartları</Link>
           <Link href="/privacy" className="transition-colors hover:text-fg">Gizlilik</Link>
+          <Link href="/cerez-politikasi" className="transition-colors hover:text-fg">Çerez politikası</Link>
           <span className="text-subtle">© {new Date().getFullYear()} PortfoyGo</span>
         </nav>
       </div>

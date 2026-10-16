@@ -1,5 +1,5 @@
 import express, { NextFunction, Request, Response } from 'express';
-import rateLimit from 'express-rate-limit';
+import { createRateLimiter } from '../infra/rateLimitStore';
 import { z } from 'zod';
 import { authenticateToken, optionalAuth, optionalUserId, requireUser } from '../middleware/auth';
 import { AuditService } from '../services/audit';
@@ -181,7 +181,7 @@ const challengesQuery = z.object({
 // ---------------------------------------------------------------------------
 
 /** Arena yazma işlemleri: kullanıcı başına dakikada 120 (tur oluşturma ayrıca saatlik sınırla korunur) */
-const arenaWriteLimiter = rateLimit({
+const arenaWriteLimiter = createRateLimiter('arena-write', {
   windowMs: 60_000,
   limit: 120,
   standardHeaders: 'draft-7',
@@ -191,7 +191,7 @@ const arenaWriteLimiter = rateLimit({
 });
 
 /** Arena sorgulama (düello / eşleştirme durumu yoklaması): kullanıcı başına dakikada 240 */
-const arenaPollLimiter = rateLimit({
+const arenaPollLimiter = createRateLimiter('arena-poll', {
   windowMs: 60_000,
   limit: 240,
   standardHeaders: 'draft-7',
@@ -201,7 +201,7 @@ const arenaPollLimiter = rateLimit({
 });
 
 /** Herkese açık yayın durumu: IP başına dakikada 120 */
-const broadcastLimiter = rateLimit({
+const broadcastLimiter = createRateLimiter('arena-broadcast', {
   windowMs: 60_000,
   limit: 120,
   standardHeaders: 'draft-7',
@@ -210,7 +210,7 @@ const broadcastLimiter = rateLimit({
 });
 
 /** Herkese açık yayın akışı bağlantısı: IP başına dakikada 20 (ayrıca eşzamanlı bağlantı sınırı var) */
-const broadcastStreamLimiter = rateLimit({
+const broadcastStreamLimiter = createRateLimiter('arena-broadcast-stream', {
   windowMs: 60_000,
   limit: 20,
   standardHeaders: 'draft-7',

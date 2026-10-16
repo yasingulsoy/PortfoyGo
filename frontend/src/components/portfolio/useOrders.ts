@@ -26,6 +26,12 @@ export interface OrderRow {
   expiresAt: string | null;
   createdAt: string;
   updatedAt: string;
+  /** Takip eden stop: yüzde VEYA TL mesafe, zirve fiyatı (triggerPrice = güncel tetikleme) */
+  trailPercent: number | null;
+  trailAmount: number | null;
+  highWater: number | null;
+  /** Açılışta emri: en erken gerçekleşme (seans açılışı); triggerPrice = referans fiyat */
+  executeAfter: string | null;
 }
 
 /** Tüm bileşenler aynı anahtarı paylaşır (tek istek, ortak önbellek). */
@@ -41,9 +47,24 @@ export const ORDER_TYPE_LABEL: Record<`${OrderSide}:${OrderType}`, string> = {
   'sell:limit': 'Limit satış',
   'sell:stop_loss': 'Zarar durdur',
   'sell:take_profit': 'Kâr al',
+  'sell:trailing_stop': 'Takip eden stop',
+  'buy:market_on_open': 'Açılışta alış',
+  'sell:market_on_open': 'Açılışta satış',
   'buy:stop_loss': 'Zarar durdur',
   'buy:take_profit': 'Kâr al',
+  'buy:trailing_stop': 'Takip eden stop',
 };
+
+/** Tetiklemesi fiyata bağlı olmayan emir (açılışta): tetikleme sütununda referans fiyat gösterilir. */
+export const isMarketOnOpen = (o: Pick<OrderRow, 'type'>) => o.type === 'market_on_open';
+export const isTrailing = (o: Pick<OrderRow, 'type'>) => o.type === 'trailing_stop';
+
+/** "%5" ya da "₺20" — takip mesafesi */
+export function trailLabel(o: Pick<OrderRow, 'trailPercent' | 'trailAmount'>): string | null {
+  if (o.trailPercent != null) return `%${o.trailPercent.toLocaleString('tr-TR', { maximumFractionDigits: 2 })}`;
+  if (o.trailAmount != null) return `₺${o.trailAmount.toLocaleString('tr-TR', { maximumFractionDigits: 2 })}`;
+  return null;
+}
 
 export const orderLabel = (o: Pick<OrderRow, 'side' | 'type'>) => ORDER_TYPE_LABEL[`${o.side}:${o.type}`] ?? o.type;
 
@@ -90,6 +111,10 @@ function mapOrder(o: any): OrderRow {
     expiresAt: strOrNull(o.expires_at),
     createdAt: String(o.created_at ?? ''),
     updatedAt: String(o.updated_at ?? o.created_at ?? ''),
+    trailPercent: numOrNull(o.trail_percent),
+    trailAmount: numOrNull(o.trail_amount),
+    highWater: numOrNull(o.high_water_price),
+    executeAfter: strOrNull(o.execute_after),
   };
 }
 

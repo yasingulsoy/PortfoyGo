@@ -28,6 +28,7 @@ import { PageLoader } from '@portfoygo/shared/ui/Spinner';
 import { useAdminAuth, useRequireAdmin } from '@/lib/auth';
 import { APP_URL } from '@/lib/api';
 import AdminUserMenu from './AdminUserMenu';
+import TwoFactorRequired from './TwoFactorRequired';
 
 const SECTIONS: SidebarSection[] = [
   {
@@ -69,6 +70,9 @@ export default function AdminShell({ children }: { children: ReactNode }) {
 function Guarded({ children }: { children: ReactNode }) {
   const { status, ready } = useRequireAdmin();
   const { logout } = useAdminAuth();
+
+  // Yönetici, ama ADMIN_REQUIRE_2FA açık ve hesabında iki adımlı doğrulama kapalı
+  if (status === '2fa_required') return <TwoFactorRequired />;
 
   // Yönetici olmayan hesap: menüsüz, sade bir uyarı ekranı
   if (status === 'forbidden') {

@@ -14,9 +14,12 @@ const CSRF_HEADERS = { 'X-Requested-With': 'PortfoyGo' } as const;
 const LEGACY_KEYS = ['token', 'user', 'portfolio'];
 
 export class ApiError extends Error {
-  constructor(message: string, public status: number) {
+  /** Backend'in makinece okunur hata kodu (ör. 'INVALID_2FA_CODE', 'ADMIN_2FA_REQUIRED'); yoksa undefined */
+  public code?: string | null;
+  constructor(message: string, public status: number, code?: string) {
     super(message);
     this.name = 'ApiError';
+    this.code = code;
   }
 }
 
@@ -76,7 +79,7 @@ export async function apiFetch<T = any>(
   if (!response.ok) {
     if (response.status === 401 && !silent401) handleUnauthorized();
     const message = (body && (body.message || body.error)) || 'Beklenmeyen bir hata oluştu.';
-    throw new ApiError(message, response.status);
+    throw new ApiError(message, response.status, body && typeof body.code === 'string' ? body.code : undefined);
   }
   return body as T;
 }

@@ -7,6 +7,10 @@ import GameButton from '@/components/game/ui/GameButton';
 import GamePanel from '@/components/game/ui/GamePanel';
 import { CoinIcon, StarIcon, TrophyIcon } from '@/components/game/ui/icons';
 import type { PicksWeek, WeeklyPick } from '@/types';
+import ProfileLink from '@/components/profile/ProfileLink';
+import { GameShareButton } from '@/components/common/ShareButton';
+import { profileUrl } from '@/lib/publicProfile';
+import { picksShareText } from '@/lib/share';
 import { beatText, displayRank, formatClock, podiumPicks, rewardForRank, sortStandings, voidText } from './model';
 import { MeTag } from './PickCard';
 import { DirectionPill, LiveDot, ReturnText } from './parts';
@@ -26,7 +30,7 @@ function StandingRow({ pick, rank, showReturn = true }: { pick: WeeklyPick; rank
       <Avatar avatarId={pick.avatar_id} seed={pick.username} frameId={pick.frame_id} size="sm" />
       <div className="min-w-0 flex-1">
         <p className="flex min-w-0 items-center gap-1.5 font-extrabold leading-tight">
-          <span className="truncate">{pick.username}</span>
+          <ProfileLink username={pick.username} className="truncate" />
           {pick.is_me && <MeTag />}
         </p>
         <p className="mt-0.5 flex min-w-0 items-center gap-1.5 text-xs font-bold text-(--g-ink-soft)">
@@ -255,6 +259,19 @@ export function ResultsPanel({ week, className }: { week: PicksWeek; className?:
           )
         ) : (
           <p className="text-sm font-bold text-(--g-ink-soft)">Bu hafta seçim yapmadın. Bir sonraki hafta zarfını bırakmayı unutma!</p>
+        )}
+        {my && my.status !== 'void' && !settling && rank != null && (
+          <GameShareButton
+            variant="purple"
+            size="sm"
+            className="mt-3"
+            label="Sonucumu paylaş"
+            payload={() => ({
+              title: 'PortfoyGo Haftalık Seçim',
+              text: picksShareText({ symbol: my.symbol, direction: my.direction, returnPct: my.return_pct, rank, participants: total || null }),
+              url: profileUrl(my.username, window.location.origin),
+            })}
+          />
         )}
       </GamePanel>
 

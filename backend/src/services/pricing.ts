@@ -47,11 +47,29 @@ export interface PriceKey {
 
 export const priceKey = (assetType: string, symbol: string) => `${assetType}:${symbol.toUpperCase()}`;
 
+/** İşlem yönü: alışta kullanıcı satış kurundan alır, satışta alış kurundan satar (yalnızca döviz). */
+export type PriceSide = 'buy' | 'sell';
+
 let usdMemo: { value: UsdTryRate | null; at: number } | null = null;
 
 function positive(n: unknown): number | null {
   const v = typeof n === 'number' ? n : parseFloat(String(n ?? ''));
   return Number.isFinite(v) && v > 0 ? v : null;
+}
+
+/**
+ * Döviz işlem fiyatı (TL / birim). Alış (kullanıcı döviz alır) → satış kuru (selling);
+ * satış (kullanıcı döviz satar) → alış kuru (buying). Satış fiyatı hiçbir zaman alış fiyatını
+ * geçemez (ters/bozuk veride al-sat ile sanal para yaratılmasın): min(buying, selling).
+ * Alış kuru yoksa satış kuru kullanılır (önceki davranış). Değerleme satış kuruyla yapılır
+ * (bkz. migrations/README.md, 020).
+ */
+export function currencyTradePrice(row: { buying?: unknown; selling?: unknown } | null | undefined, side: PriceSide): number | null {
+  const selling = positive(row?.selling);
+  if (!selling) return null;
+  if (side === 'buy') return selling;
+  const buying = positive(row?.buying);
+  return buying ? Math.min(buying, selling) : selling;
 }
 
 export class PricingService {
@@ -105,11 +123,11 @@ export class PricingService {
   /**
    * Sunucu tarafında belirlenen işlem fiyatı (TL / birim).
    * - stock, crypto: market_data_cache (USD) × USD/TRY
-   * - currency: currency_rates satış kuru (zaten TL / birim)
+   * - currency: currency_rates (zaten TL / birim) — alışta satış kuru, satışta alış kuru (currencyTradePrice)
    * - commodity: emtia sağlayıcısı (providers.commodities); GAU ve *TRY kodları TL, diğerleri USD × USD/TRY
    * Fiyat yoksa veya bayatsa PriceUnavailableError fırlatır.
    */
-  static async getExecutionPriceTRY(symbol: string, assetType: AssetType): Promise<ExecutionPrice> {
+  static async getExecutionPriceTRY(symbol: string, assetType: AssetType, side: PriceSide = 'buy'): Promise<ExecutionPrice> {
     const sym = symbol.trim().toUpperCase();
     const maxAge = MAX_PRICE_AGE_MS[assetType];
 
@@ -140,7 +158,7 @@ export class PricingService {
           throw new AppError(400, 'Bu varlık için işlem yapılamaz', 'INVALID_ASSET');
         }
         const r = await pool.query(
-          `SELECT code, name, selling, updated_at
+          `SELECT code, name, buying, selling, updated_at
              FROM currency_rates
             WHERE UPPER(code) = $1
               AND updated_at >= CURRENT_TIMESTAMP - ($2::int * INTERVAL '1 millisecond')
@@ -148,7 +166,7 @@ export class PricingService {
           [sym, maxAge]
         );
         const row = r.rows[0];
-        const price = positive(row?.selling);
+        const price = currencyTradePrice(row, side);
         if (!row || !price) {
           throw new PriceUnavailableError();
         }
@@ -173,8 +191,9 @@ export class PricingService {
   /**
    * Birden çok varlık için TL fiyatlarını toplu getirir (bulunamayanlar haritada yer almaz).
    * strict=true: işlem tazelik pencereleri; false: değerleme için daha gevşek pencere.
+   * side: yalnızca dövizi etkiler ('sell' → alış kuru; değerleme ve alış tarafı → satış kuru).
    */
-  static async getPricesTRY(keys: PriceKey[], strict = false): Promise<Map<string, number>> {
+  static async getPricesTRY(keys: PriceKey[], strict = false, side: PriceSide = 'buy'): Promise<Map<string, number>> {
     const out = new Map<string, number>();
     if (keys.length === 0) return out;
 
@@ -200,14 +219,14 @@ export class PricingService {
 
     if (types.has('currency')) {
       const r = await pool.query(
-        `SELECT UPPER(code) AS sym, selling
+        `SELECT UPPER(code) AS sym, buying, selling
            FROM currency_rates
           WHERE selling > 0
             AND updated_at >= CURRENT_TIMESTAMP - ($1::int * INTERVAL '1 millisecond')`,
         [MAX_PRICE_AGE_MS.currency]
       );
       for (const row of r.rows) {
-        const p = positive(row.selling);
+        const p = currencyTradePrice(row, side);
         if (p && row.sym !== 'TRY') out.set(priceKey('currency', row.sym), p);
       }
     }
@@ -230,6 +249,26 @@ export class PricingService {
       }
     }
 
+    return out;
+  }
+
+  /**
+   * Fiyatı verilen andan (ör. seans açılışı) SONRA alınmış hisseler (büyük harf semboller).
+   * Seans kuralı için: açılıştan önce alınmış fiyat (önceki kapanış) emir tetiklemez.
+   * Karşılaştırma SQL'de yapılır (TIMESTAMP kolonları oturum saat dilimindedir; Node TZ'den bağımsız).
+   */
+  static async getStocksQuotedSince(symbols: string[], since: Date): Promise<Set<string>> {
+    const out = new Set<string>();
+    const syms = [...new Set(symbols.map((s) => s.toUpperCase()))];
+    if (syms.length === 0) return out;
+    const r = await pool.query(
+      `SELECT DISTINCT UPPER(symbol) AS sym
+         FROM market_data_cache
+        WHERE asset_type = 'stock' AND UPPER(symbol) = ANY($1::text[]) AND price > 0
+          AND cached_at >= $2::timestamptz`,
+      [syms, since.toISOString()]
+    );
+    for (const row of r.rows) out.add(String(row.sym));
     return out;
   }
 }

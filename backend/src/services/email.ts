@@ -67,6 +67,18 @@ ${String(mail.data.text ?? String(mail.data.html ?? '').replace(/<[^>]+>/g, ' ')
     return process.env.SMTP_FROM || `"PortfoyGo" <${process.env.SMTP_USER}>`;
   }
 
+  /**
+   * Genel amaçlı gönderim (ör. haftalık özet). Taşıyıcı yoksa (SMTP tanımsız) false döner; SMTP hatası fırlatılır.
+   * DİKKAT: Haftalık özet bunu yalnızca gönderim koruması izin verdiğinde çağırır
+   * (services/email/digest.ts → digestSendEnabled: production ya da açıkça EMAIL_DIGEST_SEND=1).
+   */
+  async sendMail(mail: { to: string; subject: string; html: string; text?: string; headers?: Record<string, string> }): Promise<boolean> {
+    const transporter = this.getTransporter();
+    if (!transporter) return false;
+    await transporter.sendMail({ from: this.fromAddress(), ...mail });
+    return true;
+  }
+
   /** Kriptografik olarak güvenli 6 haneli kod */
   generateVerificationCode(): string {
     return crypto.randomInt(0, 1_000_000).toString().padStart(6, '0');
@@ -223,9 +235,9 @@ ${String(mail.data.text ?? String(mail.data.html ?? '').replace(/<[^>]+>/g, ' ')
   }
 
   private async sendPasswordResetCodeInternal(email: string): Promise<void> {
-    const userRes = await pool.query('SELECT id, username, email, is_banned FROM users WHERE LOWER(email) = $1 LIMIT 1', [email]);
+    const userRes = await pool.query('SELECT id, username, email, is_banned, COALESCE(is_deleted, false) AS is_deleted FROM users WHERE LOWER(email) = $1 LIMIT 1', [email]);
     const user = userRes.rows[0];
-    if (!user || user.is_banned) return;
+    if (!user || user.is_banned || user.is_deleted) return;
 
     const active = await pool.query(
       `SELECT COUNT(*)::int AS n FROM email_verifications

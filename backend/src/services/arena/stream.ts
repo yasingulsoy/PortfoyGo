@@ -1,5 +1,6 @@
 import type { Request, Response } from 'express';
 import { logger } from '../../utils/logger';
+import { trackSseConnection } from '../../observability/metrics';
 import { arenaBus, type ArenaBusEvent } from './bus';
 import {
   ArenaService,
@@ -66,6 +67,7 @@ export async function openRoundStream(req: Request, res: Response, roundId: stri
   res.setHeader('Connection', 'keep-alive');
   res.setHeader('X-Accel-Buffering', 'no');
   res.flushHeaders();
+  const untrack = trackSseConnection('arena');
   req.socket.setTimeout(0);
   req.socket.setNoDelay(true);
   req.socket.setKeepAlive(true);
@@ -226,6 +228,7 @@ export async function openRoundStream(req: Request, res: Response, roundId: stri
     clearInterval(interval);
     clearInterval(heartbeat);
     unsubscribe();
+    untrack();
     const n = arenaStreamCount(userId) - 1;
     if (n > 0) streamsByUser.set(userId, n);
     else streamsByUser.delete(userId);

@@ -1,5 +1,5 @@
 import express, { Request } from 'express';
-import rateLimit from 'express-rate-limit';
+import { createRateLimiter } from '../infra/rateLimitStore';
 import { z } from 'zod';
 import { authenticateToken, optionalAuth, optionalUserId, requireUser } from '../middleware/auth';
 import { BUILDING_IDS, TAP } from '../services/idle/config';
@@ -68,7 +68,7 @@ const userKey = (prefix: string) => (req: Request) => `${prefix}:${(req as Reque
 const limitMessage = { success: false, message: 'Çok fazla istek gönderdin. Lütfen biraz yavaşla.', code: 'RATE_LIMITED' };
 
 /** Dokunuş istekleri: saniyede 10 istek (dokunuş adedi ayrıca servis içinde sınırlanır: 10/sn, 1500/dk) */
-const tapRequestLimiter = rateLimit({
+const tapRequestLimiter = createRateLimiter('idle-tap', {
   windowMs: 1000,
   limit: 10,
   standardHeaders: 'draft-7',
@@ -78,7 +78,7 @@ const tapRequestLimiter = rateLimit({
 });
 
 /** Satın alma / yükseltme / halka arz: dakikada 240 */
-const writeLimiter = rateLimit({
+const writeLimiter = createRateLimiter('idle-write', {
   windowMs: 60 * 1000,
   limit: 240,
   standardHeaders: 'draft-7',

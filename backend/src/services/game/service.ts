@@ -49,7 +49,7 @@ export interface LeaderboardItem {
 }
 
 /** Yasaklı ve bot (users.is_bot — migration 013) hesaplar hariç */
-const HUMAN_SQL = `COALESCE(u.is_banned, FALSE) = FALSE AND COALESCE(u.is_bot, FALSE) = FALSE`;
+const HUMAN_SQL = `COALESCE(u.is_banned, FALSE) = FALSE AND COALESCE(u.is_bot, FALSE) = FALSE AND COALESCE(u.is_deleted, FALSE) = FALSE`;
 
 function titleOf(id: string | null | undefined): { id: string; label: string } | null {
   if (!id) return null;
@@ -182,9 +182,10 @@ export class GameService {
   }
 
   static async publicProfile(username: string) {
+    // users.profile_public (019): profilini gizleyen oyuncunun oyun profili de herkese açık dönmez
     const u = await pool.query(
       `SELECT id, username, avatar_id, frame_id, title_id, xp, arena_rating
-         FROM users u WHERE LOWER(u.username) = LOWER($1) AND ${HUMAN_SQL}`,
+         FROM users u WHERE LOWER(u.username) = LOWER($1) AND ${HUMAN_SQL} AND COALESCE(u.profile_public, TRUE) = TRUE`,
       [username]
     );
     const row = u.rows[0];

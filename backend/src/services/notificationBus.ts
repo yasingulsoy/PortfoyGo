@@ -1,15 +1,15 @@
 import { EventEmitter } from 'events';
+import { FanoutChannel } from '../infra/fanout';
 
 /**
- * Süreç içi bildirim veri yolu (SSE abonelikleri için).
+ * Bildirim veri yolu (SSE abonelikleri için).
  *
  * Olay adı = kullanıcı ID'si. NotificationService yeni bildirimleri (commit sonrası) buraya yayınlar;
  * GET /api/notifications/stream bağlantıları kendi kullanıcı ID'lerini dinler.
  *
- * NOT: Bu yalnızca TEK süreç (tek instance) için çalışır. Birden fazla API instance'ı
- * (yatay ölçekleme / cluster) çalıştırılırsa bir instance'ta oluşan bildirim diğer instance'a bağlı
- * SSE istemcisine ulaşmaz — o durumda bu modül Redis pub/sub (veya Postgres LISTEN/NOTIFY) ile
- * değiştirilmelidir. Bildirimler yine de veritabanındadır; istemci yeniden bağlanınca / listeyi
+ * Çoklu örnek: REDIS_URL tanımlıysa olaylar Redis pub/sub ile diğer örneklere (ve worker'ın ürettiği
+ * bildirimler API örneklerine) dağıtılır; tanımsızsa yalnızca süreç içidir (bkz. infra/fanout.ts).
+ * Teslim en fazla bir kezdir; bildirimler yine de veritabanındadır, istemci yeniden bağlanınca / listeyi
  * çekince görür.
  */
 
@@ -33,13 +33,20 @@ export type NotificationBusEvent =
   | { kind: 'unread_changed' };
 
 class NotificationBus extends EventEmitter {
+  private readonly fanout = new FanoutChannel<NotificationBusEvent>('notifications', (userId, event) => this.deliver(userId, event));
+
   constructor() {
     super();
     // Her SSE bağlantısı bir dinleyici; çok sekmeli kullanıcılar + çok kullanıcı → limit kaldırıldı
     this.setMaxListeners(0);
   }
 
+  /** Yerel dinleyicilere iletir + (Redis varsa) diğer örneklere yayınlar. */
   publish(userId: string, event: NotificationBusEvent): void {
+    this.fanout.publish(userId, event);
+  }
+
+  private deliver(userId: string, event: NotificationBusEvent): void {
     try {
       this.emit(userId, event);
     } catch {
@@ -48,6 +55,7 @@ class NotificationBus extends EventEmitter {
   }
 
   subscribe(userId: string, listener: (event: NotificationBusEvent) => void): () => void {
+    this.fanout.ensureSubscribed();
     this.on(userId, listener);
     return () => {
       this.off(userId, listener);

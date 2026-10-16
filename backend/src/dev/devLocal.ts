@@ -1,6 +1,7 @@
 import { spawn, spawnSync, ChildProcess } from 'child_process';
 import path from 'path';
 import { closeOnSignals, startLocalDb } from './localDb';
+import { localDevEnv } from './localEnv';
 
 /**
  * npm run dev:local — harici veritabanı / API anahtarı olmadan backend'i çalıştırır:
@@ -28,41 +29,8 @@ function killTree(child: ChildProcess): void {
 async function main() {
   const ldb = await startLocalDb({ reset: process.argv.includes('--reset') });
 
-  const env: NodeJS.ProcessEnv = {
-    ...process.env,
-    NODE_ENV: 'development',
-    // concurrently altında stdout bir TTY değildir; okunabilir (pino-pretty) loglar için
-    LOG_PRETTY: process.env.LOG_PRETTY || '1',
-    // Genel PORT değişkeni (ör. frontend araçlarının ayarladığı 3000) devralınmasın diye ayrı değişken
-    PORT: process.env.API_PORT || '5001',
-    // --- Veritabanı: SADECE yerel PGlite ---
-    DATABASE_URL: ldb.url,
-    DB_SSL: 'false',
-    DB_HOST: '127.0.0.1',
-    DB_PORT: String(ldb.port),
-    // --- Kimlik doğrulama: sadece geliştirme için sabit anahtar ---
-    JWT_SECRET: process.env.LOCAL_JWT_SECRET || 'dev-only-local-jwt-secret-do-not-use-in-production-000000',
-    COOKIE_SECURE: 'false',
-    COOKIE_DOMAIN: '',
-    // 3002: 3000 portu başka bir uygulamaca kullanılıyorsa site geçici olarak 3002'de çalıştırılabilir
-    ALLOWED_ORIGINS: 'http://localhost:3000,http://127.0.0.1:3000,http://localhost:3001,http://127.0.0.1:3001,http://localhost:3002,http://127.0.0.1:3002',
-    // --- Dış servisler kapalı: piyasa verisi tohumlanmış cache'ten gelir ---
-    DISABLE_MARKET_REFRESH: '1',
-    // SMTP yok: doğrulama/sıfırlama kodları konsola yazılır
-    EMAIL_DEV_LOG: '1',
-    ENABLE_BACKGROUND_STOCK_REFRESH: 'false',
-    FINNHUB_API_KEY: '',
-    FINNHUB_API_KEYS: '',
-    COINGECKO_API_KEY: '',
-    NEXT_PUBLIC_COINGECKO_API_KEY: '',
-    DOVIZ: '',
-    EMTIA: '',
-    DEFAULT_USD_TRY: '',
-    SMTP_HOST: '',
-    SMTP_USER: '',
-    SMTP_PASS: '',
-    SMTP_FROM: '',
-  };
+  // Ortam (yerel DB, sabit JWT, dış servisler kapalı): bkz. localEnv.ts — dev:worker:local ile ortak
+  const env = localDevEnv(ldb);
 
   console.log(`[dev:local] Backend başlatılıyor → http://localhost:${env.PORT}/api (DB: ${ldb.url})`);
   const nodemonBin = require.resolve('nodemon/bin/nodemon.js', { paths: [BACKEND_DIR] });

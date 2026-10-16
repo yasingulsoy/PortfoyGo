@@ -1,5 +1,5 @@
 import './env';
-import { Pool, PoolConfig } from 'pg';
+import { Client, ClientConfig, Pool, PoolConfig } from 'pg';
 
 /**
  * PostgreSQL bağlantı havuzu.
@@ -64,6 +64,17 @@ if (ssl !== undefined) {
 }
 
 const pool = new Pool(poolConfig);
+
+/**
+ * Havuz DIŞI tekil bağlantı (havuzla aynı bağlantı / SSL ayarları). Uzun ömürlü oturum gerektiren işler için
+ * (ör. zamanlanmış işlerin advisory lock bağlantısı, bkz. jobs/advisoryLock.ts). Kapatmak çağıranın sorumluluğu.
+ * `connectionString` verilirse (ör. JOB_LOCK_DATABASE_URL) URL o olur; SSL ayarı yine DB_SSL'e göre uygulanır.
+ */
+export function createStandaloneClient(overrides: ClientConfig = {}): Client {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { max, idleTimeoutMillis, ...base } = poolConfig;
+  return new Client({ ...base, ...overrides });
+}
 
 pool.on('error', (err) => {
   // Boştaki bir istemcide oluşan beklenmedik hata (ör. bağlantı koptu)

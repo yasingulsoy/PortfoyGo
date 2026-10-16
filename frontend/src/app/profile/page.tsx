@@ -34,8 +34,11 @@ import BadgesGrid from '@/components/profile/BadgesGrid';
 import ActivityLog from '@/components/profile/ActivityLog';
 import SeasonAwards from '@/components/profile/SeasonAwards';
 import NotificationPrefsCard from '@/components/notifications/NotificationPrefsCard';
+import ProfileVisibilityCard from '@/components/profile/ProfileVisibilityCard';
 import ResponsibleProfileCard from '@/components/game/responsible/ResponsibleProfileCard';
 import ArenaHistory from '@/components/arena/ArenaHistory';
+import TwoFactorSection from '@/components/profile/TwoFactorSection';
+import AccountDataCard from '@/components/profile/AccountDataCard';
 import { computeTradeStats } from '@/components/profile/tradeStats';
 import { MY_RANK_KEY } from '@/components/leaderboard/MyRankCard';
 import { normalizeMyRank } from '@/components/leaderboard/model';
@@ -56,9 +59,11 @@ export default function ProfilePage() {
         <ActivityLog />
       </div>
       <ArenaHistory />
+      <ProfileVisibilityCard />
       <NotificationPrefsCard />
       <ResponsibleProfileCard />
       <SecurityCard />
+      <AccountDataCard />
     </div>
   );
 }
@@ -266,8 +271,12 @@ function SecurityCard() {
   };
 
   return (
-    <Card>
+    // id="guvenlik": yönetim paneli ve 2FA bildirimleri buraya bağlantı verir (/profile#guvenlik)
+    <Card id="guvenlik" className="scroll-mt-24">
       <CardHeader title="Güvenlik" description="Oturumların ve hesap güvenliğin" />
+      <CardBody className="border-t border-line">
+        <TwoFactorSection />
+      </CardBody>
       <CardBody className="flex flex-col gap-4 border-t border-line sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0 text-sm">
           <p className="font-medium text-fg">Tüm cihazlardan çıkış yap</p>

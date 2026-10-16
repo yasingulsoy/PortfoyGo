@@ -1,5 +1,7 @@
 'use client';
 
+import { useEffect } from 'react';
+import { reportClientError } from '@portfoygo/shared/errors';
 import './globals.css';
 
 /** Tema sağlayıcısı burada çalışmaz: kayıtlı tercih, yoksa işletim sistemi şeması kullanılır. */
@@ -16,6 +18,10 @@ function detectTheme(): 'light' | 'dark' {
 
 /** Kök düzen dahil her şey çöktüğünde gösterilir; kendi <html>/<body> etiketlerini çizer. */
 export default function GlobalError({ error, retry }: { error: Error & { digest?: string }; retry: () => void }) {
+  useEffect(() => {
+    reportClientError('web', 'global-boundary', error, { digest: error.digest });
+  }, [error]);
+
   return (
     <html lang="tr" data-theme={detectTheme()} suppressHydrationWarning>
       <body className="flex min-h-dvh items-center justify-center bg-canvas p-6 font-sans text-fg antialiased">

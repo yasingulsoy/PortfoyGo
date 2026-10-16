@@ -19,6 +19,8 @@ import {
   EnvelopeOpenIcon,
   StarIcon,
   UsersIcon,
+  SunIcon,
+  ArrowTrendingDownIcon,
 } from '@heroicons/react/24/outline';
 import type { AppNotification, NotificationCategory } from '@/lib/api';
 
@@ -37,6 +39,9 @@ export const CATEGORY_ORDER: NotificationCategory[] = ['orders', 'competition', 
 /** Türe özgü ikon (ve gerekirse kategoriden farklı renk). */
 const TYPE_META: Record<string, { icon: Icon; tone?: string }> = {
   'order.filled': { icon: CheckCircleIcon },
+  // Açılışta gerçekleşen hisse emri (borsa kapalıyken verilen) ve tetiklenen takip eden stop
+  'order.moo_filled': { icon: SunIcon, tone: 'bg-up-soft text-up' },
+  'order.trailing_triggered': { icon: ArrowTrendingDownIcon },
   'order.expired': { icon: ClockIcon },
   'order.failed': { icon: ExclamationTriangleIcon, tone: 'bg-down-soft text-down' },
   'order.cancelled_admin': { icon: NoSymbolIcon, tone: 'bg-down-soft text-down' },
