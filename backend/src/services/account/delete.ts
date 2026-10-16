@@ -207,6 +207,11 @@ export class AccountDeletionService {
         );
       }
 
+      // 4f) Slot Makinesi (026): çevirme geçmişi silinir (jeton defteri game_ledger diğer oyun kayıtları gibi anonim kalır)
+      if (await tableExists(client, 'slot_spins')) {
+        await client.query('DELETE FROM slot_spins WHERE user_id = $1', [userId]);
+      }
+
       // 5) Kullanıcı satırı: anonimleştir + tüm oturumları bitir
       const anon = await uniqueAnonName(client);
       const unusable = `${UNUSABLE_PASSWORD_PREFIX}${crypto.randomBytes(24).toString('hex')}`;

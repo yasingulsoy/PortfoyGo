@@ -51,6 +51,7 @@ import subscriptionsRoutes, { meEntitlementsRouter } from './routes/subscription
 import adminSubscriptionsRoutes from './routes/adminSubscriptions';
 import globalLabRoutes from './routes/globalLab';
 import adminGlobalLabRoutes from './routes/adminGlobalLab';
+import slotRoutes, { adminGameRouter as adminSlotRoutes } from './routes/slot';
 /**
  * Express uygulamasını kurar (middleware + route'lar). Sunucuyu BAŞLATMAZ, cron kurmaz.
  *
@@ -230,6 +231,9 @@ export function createApp(): express.Express {
   // Global Portföy Lab (025): araştırma kataloğu, sınıflandırma, senaryo laboratuvarı (Premium) + yönetici kataloğu / varsayımlar
   app.use('/api/global-lab', globalLabRoutes);
   app.use('/api/admin/global-lab', adminGlobalLabRoutes);
+  // Slot Makinesi — "Olasılık dersi" (026): GET /api/game/slot, POST /api/game/slot/spin + yönetici aç/kapat ve özet (/api/admin/game/slot)
+  app.use('/api/game/slot', slotRoutes);
+  app.use('/api/admin/game', adminSlotRoutes);
 
   // Proxy /api önekini siliyorsa: /currencies, /commodities, /news için geriye dönük uyumluluk
   app.use(['/commodities', '/currencies', '/news'], globalApiLimiter);

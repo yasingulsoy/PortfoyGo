@@ -275,6 +275,14 @@ const USER_TABLES: Array<{ key: string; label: string; sql: string; optionalTabl
             FROM global_lab_scenarios WHERE user_id = $1 ORDER BY created_at`,
     optionalTable: 'global_lab_scenarios',
   },
+  // Slot Makinesi (026)
+  {
+    key: 'slot_spins',
+    label: 'Slot Makinesi çevirmeleri (bahis, kazanç, makara sonuçları)',
+    sql: `SELECT request_id, bet, win, reels, combo, multiplier, balance_after, reality_ack, created_at
+            FROM slot_spins WHERE user_id = $1 ORDER BY created_at, id`,
+    optionalTable: 'slot_spins',
+  },
 ];
 
 export interface AccountExport {

@@ -12,7 +12,8 @@ import type { AuthenticatedRequest } from '../middleware/auth';
  *   announcement.create, arena.challenge_create, arena.challenge_cancel,
  *   picks.comment_delete, picks.note_hide,
  *   ideas.hide, ideas.unhide, ideas.comment_delete, ideas.report_resolve,
- *   subscription.grant, subscription.revoke, global_lab.* (katalog / notlar / varsayımlar / stres senaryoları)
+ *   subscription.grant, subscription.revoke, global_lab.* (katalog / notlar / varsayımlar / stres senaryoları),
+ *   settings.slot_toggle
  */
 
 export const AUDIT_ACTIONS = [
@@ -52,6 +53,8 @@ export const AUDIT_ACTIONS = [
   'global_lab.stress_delete',
   // Portföy Ligi (023): devam eden ligi erken bitir
   'league.finalize',
+  // Uygulama ayarları (026): Slot Makinesi aç/kapat
+  'settings.slot_toggle',
 ] as const;
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
 

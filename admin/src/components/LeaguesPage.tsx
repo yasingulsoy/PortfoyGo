@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { MagnifyingGlassIcon, TrashIcon, UserGroupIcon } from '@heroicons/react/20/solid';
+import { EyeIcon, MagnifyingGlassIcon, TrashIcon, UserGroupIcon } from '@heroicons/react/20/solid';
 import { Card } from '@portfoygo/shared/ui/Card';
 import { Badge, EmptyState } from '@portfoygo/shared/ui/Feedback';
 import Button from '@portfoygo/shared/ui/Button';
@@ -16,6 +16,7 @@ import { num } from './model';
 import { useMetrics } from './Overview';
 import { TableCardHeader, TableSkeleton, table } from './ui';
 import { ConfirmModal, LoadError, Pagination, SearchInput, StaleNotice } from './controls';
+import LeagueDetailModal from './LeagueDetailModal';
 
 const PAGE_SIZE = 20;
 
@@ -39,6 +40,7 @@ export default function LeaguesPage() {
   const [query, setQuery] = useState('');
   const [offset, setOffset] = useState(0);
   const [target, setTarget] = useState<AdminLeague | null>(null);
+  const [detailId, setDetailId] = useState<string | null>(null);
   const search = useDebouncedValue(query.trim(), 350);
   const metrics = useMetrics();
 
@@ -102,6 +104,17 @@ export default function LeaguesPage() {
                       </span>
                       <div className="min-w-0">
                         <p className="truncate font-medium text-fg">{l.name}</p>
+                        {l.mode === 'portfolio' && (
+                          <p className="mt-0.5 flex flex-wrap items-center gap-1">
+                            <Badge tone="brand">Portföy ligi</Badge>
+                            {l.rules && (
+                              <span className="num text-[11px] text-muted">
+                                {formatNumber(l.rules.starting_capital_usd, 0)} USD · %{(l.rules.commission_bps / 100).toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
+                                {l.rules.participation === 'team' ? ` · takım ${l.rules.team_size}×${l.rules.max_teams}` : ' · bireysel'}
+                              </span>
+                            )}
+                          </p>
+                        )}
                         <p className="truncate text-xs text-subtle sm:hidden">
                           Kurucu:{' '}
                           <Link href={`/users/${encodeURIComponent(l.owner_id)}`} className="text-muted underline-offset-2 hover:underline">
@@ -125,7 +138,17 @@ export default function LeaguesPage() {
                   <td className={cn(table.td, 'hidden sm:table-cell')}>
                     <LeagueEnd endsAt={l.ends_at} />
                   </td>
-                  <td className={cn(table.td, 'text-right')}>
+                  <td className={cn(table.td, 'whitespace-nowrap text-right')}>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="mr-1"
+                      icon={<EyeIcon className="h-3.5 w-3.5" aria-hidden="true" />}
+                      onClick={() => setDetailId(l.id)}
+                      aria-label={`${l.name} ligi ayrıntıları`}
+                    >
+                      <span className="hidden sm:inline">Detay</span>
+                    </Button>
                     <Button
                       variant="down"
                       size="sm"
@@ -144,6 +167,8 @@ export default function LeaguesPage() {
       )}
 
       <Pagination offset={offset} limit={PAGE_SIZE} total={total} onChange={setOffset} label="Lig sayfaları" />
+
+      {detailId && <LeagueDetailModal leagueId={detailId} onClose={() => setDetailId(null)} onChanged={() => void mutate()} />}
 
       <ConfirmModal
         open={!!target}

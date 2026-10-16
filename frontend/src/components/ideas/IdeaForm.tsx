@@ -151,7 +151,7 @@ export default function IdeaForm({ busy, error, onSubmit }: { busy: boolean; err
         <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-surface-3" role="progressbar" aria-label="Form ilerlemesi" aria-valuemin={0} aria-valuemax={6} aria-valuenow={doneCount}>
           <div className="h-full rounded-full bg-brand transition-[width] duration-300" style={{ width: `${(doneCount / 6) * 100}%` }} />
         </div>
-        <span className="num shrink-0 text-xs text-muted">{doneCount}/6 adım</span>
+        <span className="num shrink-0 text-xs text-muted">{doneCount}/6 adım hazır</span>
       </div>
 
       {/* 1 · Varlık ve duruş */}

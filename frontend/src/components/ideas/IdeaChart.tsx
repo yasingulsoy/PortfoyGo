@@ -7,7 +7,7 @@ import { EmptyState, Skeleton } from '@portfoygo/shared/ui/Feedback';
 import { axisPrice, chartFont, cssVar, useDocumentTheme, withAlpha } from '@/components/asset/chartTheme';
 import { useIdeaChart } from '@/hooks/useIdeas';
 import { formatQuote } from '@/lib/ideas';
-import type { IdeaChart as IdeaChartData } from '@/types/ideas';
+import type { IdeaChart as IdeaChartData, IdeaStance } from '@/types/ideas';
 
 /** lightweight-charts zamanları UTC gösterir; tarayıcının yerel saatine kaydır. */
 const toChartTime = (t: number) => t - new Date(t * 1000).getTimezoneOffset() * 60;
@@ -16,7 +16,7 @@ const toChartTime = (t: number) => t - new Date(t * 1000).getTimezoneOffset() * 
  * Yayından bu yana fiyat (saklanmış fiyat geçmişi + güncel / kapanış fiyatı). Referans, hedef ve geçersizlik
  * seviyeleri yatay çizgi olarak gösterilir. Yeterli nokta yoksa sade bir açıklama gösterilir.
  */
-export default function IdeaChart({ id }: { id: string }) {
+export default function IdeaChart({ id, stance }: { id: string; stance: IdeaStance }) {
   const { data, error, isLoading } = useIdeaChart(id);
   if (isLoading && !data) return <Skeleton className="h-56 w-full rounded-xl" />;
   if (error && !data) return <EmptyState className="py-8" icon={<ChartBarIcon />} title="Grafik yüklenemedi" description="Birazdan yeniden denenecek." />;
@@ -30,10 +30,10 @@ export default function IdeaChart({ id }: { id: string }) {
       />
     );
   }
-  return <ChartCanvas data={data} />;
+  return <ChartCanvas data={data} stance={stance} />;
 }
 
-function ChartCanvas({ data }: { data: IdeaChartData }) {
+function ChartCanvas({ data, stance }: { data: IdeaChartData; stance: IdeaStance }) {
   const ref = useRef<HTMLDivElement>(null);
   const theme = useDocumentTheme();
 
@@ -60,8 +60,10 @@ function ChartCanvas({ data }: { data: IdeaChartData }) {
         handleScale: false,
         localization: { locale: 'tr-TR', priceFormatter: axisPrice },
       });
+      // Renk önerinin lehine / aleyhine: 'sat' için düşüş olumludur; 'izle' yönsüzdür (marka rengi)
       const last = data.points[data.points.length - 1].v;
-      const lineColor = last >= data.ref_price ? up : down;
+      const favorable = stance === 'sat' ? last <= data.ref_price : last >= data.ref_price;
+      const lineColor = stance === 'izle' ? brand : favorable ? up : down;
       const levels = [data.ref_price, data.target_price, data.invalidation_price].filter((v): v is number => v !== null && v > 0);
       const series = chart.addSeries(lc.AreaSeries, {
         lineWidth: 2,
@@ -93,7 +95,7 @@ function ChartCanvas({ data }: { data: IdeaChartData }) {
       disposed = true;
       chart?.remove();
     };
-  }, [data, theme]);
+  }, [data, theme, stance]);
 
   return (
     <figure>

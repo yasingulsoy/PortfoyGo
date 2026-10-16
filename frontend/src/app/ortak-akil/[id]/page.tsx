@@ -228,7 +228,7 @@ function IdeaBody({ idea, back, onChanged }: { idea: IdeaDetail; back: React.Rea
                 </p>
               )}
               {!idea.directional && <p className="text-xs text-muted">“İzle” önerisi yön belirtmez; yalnızca fiyatın yayından bu yana değişimi gösterilir.</p>}
-              <IdeaChart id={idea.id} />
+              <IdeaChart id={idea.id} stance={idea.stance} />
               <p className="text-xs text-subtle">
                 Referans fiyat, yayın anındaki saklanmış fiyattır ({formatDateTime(idea.ref_price_at)}). Performans sanal bir hesaplamadır; işlem anlamına gelmez.
               </p>
