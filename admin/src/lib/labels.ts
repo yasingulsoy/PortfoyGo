@@ -70,10 +70,24 @@ export const AUDIT_ACTIONS: Record<AuditAction, { label: string; tone: Tone }> =
   'ideas.comment_delete': { label: 'Ortak Akıl yorumu kaldırıldı', tone: 'down' },
   'ideas.report_resolve': { label: 'Ortak Akıl şikâyeti sonuçlandı', tone: 'neutral' },
   'league.finalize': { label: 'Portföy ligi erken bitirildi', tone: 'gold' },
+  'subscription.grant': { label: 'Premium tanımlandı / uzatıldı', tone: 'up' },
+  'subscription.revoke': { label: 'Premium sonlandırıldı', tone: 'gold' },
+  'global_lab.instrument_create': { label: 'Global Lab aracı eklendi', tone: 'brand' },
+  'global_lab.instrument_update': { label: 'Global Lab aracı güncellendi', tone: 'neutral' },
+  'global_lab.instrument_delete': { label: 'Global Lab aracı silindi', tone: 'down' },
+  'global_lab.instruments_import': { label: 'Global Lab kataloğu CSV ile yüklendi', tone: 'brand' },
+  'global_lab.note_create': { label: 'Araştırma notu eklendi', tone: 'brand' },
+  'global_lab.note_update': { label: 'Araştırma notu güncellendi', tone: 'neutral' },
+  'global_lab.note_delete': { label: 'Araştırma notu silindi', tone: 'down' },
+  'global_lab.notes_import': { label: 'Araştırma notları CSV ile yüklendi', tone: 'brand' },
+  'global_lab.assumptions_update': { label: 'Lab varsayımları güncellendi', tone: 'gold' },
+  'global_lab.correlations_update': { label: 'Lab korelasyonları güncellendi', tone: 'gold' },
+  'global_lab.stress_upsert': { label: 'Stres senaryosu kaydedildi', tone: 'gold' },
+  'global_lab.stress_delete': { label: 'Stres senaryosu silindi', tone: 'down' },
 };
 
 /** Listede olmayan senaryo eylemleri (ör. backend'e sonradan eklenen 'scenario.*') için okunur yedek etiket */
-const AUDIT_PREFIX: Record<string, string> = { 'scenario.': 'Senaryo', 'series.': 'Tarihsel seri', 'arena.': 'Arena', 'picks.': 'Haftalık seçim', 'ideas.': 'Ortak Akıl' };
+const AUDIT_PREFIX: Record<string, string> = { 'scenario.': 'Senaryo', 'series.': 'Tarihsel seri', 'arena.': 'Arena', 'picks.': 'Haftalık seçim', 'ideas.': 'Ortak Akıl', 'subscription.': 'Abonelik', 'global_lab.': 'Global Lab' };
 export const auditAction = (a: string) => {
   const known = AUDIT_ACTIONS[a as AuditAction];
   if (known) return known;

@@ -41,6 +41,9 @@ describe('Portföy Ligi stil etiketleri', () => {
     // Hiç işlem yoksa al-tut sayılmaz; nakit ağırlıklı portföy al-tut sayılmaz
     expect(keys({ tradesCount: 0, laterTrades: 0 })).not.toContain('buy_and_hold');
     expect(keys({ cashUsd: 200, laterTrades: 0 })).not.toContain('buy_and_hold');
+    // İlk 24 saat kuruluş sayılır: henüz 1 gün geçmediyse al-tut denemez
+    expect(keys({ days: 0.5, laterTrades: 0 })).not.toContain('buy_and_hold');
+    expect(keys({ days: 1, laterTrades: 0 })).toContain('buy_and_hold');
   });
 
   it('Yoğunlaşmış (en büyük pozisyon ≥ %40 veya etkin sayı < 3) ve Çeşitlendirilmiş (etkin ≥ 5, en büyük < %25) birbirini dışlar', () => {

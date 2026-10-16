@@ -66,6 +66,11 @@ Eylemler: Yasin canlı veri gereksinimleri · Art oyun akışı ve lig/etkinlik 
 ### 3.2 Oyun Merkezi
 - [ ] Ekonomi dengesinin gerçek kullanıcı verisiyle ayarı (`backend/src/services/game/config.ts`, `backend/src/services/idle/config.ts`); haftalık düello ligi ve sezonluk kademe ödülleri; Art ile oyun akışı ve etkinlik formatı gözden geçirmesi
 - [ ] Gerçek zamanlı kotasyon sağlayıcısı geldiğinde Arena'ya "canlı" mod
+- [ ] 🔜 **Arena tur ekranında kurgusal haber akışı** (`/oyun/tur/[id]`) — toplantı kararı "sürekli haber akışı". *(Yasin sonra yapacak.)*
+  - Haberler **gerçek değil, oyunun ürettiği kurgu**: her haberin yönü (olumlu/olumsuz), etkilediği enstrüman(lar), etki büyüklüğü ve sönümlenme süresi var; fiyat bu habere göre yükselir/düşer (ör. "Merkez bankası beklenmedik faiz artışı" → EUR/USD ↓, altın ↓).
+  - Sunucu belirler: haber zamanlaması ve fiyat etkisi turun sunucu tarafındaki fiyat üretimine eklenir (gerçek geçmiş tekrarı yerine/üstüne sentetik yol; senaryo modundaki sentetik veri altyapısı kullanılabilir); aynı turdaki herkes haberi aynı anda görür.
+  - Her haber ekranda açıkça **"KURGU"** etiketli olmalı; gerçek kişi, şirket veya kurum adıyla yanlış haber üretilmemeli (ekran görüntüsü dolaşırsa yanıltıcı olur) — genel ifadeler ("Bir merkez bankası…", "Büyük bir teknoloji şirketi…") veya hayali isimler.
+  - Tur sonu debrief'i: hangi haber fiyatı nasıl etkiledi, oyuncu nasıl tepki verdi (Koç Kemal karnesine "habere tepki" kuralları eklenebilir).
 
 ### 3.3 İşlem deneyimi
 - [ ] 💡 Açığa satış (short) ve kaldıraç. Oyunu derinleştirir ama risk eğitimiyle birlikte sunulmalı.

@@ -197,12 +197,12 @@ export default function MyPortfolioTab({ leagueId, detail, data, loading, onChan
               <TBody>
                 {p.trades.map((t) => (
                   <tr key={t.id}>
-                    <Td className="max-w-0">
-                      <p className="truncate">
-                        <span className={cn('mr-1.5 text-xs font-semibold', t.side === 'buy' ? 'text-up' : 'text-down')}>{t.side === 'buy' ? 'AL' : 'SAT'}</span>
+                    <Td className="min-w-[9rem]">
+                      <p className="flex flex-wrap items-baseline gap-x-1.5">
+                        <span className={cn('text-xs font-semibold', t.side === 'buy' ? 'text-up' : 'text-down')}>{t.side === 'buy' ? 'AL' : 'SAT'}</span>
                         <span className="font-medium text-fg">{t.symbol}</span>
-                        <span className="num text-xs text-subtle"> × {formatQuantity(t.quantity)}</span>
-                        {t.reason === 'rebalance' && <span className="ml-1.5 text-[11px] text-muted">(dengeleme)</span>}
+                        <span className="num text-xs text-subtle">× {formatQuantity(t.quantity)}</span>
+                        {t.reason === 'rebalance' && <span className="text-[11px] text-muted">(dengeleme)</span>}
                       </p>
                       <p className="mt-0.5 truncate text-xs text-muted sm:hidden">
                         {t.is_me ? 'Sen' : (t.actor_username ?? '—')} · {formatDateTime(t.created_at)}

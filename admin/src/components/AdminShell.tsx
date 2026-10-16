@@ -18,6 +18,8 @@ import {
   TrophyIcon,
   UsersIcon,
   LightBulbIcon,
+  GlobeEuropeAfricaIcon,
+  SparklesIcon,
 } from '@heroicons/react/24/outline';
 import { ShieldExclamationIcon } from '@heroicons/react/20/solid';
 import SidebarLayout, { type SidebarSection } from '@portfoygo/shared/ui/SidebarLayout';
@@ -44,6 +46,8 @@ const SECTIONS: SidebarSection[] = [
       { href: '/arena/scenarios', label: 'Senaryolar', icon: FilmIcon },
       { href: '/picks', label: 'Haftalık Seçim', icon: EnvelopeIcon },
       { href: '/ideas', label: 'Ortak Akıl', icon: LightBulbIcon },
+      { href: '/global-lab', label: 'Global Portföy Lab', icon: GlobeEuropeAfricaIcon },
+      { href: '/subscriptions', label: 'Abonelikler', icon: SparklesIcon },
     ],
   },
   {

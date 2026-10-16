@@ -33,6 +33,7 @@ import { ADMIN_STATS_KEY } from './AdminStats';
 import { MetricCard, PageBreadcrumb, table } from './ui';
 import { ConfirmModal, LoadError } from './controls';
 import { OrdersTableView, TransactionsTableView, useCancelOrder } from './RecordTables';
+import PremiumBadge from '@/app/subscriptions/_components/PremiumBadge';
 
 type ActionKey = 'role' | 'verify' | 'revoke' | 'ban';
 type TabKey = 'holdings' | 'transactions' | 'orders' | 'activity' | 'leagues';
@@ -210,6 +211,7 @@ export default function UserDetail({ userId }: { userId: string }) {
                   {isAdmin && <Badge tone="brand">Yönetici</Badge>}
                   {verified ? <Badge tone="up">E-posta doğrulanmış</Badge> : <Badge tone="gold">E-posta doğrulanmamış</Badge>}
                   {self && <Badge>Sen</Badge>}
+                  <PremiumBadge userId={u.id} username={u.username} />
                 </div>
                 <dl className="mt-3 flex flex-wrap justify-center gap-x-4 gap-y-1 text-xs text-muted sm:justify-start">
                   <div className="flex gap-1">

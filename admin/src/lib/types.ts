@@ -248,7 +248,21 @@ export type AuditAction =
   | 'ideas.unhide'
   | 'ideas.comment_delete'
   | 'ideas.report_resolve'
-  | 'league.finalize';
+  | 'league.finalize'
+  | 'subscription.grant'
+  | 'subscription.revoke'
+  | 'global_lab.instrument_create'
+  | 'global_lab.instrument_update'
+  | 'global_lab.instrument_delete'
+  | 'global_lab.instruments_import'
+  | 'global_lab.note_create'
+  | 'global_lab.note_update'
+  | 'global_lab.note_delete'
+  | 'global_lab.notes_import'
+  | 'global_lab.assumptions_update'
+  | 'global_lab.correlations_update'
+  | 'global_lab.stress_upsert'
+  | 'global_lab.stress_delete';
 
 export interface AuditEntry {
   id: string;

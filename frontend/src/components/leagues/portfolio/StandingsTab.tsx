@@ -62,9 +62,9 @@ export default function StandingsTab({ data, loading, status, participation }: P
           description={team ? 'Takımını kur ve takım kodunu arkadaşlarınla paylaş.' : 'Davet kodunu paylaşarak arkadaşlarını çağır.'}
         />
       ) : (
-        <DataTable label={finished ? 'Final sıralaması' : 'Portföy ligi sıralaması'} className="pb-2" tableClassName="min-w-[22rem]">
+        <DataTable label={finished ? 'Final sıralaması' : 'Portföy ligi sıralaması'} className="pb-2" tableClassName="min-w-0">
           <THead>
-            <Th className="w-12">{upcoming ? <span className="sr-only">Sıra</span> : 'Sıra'}</Th>
+            <Th className="w-10 sm:w-12">{upcoming ? <span className="sr-only">Sıra</span> : 'Sıra'}</Th>
             <Th>{team ? 'Takım' : 'Katılımcı'}</Th>
             {!upcoming && (
               <>
@@ -81,7 +81,7 @@ export default function StandingsTab({ data, loading, status, participation }: P
                 <Th align="right" className="hidden md:table-cell">
                   İşlem
                 </Th>
-                <Th align="right" className="hidden xl:table-cell" title="İlk kurulum hariç işlem hacmi / 2 / başlangıç sermayesi">
+                <Th align="right" className="hidden xl:table-cell" title="Devir hızı: toplam işlem hacmi / 2 / başlangıç sermayesi">
                   Devir
                 </Th>
               </>
@@ -147,7 +147,7 @@ function Row({
   return (
     <tr aria-current={r.is_me ? 'true' : undefined} className={cn('transition-colors', r.is_me ? 'bg-brand-soft' : 'hover:bg-surface-2')}>
       <Td>{upcoming || r.rank == null ? <span className="num text-sm text-subtle">{index + 1}.</span> : <RankMedal rank={r.rank} highlight={r.is_me} />}</Td>
-      <Td className="max-w-0">
+      <Td className="min-w-[8rem] sm:min-w-[11rem]">
         <div className="flex min-w-0 items-center gap-2.5">
           <UserInitial name={r.label} size={32} tone={r.is_me ? 'brand' : finished && r.rank === 1 ? 'gold' : 'neutral'} className="max-sm:hidden" />
           <div className="min-w-0">
@@ -181,7 +181,9 @@ function Row({
       </Td>
       {!upcoming && (
         <>
-          <Td align="right">{r.return_pct != null ? <Delta value={r.return_pct} /> : <span className="text-subtle">—</span>}</Td>
+          <Td align="right" className="whitespace-nowrap">
+            {r.return_pct != null ? <Delta value={r.return_pct} /> : <span className="text-subtle">—</span>}
+          </Td>
           <Td align="right" className="num hidden whitespace-nowrap text-fg sm:table-cell">
             {r.equity_usd != null ? formatUSD(r.equity_usd) : '—'}
           </Td>

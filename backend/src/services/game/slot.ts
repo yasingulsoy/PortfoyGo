@@ -229,25 +229,24 @@ const addSpin = (t: SlotTotals, bet: number, win: number): SlotTotals => totals(
 
 async function loadState(db: Queryable, userId: string, now: Date): Promise<RawState> {
   const dayStart = istanbulDayStart(now);
-  const [agg, recent, user] = await Promise.all([
-    db.query(
-      `SELECT COUNT(*)::int AS spins, COALESCE(SUM(bet), 0)::bigint AS wagered, COALESCE(SUM(win), 0)::bigint AS won,
-              COUNT(*) FILTER (WHERE created_at >= $2)::int AS spins_today,
-              COALESCE(SUM(bet) FILTER (WHERE created_at >= $2), 0)::bigint AS wagered_today,
-              COALESCE(SUM(win) FILTER (WHERE created_at >= $2), 0)::bigint AS won_today,
-              MAX(created_at) AS last_at
-         FROM slot_spins WHERE user_id = $1`,
-      [userId, dayStart]
-    ),
-    // Oturum: aralarında ≤ sessionGapMs olan son çevirmeler (en fazla 3 gün geriye)
-    db.query(
-      `SELECT bet, win, created_at FROM slot_spins
-        WHERE user_id = $1 AND created_at > $2
-        ORDER BY created_at DESC, id DESC LIMIT 1000`,
-      [userId, new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000)]
-    ),
-    db.query(`SELECT coins FROM users WHERE id = $1`, [userId]),
-  ]);
+  // Sıralı: db bir transaction istemcisi olabilir (aynı istemcide eşzamanlı sorgu yok)
+  const agg = await db.query(
+    `SELECT COUNT(*)::int AS spins, COALESCE(SUM(bet), 0)::bigint AS wagered, COALESCE(SUM(win), 0)::bigint AS won,
+            COUNT(*) FILTER (WHERE created_at >= $2)::int AS spins_today,
+            COALESCE(SUM(bet) FILTER (WHERE created_at >= $2), 0)::bigint AS wagered_today,
+            COALESCE(SUM(win) FILTER (WHERE created_at >= $2), 0)::bigint AS won_today,
+            MAX(created_at) AS last_at
+       FROM slot_spins WHERE user_id = $1`,
+    [userId, dayStart]
+  );
+  // Oturum: aralarında ≤ sessionGapMs olan son çevirmeler (en fazla 3 gün geriye)
+  const recent = await db.query(
+    `SELECT bet, win, created_at FROM slot_spins
+      WHERE user_id = $1 AND created_at > $2
+      ORDER BY created_at DESC, id DESC LIMIT 1000`,
+    [userId, new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000)]
+  );
+  const user = await db.query(`SELECT coins FROM users WHERE id = $1`, [userId]);
   const a = agg.rows[0] ?? {};
   let prev = now.getTime();
   let sSpins = 0;

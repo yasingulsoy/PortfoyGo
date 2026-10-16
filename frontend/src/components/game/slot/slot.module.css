@@ -1,0 +1,113 @@
+/* Slot Makinesi makara görünümü ve mikro animasyonları (renkler yalnızca game.css değişkenleri). */
+
+/* Makara penceresi: yalnızca ödeme çizgisindeki TEK sembol görünür (üst/alt komşu yok → yakın kaçış izlenimi yok) */
+.window {
+  position: relative;
+  overflow: hidden;
+  aspect-ratio: 1 / 1.08;
+  border-radius: 16px;
+  border: 3px solid var(--g-outline);
+  background: var(--g-c-cream);
+  box-shadow: inset 0 6px 8px var(--g-outline-soft), inset 0 -6px 8px var(--g-outline-soft);
+}
+
+.strip {
+  display: flex;
+  flex-direction: column;
+  will-change: transform;
+}
+
+.cell {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+}
+
+.cell > svg {
+  width: 72%;
+  height: auto;
+}
+
+/* Hareket sırasında hafif bulanıklık (hız hissi; sonuç karesinde yok) */
+.moving .cell {
+  filter: blur(0.6px);
+}
+
+/* Kazanan makaralar (yalnızca gerçek kazançta) */
+.winning {
+  border-color: var(--g-gold-edge);
+  animation: win-glow 900ms ease-in-out infinite alternate;
+}
+
+/* Hareket azaltma: sonuç kısa bir solmayla belirir */
+.reveal {
+  animation: reveal 160ms ease-out;
+}
+
+/* Ödeme çizgisi okları */
+.payline {
+  position: absolute;
+  top: 50%;
+  width: 0;
+  height: 0;
+  border-top: 9px solid transparent;
+  border-bottom: 9px solid transparent;
+  transform: translateY(-50%);
+}
+
+.paylineLeft {
+  left: -2px;
+  border-left: 11px solid var(--g-gold);
+}
+
+.paylineRight {
+  right: -2px;
+  border-right: 11px solid var(--g-gold);
+}
+
+/* Bekleme çubuğu (1,5 sn) */
+.cooldown {
+  transform-origin: left center;
+  animation-name: cooldown;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+}
+
+@keyframes win-glow {
+  from {
+    box-shadow: inset 0 6px 8px var(--g-outline-soft), 0 0 0 0 var(--g-gold-top);
+  }
+  to {
+    box-shadow: inset 0 6px 8px var(--g-outline-soft), 0 0 0 4px var(--g-gold-top);
+  }
+}
+
+@keyframes reveal {
+  from {
+    opacity: 0.2;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes cooldown {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .winning,
+  .reveal,
+  .cooldown {
+    animation: none;
+  }
+  .moving .cell {
+    filter: none;
+  }
+}

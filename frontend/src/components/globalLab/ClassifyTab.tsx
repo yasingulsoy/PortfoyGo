@@ -21,7 +21,7 @@ export default function ClassifyTab() {
   const all = useLabInstruments();
   const compare = useCompareSelection(MAX);
   const toast = useToast();
-  const items = all.data?.items ?? [];
+  const items = useMemo(() => all.data?.items ?? [], [all.data]);
   const byId = useMemo(() => new Map(items.map((i) => [i.id, i])), [items]);
   const selected = compare.ids.map((id) => byId.get(id)).filter((x): x is LabInstrument => !!x);
 

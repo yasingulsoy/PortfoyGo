@@ -37,8 +37,8 @@ export interface StyleInput {
  * Etiket kuralları (eşikler bilinçli olarak basit ve açıklanabilir tutuldu):
  *  - Nakit ağırlıklı    : değerin ≥ %50'si nakit.
  *  - Yoğun işlem        : haftada ortalama ≥ 10 işlem (dönem < 1 hafta ise 1 hafta sayılır) VEYA devir hızı ≥ %300.
- *  - Al-tut             : Yoğun işlem DEĞİL, nakit < %50, en az bir işlem var ve kuruluştan (ilk 24 saat) sonraki
- *                         işlemler 30 günde en fazla 2 (en az 2 hak).
+ *  - Al-tut             : ölçüm en az 1 gün sürdü (ilk 24 saat kuruluş sayılır), Yoğun işlem DEĞİL, nakit < %50,
+ *                         en az bir işlem var ve kuruluştan sonraki işlemler 30 günde en fazla 2 (en az 2 hak).
  *  - Yoğunlaşmış        : nakit < %50 ve (en büyük pozisyon değerin ≥ %40'ı VEYA pozisyonların etkin sayısı < 3).
  *  - Çeşitlendirilmiş   : nakit < %50, etkin pozisyon sayısı ≥ 5 ve en büyük pozisyon < %25.
  * Etkin pozisyon sayısı = 1 / Σ wᵢ² (wᵢ: pozisyonun yatırılan tutar içindeki payı; nakit hariç).
@@ -73,7 +73,7 @@ export function styleTags(input: StyleInput): StyleTag[] {
       label: 'Yoğun işlem',
       reason: perWeek >= 10 ? `Haftada ortalama ${fmt(perWeek, 1)} işlem` : `Devir hızı %${fmt(turnover)}`,
     });
-  } else if (!cashHeavy && input.tradesCount > 0) {
+  } else if (!cashHeavy && input.tradesCount > 0 && input.days >= 1) {
     const allowance = Math.max(2, (2 * input.days) / 30);
     if (input.laterTrades <= allowance) {
       tags.push({

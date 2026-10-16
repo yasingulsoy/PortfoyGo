@@ -14,7 +14,7 @@ const AUTH_HINT_COOKIE = 'pg_auth';
 // /yayin/** (OBS yayın katmanı) bilinçli olarak herkese açıktır.
 // /u/** (herkese açık oyuncu profilleri + OG görselleri) de herkese açıktır: PROTECTED'a EKLEMEYİN (paylaşılan bağlantılar
 // ve önizleme botları oturumsuz gelir; gizlilik backend'de users.profile_public ile uygulanır).
-const PROTECTED = ['/markets', '/portfolio', '/transactions', '/leaderboard', '/leagues', '/news', '/profile', '/notifications', '/arena', '/advisor', '/oyun', '/model-portfoy', '/ortak-akil'];
+const PROTECTED = ['/markets', '/portfolio', '/transactions', '/leaderboard', '/leagues', '/news', '/profile', '/notifications', '/arena', '/advisor', '/oyun', '/model-portfoy', '/ortak-akil', '/global-lab', '/abonelik'];
 
 function isProtected(pathname: string) {
   return PROTECTED.some((p) => (p === '/' ? pathname === '/' : pathname === p || pathname.startsWith(`${p}/`))) || pathname.startsWith('/asset/');

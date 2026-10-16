@@ -86,7 +86,7 @@ export default function ScenarioBuilder({
   readOnly?: boolean;
 }) {
   const [touched, setTouched] = useState(false);
-  const cells = meta?.assumptions.cells ?? [];
+  const cells = useMemo(() => meta?.assumptions.cells ?? [], [meta]);
   const maxRows = meta?.limits.scenarioRowsMax ?? 20;
   const weights = state.rows.map((r) => parseDecimal(r.weight));
   const total = weightTotal(weights.map((w) => (Number.isFinite(w) ? w : 0)));

@@ -961,3 +961,20 @@ export const sandboxApi = {
 /* ------------------------------------------------------------------ */
 
 export { ideasApi } from './ideas';
+
+/* ------------------------------------------------------------------ */
+/* Slot Makinesi — "Olasılık dersi" (/api/game/slot, migration 026)     */
+/* ------------------------------------------------------------------ */
+
+import { toSlotInfo, toSlotSpinResult } from '@/components/game/slot/model';
+
+/**
+ * Hatalar GameApiError: 410 SLOT_DISABLED · 400 INSUFFICIENT_COINS / INVALID_BET · 403 ADULT_CONFIRM_REQUIRED / ARENA_BREAK ·
+ * 429 SLOT_COOLDOWN {retry_after_ms} / SLOT_DAILY_SPIN_LIMIT / SLOT_DAILY_LOSS_LIMIT {resets_at, max_bet} ·
+ * 409 SLOT_REALITY_CHECK {session}. Aynı request_id ile yeniden deneme aynı sonucu döndürür (idempotent).
+ */
+export const slotApi = {
+  key: '/game/slot',
+  info: async () => toSlotInfo(await gameRequest('/game/slot')),
+  spin: async (body: { bet: number; request_id: string; reality_check_ack?: boolean }) => toSlotSpinResult(await gamePost('/game/slot/spin', body)),
+};

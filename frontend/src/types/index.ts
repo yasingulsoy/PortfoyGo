@@ -1456,3 +1456,6 @@ export interface LoginResult {
 
 // Ortak Akıl — Öneri Havuzu (backend /api/ideas, migration 024)
 export type * from './ideas';
+
+// Slot Makinesi — "Olasılık dersi" (backend /api/game/slot, migration 026)
+export type * from './slot';

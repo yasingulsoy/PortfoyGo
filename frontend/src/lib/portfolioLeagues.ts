@@ -151,7 +151,7 @@ export function styleTone(key: string): 'brand' | 'up' | 'gold' | 'down' | 'neut
 /** Stil etiketlerinin açıklaması (Stratejiler sekmesi "Etiketler nasıl verilir?") */
 export const STYLE_TAG_RULES: { label: string; rule: string }[] = [
   { label: 'Yoğun işlem', rule: 'Haftada ortalama 10 veya daha fazla işlem ya da %300 üzeri devir hızı.' },
-  { label: 'Al-tut', rule: 'İlk 24 saatteki kuruluştan sonra 30 günde en fazla 2 işlem; nakit %50’nin altında.' },
+  { label: 'Al-tut', rule: 'İlk 24 saatteki kuruluştan sonra 30 günde en fazla 2 işlem (en az 1 gün ölçüldükten sonra); nakit %50’nin altında.' },
   { label: 'Yoğunlaşmış', rule: 'En büyük pozisyon değerin %40’ı veya fazlası ya da etkin pozisyon sayısı 3’ten az.' },
   { label: 'Çeşitlendirilmiş', rule: 'Etkin pozisyon sayısı 5 veya fazla ve en büyük pozisyon %25’in altında.' },
   { label: 'Nakit ağırlıklı', rule: 'Değerin %50’si veya fazlası nakitte.' },

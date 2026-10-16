@@ -52,7 +52,7 @@ export default function LeagueDetailModal({ leagueId, onClose, onChanged }: { le
             </div>
 
             {data.rules && (
-              <dl className="num grid grid-cols-2 gap-2 text-sm sm:grid-cols-3">
+              <dl className="num grid grid-cols-2 gap-2 text-sm">
                 <Item label="Sermaye" value={formatUSD(data.rules.starting_capital_usd)} />
                 <Item label="İşlem maliyeti" value={bps(data.rules.commission_bps)} />
                 <Item
@@ -162,7 +162,7 @@ function Item({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0 rounded-lg border border-line bg-surface-2 px-3 py-2">
       <dt className="text-[11px] text-muted">{label}</dt>
-      <dd className="mt-0.5 truncate text-sm font-semibold text-fg">{value}</dd>
+      <dd className="mt-0.5 break-words text-sm font-semibold text-fg">{value}</dd>
     </div>
   );
 }

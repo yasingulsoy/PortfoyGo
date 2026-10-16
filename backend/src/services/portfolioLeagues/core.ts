@@ -448,7 +448,7 @@ export interface LiveResult {
   /** Ölçüm dönemindeki yıllıklaştırılmış oynaklık (yüzde); yeterli nokta yoksa null */
   volatility_ann: number | null;
   trades_count: number;
-  /** İlk kurulum hariç işlem hacmi / 2 / başlangıç sermayesi (yüzde; motorun tanımıyla aynı) */
+  /** Devir hızı: işlem hacmi (motorun "initial" gerekçeli kuruluş işlemleri hariç; ligde kullanılmaz) / 2 / başlangıç sermayesi (yüzde) */
   turnover_pct: number;
   style_tags: StyleTag[];
   stale: boolean;

@@ -18,7 +18,7 @@ import PremiumGate from '@/components/subscription/PremiumGate';
 import { useCompareSelection, useLabInstrument } from '@/hooks/useGlobalLab';
 import { globalLabApi, globalLabKeys } from '@/lib/globalLab';
 import { FEATURES } from '@/lib/subscriptions';
-import { ClassBadge, Chip, LabDisclaimer, QuoteText, RiskMeter } from './bits';
+import { ClassBadge, LabDisclaimer, QuoteText, RiskMeter } from './bits';
 import { RISK_LABELS, classLabel, currencyLabel, money, vehicleLabel } from './model';
 
 /** /global-lab/[symbol]: sınıflandırma, açıklama, (bağlıysa) güncel fiyat, araştırma notları ve liste / karşılaştırma eylemleri. */

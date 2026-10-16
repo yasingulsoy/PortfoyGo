@@ -329,7 +329,10 @@ describe('Admin duyuruları', () => {
     const optedOut = await createUser();
     await pool.query(`UPDATE users SET notification_prefs = '{"orders":false,"competition":false}' WHERE id = $1`, [optedOut.id]);
 
-    const expected = (await pool.query('SELECT COUNT(*)::int AS n FROM users WHERE COALESCE(is_banned, false) = false')).rows[0].n;
+    // Silinmiş (anonimleştirilmiş) hesaplar duyuru almaz (NotificationService.broadcast); başka test dosyaları hesap silebilir
+    const expected = (
+      await pool.query('SELECT COUNT(*)::int AS n FROM users WHERE COALESCE(is_banned, false) = false AND COALESCE(is_deleted, false) = false')
+    ).rows[0].n;
     const res = await api()
       .post('/api/admin/announcements')
       .set(admin.auth)
