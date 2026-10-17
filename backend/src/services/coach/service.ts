@@ -90,6 +90,18 @@ export class CoachService {
       paths,
       return_pct: numOrNull(entry.rows[0].return_pct),
       labels,
+      // Haber Turu: haber programı (etkiler dahil) → haber kuralları
+      news: round.news
+        ? round.news.items.map((n) => ({
+            seq: n.seq,
+            tick: n.tick,
+            role: n.role,
+            headline: n.headline,
+            impacts: n.impacts.map((i) => ({ instrument: i.instrument, direction: i.direction, magnitude: i.magnitude })),
+            related: n.related,
+            pair: n.pair,
+          }))
+        : null,
     });
 
     await pool.query(

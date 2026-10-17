@@ -23,6 +23,9 @@ import {
   type Quote,
 } from './instruments';
 import { PathCache, buildRoundPaths, downsample, pickWindows, randomSeed, windowPointsForDuration, type RoundWindow } from './paths';
+import { buildNewsPaths, buildNewsSchedule, newsForClient, parseNewsSchedule, NEWS_SCHEDULE_VERSION, type NewsSchedule } from './news/engine';
+import { loadNewsStartPrices } from './news/prices';
+import { NEWS_INSTRUMENTS } from './news/templates';
 import {
   MIN_AMOUNT,
   closePrice,
@@ -104,6 +107,7 @@ const ROUND_SELECT = `
   SELECT r.id, r.kind, r.challenge_id, r.user_id, r.status, r.starts_at, r.ends_at, r.duration_s, r.instruments,
          r."window" AS win, r.seed::text AS seed, r.starting_cash, r.created_at, r.finished_at,
          c.title AS c_title, c.sponsor AS c_sponsor, c.prize_text AS c_prize, r.scenario_id,
+         r.news AS news_json, c.mode AS c_mode,
          d.id AS d_id, d.code AS d_code, d.creator_id AS d_creator, d.opponent_id AS d_opponent, d.opponent_is_bot AS d_bot
     FROM arena_rounds r
     LEFT JOIN arena_challenges c ON c.id = r.challenge_id
@@ -132,6 +136,8 @@ function toRound(row: any): RoundRow {
     duel: row.d_id
       ? { id: row.d_id, code: row.d_code, creator_id: row.d_creator, opponent_id: row.d_opponent ?? null, opponent_is_bot: row.d_bot === true }
       : null,
+    news: parseNewsSchedule(parseJson<unknown>(row.news_json)),
+    news_mode: row.kind === 'news' || row.c_mode === 'news',
   };
 }
 
@@ -179,15 +185,39 @@ function toEntry(row: any): EntryRow {
 
 const pathCache = new PathCache(256);
 
-/** Turun enstrüman yolları (önbellek → yoksa pencere + tohumdan üretilir). Pencere yoksa null. */
+/**
+ * Turun enstrüman yolları (önbellek → yoksa pencere + tohumdan üretilir). Pencere yoksa null.
+ * Haber Turu: tohum + başlangıç fiyatları + haber programından sentetik yol (bkz. news/engine.ts).
+ */
 export function roundPaths(round: RoundRow): Map<string, number[]> | null {
-  if (!round.window || Object.keys(round.window).length === 0) return null;
+  if (round.news_mode && !round.news) return null;
+  if (!round.news && (!round.window || Object.keys(round.window).length === 0)) return null;
   let p = pathCache.get(round.id);
   if (!p) {
-    p = buildRoundPaths(round.window, round.duration_s, round.seed);
+    p = round.news ? buildNewsPaths(round.news, round.duration_s, round.seed) : buildRoundPaths(round.window!, round.duration_s, round.seed);
     pathCache.set(round.id, p);
   }
   return p;
+}
+
+/**
+ * Haber Turu kurulumu: güncel gerçek fiyat düzeyleri (başlangıç) + tohumlu haber programı. Pencere yalnızca
+ * başlangıç fiyatını taşır (geçmiş tekrarı yoktur); gerçek tarih açıklaması (reveal) üretilmez.
+ */
+export async function newsRoundSetup(
+  seed: string | number,
+  durationS: number,
+  codes: readonly string[] = NEWS_INSTRUMENTS,
+  db: Queryable = pool,
+  now: Date = new Date()
+): Promise<{ window: RoundWindow; news: NewsSchedule; used: string[] }> {
+  const { start, source } = await loadNewsStartPrices(codes, db, now);
+  const used = codes.filter((c) => start[c] > 0);
+  const window: RoundWindow = {};
+  const iso = now.toISOString();
+  for (const c of used) window[c] = { from: iso, to: iso, points: [[Math.floor(now.getTime() / 1000), start[c]]] };
+  const news: NewsSchedule = { v: NEWS_SCHEDULE_VERSION, start, start_source: source, items: buildNewsSchedule(seed, durationS, used) };
+  return { window, news, used };
 }
 
 /** Testler için */
@@ -451,7 +481,7 @@ const notFound = () => new ArenaError(404, 'Tur bulunamadı', 'NOT_FOUND');
  * (katılmayan salt okunur).
  */
 export function canViewRound(round: RoundRow, viewerId: string): boolean {
-  if (round.kind === 'solo' || round.kind === 'scenario') return round.user_id === viewerId;
+  if (round.kind === 'solo' || round.kind === 'scenario' || round.kind === 'news') return round.user_id === viewerId;
   if (round.kind === 'duel') return !!round.duel && (round.duel.creator_id === viewerId || round.duel.opponent_id === viewerId);
   return true;
 }
@@ -712,19 +742,33 @@ export class ArenaService {
     return ArenaService.getRoundState(roundId, userId);
   }
 
-  /** Solo / senaryo turu ekler: tek aktif tur + saatlik sınır (iki tür birlikte sayılır) */
+  /**
+   * Haber Turu: fiyatlar turun açıldığı andaki gerçek fiyat düzeyinden başlayan sentetik yoldur; yönü kurgusal
+   * haberler belirler (bkz. news/engine.ts). Solo turla aynı sınırlar (tek aktif tur, saatlik sınır, sorumlu oyun).
+   */
+  static async createNewsRound(userId: string, input: { duration_s: number }): Promise<RoundStateDto> {
+    await assertCanPlay(userId);
+    const seed = randomSeed();
+    const { window, news, used } = await newsRoundSetup(seed, input.duration_s);
+    const roundId = await ArenaService.insertPrivateRound(userId, 'news', input.duration_s, used, window, seed, null, news);
+    emitRoundStarted(roundId, 'news', [userId]);
+    return ArenaService.getRoundState(roundId, userId);
+  }
+
+  /** Solo / senaryo / haber turu ekler: tek aktif tur + saatlik sınır (üç tür birlikte sayılır) */
   private static async insertPrivateRound(
     userId: string,
-    kind: 'solo' | 'scenario',
+    kind: 'solo' | 'scenario' | 'news',
     durationS: number,
     used: string[],
     window: RoundWindow,
     seed: number,
-    scenarioId: string | null
+    scenarioId: string | null,
+    news: NewsSchedule | null = null
   ): Promise<string> {
     // Süresi dolmuş ama kapanmamış turları önce kapat (tek aktif tur kuralı doğru işlesin)
     const stale = await pool.query(
-      `SELECT id FROM arena_rounds WHERE kind IN ('solo', 'scenario') AND user_id = $1 AND status IN ('scheduled', 'running') AND ends_at <= now()`,
+      `SELECT id FROM arena_rounds WHERE kind IN ('solo', 'scenario', 'news') AND user_id = $1 AND status IN ('scheduled', 'running') AND ends_at <= now()`,
       [userId]
     );
     for (const r of stale.rows) await ArenaService.finalizeRound(r.id);
@@ -733,7 +777,7 @@ export class ArenaService {
       await client.query('SELECT id FROM users WHERE id = $1 FOR UPDATE', [userId]);
       const active = await client.query(
         `SELECT id FROM arena_rounds
-          WHERE kind IN ('solo', 'scenario') AND user_id = $1 AND status IN ('scheduled', 'running') AND ends_at > now()
+          WHERE kind IN ('solo', 'scenario', 'news') AND user_id = $1 AND status IN ('scheduled', 'running') AND ends_at > now()
           ORDER BY created_at DESC LIMIT 1`,
         [userId]
       );
@@ -742,7 +786,7 @@ export class ArenaService {
       }
       const recent = await client.query(
         `SELECT COUNT(*)::int AS n, MIN(created_at) AS oldest FROM arena_rounds
-          WHERE kind IN ('solo', 'scenario') AND user_id = $1 AND created_at > now() - INTERVAL '1 hour'`,
+          WHERE kind IN ('solo', 'scenario', 'news') AND user_id = $1 AND created_at > now() - INTERVAL '1 hour'`,
         [userId]
       );
       const n = Number(recent.rows[0]?.n ?? 0);
@@ -760,10 +804,22 @@ export class ArenaService {
       const startsAt = new Date(Date.now() + SOLO_START_DELAY_MS);
       const endsAt = new Date(startsAt.getTime() + durationS * 1000);
       const ins = await client.query(
-        `INSERT INTO arena_rounds (kind, user_id, status, starts_at, ends_at, duration_s, instruments, "window", seed, starting_cash, scenario_id)
-         VALUES ($1, $2, 'running', $3, $4, $5, $6::jsonb, $7::jsonb, $8, $9, $10)
+        `INSERT INTO arena_rounds (kind, user_id, status, starts_at, ends_at, duration_s, instruments, "window", seed, starting_cash, scenario_id, news)
+         VALUES ($1, $2, 'running', $3, $4, $5, $6::jsonb, $7::jsonb, $8, $9, $10, $11::jsonb)
          RETURNING id`,
-        [kind, userId, startsAt.toISOString(), endsAt.toISOString(), durationS, JSON.stringify(used), JSON.stringify(window), seed, STARTING_CASH, scenarioId]
+        [
+          kind,
+          userId,
+          startsAt.toISOString(),
+          endsAt.toISOString(),
+          durationS,
+          JSON.stringify(used),
+          JSON.stringify(window),
+          seed,
+          STARTING_CASH,
+          scenarioId,
+          news ? JSON.stringify(news) : null,
+        ]
       );
       const id = ins.rows[0].id as string;
       await client.query('INSERT INTO arena_entries (round_id, user_id, cash) VALUES ($1, $2, $3)', [id, userId, STARTING_CASH]);
@@ -775,7 +831,7 @@ export class ArenaService {
   static async activeSoloRound(userId: string): Promise<RoundStateDto | null> {
     const r = await pool.query(
       `SELECT id, ends_at FROM arena_rounds
-        WHERE kind IN ('solo', 'scenario') AND user_id = $1 AND status IN ('scheduled', 'running')
+        WHERE kind IN ('solo', 'scenario', 'news') AND user_id = $1 AND status IN ('scheduled', 'running')
         ORDER BY created_at DESC`,
       [userId]
     );
@@ -933,6 +989,11 @@ export class ArenaService {
     if (round.challenge) state.round.challenge = { ...round.challenge };
     const reveal = ArenaService.reveal(round);
     if (reveal) state.round.reveal = reveal;
+    if (round.news_mode) {
+      state.round.mode = 'news';
+      // Yalnızca yayımlanmış haberler; etkiler tur bitince (yeniden bağlananlar / geç katılanlar akışı görür)
+      state.news = newsForClient(round.news, round.starts_at, tick, round.status === 'finished');
+    }
     if (leaderboard) state.leaderboard = leaderboard;
     void viewerId;
     return state;
@@ -940,7 +1001,8 @@ export class ArenaService {
 
   /** Bitmiş turda gerçek tarih aralığı */
   static reveal(round: RoundRow): RoundStateDto['round']['reveal'] | undefined {
-    if (round.status !== 'finished' || !round.window) return undefined;
+    // Haber Turu gerçek bir dönemin tekrarı değildir (yalnızca başlangıç düzeyi gerçektir)
+    if (round.status !== 'finished' || !round.window || round.news_mode) return undefined;
     const specs = Object.entries(round.window);
     if (specs.length === 0) return undefined;
     const from = specs.map(([, s]) => s.from).sort()[0];
@@ -1170,6 +1232,20 @@ export class ArenaService {
       if (round.status === 'finished' || round.status === 'cancelled') return null;
       if (Date.now() < round.ends_at.getTime()) return null;
 
+      if (!round.window && round.news_mode) {
+        // Haber modundaki meydan okuma başlatılamadan süresi dolduysa program şimdi kurulur
+        const setup = await newsRoundSetup(round.seed, round.duration_s, round.instruments, client);
+        await client.query(`UPDATE arena_rounds SET "window" = $2::jsonb, instruments = $3::jsonb, news = $4::jsonb WHERE id = $1`, [
+          round.id,
+          JSON.stringify(setup.window),
+          JSON.stringify(setup.used),
+          JSON.stringify(setup.news),
+        ]);
+        round.window = setup.window;
+        round.instruments = setup.used;
+        round.news = setup.news;
+        pathCache.delete(round.id);
+      }
       if (!round.window) {
         // Meydan okuma başlatılamadan süresi dolduysa (iş çalışmadıysa) pencere şimdi seçilir
         const window = await pickRoundWindow(round.instruments, round.seed, new Date(), round.duration_s, client);
@@ -1312,6 +1388,7 @@ export class ArenaService {
       if (r.duel) ev.duel_id = r.duel.id;
       if (r.challenge_id) ev.challenge_id = r.challenge_id;
       if (r.scenario_id) ev.scenario_id = r.scenario_id;
+      if (r.news_mode) ev.mode = 'news';
       arenaEvents.emit('round_finished', ev);
     }
     // Rozetler (arka planda; hata fırlatmaz) — bot hariç
@@ -1405,7 +1482,14 @@ export class ArenaService {
       const round = toRound(rr.rows[0]);
       let window = round.window;
       let used = round.instruments;
-      if (!window) {
+      let news = round.news;
+      if (!window && round.news_mode) {
+        // Haber modu: başlangıç = şu anki gerçek fiyat düzeyi + tohumlu kurgusal haber programı
+        const setup = await newsRoundSetup(round.seed, round.duration_s, round.instruments, client);
+        window = setup.window;
+        used = setup.used;
+        news = setup.news;
+      } else if (!window) {
         window = await pickRoundWindow(round.instruments, round.seed, new Date(), round.duration_s, client);
         used = round.instruments.filter((code) => window![code]);
       }
@@ -1415,10 +1499,11 @@ export class ArenaService {
         logger.warn({ challengeId }, '[arena] Meydan okuma için fiyat verisi yok; iptal edildi');
         return null;
       }
-      await client.query(`UPDATE arena_rounds SET "window" = $2::jsonb, instruments = $3::jsonb, status = 'running' WHERE id = $1`, [
+      await client.query(`UPDATE arena_rounds SET "window" = $2::jsonb, instruments = $3::jsonb, news = $4::jsonb, status = 'running' WHERE id = $1`, [
         round.id,
         JSON.stringify(window),
         JSON.stringify(used),
+        news ? JSON.stringify(news) : null,
       ]);
       await client.query(`UPDATE arena_challenges SET status = 'running' WHERE id = $1`, [challengeId]);
       const participants = await client.query('SELECT user_id FROM arena_entries WHERE round_id = $1', [round.id]);
@@ -1608,22 +1693,30 @@ export class ArenaService {
       duration_s: number;
       instruments: string[];
       starting_cash?: number;
+      /** 'news': Haber modu (kurgusal haber akışı; 4 temel enstrüman, başlangıç = o anki gerçek fiyat) */
+      mode?: 'classic' | 'news';
     }
   ): Promise<ChallengeDto> {
-    const avail = await getAvailability(pool);
-    const codes = [...new Set(input.instruments.map((c) => c.trim().toUpperCase()))];
-    if (codes.length < 2 || codes.length > 5) throw new ArenaError(400, 'Meydan okumada 2–5 enstrüman olmalı', 'VALIDATION_ERROR');
-    for (const c of codes) {
-      if (!getInstrument(c)) throw new ArenaError(400, `Bilinmeyen enstrüman: ${c}`, 'VALIDATION_ERROR');
-      if (!avail.get(c as ArenaInstrumentCode)) {
-        throw new ArenaError(400, `${getInstrument(c)!.label} için şu anda yeterli fiyat verisi yok`, 'ARENA_INSTRUMENT_UNAVAILABLE');
+    const mode = input.mode === 'news' ? 'news' : 'classic';
+    let codes = [...new Set(input.instruments.map((c) => c.trim().toUpperCase()))];
+    if (mode === 'news') {
+      // Haber şablonları 4 temel enstrümana göre yazıldı; fiyat yoksa referans düzeyle oynanır
+      codes = [...NEWS_INSTRUMENTS];
+    } else {
+      const avail = await getAvailability(pool);
+      if (codes.length < 2 || codes.length > 5) throw new ArenaError(400, 'Meydan okumada 2–5 enstrüman olmalı', 'VALIDATION_ERROR');
+      for (const c of codes) {
+        if (!getInstrument(c)) throw new ArenaError(400, `Bilinmeyen enstrüman: ${c}`, 'VALIDATION_ERROR');
+        if (!avail.get(c as ArenaInstrumentCode)) {
+          throw new ArenaError(400, `${getInstrument(c)!.label} için şu anda yeterli fiyat verisi yok`, 'ARENA_INSTRUMENT_UNAVAILABLE');
+        }
       }
     }
     const cash = input.starting_cash ?? STARTING_CASH;
     const id = await withTx(async (client) => {
       const c = await client.query(
-        `INSERT INTO arena_challenges (title, description, sponsor, prize_text, starts_at, duration_s, instruments, starting_cash, created_by)
-         VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9) RETURNING id`,
+        `INSERT INTO arena_challenges (title, description, sponsor, prize_text, starts_at, duration_s, instruments, starting_cash, created_by, mode)
+         VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9, $10) RETURNING id`,
         [
           input.title,
           input.description ?? null,
@@ -1634,6 +1727,7 @@ export class ArenaService {
           JSON.stringify(codes),
           cash,
           adminId,
+          mode,
         ]
       );
       const challengeId = c.rows[0].id as string;
@@ -1729,6 +1823,8 @@ export interface ChallengeDto {
   participants: number;
   joined: boolean;
   round_id: string | null;
+  /** 'news': Haber modu (kurgusal haber akışı) */
+  mode: 'classic' | 'news';
 }
 
 function toChallengeDto(row: any): ChallengeDto {
@@ -1746,6 +1842,7 @@ function toChallengeDto(row: any): ChallengeDto {
     participants: Number(row.participants ?? 0),
     joined: row.joined === true,
     round_id: row.round_id ?? null,
+    mode: row.mode === 'news' ? 'news' : 'classic',
   };
 }
 

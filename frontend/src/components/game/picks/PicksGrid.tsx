@@ -59,7 +59,7 @@ export default function PicksGrid({ week, revealMoment, showReturns, className }
               </button>
             ))}
           </div>
-          <ul className="grid grid-cols-1 gap-3 min-[360px]:grid-cols-2" aria-label="Seçimler">
+          <ul className="grid grid-cols-1 gap-3 min-[360px]:grid-cols-2 @2xl:grid-cols-3" aria-label="Seçimler">
             {shown.map((p, i) => (
               <PickTile key={p.id || `${p.username}:${p.symbol}`} pick={p} flipDelayMs={flip && i < PAGE ? 150 + i * FLIP_STEP_MS : null} showReturn={showReturns} />
             ))}

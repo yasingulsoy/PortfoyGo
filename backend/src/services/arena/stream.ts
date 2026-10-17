@@ -20,6 +20,7 @@ import {
   tickAt,
 } from './service';
 import type { EntryRow, PositionRow, RoundRow } from './types';
+import { newsForClient, publicNewsItem } from './news/engine';
 
 /**
  * GET /api/arena/rounds/:id/stream — Server-Sent Events (bildirim akışıyla aynı başlıklar/heartbeat/temizlik).
@@ -32,8 +33,12 @@ import type { EntryRow, PositionRow, RoundRow } from './types';
  *  event: opponent    {equity, return_pct}               düello, saniyede bir (rakibin anlık durumu)
  *  event: reaction    {emoji, username}                  katılımcı tepkisi
  *  event: host_message {text, at}                        meydan okuma sunucusunun mesajı
- *  event: end         {final, reveal, leaderboard?, duel?} ardından bağlantı kapanır
- *                     (reveal.debrief: senaryo turu; duel: {result, opponent_equity, opponent_return_pct, …})
+ *  event: news        {id, seq, tick, at, category, category_label, headline, body, fictional}
+ *                     Haber Turu: kurgusal haber TAM yayın tick'inde (bağlantı açılınca o ana kadarki haberler de
+ *                     bir kez gönderilir; istemci seq ile tekilleştirir). Etkiler tur bitene kadar GÖNDERİLMEZ.
+ *  event: end         {final, reveal, leaderboard?, duel?, news?} ardından bağlantı kapanır
+ *                     (reveal.debrief: senaryo turu; duel: {result, opponent_equity, opponent_return_pct, …};
+ *                      news: Haber Turu'nda tüm haberler etkileri ve "Neden?" açıklamalarıyla)
  *  : ping                                                25 sn'de bir
  */
 
@@ -80,6 +85,8 @@ export async function openRoundStream(req: Request, res: Response, roundId: stri
   let lastCountdownSec = -1;
   let lastLeaderboardAt = 0;
   let myRank: number | null = null;
+  /** Bu bağlantıda gönderilmiş haberler (seq) */
+  const sentNews = new Set<number>();
   let entry: EntryRow | null = null;
   let open: PositionRow[] = [];
   let current: RoundRow = round;
@@ -128,6 +135,7 @@ export async function openRoundStream(req: Request, res: Response, roundId: stri
         const d = await duelStateFor(current, paths, current.duration_s, userId);
         if (d) payload.duel = d;
       }
+      if (current.news_mode && current.status === 'finished') payload.news = newsForClient(current.news, current.starts_at, current.duration_s, true);
       send('end', payload);
     } catch (err: any) {
       logger.warn({ err }, `[arena] SSE bitiş olayı gönderilemedi: ${err?.message || err}`);
@@ -170,6 +178,13 @@ export async function openRoundStream(req: Request, res: Response, roundId: stri
         if (q) quotes[code] = displayQuote(code, q);
       }
       send('tick', { tick, server_now: new Date(now).toISOString(), quotes });
+      if (current.news) {
+        for (const item of current.news.items) {
+          if (item.tick > tick || sentNews.has(item.seq)) continue;
+          sentNews.add(item.seq);
+          send('news', publicNewsItem(item, current.starts_at));
+        }
+      }
 
       if (entry && open.length > 0 && anyTrigger(open, paths, tick)) {
         // Olaylar (position + me) yol üzerinden gelir

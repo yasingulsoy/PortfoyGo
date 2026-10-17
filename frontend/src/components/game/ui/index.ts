@@ -5,6 +5,7 @@ export { default as GameScreen, type GameBackground } from './GameScreen';
 export { default as GameTopBar } from './GameTopBar';
 export { default as GameButton, GameLinkButton, GameSpinner, gameButtonClass, type GameButtonProps, type GameButtonSize, type GameButtonVariant } from './GameButton';
 export { default as GamePanel, type GameAccent } from './GamePanel';
+export { default as GameColumns, type GameColumnsSplit } from './GameColumns';
 export { default as ModeTile } from './ModeTile';
 export { CoinCounter, HudCounter, RatingCounter } from './CoinCounter';
 export { default as XpBar } from './XpBar';

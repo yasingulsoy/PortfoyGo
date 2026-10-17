@@ -42,7 +42,7 @@ export default function PicksHistoryScreen() {
   const status = (error as { status?: number } | null)?.status;
 
   return (
-    <GameScreen topBar back={PICKS_PATH} backLabel="Haftalık Seçim’e dön" title="Geçmiş haftalar">
+    <GameScreen topBar back={PICKS_PATH} backLabel="Haftalık Seçim’e dön" title="Geçmiş haftalar" layout="full">
       <p className="g-title-sm -mt-2 mb-5 text-base">Her haftanın kürsüsü, kitlenin sonucu ve senin yerin.</p>
 
       {isLoading && !data ? (
@@ -51,6 +51,7 @@ export default function PicksHistoryScreen() {
         <GameNotice
           tone="red"
           title="Yüklenemedi"
+          className="mx-auto w-full max-w-xl"
           actions={
             <GameButton variant="blue" onClick={() => void mutate()}>
               Tekrar dene
@@ -60,18 +61,18 @@ export default function PicksHistoryScreen() {
           {status === 404 ? 'Geçmiş haftalar henüz hazır değil.' : 'Geçmiş haftalar şu an yüklenemedi.'}
         </GameNotice>
       ) : items.length === 0 ? (
-        <GameNotice icon={<ClockIcon />} title="Henüz geçmiş yok" tone="teal">
+        <GameNotice icon={<ClockIcon />} title="Henüz geçmiş yok" tone="teal" className="mx-auto w-full max-w-xl">
           İlk hafta bittiğinde sonuçlar burada listelenecek.
         </GameNotice>
       ) : (
         <>
-          <ul className="space-y-3" aria-label="Haftalar">
+          <ul className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:gap-4 2xl:grid-cols-3" aria-label="Haftalar">
             {items.map((w) => (
               <WeekRow key={w.week_id} week={w} />
             ))}
           </ul>
           {(data?.total ?? 0) > items.length && (
-            <GameButton variant="ghost" size="md" block className="mt-4" loading={isValidating} onClick={() => setLimit((l) => l + STEP)}>
+            <GameButton variant="ghost" size="md" block className="mx-auto mt-4 max-w-md" loading={isValidating} onClick={() => setLimit((l) => l + STEP)}>
               Daha fazla hafta
             </GameButton>
           )}
@@ -86,8 +87,8 @@ export default function PicksHistoryScreen() {
 function WeekRow({ week: w }: { week: PicksWeekSummary }) {
   const label = weekRangeLabel(w.starts_at, w.ends_at, true);
   return (
-    <li>
-      <Link href={pickWeekPath(w.week_id)} className="g-panel g-focus flex items-center gap-3 p-3.5 transition-transform active:translate-y-0.5">
+    <li className="min-w-0">
+      <Link href={pickWeekPath(w.week_id)} className="g-panel g-focus flex h-full items-center gap-3 p-3.5 transition-transform active:translate-y-0.5">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="text-base font-extrabold leading-tight">{label}</h2>

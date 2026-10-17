@@ -1,7 +1,8 @@
 import type { RoundWindow } from './paths';
 import type { CloseReason, Side } from './engine';
+import type { NewsItemDto, NewsSchedule } from './news/engine';
 
-export type RoundKind = 'solo' | 'challenge' | 'duel' | 'scenario';
+export type RoundKind = 'solo' | 'challenge' | 'duel' | 'scenario' | 'news';
 export type RoundStatus = 'scheduled' | 'running' | 'finished' | 'cancelled';
 
 export interface RoundRow {
@@ -24,6 +25,10 @@ export interface RoundRow {
   scenario_id: string | null;
   /** Düello turu (kind = 'duel'): arena_duels satırının özeti */
   duel: { id: string; code: string; creator_id: string; opponent_id: string | null; opponent_is_bot: boolean } | null;
+  /** Haber Turu programı (kind = 'news' ya da Haber modundaki meydan okuma; başlayana kadar null) */
+  news: NewsSchedule | null;
+  /** Haber modu: solo Haber Turu veya mode = 'news' meydan okuma */
+  news_mode: boolean;
 }
 
 export interface PositionRow {
@@ -124,6 +129,8 @@ export interface RoundStateDto {
       /** Senaryo turu bittiğinde: senaryonun açıklaması (ne oldu?) */
       debrief?: string;
     };
+    /** Haber Turu / Haber modundaki meydan okuma */
+    mode?: 'news';
   };
   me: MeDto;
   quotes: Record<string, QuoteDto & { change_pct_since_start: number }>;
@@ -135,6 +142,8 @@ export interface RoundStateDto {
   duel?: DuelStateDto;
   /** Senaryo turu */
   scenario?: { id: string; title: string; briefing: string; synthetic: boolean };
+  /** Haber Turu: yayımlanmış kurgusal haberler (eskiden yeniye). Etkiler yalnızca tur bitince gelir. */
+  news?: NewsItemDto[];
 }
 
 export interface DuelOpponentDto {

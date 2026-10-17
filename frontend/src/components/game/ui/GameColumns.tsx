@@ -60,7 +60,8 @@ export default function GameColumns({
 }: Props) {
   const three = extra != null && extra !== false;
   const g = GAP[gap];
-  const col = cn('flex min-w-0 flex-col', g);
+  // @container: sütun içindeki bileşenler sütun genişliğine göre uyarlanabilir (@md:, @2xl: …)
+  const col = cn('@container flex min-w-0 flex-col', g);
   return (
     <div
       className={cn(

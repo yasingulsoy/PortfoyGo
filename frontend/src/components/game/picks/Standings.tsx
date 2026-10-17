@@ -199,6 +199,16 @@ export function RewardsTable({ week, className }: { week: PicksWeek; className?:
 
 /** Hafta sonucu: kürsü, benim sonucum, kitle içgörüsü, ödüller ve sıralama. */
 export function ResultsPanel({ week, className }: { week: PicksWeek; className?: string }) {
+  return (
+    <div className={cn('space-y-4', className)}>
+      <ResultsSummary week={week} />
+      <Standings week={week} title={week.phase === 'settling' ? 'Geçici sıralama' : 'Son sıralama'} />
+    </div>
+  );
+}
+
+/** Hafta sonucunun özeti (sıralama hariç): kürsü, benim sonucum, kitle içgörüsü. Sütunlu yerleşimde sıralama ayrı gösterilir. */
+export function ResultsSummary({ week, className }: { week: PicksWeek; className?: string }) {
   const settling = week.phase === 'settling';
   const my = week.my_pick;
   const rank = week.my_rank ?? my?.rank ?? null;
@@ -287,7 +297,6 @@ export function ResultsPanel({ week, className }: { week: PicksWeek; className?:
         </GamePanel>
       )}
 
-      <Standings week={week} title={settling ? 'Geçici sıralama' : 'Son sıralama'} />
     </div>
   );
 }

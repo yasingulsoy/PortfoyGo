@@ -6,6 +6,7 @@ import { AuditService } from '../services/audit';
 import { openBroadcastStream } from '../services/arena/broadcastStream';
 import { ArenaDuels, CODE_LENGTH, DUEL_DURATIONS, invitePath } from '../services/arena/duels';
 import { ArenaError, ArenaService, SOLO_DURATIONS } from '../services/arena/service';
+import { NEWS_DURATIONS } from '../services/arena/news/engine';
 import { ArenaSocial, HOST_MESSAGE_MAX, REACTION_EMOJIS } from '../services/arena/social';
 import { openRoundStream } from '../services/arena/stream';
 import { AppError, asyncHandler } from '../utils/errors';
@@ -18,6 +19,7 @@ import { parseOrThrow } from '../utils/validation';
  *  GET    /instruments                                   (herkese açık)
  *  POST   /rounds                    {duration_s, instruments?}         → 201 RoundState (solo)
  *  POST   /rounds                    {duration_s, scenario_id}          → 201 RoundState (senaryo)
+ *  POST   /rounds                    {duration_s: 60|180|300, mode:'news'} → 201 RoundState (Haber Turu; kurgusal haberler)
  *  GET    /rounds/active                                                → RoundState | null
  *  GET    /rounds/:id                                                   → RoundState
  *  GET    /rounds/:id/stream         SSE
@@ -84,6 +86,8 @@ const createRoundSchema = z.object({
     .max(80, 'Geçersiz senaryo ID')
     .regex(/^[A-Za-z0-9_-]+$/, 'Geçersiz senaryo ID')
     .optional(),
+  /** 'news': Haber Turu (kurgusal haber akışı; 1/3/5 dk) */
+  mode: z.enum(['classic', 'news'], { message: 'Mod "classic" veya "news" olmalı' }).optional(),
 });
 
 const duelDurationField = z
@@ -309,9 +313,18 @@ router.post(
   asyncHandler(async (req, res) => {
     const input = parseOrThrow(createRoundSchema, req.body);
     const userId = requireUser(req).id;
-    const data = input.scenario_id
-      ? await ArenaService.createScenarioRound(userId, { scenario_id: input.scenario_id, duration_s: input.duration_s })
-      : await ArenaService.createSoloRound(userId, { duration_s: input.duration_s, instruments: input.instruments });
+    if (input.mode === 'news') {
+      if (input.scenario_id) throw new ArenaError(400, 'Haber Turu senaryoyla birlikte başlatılamaz', 'VALIDATION_ERROR');
+      if (!(NEWS_DURATIONS as readonly number[]).includes(input.duration_s)) {
+        throw new ArenaError(400, `Haber Turu süresi ${NEWS_DURATIONS.join(', ')} saniyeden biri olmalı`, 'VALIDATION_ERROR');
+      }
+    }
+    const data =
+      input.mode === 'news'
+        ? await ArenaService.createNewsRound(userId, { duration_s: input.duration_s })
+        : input.scenario_id
+          ? await ArenaService.createScenarioRound(userId, { scenario_id: input.scenario_id, duration_s: input.duration_s })
+          : await ArenaService.createSoloRound(userId, { duration_s: input.duration_s, instruments: input.instruments });
     res.status(201).json({ success: true, data });
   })
 );
@@ -574,6 +587,8 @@ const createChallengeSchema = z.object({
     .min(1000, 'Başlangıç nakdi en az 1.000 olmalı')
     .max(100_000, 'Başlangıç nakdi en fazla 100.000 olabilir')
     .optional(),
+  /** 'news': Haber modu — kurgusal haber akışı; enstrümanlar 4 temel enstrümana sabitlenir */
+  mode: z.enum(['classic', 'news'], { message: 'Mod "classic" veya "news" olmalı' }).optional(),
 });
 
 const adminListQuery = z.object({ limit: clampedInt(50, 1, 100), offset: clampedInt(0, 0, 1_000_000) });
@@ -588,7 +603,7 @@ adminArenaRouter.post(
       targetType: 'arena_challenge',
       targetId: data.id,
       targetLabel: data.title,
-      metadata: { starts_at: data.starts_at, duration_s: data.duration_s, instruments: data.instruments, sponsor: data.sponsor },
+      metadata: { starts_at: data.starts_at, duration_s: data.duration_s, instruments: data.instruments, sponsor: data.sponsor, mode: data.mode },
     });
     res.status(201).json({ success: true, message: 'Meydan okuma oluşturuldu', data });
   })

@@ -10,7 +10,7 @@ import { touchInTx } from './streak';
 
 /**
  * Arena olaylarını dinler (B1: services/arena/events.ts; olaylar COMMIT sonrası yayınlanır):
- *  - round_finished  → reyting (düello / meydan okuma), XP + jeton, seri, görevler
+ *  - round_finished  → reyting (düello / meydan okuma), XP + jeton (haber turu = solo), seri, görevler
  *  - position_closed → 'arena_use_sl' (close_reason 'sl'), 'arena_3_instruments' (bugünkü farklı enstrüman)
  *  - round_started   → 'challenge_join'
  * Dinleyiciler hata fırlatmaz (yakalanır, loglanır). Testler için `GameListeners.idle()` bekleyen işleri bekler.
@@ -68,7 +68,7 @@ export function roundReward(
       ...(top ? { bonus: { ...top, reason: LEDGER_REASONS.challengeTop } } : {}),
     };
   }
-  // solo / senaryo
+  // solo / senaryo / haber turu
   const ret = Number(entry.return_pct);
   const extra = ret > 0 ? Math.min(REWARDS.round.profitXpMax, Math.ceil(ret * REWARDS.round.profitXpPerPct)) : 0;
   return { base: { xp: REWARDS.round.xp + extra, coins: REWARDS.round.coins, reason: LEDGER_REASONS.round } };
@@ -129,6 +129,8 @@ export async function handleRoundFinished(e: ArenaRoundFinishedEvent, now: Date 
           if (outcome === 'win') await Quests.progress(entry.user_id, 'duel_win', 1, c, now);
         }
         if (e.kind === 'challenge') await Quests.progress(entry.user_id, 'challenge_join', 1, c, now);
+        // Haber Turu (solo ya da Haber modundaki meydan okuma)
+        if (e.kind === 'news' || e.mode === 'news') await Quests.progress(entry.user_id, 'news_play', 1, c, now);
       });
     } catch (err: any) {
       logger.error({ err, round_id: e.round_id, user_id: entry.user_id }, `[game] tur ödülü verilemedi: ${err?.message || err}`);

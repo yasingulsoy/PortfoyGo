@@ -19,11 +19,18 @@
  *  STOPS_DISCIPLINE    iyi    her işlemde SL vardı
  *  DID_NOTHING         ipucu  hiç işlem yok
  *
+ * Haber Turu kuralları (yalnızca `news` verildiğinde; "etkili haber" = etkisi olan haber ya da yalanlama):
+ *  NEWS_QUICK_REACTION    iyi    habere ≤ 5 sn içinde, etkilediği enstrümanda DOĞRU yönde işlem
+ *  NEWS_WRONG_WAY         ipucu  habere ≤ 5 sn içinde, etkilediği enstrümanda TERS yönde işlem
+ *  NOISE_OVERREACTION     uyarı  etkisiz (gürültü) habere ≤ 6 sn içinde, ilgili enstrümanda işlem (yakında etkili haber yokken)
+ *  RUMOUR_TRAP            uyarı  söylenti yönünde açılıp yalanlamaya kadar taşınan ve zararla kapanan işlem
+ *  NEWS_PROFIT_GIVEN_BACK ipucu  habere doğru yönde açılıp kâra geçen ama kazancın ≥ %60'ını geri verip kapanan işlem (yol gerekir)
+ *
  * Puan (0..100) = risk (35) + disiplin (20) + kalite (20) + sonuç (25). Not: A ≥ 85, B ≥ 70, C ≥ 55, D ≥ 40, E.
  */
 
 /** Rapor biçimi/kuralları değişince artırılır: önbellekteki eski sürümlü raporlar yeniden hesaplanır */
-export const COACH_VERSION = 2;
+export const COACH_VERSION = 3;
 
 export const TIGHT_STOP_TICKS = 3;
 export const EARLY_EXIT_WINDOW_FRAC = 0.2;
@@ -37,6 +44,16 @@ export const GOOD_RR = 1.5;
 export const CONSISTENCY_MIN_WINS = 3;
 export const CONSISTENCY_MIN_WIN_RATE = 60;
 export const CONSISTENCY_MAX_SINGLE_SHARE = 0.5;
+/** Haber Turu: "hızlı tepki" penceresi (tick = sn) */
+export const NEWS_REACT_TICKS = 5;
+/** Gürültü habere tepki penceresi */
+export const NOISE_REACT_TICKS = 6;
+/** Kâr geri verme: kapanış kârı tepe kârın bu oranının altında */
+export const GIVEBACK_KEEP_SHARE = 0.4;
+/** Kâr geri verme: tepe kâr en az tutarın bu oranı olmalı (anlamlı kazanç) */
+export const GIVEBACK_MIN_PEAK_FRAC = 0.002;
+/** Kâr geri verme: haberden sonra en fazla bu kadar tick içinde açılan işlemler */
+export const GIVEBACK_ENTRY_TICKS = 10;
 
 export const SCORE_MAX = { risk: 35, discipline: 20, quality: 20, result: 25 } as const;
 /** Sonuç bileşeni: getiri −%2 → 0 puan, +%2 → 25 puan (doğrusal) */
@@ -57,7 +74,12 @@ export type InsightCode =
   | 'POOR_RISK_REWARD'
   | 'CONSISTENT_WINS'
   | 'STOPS_DISCIPLINE'
-  | 'DID_NOTHING';
+  | 'DID_NOTHING'
+  | 'NEWS_QUICK_REACTION'
+  | 'NEWS_WRONG_WAY'
+  | 'NOISE_OVERREACTION'
+  | 'RUMOUR_TRAP'
+  | 'NEWS_PROFIT_GIVEN_BACK';
 
 export interface CoachInsight {
   type: InsightType;
@@ -130,6 +152,19 @@ export interface CoachPositionInput {
   close_reason: string | null;
 }
 
+/** Haber Turu: turun haber programı (tur bittikten sonra; etkiler dahil) */
+export interface CoachNewsInput {
+  seq: number;
+  tick: number;
+  role: 'news' | 'noise' | 'rumour' | 'denial';
+  headline?: string;
+  impacts: { instrument: string; direction: 1 | -1; magnitude: number }[];
+  /** Gürültü haberde ilgili görünen enstrümanlar */
+  related?: string[];
+  /** Söylenti ↔ yalanlama eşi (seq) */
+  pair?: number | null;
+}
+
 export interface CoachRoundInput {
   round_id?: string | null;
   duration_s: number;
@@ -143,6 +178,8 @@ export interface CoachRoundInput {
   return_pct?: number | null;
   /** Enstrüman kodu → gösterim adı */
   labels?: Record<string, string>;
+  /** Haber Turu programı (varsa haber kuralları uygulanır) */
+  news?: CoachNewsInput[] | null;
   now?: Date;
 }
 
@@ -455,6 +492,10 @@ export function analyzeRound(input: CoachRoundInput): CoachReport {
     });
   }
 
+  // --- Haber Turu ----------------------------------------------------------
+  const nr = newsRules(input, trades, label);
+  insights.push(...nr.insights);
+
   // --- Puan ----------------------------------------------------------------
   let breakdown = { risk: 0, discipline: 0, quality: 0, result: 0 };
   if (n > 0) {
@@ -466,7 +507,11 @@ export function analyzeRound(input: CoachRoundInput): CoachReport {
     const pace = overtrading ? Math.max(0, 10 - (tradesPerMin - OVERTRADING_PER_MIN) * 5) : 10;
     const calm = Math.max(0, 10 - 5 * revenge.size);
     const rrScore = wins.length === 0 ? 0 : losses.length === 0 ? 10 : 10 * Math.min(1, (rr ?? 0) / 2);
-    const quality = clamp(10 * (wins.length / n) + rrScore - Math.min(4, 2 * early.length) - (concentration ? 3 : 0), 0, SCORE_MAX.quality);
+    const quality = clamp(
+      10 * (wins.length / n) + rrScore - Math.min(4, 2 * early.length) - (concentration ? 3 : 0) + nr.qualityDelta,
+      0,
+      SCORE_MAX.quality
+    );
     const result = clamp(SCORE_MAX.result / 2 + (returnPct * SCORE_MAX.result) / (2 * RESULT_PCT_SPAN), 0, SCORE_MAX.result);
     breakdown = { risk: r1(risk), discipline: r1(pace + calm), quality: r1(quality), result: r1(result) };
   }
@@ -488,6 +533,140 @@ export function analyzeRound(input: CoachRoundInput): CoachReport {
     path_available: pathAvailable,
     generated_at: (input.now ?? new Date()).toISOString(),
   };
+}
+
+// ---------------------------------------------------------------------------
+// Haber Turu kuralları
+// ---------------------------------------------------------------------------
+
+/**
+ * Haber kuralları (SAF). Etkili haber: role 'news' ya da 'denial' ve etkisi olan. Kalite puanına küçük bir
+ * katkı döner (doğru ve hızlı tepki +, gürültüye / söylentiye kapılma −); haber yoksa etkisizdir.
+ */
+export function newsRules(
+  input: CoachRoundInput,
+  trades: Trade[],
+  label: (code: string) => string = (c) => c
+): { insights: CoachInsight[]; qualityDelta: number } {
+  const news = (input.news ?? []).filter((x) => x && Number.isFinite(x.tick));
+  if (news.length === 0 || trades.length === 0) return { insights: [], qualityDelta: 0 };
+  const insights: CoachInsight[] = [];
+  const impactful = news.filter((x) => (x.role === 'news' || x.role === 'denial') && x.impacts.length > 0);
+  const impactOn = (x: CoachNewsInput, code: string) => x.impacts.find((i) => i.instrument === code);
+
+  // --- Doğru / ters yönde hızlı tepki ---
+  const quick: { t: Trade; n: CoachNewsInput }[] = [];
+  const wrong: { t: Trade; n: CoachNewsInput }[] = [];
+  for (const t of trades) {
+    for (const x of impactful) {
+      const imp = impactOn(x, t.instrument);
+      if (!imp || t.entry_tick < x.tick || t.entry_tick - x.tick > NEWS_REACT_TICKS) continue;
+      if (imp.direction === dir(t.side)) quick.push({ t, n: x });
+      else wrong.push({ t, n: x });
+      break;
+    }
+  }
+  if (quick.length > 0) {
+    const fastest = Math.min(...quick.map((q) => q.t.entry_tick - q.n.tick));
+    insights.push({
+      type: 'good',
+      code: 'NEWS_QUICK_REACTION',
+      title: 'Habere hızlı ve doğru yönde tepki verdin',
+      detail: `${quick.length} işleminde haberin etkilediği enstrümanda, haberden en fazla ${NEWS_REACT_TICKS} saniye içinde doğru yönde pozisyon açtın (en hızlısı ${fastest} sn).`,
+      why: 'Fiyatlar yeni bilgiyi çok hızlı yansıtır. Haberin hangi varlığı, hangi yönde etkileyeceğini önceden düşünmek hızlı ve isabetli karar vermeni sağlar.',
+      refs: quick.map((q) => q.t.id),
+    });
+  }
+  if (wrong.length > 0) {
+    insights.push({
+      type: 'tip',
+      code: 'NEWS_WRONG_WAY',
+      title: 'Habere ters yönde işlem açtın',
+      detail: `${wrong.length} işlemin haberden hemen sonra, haberin etkisine ters yönde açıldı. Tur sonundaki "Haberler ve etkileri" listesinde her haberin "Neden?" açıklamasına göz at.`,
+      why: 'Faiz, enflasyon, arz ve risk iştahı haberlerinin fiyatları hangi yöne ittiğini bilmek, haber akışını doğru okumanın temelidir.',
+      refs: wrong.map((w) => w.t.id),
+    });
+  }
+
+  // --- Gürültü habere aşırı tepki ---
+  const noisy = new Set<string>();
+  for (const x of news.filter((n) => n.role === 'noise')) {
+    for (const t of trades) {
+      if (t.entry_tick < x.tick || t.entry_tick - x.tick > NOISE_REACT_TICKS) continue;
+      const related = x.related && x.related.length > 0 ? x.related.includes(t.instrument) : true;
+      if (!related) continue;
+      // Yakında etkili bir haber (ya da söylenti) varsa işlem ona tepki sayılır
+      const explained = news.some(
+        (y) => y.role !== 'noise' && !!impactOn(y, t.instrument) && y.tick <= t.entry_tick && t.entry_tick - y.tick <= NOISE_REACT_TICKS
+      );
+      if (!explained) noisy.add(t.id);
+    }
+  }
+  if (noisy.size > 0) {
+    insights.push({
+      type: 'warning',
+      code: 'NOISE_OVERREACTION',
+      title: 'Gürültü habere tepki verdin',
+      detail: `${noisy.size} işlemini yeni bilgi içermeyen bir haberden hemen sonra açtın. O haberler fiyatı hiç etkilemedi; işlem yalnızca alış-satış farkı (makas) maliyeti getirdi.`,
+      why: 'Her başlık işlem nedeni değildir. "Bu haber arz, talep, faiz ya da riskle ilgili YENİ bir bilgi mi?" diye sor; değilse beklemek de bir karardır.',
+      refs: [...noisy],
+    });
+  }
+
+  // --- Söylentiyle işlem → yalanlamada zarar ---
+  const trapped = new Set<string>();
+  for (const r of news.filter((n) => n.role === 'rumour')) {
+    const d = news.find((n) => n.role === 'denial' && (n.seq === r.pair || n.pair === r.seq));
+    if (!d) continue;
+    for (const t of trades) {
+      const imp = impactOn(r, t.instrument);
+      if (!imp || imp.direction !== dir(t.side)) continue;
+      if (t.entry_tick < r.tick || t.entry_tick >= d.tick) continue;
+      if (t.closeT <= d.tick || !(t.pnlv < 0)) continue;
+      trapped.add(t.id);
+    }
+  }
+  if (trapped.size > 0) {
+    insights.push({
+      type: 'warning',
+      code: 'RUMOUR_TRAP',
+      title: 'Söylentiyle girdin, yalanlamada zarar ettin',
+      detail: `${trapped.size} işlemini doğrulanmamış bir söylentinin yönünde açtın ve yalanlama gelene kadar tuttun; işlem zararla kapandı.`,
+      why: 'Söylentiler fiyatı hızlı hareket ettirir ama kırılgandır: yalanlama geldiğinde hareket tersine döner. Kaynağı belirsiz haberde küçük tutar ve sıkı bir stop kullan, kâra geçince kârı korumayı düşün.',
+      refs: [...trapped],
+    });
+  }
+
+  // --- Haber sonrası kâr almama (yol gerekir) ---
+  const gaveBack: Trade[] = [];
+  for (const t of trades) {
+    const path = getPath(input.paths, t.instrument);
+    if (!path) continue;
+    const reacted = impactful.some((x) => {
+      const imp = impactOn(x, t.instrument);
+      return !!imp && imp.direction === dir(t.side) && t.entry_tick >= x.tick && t.entry_tick - x.tick <= GIVEBACK_ENTRY_TICKS;
+    });
+    if (!reacted) continue;
+    const qty = t.qty > 0 ? t.qty : t.entry_price > 0 ? t.amount / t.entry_price : 0;
+    let peak = 0;
+    for (let k = t.entry_tick; k <= t.closeT && k < path.length; k++) peak = Math.max(peak, dir(t.side) * (path[k] - t.entry_price) * qty);
+    if (peak >= GIVEBACK_MIN_PEAK_FRAC * t.amount && t.pnlv <= GIVEBACK_KEEP_SHARE * peak) gaveBack.push(t);
+  }
+  if (gaveBack.length > 0) {
+    const names = [...new Set(gaveBack.map((t) => label(t.instrument)))].join(', ');
+    insights.push({
+      type: 'tip',
+      code: 'NEWS_PROFIT_GIVEN_BACK',
+      title: 'Haberin kazancını geri verdin',
+      detail: `Habere doğru yönde açtığın ${gaveBack.length} işlemde (${names}) fiyat lehine gitti ama kazancının büyük kısmını geri vererek kapattın. Haberin etkisi oturunca kâr almayı ya da stopu kâra taşımayı dene.`,
+      why: 'Haber etkisi çoğu zaman bir kez fiyatlanır ve sonra durulur. Etki tamamlandığında pozisyonu tutmaya devam etmek, kazancı yeniden gürültüye bırakmak demektir.',
+      refs: gaveBack.map((t) => t.id),
+    });
+  }
+
+  const qualityDelta =
+    Math.min(4, 2 * quick.length) - Math.min(4, 2 * noisy.size) - (trapped.size > 0 ? 3 : 0) - Math.min(3, gaveBack.length * 1.5) - Math.min(2, wrong.length);
+  return { insights, qualityDelta };
 }
 
 export function headlineFor(grade: Grade, trades: number): string {

@@ -13,7 +13,7 @@ import type { CloseReason, Side } from './engine';
  * (dinleyicide fırlatılan hata yakalanır ve loglanır, arena akışını bozmaz).
  */
 
-export type ArenaRoundKindEvent = 'solo' | 'challenge' | 'duel' | 'scenario';
+export type ArenaRoundKindEvent = 'solo' | 'challenge' | 'duel' | 'scenario' | 'news';
 
 /**
  * Tur oluşturuldu / başladı. Solo, senaryo ve düello turlarında tur OLUŞTURULDUĞUNDA (başlangıç geri sayımı
@@ -29,7 +29,7 @@ export interface ArenaRoundFinishedEntry {
   user_id: string;
   /** Yüzde puan (ör. 1.25 = %1,25) */
   return_pct: number;
-  /** Meydan okuma / düelloda sıra (1 = birinci; düelloda beraberlikte iki taraf da 1); solo ve senaryoda null */
+  /** Meydan okuma / düelloda sıra (1 = birinci; düelloda beraberlikte iki taraf da 1); solo, senaryo ve haber turunda null */
   rank: number | null;
   trades_count: number;
   equity_final: number;
@@ -43,6 +43,8 @@ export interface ArenaRoundFinishedEvent {
   duel_id?: string;
   challenge_id?: string;
   scenario_id?: string;
+  /** Haber Turu ya da Haber modundaki meydan okuma */
+  mode?: 'news';
   /** ISO-8601 */
   finished_at: string;
   entries: ArenaRoundFinishedEntry[];

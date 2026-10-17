@@ -150,6 +150,7 @@ export const QUEST_KEYS = [
   'main_buy',
   'challenge_join',
   'idle_collect',
+  'news_play',
 ] as const;
 
 export type QuestKey = (typeof QUEST_KEYS)[number];
@@ -171,6 +172,7 @@ export const QUEST_POOL: QuestDef[] = [
   { key: 'main_buy', title: 'Yatırımcı', description: 'Ana portföyünde bir alım yap', target: 1, reward: { coins: 30, xp: 20 } },
   { key: 'challenge_join', title: 'Meydan okuma', description: 'Bir meydan okumaya katıl', target: 1, reward: { coins: 50, xp: 40 } },
   { key: 'idle_collect', title: 'İmparator', description: "İmparatorluk'tan gelir topla", target: 1, reward: { coins: 30, xp: 20 } },
+  { key: 'news_play', title: 'Habere tepki', description: 'Bir Haber Turu oyna', target: 1, reward: { coins: 40, xp: 30 } },
 ];
 
 export const QUESTS_PER_DAY = 3;

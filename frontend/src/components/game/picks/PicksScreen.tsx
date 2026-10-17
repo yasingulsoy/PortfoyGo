@@ -1,9 +1,10 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { ClockIcon, PencilSquareIcon } from '@heroicons/react/20/solid';
 import { cn } from '@portfoygo/shared/format';
 import GameButton, { GameLinkButton } from '@/components/game/ui/GameButton';
+import GameColumns from '@/components/game/ui/GameColumns';
 import GameDialog from '@/components/game/ui/GameDialog';
 import GameScreen from '@/components/game/ui/GameScreen';
 import { GameLoader, GameNotice } from '@/components/game/ui/bits';
@@ -18,7 +19,7 @@ import { MyPickCard } from './PickCard';
 import PickForm from './PickForm';
 import PicksGrid from './PicksGrid';
 import RewardCelebration from './RewardCelebration';
-import { ResultsPanel, RewardsTable, Standings } from './Standings';
+import { ResultsPanel, ResultsSummary, RewardsTable, Standings } from './Standings';
 import { PHASE_LABELS, PICKS_HISTORY_PATH, atDayTime, canEditPick, formatDayTime, isResultPhase, phaseDeadline, placedInWeek, weekRangeLabel } from './model';
 import { LiveDot, PhaseTimeline, PicksCountdown, PicksFooterNote, SealedEnvelope, WhyHiddenPanel } from './parts';
 
@@ -52,6 +53,7 @@ export default function PicksScreen() {
       back="/oyun"
       backLabel="Oyun Merkezi’ne dön"
       title="Haftalık Seçim"
+      layout="full"
       actions={
         <GameLinkButton href={PICKS_HISTORY_PATH} variant="ghost" size="sm" icon={<ClockIcon aria-hidden="true" />} aria-label="Geçmiş haftalar">
           Geçmiş
@@ -65,6 +67,7 @@ export default function PicksScreen() {
       ) : error && !data ? (
         <GameNotice
           tone={status === 404 ? 'purple' : 'red'}
+          className="mx-auto w-full max-w-xl"
           title={status === 404 ? 'Çok yakında' : 'Yüklenemedi'}
           actions={
             <GameButton variant="blue" onClick={() => void mutate()}>
@@ -101,37 +104,45 @@ function WeekView({ current, onRefresh }: { current: PicksCurrent; onRefresh: ()
     refreshTimer.current = setTimeout(onRefresh, 4000);
   }, [onRefresh]);
 
+  const hero = <PhaseHero week={active} offset={offset} onDeadline={onDeadline} />;
+  const prev =
+    showPrevious && previous ? (
+      <section aria-labelledby="picks-prev-title" className="pt-4 lg:pt-0">
+        <h2 id="picks-prev-title" className="g-title text-2xl">
+          Geçen haftanın sonuçları
+        </h2>
+        <p className="g-title-sm mb-2 text-sm">{weekRangeLabel(previous.starts_at, previous.ends_at)} haftası</p>
+        <ResultsPanel week={previous} />
+      </section>
+    ) : null;
+
+  // Telefonda tek sütun (kod sırası = görsel sıra); masaüstünde solda hafta durumu ve benim seçimim,
+  // sağda kitle / sıralama / tartışma, xl'de üçüncü sütunda tartışma ve geçen hafta.
   return (
-    <div className="space-y-5">
+    <>
       <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
         {PHASE_ANNOUNCE[active.phase]}
       </p>
 
-      <PhaseHero week={active} offset={offset} onDeadline={onDeadline} />
-
-      {active.phase === 'upcoming' && <UpcomingView week={active} />}
-      {active.phase === 'submit' && <SubmitView key={active.week_id} week={active} offset={offset} />}
-      {active.phase === 'revealed' && <RevealedView key={active.week_id} week={active} />}
-      {active.phase === 'live' && <LiveView key={active.week_id} week={active} />}
+      {active.phase === 'upcoming' && <UpcomingView week={active} hero={hero} previous={prev} />}
+      {active.phase === 'submit' && <SubmitView key={active.week_id} week={active} offset={offset} hero={hero} previous={prev} />}
+      {active.phase === 'revealed' && <RevealedView key={active.week_id} week={active} hero={hero} previous={prev} />}
+      {active.phase === 'live' && <LiveView key={active.week_id} week={active} hero={hero} />}
       {isResultPhase(active.phase) && (
-        <>
-          <ResultsPanel week={active} />
-          <Discussion weekId={active.week_id} count={active.comments_count} lockedText="Tartışma kapalı." />
-        </>
-      )}
-
-      {showPrevious && previous && (
-        <section aria-labelledby="picks-prev-title" className="pt-4">
-          <h2 id="picks-prev-title" className="g-title text-2xl">
-            Geçen haftanın sonuçları
-          </h2>
-          <p className="g-title-sm mb-2 text-sm">{weekRangeLabel(previous.starts_at, previous.ends_at)} haftası</p>
-          <ResultsPanel week={previous} />
-        </section>
+        <GameColumns
+          main={
+            <>
+              {hero}
+              <ResultsSummary week={active} />
+            </>
+          }
+          side={<Standings week={active} title={active.phase === 'settling' ? 'Geçici sıralama' : 'Son sıralama'} />}
+          extra={<Discussion weekId={active.week_id} count={active.comments_count} lockedText="Tartışma kapalı." />}
+        />
       )}
 
       <RewardCelebration week={celebrate} />
-    </div>
+    </>
   );
 }
 
@@ -157,21 +168,33 @@ function PhaseHero({ week, offset, onDeadline }: { week: PicksWeek; offset: numb
 /* Evreler                                                              */
 /* ------------------------------------------------------------------ */
 
-function UpcomingView({ week }: { week: PicksWeek }) {
+type ViewSlots = { hero: ReactNode; previous?: ReactNode };
+
+function UpcomingView({ week, hero, previous }: { week: PicksWeek } & ViewSlots) {
   return (
-    <>
-      <section className="flex flex-col items-center gap-2 text-center">
-        <SealedEnvelope />
-        <h2 className="g-title text-2xl">Yeni hafta geliyor</h2>
-        <p className="g-title-sm text-base">Seçimler {atDayTime(week.opens_at)} açılır. Bir varlık, bir yön, kısa bir not — hepsi bu.</p>
-      </section>
-      <WhyHiddenPanel revealText={atDayTime(week.reveal_at)} />
-      <RewardsTable week={week} />
-    </>
+    <GameColumns
+      main={
+        <>
+          {hero}
+          <section className="flex flex-col items-center gap-2 text-center">
+            <SealedEnvelope />
+            <h2 className="g-title text-2xl">Yeni hafta geliyor</h2>
+            <p className="g-title-sm text-base">Seçimler {atDayTime(week.opens_at)} açılır. Bir varlık, bir yön, kısa bir not — hepsi bu.</p>
+          </section>
+        </>
+      }
+      side={
+        <>
+          <WhyHiddenPanel revealText={atDayTime(week.reveal_at)} />
+          <RewardsTable week={week} />
+        </>
+      }
+      extra={previous}
+    />
   );
 }
 
-function SubmitView({ week, offset }: { week: PicksWeek; offset: number }) {
+function SubmitView({ week, offset, hero, previous }: { week: PicksWeek; offset: number } & ViewSlots) {
   const now = useNow(5_000) + offset;
   const actions = usePickActions(week.week_id);
   const [editing, setEditing] = useState(false);
@@ -220,71 +243,82 @@ function SubmitView({ week, offset }: { week: PicksWeek; offset: number }) {
         {announce}
       </p>
 
-      <section aria-labelledby="picks-vault-title" className="flex flex-col items-center gap-2 text-center">
-        <SealedEnvelope key={sealCount} sealing={sealCount > 0} mine={!!mine} />
-        <h2 id="picks-vault-title" className="g-title text-2xl">
-          Gizli zarf
-        </h2>
-        <p className="g-title-sm max-w-sm text-base">
-          {participants > 0 ? (
-            <>
-              <span className="g-num">{participants.toLocaleString('tr-TR')}</span> kişi seçimini yaptı — kimin neyi seçtiğini {revealText} göreceksin.
-            </>
-          ) : (
-            <>Henüz kimse seçim yapmadı — ilk zarfı sen bırak! Tüm seçimler {revealText} açılır.</>
-          )}
-        </p>
-      </section>
-
-      {editing && editable ? (
-        <div ref={formRef} className="scroll-mt-4">
-          <PickForm
-            initial={mine}
-            busy={actions.busy === 'submit'}
-            error={actions.error}
-            onSubmit={(input) => void submit(input)}
-            onCancel={() => {
-              setEditing(false);
-              actions.clearError();
-            }}
-          />
-        </div>
-      ) : mine ? (
-        <MyPickCard
-          pick={mine}
-          phase="submit"
-          revealAt={week.reveal_at}
-          actions={
-            editable ? (
-              <div className="grid grid-cols-2 gap-3">
-                <GameButton variant="blue" size="md" icon={<PencilSquareIcon aria-hidden="true" />} onClick={openForm}>
-                  Değiştir
-                </GameButton>
-                <GameButton variant="plain" size="md" onClick={() => setConfirmWithdraw(true)} loading={actions.busy === 'withdraw'}>
-                  Geri çek
-                </GameButton>
-                {actions.error && (
-                  <p role="alert" className="col-span-2 rounded-2xl bg-(--g-down-soft) px-3 py-2 text-center text-sm font-bold text-(--g-down)">
-                    {actions.error}
-                  </p>
+      <GameColumns
+        main={
+          <>
+            {hero}
+            <section aria-labelledby="picks-vault-title" className="flex flex-col items-center gap-2 text-center">
+              <SealedEnvelope key={sealCount} sealing={sealCount > 0} mine={!!mine} />
+              <h2 id="picks-vault-title" className="g-title text-2xl">
+                Gizli zarf
+              </h2>
+              <p className="g-title-sm max-w-sm text-base">
+                {participants > 0 ? (
+                  <>
+                    <span className="g-num">{participants.toLocaleString('tr-TR')}</span> kişi seçimini yaptı — kimin neyi seçtiğini {revealText} göreceksin.
+                  </>
+                ) : (
+                  <>Henüz kimse seçim yapmadı — ilk zarfı sen bırak! Tüm seçimler {revealText} açılır.</>
                 )}
-              </div>
-            ) : null
-          }
-        />
-      ) : editable ? (
-        <GameButton variant="green" size="xl" block className="g-anim-pop" onClick={openForm}>
-          SEÇİMİNİ YAP
-        </GameButton>
-      ) : (
-        <GameNotice tone="purple" title="Zarflar mühürlendi">
-          Bu haftanın seçim süresi doldu. Açılış birazdan!
-        </GameNotice>
-      )}
+              </p>
+            </section>
 
-      <WhyHiddenPanel revealText={revealText} />
-      <RewardsTable week={week} />
-      <Discussion weekId={week.week_id} locked lockedText={`Tartışma ${revealText} açılır.`} />
+            {editing && editable ? (
+              <div ref={formRef} className="scroll-mt-4">
+                <PickForm
+                  initial={mine}
+                  busy={actions.busy === 'submit'}
+                  error={actions.error}
+                  onSubmit={(input) => void submit(input)}
+                  onCancel={() => {
+                    setEditing(false);
+                    actions.clearError();
+                  }}
+                />
+              </div>
+            ) : mine ? (
+              <MyPickCard
+                pick={mine}
+                phase="submit"
+                revealAt={week.reveal_at}
+                actions={
+                  editable ? (
+                    <div className="grid grid-cols-2 gap-3">
+                      <GameButton variant="blue" size="md" icon={<PencilSquareIcon aria-hidden="true" />} onClick={openForm}>
+                        Değiştir
+                      </GameButton>
+                      <GameButton variant="plain" size="md" onClick={() => setConfirmWithdraw(true)} loading={actions.busy === 'withdraw'}>
+                        Geri çek
+                      </GameButton>
+                      {actions.error && (
+                        <p role="alert" className="col-span-2 rounded-2xl bg-(--g-down-soft) px-3 py-2 text-center text-sm font-bold text-(--g-down)">
+                          {actions.error}
+                        </p>
+                      )}
+                    </div>
+                  ) : null
+                }
+              />
+            ) : editable ? (
+              <GameButton variant="green" size="xl" block className="g-anim-pop" onClick={openForm}>
+                SEÇİMİNİ YAP
+              </GameButton>
+            ) : (
+              <GameNotice tone="purple" title="Zarflar mühürlendi">
+                Bu haftanın seçim süresi doldu. Açılış birazdan!
+              </GameNotice>
+            )}
+          </>
+        }
+        side={
+          <>
+            <WhyHiddenPanel revealText={revealText} />
+            <RewardsTable week={week} />
+            <Discussion weekId={week.week_id} locked lockedText={`Tartışma ${revealText} açılır.`} />
+          </>
+        }
+        extra={previous}
+      />
 
       <GameDialog open={confirmWithdraw} onClose={() => setConfirmWithdraw(false)} title="Geri çekilsin mi?" accent="red">
         <p className="text-center text-sm font-semibold text-(--g-ink-soft)">
@@ -305,43 +339,62 @@ function SubmitView({ week, offset }: { week: PicksWeek; offset: number }) {
   );
 }
 
-function RevealedView({ week }: { week: PicksWeek }) {
+function RevealedView({ week, hero, previous }: { week: PicksWeek } & ViewSlots) {
   return (
-    <>
-      <section className="text-center">
-        <h2 className="g-title g-anim-pop text-[30px]">Zarflar açıldı!</h2>
-        <p className="g-title-sm mt-1 text-base">
-          <span className="g-num">{week.participants.toLocaleString('tr-TR')}</span> seçim ortada. Yarış {atDayTime(week.starts_at)} başlıyor; o zamana kadar seçimleri inceleyip tartış.
-        </p>
-      </section>
-      {week.my_pick ? (
-        <MyPickCard pick={week.my_pick} phase="revealed" />
-      ) : (
-        <GameNotice tone="blue" title="Bu hafta izleyicisin">
-          Bu hafta seçim yapmadın. Kitleyi izleyip tartışmaya katılabilirsin; yeni seçimler Cumartesi açılır.
-        </GameNotice>
-      )}
-      <CrowdPanel week={week} />
-      <PicksGrid key={week.week_id} week={week} revealMoment />
-      <Discussion weekId={week.week_id} count={week.comments_count} lockedText="Tartışma açılışta başlar." />
-    </>
+    <GameColumns
+      main={
+        <>
+          {hero}
+          <section className="text-center">
+            <h2 className="g-title g-anim-pop text-[30px]">Zarflar açıldı!</h2>
+            <p className="g-title-sm mt-1 text-base">
+              <span className="g-num">{week.participants.toLocaleString('tr-TR')}</span> seçim ortada. Yarış {atDayTime(week.starts_at)} başlıyor; o zamana kadar seçimleri inceleyip tartış.
+            </p>
+          </section>
+          {week.my_pick ? (
+            <MyPickCard pick={week.my_pick} phase="revealed" />
+          ) : (
+            <GameNotice tone="blue" title="Bu hafta izleyicisin">
+              Bu hafta seçim yapmadın. Kitleyi izleyip tartışmaya katılabilirsin; yeni seçimler Cumartesi açılır.
+            </GameNotice>
+          )}
+          <CrowdPanel week={week} />
+        </>
+      }
+      side={<PicksGrid key={week.week_id} week={week} revealMoment />}
+      extra={
+        <>
+          <Discussion weekId={week.week_id} count={week.comments_count} lockedText="Tartışma açılışta başlar." />
+          {previous}
+        </>
+      }
+    />
   );
 }
 
-function LiveView({ week }: { week: PicksWeek }) {
+function LiveView({ week, hero }: { week: PicksWeek } & ViewSlots) {
   return (
-    <>
-      {week.my_pick ? (
-        <MyPickCard pick={week.my_pick} phase="live" rank={week.my_rank} />
-      ) : (
-        <GameNotice tone="blue" title="Bu hafta izleyicisin">
-          Bu hafta seçim yapmadın. Sıralamayı izleyip tartışmaya katılabilirsin; yeni seçimler Cumartesi açılır.
-        </GameNotice>
-      )}
-      <ComparePanel week={week} />
-      <Standings week={week} live />
-      <CrowdPanel week={week} showReturns />
-      <Discussion weekId={week.week_id} count={week.comments_count} lockedText="Tartışma açılışta başlar." />
-    </>
+    <GameColumns
+      main={
+        <>
+          {hero}
+          {week.my_pick ? (
+            <MyPickCard pick={week.my_pick} phase="live" rank={week.my_rank} />
+          ) : (
+            <GameNotice tone="blue" title="Bu hafta izleyicisin">
+              Bu hafta seçim yapmadın. Sıralamayı izleyip tartışmaya katılabilirsin; yeni seçimler Cumartesi açılır.
+            </GameNotice>
+          )}
+          <ComparePanel week={week} />
+        </>
+      }
+      side={<Standings week={week} live />}
+      extra={
+        <>
+          <CrowdPanel week={week} showReturns />
+          <Discussion weekId={week.week_id} count={week.comments_count} lockedText="Tartışma açılışta başlar." />
+        </>
+      }
+    />
   );
 }
