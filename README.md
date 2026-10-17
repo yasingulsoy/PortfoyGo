@@ -88,7 +88,7 @@ npm run create-admin -w @portfoygo/backend
 
 | Komut | Açıklama |
 | --- | --- |
-| `npm run dev:local` | **Kurulumsuz:** gömülü yerel veritabanı + API + site + admin. Dış API'ler kapalı |
+| `npm run dev:local` | **Kurulumsuz:** gömülü yerel veritabanı + API + site + admin. Yalnızca ücretsiz, anahtarsız fiyat kaynakları (aşağıda); `LOCAL_LIVE_PRICES=0` ile tamamen çevrimdışı |
 | `npm run dev` | API (`backend/.env` ile) + site + admin |
 | `npm run dev:web` / `dev:admin` / `dev:api` | Tek bir uygulama |
 | `npm run build` | Site ve admin production derlemesi |
@@ -106,9 +106,32 @@ npm run dev:local
 
 Bu komut şunları yapar:
 - `backend/.localdb/` altında gömülü bir PostgreSQL (PGlite, `127.0.0.1:54329`) başlatır ve tüm migration'ları uygular.
-- Örnek veri yükler: demo yönetici `demo@portfoygo.local`, 4 örnek kullanıcı, döviz kurları, 10 hisse ve 10 kripto fiyatı.
+- Örnek veri yükler: demo yönetici `demo@portfoygo.local`, 4 örnek kullanıcı, 18 döviz kuru (TCMB 16.10.2026), 48 ABD hissesi (yaklaşık örnek fiyatlar), piyasa değerine göre ilk 50 kripto ve 6 emtia geçmişi. Eski bir yerel veritabanında tohumdan çok sapmış (eski) fiyat düzeyleri ve sentetik grafik geçmişi açılışta güncel düzeye yeniden çapalanır.
 - Demo şifresini `backend/.localdb/demo-credentials.txt` dosyasına yazar (`LOCAL_DEMO_PASSWORD` ile belirlenebilir).
-- `backend/.env` içindeki canlı veritabanını, API anahtarlarını ve SMTP'yi **kullanmaz**. Fiyatlar dakikada bir küçük adımlarla oynatılır. E-posta doğrulama ve sıfırlama kodları konsola yazılır.
+- `backend/.env` içindeki canlı veritabanını, API anahtarlarını ve SMTP'yi **kullanmaz**. E-posta doğrulama ve sıfırlama kodları konsola yazılır.
+
+**Canlı fiyatlar (varsayılan açık, yalnızca ücretsiz ve anahtarsız kaynaklar):**
+
+| Veri | Kaynak | Sıklık |
+| --- | --- | --- |
+| Kripto (ilk 50) | CoinGecko genel API (anahtarsız) | 2 dakikada bir tek istek |
+| Döviz | TCMB `today.xml` — **günlük** gösterge kur (arayüzde "TCMB günlük kur") | açılış + 12 saatte bir |
+| Altın, gümüş, platin, paladyum, bakır | gold-api.com (anahtarsız) | en fazla 2 dakikada bir, istekler arası 1,1 sn |
+| Gram altın (GAU) | ons altın × USD/TRY ÷ 31,1035 (türetilir) | — |
+| ABD hisseleri | Finnhub — yalnızca `LOCAL_FINNHUB_API_KEY` verilirse (ücretsiz katman da anahtar ister) | 2 dakikada bir, hisse başına 1 çağrı |
+| Brent petrol vb. | Anahtarsız resmî kaynak yok → son bilinen fiyat + yerel simülasyon | — |
+
+Canlı kaynaktan beslenmeyen satırlar (anahtarsız hisseler, Brent) dakikada bir küçük adımlarla oynatılır.
+
+```bash
+LOCAL_LIVE_PRICES=0 npm run dev:local                   # tamamen çevrimdışı (dış istek yok; eski davranış)
+LOCAL_FX_PROVIDER=frankfurter npm run dev:local         # döviz: TCMB yerine ECB referans kurları
+LOCAL_FINNHUB_API_KEY=<kendi-test-anahtarın> npm run dev:local   # hisseler de canlı (backend/.env'deki anahtar kullanılmaz)
+```
+
+Bu değişkenler kabuk ortamından okunur (backend/.env'den değil). Değiştirdikten sonra `dev:local` sürecini yeniden başlatın: sağlayıcı seçimi ve yerel fiyat simülasyonu açılışta ayarlanır (nodemon'un kod yeniden yüklemesi yetmez). Ayrıntı: `backend/src/providers/README.md`.
+
+**TL / USD gösterimi:** Üst çubuktaki **TL | USD** düğmesi (ayrıca komut paleti ve Profil → Görüntüleme) tüm tutarları seçilen birimde gösterir; tercih tarayıcıda saklanır. Bakiye ve işlemler TL tutulur; hisse ve kripto USD görünümde kendi dolar fiyatıyla, diğer tutarlar güncel USD/TRY kuruyla çevrilir. Yüzdeler değişmez.
 
 Adresler: site <http://localhost:3000>, yönetim paneli <http://localhost:3001>, API <http://localhost:5001/api>.
 

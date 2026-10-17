@@ -62,6 +62,24 @@ Bu liste, `feature/platform-v0.4` dalındaki çalışmanın canlıya alınmadan 
 
 - [ ] **Veri sağlayıcıları:** Koray'ın araştırması sonucuna göre `backend/src/providers/adapters/` altına adaptör yazılacak. Canlı Arena turları için gerçek zamanlı kotasyon gerekir; şu an turlar gerçek geçmiş fiyatın hızlandırılmış tekrarıdır.
 - [ ] **Emtia kotası:** Emtia anahtarı tanımlıyken fiyat geçmişi kaydı, popüler emtia listesini saatte bir yeniler.
+- [ ] **VERİ LİSANSI — ücretsiz kaynaklar (canlıya çıkmadan, hukuk + ürün):** Yerel geliştirmede kullanılan ücretsiz kaynakların
+  (`backend/src/providers/README.md` → "Ücretsiz kaynaklar") **ticari bir üründe gösterim koşulları** tek tek doğrulanmalı;
+  ücretsiz/anahtarsız olması ticari kullanıma izin verdiği anlamına gelmez:
+  - **CoinGecko** (anahtarsız genel uç / Demo): ücretsiz planlarda atıf istenir ("Data provided by CoinGecko" + API sayfasına
+    bağlantı); resmî fiyat sayfası ticari kullanımı yalnızca ücretli planlar (Analyst/Lite/Pro) için açıkça tanımlıyor, Demo/genel
+    uç için durum belirsiz → ücretli plan ya da CoinGecko'dan yazılı teyit. Yeniden dağıtım / beyaz etiket Enterprise ister.
+  - **TCMB** gösterge niteliğindeki kurlar (`today.xml`): kamuya açık, günlük; sitede kaynak gösterilmeli ("Kaynak: TCMB") ve
+    TCMB web sitesi yasal uyarısı (yeniden kullanım/atıf) kontrol edilmeli. Kurlar bilgi amaçlıdır, işlem kuru değildir.
+  - **Frankfurter** (ECB vb. referans kurları): açık kaynak, kota yok; harmanlanmış (blended) kurlar ticari kullanıma açık,
+    tek bir sağlayıcıya doğrudan sorgu o sağlayıcının koşullarına tabi (ECB: kaynak gösterilerek yeniden kullanım).
+  - **gold-api.com** (değerli metaller): koşullar (Eylül 2026) ticari kullanıma izin veriyor, atıf istemiyor; veriler "olduğu gibi"
+    (doğruluk garantisi yok), saniyede birden fazla istek yasak (adaptör 1,1 sn arayla, en fazla 2 dk'da bir çağırır), koşullar
+    önceden haber vermeden değişebilir → canlıda yedek / ücretli kaynak planlanmalı.
+  - **Finnhub** ücretsiz katman: kişisel/ticari olmayan kullanım içindir; ticari gösterim için ücretli plan gerekir. Sızan eski
+    anahtar iptal edilip yenilenmeden (bkz. §2) hiçbir ortamda kullanılmamalı. Yerelde yalnızca `LOCAL_FINNHUB_API_KEY` okunur.
+  - **Petrol / doğal gaz / tarım:** anahtarsız meşru kaynak bulunamadı (FRED ticari kullanım ve önbelleklemeye izin vermiyor; EIA
+    ücretsiz ama anahtar ister ve günlük gecikmeli) → canlıda NosyAPI ya da lisanslı bir emtia kaynağı.
+  - Kaynak / gecikme notları arayüzde gösterilmeli (ör. "TCMB günlük kur" notu Piyasalar, varlık sayfası ve Profil → Görüntüleme'de var).
 - [ ] **Portföy Sihirbazı:**
   - TL nakit getiri varsayımı (`ADVISOR_TRY_CASH_RETURN`, varsayılan %40) önerileri doğrudan etkiler; H.Burak ile netleştirilmeli.
   - Anket soruları `backend/src/services/advisor/questionnaire.ts` dosyasında.

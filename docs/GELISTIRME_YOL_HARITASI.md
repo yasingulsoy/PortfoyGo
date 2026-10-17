@@ -129,12 +129,16 @@ Eylemler: Yasin canlı veri gereksinimleri · Art oyun akışı ve lig/etkinlik 
 >
 > Araştırmada bakılacak ölçütler: lisans (ticari kullanım, gösterim izni), gecikme (gerçek zamanlı / 15 dk), kota ve fiyat, BIST kapsamı, geçmiş (mum) verisi, WebSocket desteği, SLA.
 
-| Veri | Şu an | Risk | Öneri |
-| --- | --- | --- | --- |
-| ABD hisseleri | Finnhub ücretsiz katman (10 sembol) | Dakikada 60 çağrı; geçmiş mum verisi ücretsiz katmanda yok, bu yüzden hisse grafikleri boş | Ücretli plan veya Polygon/Twelve Data; fiyat geçmişini kendi DB'mizde biriktirmek |
-| Kripto | CoinGecko ücretsiz | Hız sınırı | Demo anahtarı (ücretsiz) + önbellek; ölçeklenince Pro |
-| Döviz ve emtia | NosyAPI (kredi bazlı) | Kredi tükenirse veri durur | Saatlik önbellek (yapıldı); yedek kaynak olarak TCMB kurları |
-| Haberler | RSS (bsekonomi) | Tek kaynak | Birden çok RSS kaynağı ve kategori eşleme |
+| Veri | Şu an | Ücretsiz seçenek (adaptör hazır) | Risk | Öneri |
+| --- | --- | --- | --- | --- |
+| ABD hisseleri | Finnhub ücretsiz katman (varsayılan 48 hisselik evren, `STOCK_SYMBOLS` ile ≤50) | `finnhub-cached`: hisse başına 1 çağrı + 24 sa profil önbelleği (~24 çağrı/dk) — **anahtar gerekir**; anahtarsız meşru kaynak yok | Dakikada 60 çağrı; geçmiş mum verisi ücretsiz katmanda yok; ücretsiz katman ticari değil | Ücretli plan veya Polygon/Twelve Data; fiyat geçmişini kendi DB'mizde biriktirmek |
+| Kripto | CoinGecko (ilk 50, `CRYPTO_TOP_N`) | `coingecko` anahtarsız genel uçla çalışır (2 dk'da 1 istek) | Hız sınırı; ücretsiz planda ticari kullanım belirsiz, atıf gerekir | Demo anahtarı + önbellek; ticari yayında ücretli plan |
+| Döviz | NosyAPI (kredi bazlı) | `tcmb` (TCMB `today.xml`, günlük, anahtarsız) · `frankfurter` (ECB referans, günlük, anahtarsız) | Günlük veri (anlık değil); NosyAPI kredisi tükenirse veri durur | Canlıda TCMB'yi yedek/birincil kaynak olarak değerlendirmek (`FX_PROVIDER=tcmb`) |
+| Emtia | NosyAPI (kredi bazlı) | `goldapi` (gold-api.com, değerli metaller anlık, anahtarsız; koşullar ticari kullanıma izin veriyor) · `pricehistory` (son bilinen fiyat, dış API yok) | Petrol / doğal gaz / tarım için anahtarsız meşru kaynak yok | Metaller için goldapi + NosyAPI ya da lisanslı emtia kaynağı (petrol) |
+| Haberler | RSS (bsekonomi) | — | Tek kaynak | Birden çok RSS kaynağı ve kategori eşleme |
+
+Yerelde (`npm run dev:local`) anahtarsız kaynaklar varsayılan açık (`LOCAL_LIVE_PRICES=0` ile çevrimdışı); ayrıntı ve lisans notları:
+`backend/src/providers/README.md`, `docs/YAYIN_KONTROL_LISTESI.md` §5.
 
 ---
 
