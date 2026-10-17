@@ -4,7 +4,8 @@ import { basename, resolve } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { cleanup, render } from '@testing-library/react';
 import AssetAvatar from '@portfoygo/shared/ui/AssetAvatar';
-import { assetLogoKey, assetLogoSrc, hasAssetLogo, normalizeLogoSymbol } from '@portfoygo/shared/assetLogos';
+import { assetLogoKey, assetLogoSrc, assetRefWithLogo, hasAssetLogo, normalizeLogoSymbol, parseAssetRef } from '@portfoygo/shared/assetLogos';
+import { arenaInstrumentAsset } from '@/components/arena/model';
 import { ASSET_LOGO_ALIASES, ASSET_LOGO_FILES } from '../../../packages/shared/src/assetLogos.generated';
 
 afterEach(cleanup);
@@ -38,14 +39,14 @@ describe('assetLogoSrc', () => {
   });
 
   it('logo yoksa null döner (istek atılmaz → 404 yok)', () => {
-    expect(assetLogoSrc('stock', 'MSFT')).toBeNull(); // simple-icons'ta marka yok → monogram
+    expect(assetLogoSrc('stock', 'AVGO')).toBeNull(); // simple-icons girdisi CC0 dışı lisanslı → monogram
     expect(assetLogoSrc('crypto', 'NOPE')).toBeNull();
     expect(assetLogoSrc('crypto', 'AAPL')).toBeNull(); // tip de eşleşmeli
     expect(assetLogoSrc('stock', '')).toBeNull();
     expect(assetLogoSrc('stock', null)).toBeNull();
     expect(assetLogoSrc('stock', 'constructor')).toBeNull();
     expect(assetLogoSrc('', 'BTC')).toBeNull();
-    expect(hasAssetLogo('stock', 'AMZN')).toBe(false);
+    expect(hasAssetLogo('crypto', 'RENDER')).toBe(false); // simple-icons'taki 'render' Render.com'dur, eşlenmez
   });
 
   it('takma adları kanonik dosyaya çözer (Arena / Global Lab / hisse sınıfları / yeniden adlandırılan coinler)', () => {
@@ -59,9 +60,11 @@ describe('assetLogoSrc', () => {
   });
 
   it('uygulamanın bilinen varlık evrenini kapsar', () => {
-    // backend: FinnhubService.getTrackedSymbols varsayılanı + yerel tohum (MSFT/AMZN bilinçli olarak monogram)
-    for (const s of ['AAPL', 'GOOGL', 'TSLA', 'META', 'NVDA', 'NFLX', 'AMD', 'INTC', 'JPM']) expect(hasAssetLogo('stock', s), s).toBe(true);
+    // backend: FinnhubService.getTrackedSymbols varsayılanı + yerel tohum (MSFT / AMZN: PortfoyGo'nun çizdiği işaretler)
+    for (const s of ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'META', 'NVDA', 'NFLX', 'AMD', 'INTC', 'JPM']) expect(hasAssetLogo('stock', s), s).toBe(true);
     for (const s of ['btc', 'eth', 'xrp', 'usdt', 'bnb', 'sol', 'doge', 'ada', 'link', 'avax', 'usdc', 'trx', 'ltc', 'dot']) expect(hasAssetLogo('crypto', s), s).toBe(true);
+    // cryptocurrency-icons'ta olmayıp simple-icons yedeğinden gelenler
+    for (const s of ['TON', 'SUI', 'NEAR', 'HBAR', 'OP', 'PI']) expect(hasAssetLogo('crypto', s), s).toBe(true);
     // FEATURED_CURRENCIES + sandbox kurları + TCMB listesi
     for (const s of ['USD', 'EUR', 'GBP', 'CHF', 'JPY', 'SAR', 'CAD', 'AUD', 'DKK', 'SEK', 'NOK', 'KWD', 'RUB', 'CNY', 'AZN', 'BGN', 'RON', 'IRR', 'PKR', 'QAR', 'KRW', 'AED']) {
       expect(hasAssetLogo('currency', s), s).toBe(true);
@@ -130,13 +133,44 @@ describe('AssetAvatar', () => {
   });
 
   it('logo yoksa baş harflere düşer ve hiçbir görsel istemez', () => {
-    const { container } = render(<AssetAvatar symbol="MSFT" type="stock" />);
+    const { container } = render(<AssetAvatar symbol="AVGO" type="stock" />);
     expect(container.querySelector('img')).toBeNull();
-    expect(container.textContent).toBe('MS');
+    expect(container.textContent).toBe('AV');
   });
 
   it('yerel logo yoksa verilen görseli kullanır', () => {
     const { container } = render(<AssetAvatar symbol="NEWCOIN" type="crypto" image="https://assets.coingecko.com/coins/images/1/large/new.png" />);
     expect(container.querySelector('img')?.getAttribute('src')).toContain(encodeURIComponent('https://assets.coingecko.com/coins/images/1/large/new.png'));
+  });
+});
+
+describe('varlık bağlantıları (Global Lab / Arena)', () => {
+  it('parseAssetRef "tip:SEMBOL" biçimini ayrıştırır', () => {
+    expect(parseAssetRef('commodity:GOLD')).toEqual({ type: 'commodity', symbol: 'GOLD' });
+    expect(parseAssetRef(' crypto:btc ')).toEqual({ type: 'crypto', symbol: 'BTC' });
+    expect(parseAssetRef('fund:SPY')).toBeNull();
+    expect(parseAssetRef('GOLD')).toBeNull();
+    expect(parseAssetRef(null)).toBeNull();
+    expect(parseAssetRef('stock:')).toBeNull();
+  });
+
+  it('assetRefWithLogo yalnızca logosu olan bağlantıları döndürür', () => {
+    expect(assetRefWithLogo('commodity:BRENT_OIL')).toEqual({ type: 'commodity', symbol: 'BRENT_OIL' });
+    expect(assetRefWithLogo('currency:EUR')).toEqual({ type: 'currency', symbol: 'EUR' });
+    expect(assetRefWithLogo('stock:AVGO')).toBeNull();
+    expect(assetRefWithLogo(null)).toBeNull();
+  });
+
+  it('Arena enstrümanlarını logolu varlığa eşler', () => {
+    expect(arenaInstrumentAsset('XAUUSD')).toEqual({ type: 'commodity', symbol: 'XAUUSD' });
+    expect(arenaInstrumentAsset('xagusd')).toEqual({ type: 'commodity', symbol: 'XAGUSD' });
+    expect(arenaInstrumentAsset('BRENT')).toEqual({ type: 'commodity', symbol: 'BRENT' });
+    expect(arenaInstrumentAsset('BTCUSD')).toEqual({ type: 'crypto', symbol: 'BTC' });
+    expect(arenaInstrumentAsset('EURUSD')).toEqual({ type: 'currency', symbol: 'EUR' });
+    expect(arenaInstrumentAsset('SYN_CRASH_BTC')).toBeNull();
+    for (const code of ['XAUUSD', 'XAGUSD', 'BRENT', 'BTCUSD', 'EURUSD']) {
+      const a = arenaInstrumentAsset(code)!;
+      expect(assetLogoSrc(a.type, a.symbol), code).toMatch(/^\/logos\//);
+    }
   });
 });

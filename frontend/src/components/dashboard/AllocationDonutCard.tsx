@@ -2,10 +2,11 @@
 
 import { useMemo } from 'react';
 import { useLivePortfolio } from '@/context/PortfolioContext';
-import { cn, formatTRY } from '@portfoygo/shared/format';
+import { cn } from '@portfoygo/shared/format';
 import { Card, CardHeader } from '@portfoygo/shared/ui/Card';
 import { Skeleton } from '@portfoygo/shared/ui/Feedback';
 import { ASSET_TYPE_LABELS, type AssetType } from '@/types';
+import { useDisplayCurrency } from '@/hooks/useDisplayCurrency';
 
 type Bucket = AssetType | 'cash';
 
@@ -29,6 +30,7 @@ const pct = (n: number) => `%${n.toLocaleString('tr-TR', { maximumFractionDigits
 
 /** Panel: varlık türüne göre dağılım (nakit dahil) — düz SVG halka grafik ve açıklama listesi. */
 export default function AllocationDonutCard({ className }: { className?: string }) {
+  const dc = useDisplayCurrency();
   const { balance, reservedCash, holdings, totals, loaded } = useLivePortfolio();
 
   const slices = useMemo(() => {
@@ -93,7 +95,7 @@ export default function AllocationDonutCard({ className }: { className?: string 
               {loaded ? (
                 <span className="num shrink-0 text-right">
                   <span className="font-medium text-fg">{pct(s.share)}</span>
-                  <span className="ml-1.5 hidden text-xs text-subtle min-[420px]:inline">{formatTRY(s.value)}</span>
+                  <span className="ml-1.5 hidden text-xs text-subtle min-[420px]:inline">{dc.money(s.value)}</span>
                 </span>
               ) : (
                 <Skeleton className="h-4 w-12" />

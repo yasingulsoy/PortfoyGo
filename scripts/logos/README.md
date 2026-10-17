@@ -32,9 +32,11 @@ Okuma yardımcıları elle yazılmıştır: `packages/shared/src/assetLogos.ts` 
 
 | Tür | Kaynak | Lisans | Not |
 | --- | --- | --- | --- |
-| Kripto | `cryptocurrency-icons@0.18.1` — `svg/color` | CC0-1.0 | Pakette olmayan coinler baş harf gösterir (başka siteden çekilmez). Sembolü bugün başka projeye ait olanlar (SKY, BEAM, AMP, HT) dışarıda. |
+| Kripto | `cryptocurrency-icons@0.18.1` — `svg/color` | CC0-1.0 | Önce bu paket. Sembolü bugün başka projeye ait olanlar (SKY, BEAM, AMP, HT) dışarıda. |
+| Kripto (yedek) | `simple-icons@16.33.0` | CC0-1.0 (simge verisi) | Yalnızca ilk pakette olmayan coinler, simgenin o projeye ait olduğu doğrulanan `CRYPTO_BRANDS` girdileri (TON, SUI, NEAR, HBAR, OP, PI, HNT, ENS); hisse rozetleriyle aynı stil (`FULL_DISC_BRANDS`: dolu daire simgeler tam boy). İkisinde de olmayanlar baş harf gösterir. |
 | Döviz | `flag-icons@7.5.0` — `flags/1x1` | MIT | Para birimi → ülke/bölge bayrağı (`CURRENCY_FLAGS`). 24 KB'yi aşan bayraklar (MXN, RSD, TMT) atlanır. |
-| Hisse | `simple-icons@16.33.0` | CC0-1.0 (simge verisi) | Marka rengi dairede beyaz (açık renklerde koyu) glif. `license` alanı taşıyan (CC0 dışı) girdiler otomatik dışlanır (ör. Broadcom). Microsoft, Amazon gibi pakette olmayan markalar monogram gösterir. **Ticari markalar sahiplerinindir.** |
+| Hisse | `simple-icons@16.33.0` | CC0-1.0 (simge verisi) | Marka rengi dairede beyaz (açık renklerde koyu) glif. `license` alanı taşıyan (CC0 dışı) girdiler otomatik dışlanır (ör. Broadcom → baş harf). **Ticari markalar sahiplerinindir.** |
+| Hisse (kendi çizim) | `stock-marks.mjs` | Proje lisansı (marka hakları sahiplerinde) | simple-icons'ta olmayan çok görünür hisseler: MSFT (açık dairede dört renkli kare ızgarası — Microsoft logosunun kendisine çok yakın, hukuk incelemesinde ayrıca bakılmalı), AMZN (koyu dairede turuncu küçük harf "a" monogramı; gülümseme logosu değil). |
 | Emtia | PortfoyGo'nun kendi çizimi — `commodity-icons.mjs` | Proje lisansı | Renkli daire + beyaz glif: külçe (altın/gümüş/platin…), gram altın kartı, bakır bobini, varil, damla, alev, pompa, başak… |
 
 ## Güvenlik
@@ -50,7 +52,8 @@ Okuma yardımcıları elle yazılmıştır: `packages/shared/src/assetLogos.ts` 
 
 ## Yeni varlık / sürüm eklemek
 
-1. `sources.mjs`: `CRYPTO_SYMBOLS`, `CURRENCY_FLAGS`, `STOCK_BRANDS` (ticker → simple-icons slug) veya takma adlar;
+1. `sources.mjs`: `CRYPTO_SYMBOLS` (+ yedek `CRYPTO_BRANDS`), `CURRENCY_FLAGS`, `STOCK_BRANDS` (ticker → simple-icons slug) veya takma adlar;
+   simple-icons'ta olmayan bir hisse için kendi işaret: `stock-marks.mjs` → `OWN_STOCK_MARKS`;
    yeni emtia için `commodity-icons.mjs` → `COMMODITY_ICONS` (kanonik kod + takma adlar).
 2. Sürüm yükseltme: `PACKAGES` içinde `version`, `tarball` ve `integrity` (`npm view <paket>@<sürüm> dist.integrity`).
 3. `node scripts/logos/fetch-logos.mjs` → çıktıdaki "kapsanmayan" listesini kontrol edin → `npm run test -w @portfoygo/frontend`.

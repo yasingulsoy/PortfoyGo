@@ -7,7 +7,7 @@ import { ChartBarIcon } from '@heroicons/react/24/outline';
 import { useMarketHistory } from '@/hooks/useMarketHistory';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import type { MarketRange } from '@/lib/api';
-import { cn, formatTRY, formatUSD } from '@portfoygo/shared/format';
+import { cn, formatMoney } from '@portfoygo/shared/format';
 import { Delta } from '@portfoygo/shared/ui/Delta';
 import { EmptyState, Skeleton } from '@portfoygo/shared/ui/Feedback';
 import type { AssetType } from '@/types';
@@ -60,6 +60,8 @@ interface Props {
   symbol: string;
   coinId?: string;
   usdTry: number | null;
+  /** Görüntüleme birimi (TL / USD tercihi); seri gerekirse güncel USD/TRY ile çevrilir. Varsayılan TL. */
+  displayCurrency?: 'TRY' | 'USD';
   /** Tam ekranda başlıkta gösterilecek metin (ör. "AAPL · Apple Inc.") */
   title?: string;
   className?: string;
@@ -76,7 +78,7 @@ const segBtn = (active: boolean) =>
  * tam ekran ve artı imleç ipucu. Grafik bir kez oluşturulur; aralık/tema/stil değişince yalnızca
  * seri verisi ve seçenekleri güncellenir.
  */
-export default function AssetChart({ type, symbol, coinId, usdTry, title, className }: Props) {
+export default function AssetChart({ type, symbol, coinId, usdTry, displayCurrency = 'TRY', title, className }: Props) {
   const cardId = useId();
   const cardRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -97,20 +99,20 @@ export default function AssetChart({ type, symbol, coinId, usdTry, title, classN
   const docTheme = useDocumentTheme();
   const history = useMarketHistory(type, symbol, range, coinId);
 
-  // USD kotasyonlu seriler güncel kurla TL'ye çevrilir; kur yoksa USD gösterilir
-  const convert = history.currency === 'USD' && !!usdTry;
-  const currency: 'TRY' | 'USD' = history.currency === 'TRY' || convert ? 'TRY' : 'USD';
-  const data = useMemo(() => {
-    const k = convert ? usdTry! : 1;
-    return history.points.map((p) => ({ time: p.t as UTCTimestamp, value: p.v * k }));
-  }, [history.points, convert, usdTry]);
+  // Seri, görüntüleme birimine güncel kurla çevrilir (USD kotasyonlu → TL ya da TL kotasyonlu → USD);
+  // kur yoksa kaynağın kendi biriminde gösterilir
+  const rate = usdTry && usdTry > 0 ? usdTry : null;
+  const convert = history.currency !== displayCurrency && !!rate;
+  const currency: 'TRY' | 'USD' = convert ? displayCurrency : history.currency;
+  const factor = !convert || !rate ? 1 : displayCurrency === 'TRY' ? rate : 1 / rate;
+  const data = useMemo(() => history.points.map((p) => ({ time: p.t as UTCTimestamp, value: p.v * factor })), [history.points, factor]);
 
   const hasData = data.length > 1;
   const first = hasData ? data[0].value : null;
   const last = hasData ? data[data.length - 1].value : null;
   const rangeChange = first && last != null ? ((last - first) / first) * 100 : null;
   const rising = rangeChange == null || rangeChange >= 0;
-  const money = (v: number | null) => (currency === 'TRY' ? formatTRY(v, { precise: true }) : formatUSD(v, { precise: true }));
+  const money = (v: number | null) => formatMoney(v, currency, { precise: true });
 
   const fullscreen = useSyncExternalStore(
     subscribeFullscreen,
@@ -142,7 +144,7 @@ export default function AssetChart({ type, symbol, coinId, usdTry, title, classN
       if (!point || typeof point.value !== 'number') return hideTip();
 
       const { currency: cur, intraday } = fmtRef.current;
-      if (tipPriceRef.current) tipPriceRef.current.textContent = cur === 'TRY' ? formatTRY(point.value, { precise: true }) : formatUSD(point.value, { precise: true });
+      if (tipPriceRef.current) tipPriceRef.current.textContent = formatMoney(point.value, cur, { precise: true });
       if (tipDateRef.current) tipDateRef.current.textContent = (intraday ? fmtDayTime : fmtDay).format(toMs(param.time));
 
       const w = tip.offsetWidth;
@@ -352,10 +354,14 @@ export default function AssetChart({ type, symbol, coinId, usdTry, title, classN
       {!fullscreen && (
         <p className="px-5 pb-4 pt-1 text-xs text-subtle sm:px-6">
           {convert
-            ? 'Geçmiş fiyatlar USD cinsinden alınır ve güncel USD/TRY kuruyla TL’ye çevrilir.'
-            : history.currency === 'USD'
-              ? 'Kur bilgisi alınamadığı için grafik USD cinsindendir.'
-              : 'Fiyatlar Türk lirası cinsindendir.'}
+            ? history.currency === 'USD'
+              ? 'Geçmiş fiyatlar USD cinsinden alınır ve güncel USD/TRY kuruyla TL’ye çevrilir.'
+              : 'Geçmiş fiyatlar TL cinsinden alınır ve güncel USD/TRY kuruyla USD’ye çevrilir.'
+            : history.currency !== displayCurrency
+              ? `Kur bilgisi alınamadığı için grafik ${history.currency === 'USD' ? 'USD' : 'TL'} cinsindendir.`
+              : history.currency === 'USD'
+                ? 'Fiyatlar ABD doları cinsindendir.'
+                : 'Fiyatlar Türk lirası cinsindendir.'}
           {history.source === 'fallback' && ' Kaynak: CoinGecko.'}
         </p>
       )}

@@ -11,12 +11,14 @@ temizleyiciden geçirilmiştir (betik, olay işleyicisi, dış bağlantı, `<for
 | Klasör | Kaynak | Sürüm | Lisans | Dosya |
 | --- | --- | --- | --- | --- |
 | `crypto/` | [cryptocurrency-icons](https://github.com/spothq/cryptocurrency-icons) — `svg/color` | 0.18.1 | CC0-1.0 | 98 |
+| `crypto/` | [simple-icons](https://github.com/simple-icons/simple-icons) — yalnızca cryptocurrency-icons'ta olmayan coinler; marka simgesi + marka rengi daire rozette | 16.33.0 | CC0-1.0 (simge verisi) | 8 |
 | `currency/` | [flag-icons](https://github.com/lipis/flag-icons) — `flags/1x1` (para biriminin ülke/bölge bayrağı) | 7.5.0 | MIT | 68 |
 | `stock/` | [simple-icons](https://github.com/simple-icons/simple-icons) — marka simgesi + marka rengi, PortfoyGo tarafından daire rozete yerleştirildi | 16.33.0 | CC0-1.0 (simge verisi) | 114 |
+| `stock/` | PortfoyGo'nun çizdiği işaretler (`scripts/logos/stock-marks.mjs`) — simple-icons'ta olmayan çok görünür hisseler | — | Proje lisansı (marka hakları sahiplerinde) | 2 |
 | `commodity/` | PortfoyGo'nun kendi çizimi (`scripts/logos/commodity-icons.mjs`) | — | Proje lisansı | 19 |
 
-Kapsanmayan varlıklar (ör. simple-icons'ta bulunmayan Microsoft / Amazon, cryptocurrency-icons'ta bulunmayan yeni coinler)
-uygulamada sembolün baş harfleriyle (monogram) gösterilir; başka kaynaktan logo çekilmez.
+Kapsanmayan varlıklar (ör. CC0 dışı lisanslı simgeler, iki pakette de bulunmayan yeni coinler) uygulamada sembolün
+baş harfleriyle (monogram) gösterilir; başka kaynaktan logo çekilmez.
 
 ## Hisse logoları (simple-icons) ve marka kılavuzları
 
@@ -139,6 +141,31 @@ orijinal marka rengi ve biçimiyle, yalnızca tanımlayıcı amaçla küçük ro
 | AKAM | Akamai | `#0096D6` | — |
 | HUBS | HubSpot | `#FF7A59` | [bağlantı](https://www.hubspot.com/style-guide) |
 | BILI | Bilibili | `#00A1D6` | — |
+
+## PortfoyGo'nun çizdiği hisse işaretleri
+
+simple-icons'ta bulunmayan ama piyasa listesinde çok görünen şirketler için basit geometrik işaretler. Marka notu bunları da
+kapsar: işaretler yalnızca varlığı tanımlamak içindir ve ilgili şirketlerin ticari markalarına dayanır.
+
+| Sembol | İşaret | Not |
+| --- | --- | --- |
+| MSFT | Microsoft — açık daire üzerinde dört renkli kare ızgarası | Microsoft'un dört renkli kare logosuna dayanır (simple-icons'tan Microsoft'un talebiyle kaldırıldı); hukuk incelemesinde ayrıca bakılmalı. |
+| AMZN | Amazon — koyu daire üzerinde turuncu küçük harf "a" monogramı | PortfoyGo monogramı; Amazon logosunun (gülümseme oku) kopyası değildir, yalnızca marka turuncusu kullanılır. |
+
+## Kripto logoları (simple-icons yedeği)
+
+cryptocurrency-icons'ta bulunmayan coinler için, simgenin o projeye ait olduğu doğrulanan simple-icons girdileri.
+
+| Sembol | Proje | Renk | Kılavuz |
+| --- | --- | --- | --- |
+| SUI | Sui | `#4DA2FF` | [bağlantı](https://sui.io/media-kit) |
+| HBAR | Hedera | `#222222` | [bağlantı](https://brand.hedera.com) |
+| TON | TON | `#0098EA` | [bağlantı](https://ton.org/en/brand-assets) |
+| PI | Pi Network | `#F4AF47` | — |
+| NEAR | NEAR | `#000000` | — |
+| OP | Optimism | `#FF0420` | — |
+| HNT | Helium | `#0ACF83` | — |
+| ENS | ENS | `#0080BC` | [bağlantı](https://ens.domains/brand) |
 
 ## Emtia simgeleri
 

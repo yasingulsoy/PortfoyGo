@@ -1,11 +1,12 @@
 import { Delta, Money } from '@portfoygo/shared/ui/Delta';
 import { Badge, Skeleton } from '@portfoygo/shared/ui/Feedback';
 import UserInitial from '@portfoygo/shared/ui/UserInitial';
-import { cn, formatTRY } from '@portfoygo/shared/format';
+import { cn } from '@portfoygo/shared/format';
 import { DataTable, TBody, THead, Td, Th, Tr } from '@/components/common/Table';
 import { RankMedal } from '@/components/season/TitleBadge';
 import ProfileLink from '@/components/profile/ProfileLink';
 import type { Leader } from './model';
+import { useDisplayCurrency } from '@/hooks/useDisplayCurrency';
 
 /** Sabit sütun genişlikleri: sayfalı parçalar (ayrı tablolar) alt alta hizalı kalır. */
 const COL = {
@@ -28,6 +29,7 @@ export default function RankList({
   /** Sayfalı listelerde ikinci ve sonraki parçalar sütun başlığını görsel olarak tekrarlamaz. */
   showHeader?: boolean;
 }) {
+  const dc = useDisplayCurrency();
   return (
     <DataTable label="Sıralama" tableClassName="table-fixed">
       <THead className={showHeader ? undefined : 'sr-only'}>
@@ -59,20 +61,20 @@ export default function RankList({
                       <ProfileLink username={l.username} className="truncate font-medium text-fg" />
                       {isMe && <Badge tone="brand">Sen</Badge>}
                     </p>
-                    <p className="num truncate text-xs text-muted md:hidden">{formatTRY(l.totalValue)}</p>
+                    <p className="num truncate text-xs text-muted md:hidden">{dc.money(l.totalValue)}</p>
                   </div>
                 </div>
               </Td>
               <Td align="right" className={cn(COL.total, 'num font-medium text-fg')}>
-                {formatTRY(l.totalValue)}
+                {dc.money(l.totalValue)}
               </Td>
               <Td align="right" className={COL.pl}>
-                <Money value={l.pl} signed />
+                <Money value={dc.convert(l.pl)} currency={dc.currency} signed />
               </Td>
               <Td align="right" className={COL.ret}>
                 <Delta value={l.plPercent} />
                 <p className="mt-1 truncate text-xs lg:hidden">
-                  <Money value={l.pl} signed />
+                  <Money value={dc.convert(l.pl)} currency={dc.currency} signed />
                 </p>
               </Td>
             </Tr>

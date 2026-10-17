@@ -11,8 +11,9 @@ import { Delta } from '@portfoygo/shared/ui/Delta';
 import { EmptyState, Skeleton } from '@portfoygo/shared/ui/Feedback';
 import Tabs from '@portfoygo/shared/ui/Tabs';
 import { STARTING_BALANCE } from '@/lib/constants';
-import { cn, formatNumber, formatTRY } from '@portfoygo/shared/format';
+import { cn, formatNumber } from '@portfoygo/shared/format';
 import SectionHeading from './SectionHeading';
+import { useDisplayCurrency } from '@/hooks/useDisplayCurrency';
 
 const LIMIT = 5;
 const MEDALS = ['bg-gold text-black', 'bg-silver text-black', 'bg-bronze text-black'];
@@ -27,6 +28,7 @@ const BOARDS: { value: Board; label: string }[] = [
 
 /** Herkese açık liderlik tablosundan ilk 5. */
 export default function LeaderboardTeaser() {
+  const dc = useDisplayCurrency();
   const [board, setBoard] = useState<Board>('week');
   const { data, error, isLoading } = useSWR(`landing:leaders:${board}`, () => leaderboardApi.list(LIMIT, board), {
     refreshInterval: 60_000,
@@ -87,7 +89,7 @@ export default function LeaderboardTeaser() {
                 </span>
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-semibold text-fg">{l.username}</p>
-                  <p className="num text-xs text-subtle">{formatTRY(l.totalValue)}</p>
+                  <p className="num text-xs text-subtle">{dc.money(l.totalValue)}</p>
                 </div>
                 <Delta value={l.plPercent} />
               </li>

@@ -10,7 +10,8 @@ import { useLivePortfolio } from '@/context/PortfolioContext';
 import type { PortfolioHistory } from '@/components/portfolio/PerformanceChart';
 import { chartFont, cssVar, useDocumentTheme, withAlpha } from '@/components/asset/chartTheme';
 import { STARTING_BALANCE } from '@/lib/constants';
-import { cn, formatTRY } from '@portfoygo/shared/format';
+import { cn } from '@portfoygo/shared/format';
+import { useDisplayCurrency } from '@/hooks/useDisplayCurrency';
 import { Card, CardHeader } from '@portfoygo/shared/ui/Card';
 import { Delta, Money } from '@portfoygo/shared/ui/Delta';
 import { EmptyState, Skeleton } from '@portfoygo/shared/ui/Feedback';
@@ -50,6 +51,12 @@ const toMs = (t: Time) => (typeof t === 'number' ? t * 1000 : typeof t === 'stri
 export default function PortfolioPerformanceCard({ className }: { className?: string }) {
   const { user } = useAuth();
   const { totals, loaded } = useLivePortfolio();
+  const dc = useDisplayCurrency();
+  // Grafik bir kez kurulur; ipucu biçimlendiricisi güncel görüntüleme birimini ref'ten okur
+  const moneyRef = useRef(dc.money);
+  useEffect(() => {
+    moneyRef.current = dc.money;
+  });
   const docTheme = useDocumentTheme();
   const [range, setRange] = useState<Range>('1M');
 
@@ -90,7 +97,7 @@ export default function PortfolioPerformanceCard({ className }: { className?: st
       if (!tip || !s || !param.point || param.time === undefined) return hideTip();
       const point = param.seriesData.get(s) as { value?: number } | undefined;
       if (!point || typeof point.value !== 'number') return hideTip();
-      if (tipValueRef.current) tipValueRef.current.textContent = formatTRY(point.value);
+      if (tipValueRef.current) tipValueRef.current.textContent = moneyRef.current(point.value);
       if (tipDateRef.current) tipDateRef.current.textContent = fmt.tip.format(toMs(param.time));
       const w = tip.offsetWidth;
       const h = tip.offsetHeight;
@@ -214,11 +221,11 @@ export default function PortfolioPerformanceCard({ className }: { className?: st
           {loaded ? (
             <>
               <p className="text-3xl font-semibold tracking-tight text-fg">
-                <AnimatedNumber value={totals.netWorth} format={formatTRY} />
+                <AnimatedNumber value={totals.netWorth} format={(n) => dc.money(n)} />
               </p>
               <div className="flex flex-wrap items-center gap-2 pb-1 text-sm">
                 <Delta value={changePct} />
-                <Money value={change} signed className="font-medium" />
+                <Money value={dc.convert(change)} currency={dc.currency} signed className="font-medium" />
                 <span className="text-subtle">{CAPTION[range]}</span>
               </div>
             </>

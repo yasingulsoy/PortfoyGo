@@ -5,18 +5,20 @@ import { ArrowRightIcon } from '@heroicons/react/20/solid';
 import { TrophyIcon } from '@heroicons/react/24/outline';
 import { leaderboardApi } from '@/lib/api';
 import { useAuth } from '@/context/AuthContext';
-import { cn, formatTRY } from '@portfoygo/shared/format';
+import { cn } from '@portfoygo/shared/format';
 import { Card, CardHeader } from '@portfoygo/shared/ui/Card';
 import { Delta } from '@portfoygo/shared/ui/Delta';
 import { LinkButton } from '@portfoygo/shared/ui/Button';
 import { EmptyState, Skeleton } from '@portfoygo/shared/ui/Feedback';
 import UserInitial from '@portfoygo/shared/ui/UserInitial';
 import type { LeaderboardEntry } from '@/types';
+import { useDisplayCurrency } from '@/hooks/useDisplayCurrency';
 
 const MEDAL = ['bg-gold-soft text-gold', 'bg-surface-3 text-fg', 'bg-gold-soft text-bronze'];
 
 /** Panel: tüm zamanların ilk 5 yatırımcısı. */
 export default function LeadersCard({ className }: { className?: string }) {
+  const dc = useDisplayCurrency();
   const { user } = useAuth();
   const { data, error, isLoading } = useSWR('leaders:top5', () => leaderboardApi.list(5, 'alltime'), { refreshInterval: 60_000 });
   const leaders: LeaderboardEntry[] = data?.leaderboard ?? [];
@@ -55,7 +57,7 @@ export default function LeadersCard({ className }: { className?: string }) {
                     {l.username}
                     {me && <span className="ml-1.5 text-xs font-normal text-brand">(sen)</span>}
                   </span>
-                  <span className="num block truncate text-xs text-muted">{formatTRY(l.total_value != null ? Number(l.total_value) : Number(l.portfolio_value) + Number(l.balance))}</span>
+                  <span className="num block truncate text-xs text-muted">{dc.money(l.total_value != null ? Number(l.total_value) : Number(l.portfolio_value) + Number(l.balance))}</span>
                 </span>
                 <Delta value={Number(l.profit_loss_percent)} />
               </li>

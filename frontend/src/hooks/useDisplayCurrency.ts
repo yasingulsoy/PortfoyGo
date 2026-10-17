@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo, useSyncExternalStore } from 'react';
+import { createContext, useContext, useMemo, useSyncExternalStore } from 'react';
 import { formatMoney, formatMoneyCompact } from '@portfoygo/shared/format';
 import { useCurrencies } from '@/hooks/useMarketData';
 import {
@@ -108,50 +108,59 @@ export interface PricedAsset {
 export const isTryPair = (a: Pick<PricedAsset, 'type' | 'symbol'>, pairTRY?: boolean) =>
   a.type === 'currency' && (pairTRY === true || a.symbol.toUpperCase() === 'USD');
 
+/** Kancasız (saf) API kurucu: sağlayıcı ve varsayılan (sağlayıcı dışı → TL) değer bunu kullanır */
+export function buildDisplayCurrencyApi(preference: DisplayCurrency, usdTry: number | null, setCurrency: (c: DisplayCurrency) => void): DisplayCurrencyApi {
+  const ctx: MoneyContext = { currency: preference, usdTry };
+  const currency = resolveCurrency(ctx);
+  const secondaryPrice = (priceTRY: number | null | undefined, priceUSD: number | null | undefined): string | null => {
+    if (currency === 'USD') return priceTRY != null && Number.isFinite(priceTRY) ? formatMoney(priceTRY, 'TRY', { precise: true }) : null;
+    return priceUSD != null && Number.isFinite(priceUSD) ? formatMoney(priceUSD, 'USD', { precise: true }) : null;
+  };
+  return {
+    preference,
+    currency,
+    usdTry,
+    symbol: displaySymbol(currency),
+    ctx,
+    setCurrency,
+    toggle: () => setCurrency(preference === 'USD' ? 'TRY' : 'USD'),
+    convert: (v, nativeUSD) => convertFromTRY(v, ctx, nativeUSD),
+    convertUSD: (v) => convertFromUSD(v, ctx),
+    money: (v, opts) => formatDisplayMoney(v, ctx, opts),
+    alt: (v, opts) => formatAlternateMoney(v, ctx, opts),
+    compact: (v, nativeUSD) => formatDisplayCompact(v, ctx, nativeUSD),
+    compactUSD: (v) => {
+      const c = convertFromUSD(v, ctx);
+      return c == null || c === 0 ? '—' : formatMoneyCompact(c, currency);
+    },
+    secondaryPrice,
+    assetPrice: (a, opts) => {
+      if (isTryPair(a, opts?.pairTRY)) return a.priceTRY != null ? formatMoney(a.priceTRY, 'TRY', { precise: true }) : '—';
+      if (a.priceTRY == null && !(currency === 'USD' && a.priceUSD != null)) return '—';
+      return formatDisplayMoney(a.priceTRY, ctx, { precise: true, nativeUSD: a.priceUSD });
+    },
+    assetSecondary: (a, opts) => (isTryPair(a, opts?.pairTRY) ? null : secondaryPrice(a.priceTRY, a.priceUSD)),
+  };
+}
+
+/** Sağlayıcı dışında (ör. tek başına test edilen bileşen): TL, çeviri yok */
+export const DisplayCurrencyContext = createContext<DisplayCurrencyApi>(buildDisplayCurrencyApi('TRY', null, () => undefined));
+
 /**
- * Site geneli TL / USD görüntüleme tercihi + kur. Para gösteren her bileşen bunu kullanır; tercih değişince
- * tüm abonelikler aynı anda yeniden çizilir. Kur, /currencies (SWR, paylaşılan önbellek) USD satış kurudur.
+ * Sağlayıcının durumu: tercih (localStorage) + kur (/currencies USD satış; SWR paylaşılan önbellek, 5 dk).
+ * Uygulama kökünde BİR KEZ çağrılır (components/Providers.tsx → DisplayCurrencyProvider); satırlar ve kartlar
+ * yalnızca bağlamı okur (her satırda ayrı SWR aboneliği olmaz).
  */
-export function useDisplayCurrency(): DisplayCurrencyApi {
+export function useDisplayCurrencyState(): DisplayCurrencyApi {
   const [preference, setCurrency] = useDisplayCurrencyPreference();
   const { usdTry } = useCurrencies();
-  const ctx = useMemo<MoneyContext>(() => ({ currency: preference, usdTry }), [preference, usdTry]);
-  const currency = resolveCurrency(ctx);
-  const toggle = useCallback(() => setCurrency(preference === 'USD' ? 'TRY' : 'USD'), [preference, setCurrency]);
-  const secondaryPrice = useCallback(
-    (priceTRY: number | null | undefined, priceUSD: number | null | undefined): string | null => {
-      if (currency === 'USD') return priceTRY != null && Number.isFinite(priceTRY) ? formatMoney(priceTRY, 'TRY', { precise: true }) : null;
-      return priceUSD != null && Number.isFinite(priceUSD) ? formatMoney(priceUSD, 'USD', { precise: true }) : null;
-    },
-    [currency],
-  );
+  return useMemo(() => buildDisplayCurrencyApi(preference, usdTry, setCurrency), [preference, usdTry, setCurrency]);
+}
 
-  return useMemo<DisplayCurrencyApi>(
-    () => ({
-      preference,
-      currency,
-      usdTry,
-      symbol: displaySymbol(currency),
-      ctx,
-      setCurrency,
-      toggle,
-      convert: (v, nativeUSD) => convertFromTRY(v, ctx, nativeUSD),
-      convertUSD: (v) => convertFromUSD(v, ctx),
-      money: (v, opts) => formatDisplayMoney(v, ctx, opts),
-      alt: (v, opts) => formatAlternateMoney(v, ctx, opts),
-      compact: (v, nativeUSD) => formatDisplayCompact(v, ctx, nativeUSD),
-      compactUSD: (v) => {
-        const c = convertFromUSD(v, ctx);
-        return c == null || c === 0 ? '—' : formatMoneyCompact(c, currency);
-      },
-      secondaryPrice,
-      assetPrice: (a, opts) => {
-        if (isTryPair(a, opts?.pairTRY)) return a.priceTRY != null ? formatMoney(a.priceTRY, 'TRY', { precise: true }) : '—';
-        if (a.priceTRY == null && !(currency === 'USD' && a.priceUSD != null)) return '—';
-        return formatDisplayMoney(a.priceTRY, ctx, { precise: true, nativeUSD: a.priceUSD });
-      },
-      assetSecondary: (a, opts) => (isTryPair(a, opts?.pairTRY) ? null : secondaryPrice(a.priceTRY, a.priceUSD)),
-    }),
-    [preference, currency, usdTry, ctx, setCurrency, toggle, secondaryPrice],
-  );
+/**
+ * Site geneli TL / USD görüntüleme tercihi + kur. Para gösteren her bileşen bunu kullanır; tercih değişince
+ * bağlamı okuyan her bileşen aynı anda yeniden çizilir.
+ */
+export function useDisplayCurrency(): DisplayCurrencyApi {
+  return useContext(DisplayCurrencyContext);
 }

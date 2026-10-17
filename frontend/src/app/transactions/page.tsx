@@ -6,7 +6,7 @@ import { ArrowDownTrayIcon, ArrowPathIcon, ArrowsUpDownIcon, MagnifyingGlassIcon
 import { ArrowsRightLeftIcon, ArrowTrendingDownIcon, ArrowTrendingUpIcon, ClockIcon, ReceiptPercentIcon } from '@heroicons/react/24/outline';
 import { useRequireAuth } from '@/hooks/useRequireAuth';
 import { usePortfolio } from '@/context/PortfolioContext';
-import { cn, formatNumber, formatQuantity, formatTRY } from '@portfoygo/shared/format';
+import { cn, formatNumber, formatQuantity } from '@portfoygo/shared/format';
 import { ASSET_TYPE_LABELS, type AssetType, type Transaction } from '@/types';
 import { Card } from '@portfoygo/shared/ui/Card';
 import { Badge, EmptyState, Skeleton } from '@portfoygo/shared/ui/Feedback';
@@ -21,6 +21,7 @@ import Pagination from '@/components/common/Pagination';
 import { SearchInput, Select, ToolbarButton } from '@/components/common/controls';
 import { DataTable, TBody, THead, Td, Th, Tr } from '@/components/common/Table';
 import { assetHref } from '@/components/market/MarketTable';
+import { useDisplayCurrency } from '@/hooks/useDisplayCurrency';
 
 type TypeFilter = 'all' | 'buy' | 'sell';
 type AssetFilter = 'all' | AssetType;
@@ -41,6 +42,7 @@ export default function TransactionsPage() {
 }
 
 function Transactions() {
+  const dc = useDisplayCurrency();
   const { transactions, loaded, refresh } = usePortfolio();
   const [type, setType] = useState<TypeFilter>('all');
   const [asset, setAsset] = useState<AssetFilter>('all');
@@ -132,9 +134,9 @@ function Transactions() {
           value={formatNumber(transactions.length, 0)}
           sub={`${formatNumber(stats.buyCount, 0)} alış · ${formatNumber(stats.sellCount, 0)} satış`}
         />
-        <MetricCard icon={<ArrowTrendingUpIcon />} tone="up" label="Toplam alım hacmi" loading={!loaded} value={formatTRY(stats.buy)} sub="Komisyon hariç" />
-        <MetricCard icon={<ArrowTrendingDownIcon />} tone="down" label="Toplam satım hacmi" loading={!loaded} value={formatTRY(stats.sell)} sub="Komisyon hariç" />
-        <MetricCard icon={<ReceiptPercentIcon />} label="Ödenen komisyon" loading={!loaded} value={formatTRY(stats.commission)} sub="Tüm işlemlerde" />
+        <MetricCard icon={<ArrowTrendingUpIcon />} tone="up" label="Toplam alım hacmi" loading={!loaded} value={dc.money(stats.buy)} sub="Komisyon hariç" />
+        <MetricCard icon={<ArrowTrendingDownIcon />} tone="down" label="Toplam satım hacmi" loading={!loaded} value={dc.money(stats.sell)} sub="Komisyon hariç" />
+        <MetricCard icon={<ReceiptPercentIcon />} label="Ödenen komisyon" loading={!loaded} value={dc.money(stats.commission)} sub="Tüm işlemlerde" />
       </MetricGrid>
 
       <Card className="overflow-hidden">
@@ -280,17 +282,19 @@ function TypeBadge({ buy }: { buy: boolean }) {
 }
 
 function NetAmount({ t, className }: { t: Transaction; className?: string }) {
+  const dc = useDisplayCurrency();
   const buy = t.type === 'buy';
   return (
     <span className={cn('num whitespace-nowrap font-semibold', buy ? 'text-fg' : 'text-up', className)}>
       <span className="sr-only">{buy ? 'Ödenen' : 'Hesaba geçen'}: </span>
       {buy ? '−' : '+'}
-      {formatTRY(t.netAmount)}
+      {dc.money(t.netAmount)}
     </span>
   );
 }
 
 function TxTableRow({ t }: { t: Transaction }) {
+  const dc = useDisplayCurrency();
   const buy = t.type === 'buy';
   const { date, time } = txTime(t);
   return (
@@ -315,13 +319,13 @@ function TxTableRow({ t }: { t: Transaction }) {
       </Td>
       <Td align="right" className="num whitespace-nowrap text-fg">
         {formatQuantity(t.quantity)}
-        <p className="mt-0.5 text-xs text-muted lg:hidden">× {formatTRY(t.price, { precise: true })}</p>
+        <p className="mt-0.5 text-xs text-muted lg:hidden">× {dc.money(t.price, { precise: true })}</p>
       </Td>
       <Td align="right" className="num hidden whitespace-nowrap text-fg lg:table-cell">
-        {formatTRY(t.price, { precise: true })}
+        {dc.money(t.price, { precise: true })}
       </Td>
       <Td align="right" className="num hidden whitespace-nowrap text-muted xl:table-cell">
-        {formatTRY(t.commission)}
+        {dc.money(t.commission)}
       </Td>
       <Td align="right">
         <NetAmount t={t} />
@@ -331,6 +335,7 @@ function TxTableRow({ t }: { t: Transaction }) {
 }
 
 function TxListRow({ t }: { t: Transaction }) {
+  const dc = useDisplayCurrency();
   const buy = t.type === 'buy';
   const { date, time } = txTime(t);
   return (
@@ -344,7 +349,7 @@ function TxListRow({ t }: { t: Transaction }) {
           <TypeBadge buy={buy} />
         </p>
         <p className="num mt-0.5 truncate text-xs text-muted">
-          {formatQuantity(t.quantity)} × {formatTRY(t.price, { precise: true })}
+          {formatQuantity(t.quantity)} × {dc.money(t.price, { precise: true })}
         </p>
       </div>
       <div className="shrink-0 text-right">

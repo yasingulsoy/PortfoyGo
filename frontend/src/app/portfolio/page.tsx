@@ -8,7 +8,7 @@ import { useRequireAuth } from '@/hooks/useRequireAuth';
 import { useAuth } from '@/context/AuthContext';
 import { useLivePortfolio, type LiveHolding } from '@/context/PortfolioContext';
 import { STARTING_BALANCE } from '@/lib/constants';
-import { cn, formatPercent, formatQuantity, formatRelative, formatTRY, trend } from '@portfoygo/shared/format';
+import { cn, formatPercent, formatQuantity, formatRelative, trend } from '@portfoygo/shared/format';
 import { Card, CardHeader } from '@portfoygo/shared/ui/Card';
 import { Delta, Money } from '@portfoygo/shared/ui/Delta';
 import { Alert, Badge, EmptyState, Skeleton } from '@portfoygo/shared/ui/Feedback';
@@ -29,6 +29,7 @@ import PerformanceChart from '@/components/portfolio/PerformanceChart';
 import AdvisorTeaser from '@/components/advisor/AdvisorTeaser';
 import { holdingKey, useOrders } from '@/components/portfolio/useOrders';
 import type { Transaction } from '@/types';
+import { useDisplayCurrency } from '@/hooks/useDisplayCurrency';
 
 export default function PortfolioPage() {
   const { user, ready } = useRequireAuth();
@@ -37,6 +38,7 @@ export default function PortfolioPage() {
 }
 
 function Portfolio() {
+  const dc = useDisplayCurrency();
   const { refreshUser } = useAuth();
   const { holdings, totals, balance, reservedCash, transactions, loaded, error, refresh, market } = useLivePortfolio();
   const orders = useOrders();
@@ -83,10 +85,10 @@ function Portfolio() {
           icon={<WalletIcon />}
           label="Toplam varlık"
           loading={!loaded}
-          value={formatTRY(totals.netWorth)}
+          value={dc.money(totals.netWorth)}
           sub={
             <>
-              <Money value={allTimeChange} signed /> başlangıçtan beri
+              <Money value={dc.convert(allTimeChange)} currency={dc.currency} signed /> başlangıçtan beri
             </>
           }
           aside={<Delta value={allTimePct} />}
@@ -95,10 +97,10 @@ function Portfolio() {
           icon={<BanknotesIcon />}
           label="Nakit"
           loading={!loaded}
-          value={formatTRY(balance)}
+          value={dc.money(balance)}
           sub={
             reservedCash > 0
-              ? `${formatTRY(reservedCash)} emirlerde ayrıldı`
+              ? `${dc.money(reservedCash)} emirlerde ayrıldı`
               : totals.netWorth > 0
                 ? `Varlığın ${formatPercent((balance / totals.netWorth) * 100, { sign: false })}`
                 : undefined
@@ -108,15 +110,15 @@ function Portfolio() {
           icon={<BriefcaseIcon />}
           label="Yatırım değeri"
           loading={!loaded}
-          value={formatTRY(totals.value)}
-          sub={`Maliyet ${formatTRY(totals.invested)}`}
+          value={dc.money(totals.value)}
+          sub={`Maliyet ${dc.money(totals.invested)}`}
           aside={holdings.length > 0 ? <Badge>{holdings.length} pozisyon</Badge> : undefined}
         />
         <MetricCard
           icon={<ArrowTrendingUpIcon />}
           label="Açık pozisyon K/Z"
           loading={!loaded}
-          value={<span className={cn(plTrend === 'up' && 'text-up', plTrend === 'down' && 'text-down')}>{formatTRY(totals.pl, { sign: true })}</span>}
+          value={<span className={cn(plTrend === 'up' && 'text-up', plTrend === 'down' && 'text-down')}>{dc.money(totals.pl, { sign: true })}</span>}
           sub={holdings.length ? 'Maliyete göre gerçekleşmemiş' : 'Açık pozisyon yok'}
           aside={holdings.length ? <Delta value={totals.plPercent} /> : undefined}
         />
@@ -136,7 +138,7 @@ function Portfolio() {
           <EmptyState
             icon={<ChartBarIcon />}
             title="Henüz pozisyonun yok"
-            description={`${formatTRY(balance)} sanal bakiyenle hisse, kripto, döviz ve emtia alarak portföyünü oluşturmaya başla.`}
+            description={`${dc.money(balance)} sanal bakiyenle hisse, kripto, döviz ve emtia alarak portföyünü oluşturmaya başla.`}
             action={
               <LinkButton href="/" icon={<MagnifyingGlassIcon className="h-4 w-4" aria-hidden="true" />}>
                 Piyasalara göz at
@@ -202,6 +204,7 @@ function Highlights({ holdings, loaded }: { holdings: LiveHolding[]; loaded: boo
 }
 
 function Highlight({ label, h }: { label: string; h: LiveHolding }) {
+  const dc = useDisplayCurrency();
   return (
     <li>
       <Link
@@ -214,7 +217,7 @@ function Highlight({ label, h }: { label: string; h: LiveHolding }) {
           <p className="truncate text-sm font-semibold text-fg">{h.symbol}</p>
         </div>
         <div className="text-right">
-          <Money value={h.livePL} signed className="block text-sm font-medium" />
+          <Money value={dc.convert(h.livePL)} currency={dc.currency} signed className="block text-sm font-medium" />
           <Delta value={h.livePLPercent} className="mt-0.5" />
         </div>
       </Link>
@@ -225,6 +228,7 @@ function Highlight({ label, h }: { label: string; h: LiveHolding }) {
 /* ------------------------------------------------------------------ */
 
 function RecentTransactions({ transactions, loaded }: { transactions: Transaction[]; loaded: boolean }) {
+  const dc = useDisplayCurrency();
   const recent = transactions.slice(0, 6);
   return (
     <Card className="overflow-hidden">
@@ -277,12 +281,12 @@ function RecentTransactions({ transactions, loaded }: { transactions: Transactio
                     </div>
                   </Td>
                   <Td className="num hidden whitespace-nowrap text-muted sm:table-cell">
-                    {formatQuantity(t.quantity)} × {formatTRY(t.price, { precise: true })}
+                    {formatQuantity(t.quantity)} × {dc.money(t.price, { precise: true })}
                   </Td>
                   <Td align="right" className={cn('num whitespace-nowrap font-medium', buy ? 'text-fg' : 'text-up')}>
                     <span className="sr-only">{buy ? 'Ödenen' : 'Hesaba geçen'}: </span>
                     {buy ? '−' : '+'}
-                    {formatTRY(t.netAmount)}
+                    {dc.money(t.netAmount)}
                   </Td>
                 </Tr>
               );

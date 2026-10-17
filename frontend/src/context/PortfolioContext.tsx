@@ -110,6 +110,8 @@ export function usePortfolio() {
 
 export interface LiveHolding extends Holding {
   livePrice: number;
+  /** Canlı fiyatın kendi USD kotasyonu (hisse/kripto/USD emtia); TL/USD görüntülemede kullanılır, yoksa null */
+  livePriceUSD: number | null;
   liveValue: number;
   livePL: number;
   livePLPercent: number;
@@ -137,6 +139,7 @@ export function useLivePortfolio() {
         return {
           ...h,
           livePrice,
+          livePriceUSD: asset?.priceTRY != null ? asset.priceUSD : null,
           liveValue,
           livePL,
           livePLPercent: cost > 0 ? (livePL / cost) * 100 : 0,

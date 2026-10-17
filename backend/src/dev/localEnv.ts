@@ -11,7 +11,7 @@ import { GOLD_API_LIVE_CODES } from '../providers/adapters/goldApiSymbols';
 
 /** Yerel canlı fiyat ayarı (LOCAL_LIVE_PRICES); bkz. localLivePrices */
 export interface LocalLivePrices {
-  /** LOCAL_LIVE_PRICES=1 */
+  /** Varsayılan açık; LOCAL_LIVE_PRICES=0 ile kapalı */
   enabled: boolean;
   /** Kripto: CoinGecko genel (anahtarsız) uç, 2 dk'da bir */
   crypto: boolean;
@@ -26,16 +26,17 @@ export interface LocalLivePrices {
   liveCommodityCodes: readonly string[];
 }
 
-const isOn = (v: string | undefined) => ['1', 'true', 'yes', 'on'].includes((v || '').trim().toLowerCase());
+const isOff = (v: string | undefined) => ['0', 'false', 'no', 'off'].includes((v || '').trim().toLowerCase());
 
 /**
- * LOCAL_LIVE_PRICES=1 → yerelde YALNIZCA ücretsiz ve anahtarsız kaynaklardan canlı fiyat: kripto (CoinGecko genel uç),
- * döviz (TCMB / Frankfurter günlük), değerli metaller (gold-api.com). Hisse yalnızca LOCAL_FINNHUB_API_KEY ile.
- * Varsayılan KAPALI: yerel geliştirme hiçbir kota harcamaz, fiyatlar tohum + simülasyondan gelir.
- * backend/.env'deki gerçek anahtarlar hiçbir durumda okunmaz/kullanılmaz.
+ * Yerel canlı fiyat — VARSAYILAN AÇIK, yalnızca ücretsiz ve ANAHTARSIZ kaynaklar: kripto (CoinGecko genel uç, 2 dk'da
+ * bir tek istek), döviz (TCMB günlük; 12 sa + açılış), değerli metaller (gold-api.com; en fazla 2 dk'da bir, istekler
+ * arası 1,1 sn). Hisse yalnızca LOCAL_FINNHUB_API_KEY ile (Finnhub ücretsiz katmanı da anahtar ister).
+ * LOCAL_LIVE_PRICES=0 → tamamen çevrimdışı: dış istek yok, fiyatlar tohum + simülasyon (eski varsayılan).
+ * backend/.env'deki gerçek anahtarlar hiçbir durumda okunmaz/kullanılmaz. Testler bu dosyayı kullanmaz (ağ yok).
  */
 export function localLivePrices(env: NodeJS.ProcessEnv = process.env): LocalLivePrices {
-  const enabled = isOn(env.LOCAL_LIVE_PRICES);
+  const enabled = !isOff(env.LOCAL_LIVE_PRICES);
   const finnhubKey = (env.LOCAL_FINNHUB_API_KEY || '').trim();
   return {
     enabled,
@@ -71,8 +72,8 @@ export function localDevEnv(db: { url: string; port: number }, extra: NodeJS.Pro
     // Çok sekme, canlı akışlar ve E2E aynı IP'den: genel sınır (canlıda 300/dk) yerelde yüksek
     API_RATE_LIMIT_PER_MIN: process.env.API_RATE_LIMIT_PER_MIN || '5000',
     ALLOWED_ORIGINS: 'http://localhost:3000,http://127.0.0.1:3000,http://localhost:3001,http://127.0.0.1:3001,http://localhost:3002,http://127.0.0.1:3002',
-    // --- Dış servisler varsayılan kapalı: piyasa verisi tohumlanmış cache'ten gelir ---
-    // LOCAL_LIVE_PRICES=1 → piyasa cache işi açılır ama YALNIZCA anahtarsız kaynaklarla (aşağıdaki seçiciler)
+    // --- Dış servisler: yalnızca anahtarsız ücretsiz kaynaklar (aşağıdaki seçiciler); LOCAL_LIVE_PRICES=0 → hiçbiri,
+    // piyasa verisi tohumlanmış cache + simülasyondan gelir ---
     DISABLE_MARKET_REFRESH: live.enabled ? '0' : '1',
     // SMTP yok: doğrulama/sıfırlama kodları konsola yazılır
     EMAIL_DEV_LOG: '1',

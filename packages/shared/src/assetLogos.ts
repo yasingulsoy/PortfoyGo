@@ -3,6 +3,7 @@
 // yardımcıları vardır. Manifestte olmayan bir logo için ASLA istek atılmaz (404 yok) — çağıran baş harf gösterir.
 
 import { ASSET_LOGO_ALIASES, ASSET_LOGO_FILES } from './assetLogos.generated';
+import { isAssetType, type AssetType } from './types';
 
 /** Logoların public kökü (her iki uygulamada da aynı yol). */
 export const ASSET_LOGO_BASE = '/logos';
@@ -42,4 +43,21 @@ export function assetLogoSrc(type: string, symbol: string | null | undefined): s
   const dir = key.slice(0, sep);
   const file = key.slice(sep + 1);
   return `${ASSET_LOGO_BASE}/${dir}/${encodeURIComponent(file)}.svg?v=${ASSET_LOGO_FILES[key]}`;
+}
+
+/**
+ * "tip:SEMBOL" biçimindeki varlık bağlantısını ayrıştırır (ör. Global Lab `provider_symbol` = "commodity:GOLD").
+ * Geçersiz / boş girdide null.
+ */
+export function parseAssetRef(ref: string | null | undefined): { type: AssetType; symbol: string } | null {
+  const m = /^([a-z]+):([A-Za-z0-9._-]{1,30})$/.exec((ref ?? '').trim());
+  if (!m) return null;
+  const type = m[1];
+  return isAssetType(type) ? { type, symbol: normalizeLogoSymbol(m[2]) } : null;
+}
+
+/** Bağlantının işaret ettiği varlığın yerel logosu varsa { type, symbol }, yoksa null (AssetAvatar için). */
+export function assetRefWithLogo(ref: string | null | undefined): { type: AssetType; symbol: string } | null {
+  const asset = parseAssetRef(ref);
+  return asset && hasAssetLogo(asset.type, asset.symbol) ? asset : null;
 }

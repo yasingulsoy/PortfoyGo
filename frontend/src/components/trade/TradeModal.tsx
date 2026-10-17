@@ -18,6 +18,7 @@ import { TradeApiError, isMarketClosedError, ordersApi, tradeApi } from '@/lib/a
 import { COMMISSION_RATE } from '@/lib/constants';
 import { formatTrDayTime } from '@/lib/marketHours';
 import { cn, formatPercent, formatQuantity, formatTRY } from '@portfoygo/shared/format';
+import { isTryPair, useDisplayCurrency } from '@/hooks/useDisplayCurrency';
 import { ASSET_TYPE_LABELS, type RateQuote } from '@/types';
 import { refreshOrders } from '@/components/portfolio/useOrders';
 import { toolbarButtonClass } from '@/components/common/controls';
@@ -132,6 +133,13 @@ function TradeForm({
   const livePrice = asset?.priceTRY ?? holding?.livePrice ?? null;
   // İşlem fiyatı: dövizde yöne göre (alış/satış kuru), diğerlerinde canlı fiyat
   const price = target.type === 'currency' && (fx.ask || fx.bid) ? (side === 'buy' ? fx.ask : fx.bid) : livePrice;
+  // Görüntüleme: işlem TL ile yapılır; tutarlar seçili birimde, diğer birim ikincil satırda ("≈ $123,45").
+  // Birim fiyatta hisse/kripto USD görünümde kendi USD kotasyonu; USD/TRY her zaman TL kurudur.
+  const dc = useDisplayCurrency();
+  const nativeUSD = (target.type === 'stock' || target.type === 'crypto') && asset?.priceTRY === price ? (asset?.priceUSD ?? null) : null;
+  const unitPair = isTryPair({ type: target.type, symbol: target.symbol });
+  const unitPriceText = price ? (unitPair ? formatTRY(price, { precise: true }) : dc.money(price, { precise: true, nativeUSD })) : '—';
+  const unitPriceAlt = price && !unitPair ? dc.alt(price, { precise: true, nativeUSD }) : null;
 
   const isStock = target.type === 'stock';
   const marketClosed = isStock && (serverClosed !== null || !stock.open);
@@ -306,7 +314,8 @@ function TradeForm({
             <p className="truncate text-xs text-muted">{target.name}</p>
           </div>
           <div className="text-right">
-            <p className="num text-sm font-semibold">{price ? formatTRY(price, { precise: true }) : '—'}</p>
+            <p className="num text-sm font-semibold">{unitPriceText}</p>
+            {unitPriceAlt && <p className="num text-[11px] text-subtle">{unitPriceAlt}</p>}
             {asset && <Delta value={asset.changePercent} variant="text" className="text-xs" />}
           </div>
         </div>
@@ -460,9 +469,17 @@ function TradeForm({
       )}
 
       <dl className="mt-5 space-y-2.5 rounded-xl border border-line bg-surface-2 p-4 text-sm">
-        <Row label={side === 'buy' ? 'Kullanılabilir nakit' : 'Elinizdeki miktar'} value={side === 'buy' ? formatTRY(balance) : `${formatQuantity(held)} ${target.symbol}`} />
-        <Row label={mode === 'amount' ? 'Tahmini miktar' : 'Tahmini tutar'} value={mode === 'amount' ? `${formatQuantity(orderQty)} ${target.symbol}` : formatTRY(gross)} />
-        <Row label={`Komisyon (%${(COMMISSION_RATE * 100).toLocaleString('tr-TR')})`} value={formatTRY(commission)} />
+        <Row
+          label={side === 'buy' ? 'Kullanılabilir nakit' : 'Elinizdeki miktar'}
+          value={side === 'buy' ? dc.money(balance) : `${formatQuantity(held)} ${target.symbol}`}
+          sub={side === 'buy' ? dc.alt(balance) : null}
+        />
+        <Row
+          label={mode === 'amount' ? 'Tahmini miktar' : 'Tahmini tutar'}
+          value={mode === 'amount' ? `${formatQuantity(orderQty)} ${target.symbol}` : dc.money(gross)}
+          sub={mode === 'amount' ? null : dc.alt(gross)}
+        />
+        <Row label={`Komisyon (%${(COMMISSION_RATE * 100).toLocaleString('tr-TR')})`} value={dc.money(commission)} />
         <div className="border-t border-line pt-2.5">
           <Row
             label={
@@ -476,7 +493,8 @@ function TradeForm({
                   ? 'Tahmini net gelir'
                   : 'Net gelir'
             }
-            value={formatTRY(total)}
+            value={dc.money(total)}
+            sub={dc.alt(total)}
             strong
           />
         </div>
@@ -533,6 +551,7 @@ function RateBox({ label, hint, value, active }: { label: string; hint: string; 
 }
 
 function ReceiptView({ receipt, symbol, onClose }: { receipt: Receipt; symbol: string; onClose: () => void }) {
+  const dc = useDisplayCurrency();
   const isBuy = receipt.side === 'buy';
   const Icon = receipt.kind === 'moo' ? ClockIcon : CheckCircleIcon;
   return (
@@ -543,10 +562,10 @@ function ReceiptView({ receipt, symbol, onClose }: { receipt: Receipt; symbol: s
           <p className="mt-3 text-base font-semibold">{isBuy ? 'Alım gerçekleşti' : 'Satış gerçekleşti'}</p>
           <p className="mt-1 text-sm text-muted">
             <span className="num">{formatQuantity(receipt.quantity)}</span> {symbol} · birim fiyat{' '}
-            <span className="num text-fg">{formatTRY(receipt.price, { precise: true })}</span>
+            <span className="num text-fg">{dc.money(receipt.price, { precise: true })}</span>
           </p>
           <dl className="mt-5 w-full rounded-xl border border-line bg-surface-2 p-4 text-sm">
-            <Row label={isBuy ? 'Ödenen toplam' : 'Hesaba geçen'} value={formatTRY(receipt.total)} strong />
+            <Row label={isBuy ? 'Ödenen toplam' : 'Hesaba geçen'} value={dc.money(receipt.total)} sub={dc.alt(receipt.total)} strong />
           </dl>
         </>
       )}
@@ -560,7 +579,7 @@ function ReceiptView({ receipt, symbol, onClose }: { receipt: Receipt; symbol: s
           <dl className="mt-5 w-full space-y-2.5 rounded-xl border border-line bg-surface-2 p-4 text-sm">
             <Row label="Emir tipi" value={isBuy ? 'Limit alış' : 'Limit satış'} />
             <Row label="Geçerlilik" value={`${receipt.expiryDays} gün`} />
-            {isBuy && <Row label="Ayrılan nakit" value={formatTRY(receipt.reserved)} strong />}
+            {isBuy && <Row label="Ayrılan nakit" value={dc.money(receipt.reserved)} sub={dc.alt(receipt.reserved)} strong />}
           </dl>
         </>
       )}
@@ -574,8 +593,8 @@ function ReceiptView({ receipt, symbol, onClose }: { receipt: Receipt; symbol: s
           </p>
           <dl className="mt-5 w-full space-y-2.5 rounded-xl border border-line bg-surface-2 p-4 text-sm">
             <Row label="Emir tipi" value={isBuy ? 'Açılışta alış' : 'Açılışta satış'} />
-            <Row label="Referans fiyat" value={formatTRY(receipt.reference, { precise: true })} />
-            {isBuy && <Row label="Ayrılan nakit" value={formatTRY(receipt.reserved)} strong />}
+            <Row label="Referans fiyat" value={dc.money(receipt.reference, { precise: true })} sub={dc.alt(receipt.reference, { precise: true })} />
+            {isBuy && <Row label="Ayrılan nakit" value={dc.money(receipt.reserved)} sub={dc.alt(receipt.reserved)} strong />}
           </dl>
         </>
       )}
@@ -593,11 +612,14 @@ function ReceiptView({ receipt, symbol, onClose }: { receipt: Receipt; symbol: s
   );
 }
 
-function Row({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
+function Row({ label, value, sub, strong }: { label: string; value: string; /** Diğer birimdeki karşılık ("≈ $123,45") */ sub?: string | null; strong?: boolean }) {
   return (
     <div className="flex items-center justify-between gap-4">
       <dt className="text-muted">{label}</dt>
-      <dd className={cn('num text-right', strong ? 'font-semibold text-fg' : 'text-fg')}>{value}</dd>
+      <dd className={cn('num text-right', strong ? 'font-semibold text-fg' : 'text-fg')}>
+        {value}
+        {sub && <span className="block text-[11px] font-normal text-subtle">{sub}</span>}
+      </dd>
     </div>
   );
 }

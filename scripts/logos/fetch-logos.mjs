@@ -18,17 +18,19 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { COMMODITY_ICONS } from './commodity-icons.mjs';
+import { OWN_STOCK_MARKS } from './stock-marks.mjs';
 import { fetchTarball, readTarball } from './lib/tarball.mjs';
 import { assertSafeSvg, parseSvg, sanitizeSvg } from './lib/svg.mjs';
 import {
   CRYPTO_ALIASES,
+  CRYPTO_BRANDS,
+  FULL_DISC_BRANDS,
   CRYPTO_SYMBOLS,
   CURRENCY_FLAGS,
   MAX_FILE_BYTES,
   PACKAGES,
   STOCK_ALIASES,
   STOCK_BRANDS,
-  STOCKS_WITHOUT_BRAND,
 } from './sources.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -89,19 +91,28 @@ const contrastWithWhite = (hex) => 1.05 / (luminance(hex) + 0.05);
 // 1) Kripto — cryptocurrency-icons (svg/color)
 // ---------------------------------------------------------------------------
 
-async function buildCrypto(meta) {
+async function buildCrypto(meta, brands) {
   const tgz = await fetchTarball(PACKAGES.crypto, { cacheDir: CACHE_DIR });
   const files = readTarball(tgz, (p) => p.startsWith('svg/color/') || p === 'manifest.json' || p === 'LICENSE.md');
   const manifest = JSON.parse(files.get('manifest.json').toString('utf8'));
   for (const symbol of CRYPTO_SYMBOLS) {
     const file = files.get(`svg/color/${symbol.toLowerCase()}.svg`);
-    if (!file) {
-      uncovered.crypto.push(symbol);
+    if (file) {
+      addLogo('crypto', symbol, file.toString('utf8'));
+      const entry = manifest.find((m) => m.symbol.toUpperCase() === symbol);
+      meta.crypto.push({ symbol, name: entry?.name ?? symbol });
       continue;
     }
-    addLogo('crypto', symbol, file.toString('utf8'));
-    const entry = manifest.find((m) => m.symbol.toUpperCase() === symbol);
-    meta.crypto.push({ symbol, name: entry?.name ?? symbol });
+    // Yedek kaynak: simple-icons'ta projenin kendi markası varsa (hisse rozetleriyle aynı stil)
+    const slug = CRYPTO_BRANDS[symbol];
+    const brand = slug ? brands.get(slug) : null;
+    if (brand?.ok) {
+      if (addLogo('crypto', symbol, brandBadge(brand.d, brand.entry.hex, slug), slug)) {
+        meta.cryptoBrands.push({ symbol, title: brand.entry.title, slug, hex: brand.entry.hex.toUpperCase(), guidelines: brand.entry.guidelines ?? null });
+      }
+      continue;
+    }
+    uncovered.crypto.push(brand ? `${symbol} (${brand.reason})` : symbol);
   }
   for (const [alias, target] of Object.entries(CRYPTO_ALIASES)) addAlias('crypto', alias, target);
 }
@@ -128,28 +139,38 @@ async function buildCurrencies(meta) {
 // 3) Hisse — simple-icons (marka rengi daire + beyaz/koyu glif)
 // ---------------------------------------------------------------------------
 
-function brandBadge(pathD, hex) {
+function brandBadge(pathD, hex, slug) {
   const bg = `#${hex.toUpperCase()}`;
+  if (FULL_DISC_BRANDS.has(slug)) {
+    // Simge zaten dolu bir dairedir (içi oyuk işaret): daireyi marka rengiyle tam boy çiz, oyuklar beyaz kalsın.
+    // Beyaz taban biraz küçük; kenarı simgenin kendi kenarı örter (koyu zeminde açık hare olmasın).
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="15.5" fill="#FFFFFF"/><path fill="${bg}" transform="scale(1.3333)" d="${pathD}"/></svg>`;
+  }
   // Beyaz glif yeterince seçilmiyorsa (açık marka renkleri: sarı, neon, beyaz) koyu glif
   const glyph = contrastWithWhite(hex) >= 2.2 ? '#FFFFFF' : '#111111';
   // 24×24 simge → 32'lik dairenin ortasında %70 (16.8 px): kare simgenin köşeleri bile dairenin içinde kalır
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="16" fill="${bg}"/><path fill="${glyph}" transform="translate(7.6 7.6) scale(.7)" d="${pathD}"/></svg>`;
 }
 
-async function buildStocks(meta) {
+/**
+ * simple-icons'u bir kez okur. Dönüş: slug → { ok: true, entry, d } | { ok: false, reason }.
+ * `license` alanı taşıyan (CC0 dışı) girdiler kullanılmaz.
+ */
+async function loadBrands(slugList) {
   const tgz = await fetchTarball(PACKAGES.brands, { cacheDir: CACHE_DIR });
-  const slugs = new Set(Object.values(STOCK_BRANDS));
-  const files = readTarball(tgz, (p) => p === 'data/simple-icons.json' || [...slugs].some((s) => p === `icons/${s}.svg`));
+  const slugs = new Set(slugList);
+  const files = readTarball(tgz, (p) => p === 'data/simple-icons.json' || (p.startsWith('icons/') && slugs.has(p.slice(6, -4))));
   const data = JSON.parse(files.get('data/simple-icons.json').toString('utf8'));
-  for (const [ticker, slug] of Object.entries(STOCK_BRANDS)) {
+  const brands = new Map();
+  for (const slug of slugs) {
     const entry = data.find((d) => d.slug === slug);
     const file = files.get(`icons/${slug}.svg`);
     if (!entry || !file) {
-      uncovered.stock.push(`${ticker} (simple-icons'ta yok: ${slug})`);
+      brands.set(slug, { ok: false, reason: `simple-icons'ta yok: ${slug}` });
       continue;
     }
     if (entry.license) {
-      uncovered.stock.push(`${ticker} (${entry.title}: CC0 dışı lisans — ${entry.license.type})`);
+      brands.set(slug, { ok: false, reason: `${entry.title}: CC0 dışı lisans — ${entry.license.type}` });
       continue;
     }
     if (!/^[0-9A-F]{6}$/i.test(entry.hex)) throw new Error(`${slug}: geçersiz renk ${entry.hex}`);
@@ -158,11 +179,28 @@ async function buildStocks(meta) {
     const paths = parseSvg(clean).children.filter((c) => c.name === 'path');
     const d = paths.length === 1 ? paths[0].attrs.find(([k]) => k === 'd')?.[1] : null;
     if (!d) throw new Error(`${slug}: beklenen tek <path> bulunamadı`);
-    if (addLogo('stock', ticker, brandBadge(d, entry.hex), slug)) {
+    brands.set(slug, { ok: true, entry, d });
+  }
+  return brands;
+}
+
+function buildStocks(meta, brands) {
+  for (const [ticker, slug] of Object.entries(STOCK_BRANDS)) {
+    const brand = brands.get(slug);
+    if (!brand.ok) {
+      uncovered.stock.push(`${ticker} (${brand.reason})`);
+      continue;
+    }
+    const { entry, d } = brand;
+    if (addLogo('stock', ticker, brandBadge(d, entry.hex, slug), slug)) {
       meta.stock.push({ symbol: ticker, title: entry.title, slug, hex: entry.hex.toUpperCase(), guidelines: entry.guidelines ?? null });
     }
   }
-  for (const ticker of STOCKS_WITHOUT_BRAND) uncovered.stock.push(`${ticker} (simple-icons'ta marka yok → monogram)`);
+  // simple-icons'ta olmayan ama çok görünür hisseler: PortfoyGo'nun çizdiği işaretler (stock-marks.mjs)
+  for (const [ticker, mark] of Object.entries(OWN_STOCK_MARKS)) {
+    if (outputs.has(`stock/${ticker}.svg`)) throw new Error(`${ticker}: hem simple-icons hem kendi işaret tanımlı`);
+    if (addLogo('stock', ticker, mark.svg)) meta.ownStock.push({ symbol: ticker, label: mark.label, note: mark.note });
+  }
   for (const [alias, target] of Object.entries(STOCK_ALIASES)) addAlias('stock', alias, target);
 }
 
@@ -228,13 +266,15 @@ function attributionMarkdown(meta) {
     '',
     '| Klasör | Kaynak | Sürüm | Lisans | Dosya |',
     '| --- | --- | --- | --- | --- |',
-    `| \`crypto/\` | [${p.crypto.name}](${p.crypto.homepage}) — \`svg/color\` | ${p.crypto.version} | ${p.crypto.license} | ${count('crypto')} |`,
+    `| \`crypto/\` | [${p.crypto.name}](${p.crypto.homepage}) — \`svg/color\` | ${p.crypto.version} | ${p.crypto.license} | ${meta.crypto.length} |`,
+    `| \`crypto/\` | [${p.brands.name}](${p.brands.homepage}) — yalnızca cryptocurrency-icons'ta olmayan coinler; marka simgesi + marka rengi daire rozette | ${p.brands.version} | ${p.brands.license} (simge verisi) | ${meta.cryptoBrands.length} |`,
     `| \`currency/\` | [${p.flags.name}](${p.flags.homepage}) — \`flags/1x1\` (para biriminin ülke/bölge bayrağı) | ${p.flags.version} | ${p.flags.license} | ${count('currency')} |`,
-    `| \`stock/\` | [${p.brands.name}](${p.brands.homepage}) — marka simgesi + marka rengi, PortfoyGo tarafından daire rozete yerleştirildi | ${p.brands.version} | ${p.brands.license} (simge verisi) | ${count('stock')} |`,
+    `| \`stock/\` | [${p.brands.name}](${p.brands.homepage}) — marka simgesi + marka rengi, PortfoyGo tarafından daire rozete yerleştirildi | ${p.brands.version} | ${p.brands.license} (simge verisi) | ${meta.stock.length} |`,
+    `| \`stock/\` | PortfoyGo'nun çizdiği işaretler (\`scripts/logos/stock-marks.mjs\`) — simple-icons'ta olmayan çok görünür hisseler | — | Proje lisansı (marka hakları sahiplerinde) | ${meta.ownStock.length} |`,
     `| \`commodity/\` | PortfoyGo'nun kendi çizimi (\`scripts/logos/commodity-icons.mjs\`) | — | Proje lisansı | ${count('commodity')} |`,
     '',
-    'Kapsanmayan varlıklar (ör. simple-icons\'ta bulunmayan Microsoft / Amazon, cryptocurrency-icons\'ta bulunmayan yeni coinler)',
-    'uygulamada sembolün baş harfleriyle (monogram) gösterilir; başka kaynaktan logo çekilmez.',
+    'Kapsanmayan varlıklar (ör. CC0 dışı lisanslı simgeler, iki pakette de bulunmayan yeni coinler) uygulamada sembolün',
+    'baş harfleriyle (monogram) gösterilir; başka kaynaktan logo çekilmez.',
     '',
     '## Hisse logoları (simple-icons) ve marka kılavuzları',
     '',
@@ -244,6 +284,23 @@ function attributionMarkdown(meta) {
     '| Sembol | Marka | Renk | Kılavuz |',
     '| --- | --- | --- | --- |',
     ...meta.stock.map((s) => `| ${s.symbol} | ${s.title} | \`#${s.hex}\` | ${s.guidelines ? `[bağlantı](${s.guidelines})` : '—'} |`),
+    '',
+    '## PortfoyGo\'nun çizdiği hisse işaretleri',
+    '',
+    'simple-icons\'ta bulunmayan ama piyasa listesinde çok görünen şirketler için basit geometrik işaretler. Marka notu bunları da',
+    'kapsar: işaretler yalnızca varlığı tanımlamak içindir ve ilgili şirketlerin ticari markalarına dayanır.',
+    '',
+    '| Sembol | İşaret | Not |',
+    '| --- | --- | --- |',
+    ...meta.ownStock.map((s) => `| ${s.symbol} | ${s.label} | ${s.note} |`),
+    '',
+    '## Kripto logoları (simple-icons yedeği)',
+    '',
+    'cryptocurrency-icons\'ta bulunmayan coinler için, simgenin o projeye ait olduğu doğrulanan simple-icons girdileri.',
+    '',
+    '| Sembol | Proje | Renk | Kılavuz |',
+    '| --- | --- | --- | --- |',
+    ...meta.cryptoBrands.map((s) => `| ${s.symbol} | ${s.title} | \`#${s.hex}\` | ${s.guidelines ? `[bağlantı](${s.guidelines})` : '—'} |`),
     '',
     '## Emtia simgeleri',
     '',
@@ -307,10 +364,11 @@ function checkAll(meta) {
 // ---------------------------------------------------------------------------
 
 async function main() {
-  const meta = { crypto: [], currency: [], stock: [], commodity: [], flagsLicense: '' };
-  await buildCrypto(meta);
+  const meta = { crypto: [], cryptoBrands: [], currency: [], stock: [], ownStock: [], commodity: [], flagsLicense: '' };
+  const brands = await loadBrands([...Object.values(STOCK_BRANDS), ...Object.values(CRYPTO_BRANDS)]);
+  await buildCrypto(meta, brands);
   await buildCurrencies(meta);
-  await buildStocks(meta);
+  buildStocks(meta, brands);
   buildCommodities(meta);
   for (const svg of outputs.values()) assertSafeSvg(svg);
 

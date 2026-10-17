@@ -4,8 +4,9 @@ import { Delta, Money } from '@portfoygo/shared/ui/Delta';
 import { Badge, Skeleton } from '@portfoygo/shared/ui/Feedback';
 import UserInitial from '@portfoygo/shared/ui/UserInitial';
 import ProfileLink from '@/components/profile/ProfileLink';
-import { cn, formatTRY } from '@portfoygo/shared/format';
+import { cn } from '@portfoygo/shared/format';
 import type { Leader } from './model';
+import { useDisplayCurrency } from '@/hooks/useDisplayCurrency';
 
 /** Madalya tonları: altın / gümüş / bronz (yalnızca tasarım token'ları) */
 const PLACE = {
@@ -16,6 +17,7 @@ const PLACE = {
 
 /** İlk üç: TailAdmin metrik kartı düzeninde altın, gümüş ve bronz kartlar (mobilde alt alta). */
 export default function Podium({ leaders, currentUsername }: { leaders: Leader[]; currentUsername?: string }) {
+  const dc = useDisplayCurrency();
   const top = leaders.slice(0, 3);
   if (top.length === 0) return null;
 
@@ -46,10 +48,10 @@ export default function Podium({ leaders, currentUsername }: { leaders: Leader[]
                 {isMe && <Badge tone="brand">Sen</Badge>}
               </div>
 
-              <p className="num mt-3 truncate text-2xl font-semibold text-fg">{formatTRY(l.totalValue)}</p>
+              <p className="num mt-3 truncate text-2xl font-semibold text-fg">{dc.money(l.totalValue)}</p>
               <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
                 <Delta value={l.plPercent} />
-                <Money value={l.pl} signed className="font-medium" />
+                <Money value={dc.convert(l.pl)} currency={dc.currency} signed className="font-medium" />
               </div>
             </Card>
           </li>

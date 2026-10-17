@@ -6,11 +6,12 @@ import { ArrowLeftIcon, ArrowRightIcon, MagnifyingGlassIcon } from '@heroicons/r
 import { ArrowsRightLeftIcon } from '@heroicons/react/24/outline';
 import { useLivePortfolio } from '@/context/PortfolioContext';
 import { assetHref } from '@/components/market/MarketTable';
-import { cn, formatDateTime, formatTRY } from '@portfoygo/shared/format';
+import { cn, formatDateTime } from '@portfoygo/shared/format';
 import { Card } from '@portfoygo/shared/ui/Card';
 import { LinkButton } from '@portfoygo/shared/ui/Button';
 import { Badge, EmptyState, Skeleton } from '@portfoygo/shared/ui/Feedback';
 import AssetAvatar from '@portfoygo/shared/ui/AssetAvatar';
+import { useDisplayCurrency } from '@/hooks/useDisplayCurrency';
 
 const PAGE_SIZE = 8;
 
@@ -31,6 +32,7 @@ const th = 'py-3 text-left text-xs font-medium text-muted whitespace-nowrap';
 
 /** Panel: son işlemler tablosu (arama + sayfalama), TailAdmin "Latest Transactions". */
 export default function RecentTransactionsCard({ className }: { className?: string }) {
+  const dc = useDisplayCurrency();
   const { transactions, loaded, market } = useLivePortfolio();
   const [query, setQuery] = useState('');
   const [page, setPage] = useState(1);
@@ -119,7 +121,7 @@ export default function RecentTransactionsCard({ className }: { className?: stri
                         </Link>
                       </td>
                       <td className="num hidden whitespace-nowrap px-3 py-3.5 text-muted md:table-cell">{formatDateTime(t.createdAt)}</td>
-                      <td className="num whitespace-nowrap px-3 py-3.5 text-right font-medium text-fg sm:text-left">{formatTRY(t.totalAmount)}</td>
+                      <td className="num whitespace-nowrap px-3 py-3.5 text-right font-medium text-fg sm:text-left">{dc.money(t.totalAmount)}</td>
                       <td className="hidden px-3 py-3.5 sm:table-cell">
                         <Badge tone={buy ? 'brand' : 'gold'}>{buy ? 'Alış' : 'Satış'}</Badge>
                       </td>

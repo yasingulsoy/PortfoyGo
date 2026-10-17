@@ -9,9 +9,10 @@ import AssetAvatar from '@portfoygo/shared/ui/AssetAvatar';
 import { Card } from '@portfoygo/shared/ui/Card';
 import { Delta } from '@portfoygo/shared/ui/Delta';
 import { Skeleton } from '@portfoygo/shared/ui/Feedback';
-import { cn, formatTRY } from '@portfoygo/shared/format';
+import { cn } from '@portfoygo/shared/format';
 import { ASSET_TYPE_LABELS, type MarketAsset } from '@/types';
 import SectionHeading from './SectionHeading';
+import { useDisplayCurrency } from '@/hooks/useDisplayCurrency';
 
 const MOVERS = 4;
 const TICKER = 16;
@@ -70,6 +71,7 @@ export default function MarketPulse() {
 }
 
 function Ticker({ assets, loading }: { assets: MarketAsset[]; loading: boolean }) {
+  const dc = useDisplayCurrency();
   if (loading) {
     return (
       <div className="flex gap-3 overflow-hidden rounded-2xl border border-line bg-surface p-3" aria-hidden="true">
@@ -101,7 +103,7 @@ function Ticker({ assets, loading }: { assets: MarketAsset[]; loading: boolean }
               >
                 <AssetAvatar symbol={a.symbol} type={a.type} image={a.image} size={22} />
                 <span className="font-mono text-[13px] font-semibold text-fg">{a.symbol}</span>
-                <span className="num text-[13px] text-muted">{formatTRY(a.priceTRY, { precise: true })}</span>
+                <span className="num text-[13px] text-muted">{dc.money(a.priceTRY, { precise: true })}</span>
                 <Delta value={a.changePercent} variant="text" className="text-xs" />
               </Link>
             </li>
@@ -113,6 +115,7 @@ function Ticker({ assets, loading }: { assets: MarketAsset[]; loading: boolean }
 }
 
 function MoverList({ title, icon, tone, assets, loading }: { title: string; icon: React.ReactNode; tone: 'up' | 'down'; assets: MarketAsset[]; loading: boolean }) {
+  const dc = useDisplayCurrency();
   return (
     <Card className="overflow-hidden">
       <div className="flex items-center gap-2.5 border-b border-line px-5 py-3.5">
@@ -151,7 +154,7 @@ function MoverList({ title, icon, tone, assets, loading }: { title: string; icon
                   <span className="block truncate text-xs text-muted">{a.name}</span>
                 </span>
                 <span className="text-right">
-                  <span className="num block text-sm font-medium text-fg">{formatTRY(a.priceTRY, { precise: true })}</span>
+                  <span className="num block text-sm font-medium text-fg">{dc.money(a.priceTRY, { precise: true })}</span>
                   <Delta value={a.changePercent} className="mt-0.5" />
                 </span>
               </Link>

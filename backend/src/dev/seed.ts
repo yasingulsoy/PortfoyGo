@@ -229,13 +229,28 @@ const round2 = (n: number) => Math.round(n * 100) / 100;
 const WEEK_KEY_SQL = `to_char((CURRENT_TIMESTAMP AT TIME ZONE 'Europe/Istanbul')::date, 'IYYY')
   || '-' || to_char((CURRENT_TIMESTAMP AT TIME ZONE 'Europe/Istanbul')::date, 'IW')`;
 
-/** Döviz kurları + piyasa cache'i (idempotent; her çağrıda cached_at/updated_at tazelenir). */
+/**
+ * Yerel veritabanında tohum düzeyinin "eskimiş" sayıldığı sapma (oran): bundan fazla sapan fiyatlar ve sentetik geçmiş
+ * açılışta güncel tohuma / güncel fiyata yeniden çapalanır (ör. eski tohumdaki BTC 118 bin, gerçek 81 bin). Simülasyon
+ * (±%0,4/dk) ve canlı fiyatlar bu eşiğin altında kaldığı sürece dokunulmaz. SADECE yerel PGlite.
+ */
+export const STALE_LEVEL_RATIO = 0.25;
+/** Döviz kurları simülasyonda çok az oynar (±%0,05/dk); eski kur düzeyi daha sıkı eşikle yakalanır (ör. USD/TRY 42 → 49) */
+export const STALE_FX_LEVEL_RATIO = 0.1;
+const STALE_LEVEL_SQL = (current: string, seed: string, ratio: number = STALE_LEVEL_RATIO) =>
+  `(${current} <= 0 OR abs(${current} / NULLIF(${seed}, 0) - 1) > ${ratio})`;
+
+/** Döviz kurları + piyasa cache'i (idempotent; her çağrıda cached_at/updated_at tazelenir; eski düzeyler yeniden çapalanır). */
 export async function seedMarketData(pool: Pool): Promise<void> {
   for (const c of CURRENCY_SEED) {
     await pool.query(
       `INSERT INTO currency_rates (code, name, buying, selling, change_rate, updated_at)
        VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP)
-       ON CONFLICT (code) DO UPDATE SET updated_at = CURRENT_TIMESTAMP`,
+       ON CONFLICT (code) DO UPDATE SET
+         -- Eski tohum düzeyi (tohumdan %25'ten fazla sapma) güncel tohuma çekilir; aksi halde simülasyon/canlı değer korunur
+         buying = CASE WHEN ${STALE_LEVEL_SQL('currency_rates.selling', 'EXCLUDED.selling', STALE_FX_LEVEL_RATIO)} THEN EXCLUDED.buying ELSE currency_rates.buying END,
+         selling = CASE WHEN ${STALE_LEVEL_SQL('currency_rates.selling', 'EXCLUDED.selling', STALE_FX_LEVEL_RATIO)} THEN EXCLUDED.selling ELSE currency_rates.selling END,
+         updated_at = CURRENT_TIMESTAMP`,
       [c.code, c.name, c.buying, c.selling, c.change]
     );
   }
@@ -247,6 +262,13 @@ export async function seedMarketData(pool: Pool): Promise<void> {
           previous_close, open_price, high_price, low_price, metadata, cached_at, expires_at)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $9, $10, $11, $12, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + INTERVAL '1 hour')
        ON CONFLICT (asset_type, symbol) DO UPDATE SET
+         -- Eski tohum düzeyi (ör. BTC 118 bin → 81 bin) güncel tohuma çekilir; aksi halde simülasyon/canlı değer korunur
+         price = CASE WHEN ${STALE_LEVEL_SQL('market_data_cache.price', 'EXCLUDED.price')} THEN EXCLUDED.price ELSE market_data_cache.price END,
+         change = CASE WHEN ${STALE_LEVEL_SQL('market_data_cache.price', 'EXCLUDED.price')} THEN EXCLUDED.change ELSE market_data_cache.change END,
+         previous_close = CASE WHEN ${STALE_LEVEL_SQL('market_data_cache.price', 'EXCLUDED.price')} THEN EXCLUDED.previous_close ELSE market_data_cache.previous_close END,
+         high_price = CASE WHEN ${STALE_LEVEL_SQL('market_data_cache.price', 'EXCLUDED.price')} THEN EXCLUDED.high_price ELSE market_data_cache.high_price END,
+         low_price = CASE WHEN ${STALE_LEVEL_SQL('market_data_cache.price', 'EXCLUDED.price')} THEN EXCLUDED.low_price ELSE market_data_cache.low_price END,
+         market_cap = CASE WHEN ${STALE_LEVEL_SQL('market_data_cache.price', 'EXCLUDED.price')} THEN EXCLUDED.market_cap ELSE market_data_cache.market_cap END,
          cached_at = CURRENT_TIMESTAMP,
          expires_at = CURRENT_TIMESTAMP + INTERVAL '1 hour'`,
       [
@@ -964,7 +986,24 @@ export interface SeedPriceHistoryResult {
   seeded: string[];
   skipped: number;
   rows: number;
+  /** Eski düzeyde kalmış olup güncel fiyata yeniden çapalanan geçmişler */
+  rebased: string[];
 }
+
+/** Her varlığın ~2 gün önceki (günlük) fiyatı: sentetik geçmişin düzeyi güncel fiyattan çok saptıysa yeniden üretilir */
+async function historyLevels(pool: Pool, now: Date): Promise<Map<string, number>> {
+  const r = await pool.query(
+    `SELECT DISTINCT ON (asset_type, symbol) asset_type, symbol, price
+       FROM price_history
+      WHERE granularity = 'day' AND bucket_start <= $1::timestamptz
+      ORDER BY asset_type, symbol, bucket_start DESC`,
+    [new Date(now.getTime() - 2 * DAY_MS).toISOString()]
+  );
+  return new Map(r.rows.map((x: any) => [`${x.asset_type}:${x.symbol}`, parseFloat(x.price)]));
+}
+
+const staleLevel = (level: number | undefined, anchor: number, ratio: number = STALE_LEVEL_RATIO) =>
+  level != null && Number.isFinite(level) && level > 0 && Math.abs(level / anchor - 1) > ratio;
 
 /**
  * Yerel demo için sentetik fiyat geçmişi (SADECE yerel PGlite; localDb.ts ve yerel tek seferlik betik çağırır).
@@ -996,15 +1035,21 @@ export async function seedPriceHistory(pool: Pool, now: Date = new Date()): Prom
     `SELECT asset_type, symbol, count(*)::int AS n FROM price_history WHERE granularity = 'day' GROUP BY 1, 2`
   );
   const dayRows = new Map<string, number>(counts.rows.map((r: any) => [`${r.asset_type}:${r.symbol}`, r.n]));
+  const levels = await historyLevels(pool, now);
 
-  const result: SeedPriceHistoryResult = { seeded: [], skipped: 0, rows: 0 };
+  const result: SeedPriceHistoryResult = { seeded: [], skipped: 0, rows: 0, rebased: [] };
   for (const src of [...sources.rows, ...commodities.rows]) {
     const key = `${src.asset_type}:${src.sym}`;
     const current = parseFloat(src.price);
     if (!Number.isFinite(current) || current <= 0) continue;
     if ((dayRows.get(key) ?? 0) >= HISTORY_MIN_DAY_ROWS) {
-      result.skipped++;
-      continue;
+      if (!staleLevel(levels.get(key), current, src.asset_type === 'currency' ? STALE_FX_LEVEL_RATIO : STALE_LEVEL_RATIO)) {
+        result.skipped++;
+        continue;
+      }
+      // Eski düzeyde sentetik geçmiş (grafik eski tohumdan güncel fiyata "uçurum" çizerdi): yerelde baştan üret
+      await pool.query(`DELETE FROM price_history WHERE asset_type = $1 AND symbol = $2`, [src.asset_type, src.sym]);
+      result.rebased.push(key);
     }
     const rows = generateSyntheticHistory(src.asset_type, src.sym, current, now);
     const ins = await pool.query(
@@ -1084,7 +1129,22 @@ export async function seedArena(pool: Pool, now: Date = new Date()): Promise<See
           AND bucket_start >= $2::timestamptz`,
       [c.symbol, new Date(now.getTime() - 14 * DAY_MS).toISOString()]
     );
-    if (Number(recent.rows[0]?.n ?? 0) >= 48) continue;
+    if (Number(recent.rows[0]?.n ?? 0) >= 48) {
+      // Eski tohum düzeyi (ör. ons altın 2650 → 4166): yerelde geçmişi güncel tohum fiyatıyla baştan üret
+      const lvl = await historyLevels(pool, now);
+      if (!staleLevel(lvl.get(`commodity:${c.symbol}`), c.price)) continue;
+      await pool.query(`DELETE FROM price_history WHERE asset_type = 'commodity' AND symbol = $1`, [c.symbol]);
+      const rows = generateSyntheticHistory('commodity', c.symbol, c.price, now);
+      await pool.query(
+        `INSERT INTO price_history (asset_type, symbol, granularity, bucket_start, price, currency, updated_at)
+         SELECT 'commodity', $1, r.g, r.bs, r.p, 'USD', $2::timestamptz
+           FROM unnest($3::text[], $4::timestamptz[], $5::numeric[]) AS r(g, bs, p)
+         ON CONFLICT (asset_type, symbol, granularity, bucket_start) DO NOTHING`,
+        [c.symbol, now.toISOString(), rows.map((r) => r.granularity), rows.map((r) => r.bucketStart.toISOString()), rows.map((r) => r.price)]
+      );
+      result.commodities.push(`${c.symbol} (yeniden çapalandı)`);
+      continue;
+    }
     const last = await pool.query(
       `SELECT price FROM price_history WHERE asset_type = 'commodity' AND symbol = $1 AND currency = 'USD'
         ORDER BY bucket_start DESC LIMIT 1`,

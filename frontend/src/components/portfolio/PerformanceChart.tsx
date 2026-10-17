@@ -7,11 +7,12 @@ import { ChartBarIcon, ClockIcon } from '@heroicons/react/24/outline';
 import type { IChartApi, ISeriesApi } from 'lightweight-charts';
 import { historyApi, swrFetcher, type HistoryRange } from '@/lib/api';
 import { useAuth } from '@/context/AuthContext';
-import { cn, formatDate, formatDateTime, formatTRY } from '@portfoygo/shared/format';
+import { cn, formatDate, formatDateTime } from '@portfoygo/shared/format';
 import { Card } from '@portfoygo/shared/ui/Card';
 import { Delta, Money } from '@portfoygo/shared/ui/Delta';
 import { EmptyState, Skeleton } from '@portfoygo/shared/ui/Feedback';
 import Tabs from '@portfoygo/shared/ui/Tabs';
+import { useDisplayCurrency } from '@/hooks/useDisplayCurrency';
 
 export interface HistoryPoint {
   /** Unix zaman damgası (saniye, UTC) */
@@ -72,6 +73,7 @@ interface Props {
 
 /** Portföyün toplam değerinin zaman içindeki seyri (GET /portfolio/history). */
 export default function PerformanceChart({ compact = false, className }: Props) {
+  const dc = useDisplayCurrency();
   const { user } = useAuth();
   const { resolvedTheme } = useTheme();
   const [range, setRange] = useState<HistoryRange>('1M');
@@ -182,7 +184,7 @@ export default function PerformanceChart({ compact = false, className }: Props) 
   const summary = data && hasData && (
     <div className="flex flex-wrap items-center gap-2 text-sm">
       <Delta value={shownPct} />
-      <Money value={shownChange} signed className="font-medium" />
+      <Money value={dc.convert(shownChange)} currency={dc.currency} signed className="font-medium" />
       <span className="text-subtle">{caption}</span>
     </div>
   );
@@ -193,7 +195,7 @@ export default function PerformanceChart({ compact = false, className }: Props) 
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
             <h3 className="text-sm font-medium text-muted">Performans</h3>
-            {hover && <span className="num text-sm font-semibold">{formatTRY(hover.value)}</span>}
+            {hover && <span className="num text-sm font-semibold">{dc.money(hover.value)}</span>}
             {summary}
           </div>
           {tabs}
@@ -217,7 +219,7 @@ export default function PerformanceChart({ compact = false, className }: Props) 
       <div className="px-5 pt-4 sm:px-6">
         {data ? (
           <div className="flex flex-wrap items-end gap-x-3 gap-y-2">
-            <p className="num truncate text-3xl font-semibold text-fg">{formatTRY(shownValue)}</p>
+            <p className="num truncate text-3xl font-semibold text-fg">{dc.money(shownValue)}</p>
             <div className="pb-1">{summary}</div>
           </div>
         ) : (

@@ -3,8 +3,9 @@ import { Card, CardBody, CardHeader } from '@portfoygo/shared/ui/Card';
 import { Delta, Money } from '@portfoygo/shared/ui/Delta';
 import { LinkButton } from '@portfoygo/shared/ui/Button';
 import { Alert, Skeleton } from '@portfoygo/shared/ui/Feedback';
-import { formatDate, formatTRY } from '@portfoygo/shared/format';
+import { formatDate } from '@portfoygo/shared/format';
 import type { SeasonMe } from '@/types';
+import { useDisplayCurrency } from '@/hooks/useDisplayCurrency';
 
 interface Props {
   me: SeasonMe | null;
@@ -15,6 +16,7 @@ interface Props {
 
 /** "Senin sezonun": oturumdaki kullanıcının bu sezondaki sırası ve getirisi. */
 export default function MySeasonCard({ me, verified, loading, participants }: Props) {
+  const dc = useDisplayCurrency();
   return (
     <Card>
       <CardHeader title="Senin sezonun" description={me?.joined_at ? `${formatDate(me.joined_at)} itibarıyla` : 'Bu sezon'} />
@@ -59,16 +61,16 @@ export default function MySeasonCard({ me, verified, loading, participants }: Pr
               <div className="min-w-0 rounded-xl border border-line bg-surface-2 p-3.5">
                 <dt className="text-xs text-muted">Sezon K/Z</dt>
                 <dd className="mt-1 truncate font-medium">
-                  <Money value={me.profit_tl} signed />
+                  <Money value={dc.convert(me.profit_tl)} currency={dc.currency} signed />
                 </dd>
               </div>
               <div className="min-w-0 rounded-xl border border-line bg-surface-2 p-3.5">
                 <dt className="text-xs text-muted">Başlangıç</dt>
-                <dd className="num mt-1 truncate font-medium">{formatTRY(me.baseline_equity)}</dd>
+                <dd className="num mt-1 truncate font-medium">{dc.money(me.baseline_equity)}</dd>
               </div>
               <div className="min-w-0 rounded-xl border border-line bg-surface-2 p-3.5">
                 <dt className="text-xs text-muted">Güncel varlık</dt>
-                <dd className="num mt-1 truncate font-semibold">{formatTRY(me.equity)}</dd>
+                <dd className="num mt-1 truncate font-semibold">{dc.money(me.equity)}</dd>
               </div>
             </dl>
           </>

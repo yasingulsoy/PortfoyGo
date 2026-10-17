@@ -17,7 +17,8 @@ import { useAuth } from '@/context/AuthContext';
 import { useLivePortfolio } from '@/context/PortfolioContext';
 import { leaderboardApi } from '@/lib/api';
 import { STARTING_BALANCE } from '@/lib/constants';
-import { formatDate, formatNumber, formatPercent, formatTRY } from '@portfoygo/shared/format';
+import { formatDate, formatNumber, formatPercent } from '@portfoygo/shared/format';
+import { useDisplayCurrency } from '@/hooks/useDisplayCurrency';
 import type { User } from '@/types';
 import PageHeader from '@portfoygo/shared/ui/PageHeader';
 import { Card, CardBody, CardHeader } from '@portfoygo/shared/ui/Card';
@@ -34,6 +35,7 @@ import BadgesGrid from '@/components/profile/BadgesGrid';
 import ActivityLog from '@/components/profile/ActivityLog';
 import SeasonAwards from '@/components/profile/SeasonAwards';
 import NotificationPrefsCard from '@/components/notifications/NotificationPrefsCard';
+import DisplayPrefsCard from '@/components/profile/DisplayPrefsCard';
 import ProfileVisibilityCard from '@/components/profile/ProfileVisibilityCard';
 import ResponsibleProfileCard from '@/components/game/responsible/ResponsibleProfileCard';
 import ArenaHistory from '@/components/arena/ArenaHistory';
@@ -60,6 +62,7 @@ export default function ProfilePage() {
       </div>
       <ArenaHistory />
       <ProfileVisibilityCard />
+      <DisplayPrefsCard />
       <NotificationPrefsCard />
       <ResponsibleProfileCard />
       <SecurityCard />
@@ -196,6 +199,7 @@ function Info({ label, children }: { label: string; children: ReactNode }) {
 
 function StatsRow() {
   const { totals, transactions, holdings, loaded } = useLivePortfolio();
+  const dc = useDisplayCurrency();
   const stats = useMemo(() => computeTradeStats(transactions), [transactions]);
   const growth = totals.netWorth - STARTING_BALANCE;
   const closed = stats.wins + stats.losses;
@@ -209,7 +213,7 @@ function StatsRow() {
         icon={<WalletIcon />}
         label="Toplam varlık"
         loading={!loaded}
-        value={formatTRY(totals.netWorth)}
+        value={dc.money(totals.netWorth)}
         aside={<Delta value={(growth / STARTING_BALANCE) * 100} />}
         sub="başlangıçtan beri"
       />
@@ -238,8 +242,8 @@ function StatsRow() {
         icon={<BanknotesIcon />}
         label="Gerçekleşen K/Z"
         loading={!loaded}
-        value={<Money value={stats.realized} signed />}
-        sub={`${holdings.length} açık pozisyon · K/Z ${formatTRY(totals.pl, { sign: true })}`}
+        value={<Money value={dc.convert(stats.realized)} currency={dc.currency} signed />}
+        sub={`${holdings.length} açık pozisyon · K/Z ${dc.money(totals.pl, { sign: true })}`}
       />
     </MetricGrid>
   );

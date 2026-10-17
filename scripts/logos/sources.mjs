@@ -50,7 +50,31 @@ export const CRYPTO_SYMBOLS = [
   'GNO', 'TWT', 'BTG', 'TUSD', 'PAXG', 'XAUT', 'CELO', 'ROSE', 'ANKR', 'RVN', 'SC', 'DCR', 'DGB', 'ONE',
   'IOTX', 'ZEN', 'LRC', 'SUSHI', 'YFI', 'BAL', 'UMA', 'BAND', 'STORJ', 'SKL', 'CVC', 'ELF', 'NMR', 'REN',
   'KNC', 'BNT', 'LPT', 'RLC', 'POWR', 'XEM', 'GUSD', 'HOT', 'ARDR', 'STEEM', 'LSK', 'SYS', 'NANO', 'ONT',
+  'ENS',
 ];
+
+/**
+ * Kripto için YEDEK kaynak: cryptocurrency-icons'ta olmayan coin → simple-icons slug'ı (CC0; hisse rozetleriyle
+ * aynı "marka rengi daire + glif" stili). Yalnızca simgenin gerçekten o projeye ait olduğu doğrulanan girdiler:
+ * ör. simple-icons'taki "render" Render.com'dur (Render Network değil), "sky" Sky Sports'tur, "gmx" e-posta
+ * hizmetidir — bunlar bilinçli olarak YOK.
+ */
+export const CRYPTO_BRANDS = {
+  SUI: 'sui', // sui.io/media-kit
+  HBAR: 'hedera', // brand.hedera.com
+  TON: 'ton', // ton.org/en/brand-assets
+  PI: 'pinetwork', // Pi Network
+  NEAR: 'near', // near.org/brand
+  OP: 'optimism', // Optimism brand kit
+  HNT: 'helium', // Helium (helium.com)
+  ENS: 'ens', // ens.domains/brand
+};
+
+/**
+ * Simgesi zaten dolu bir daire olan (içinde oyuk işaret taşıyan) simple-icons markaları: rozet içinde küçük bir
+ * daire yerine, daire marka rengiyle tam boy çizilir ve oyuklar beyaz kalır (markanın kendi logosuna en yakın hali).
+ */
+export const FULL_DISC_BRANDS = new Set(['ton', 'hedera', 'optimism', 'pinetwork']);
 
 /** Kripto takma adları: aynı projenin yeni sembolü → paketteki dosya. */
 export const CRYPTO_ALIASES = {
@@ -75,8 +99,8 @@ export const CURRENCY_FLAGS = {
 
 /**
  * Hisse (ABD borsaları; ADR'ler dahil) → simple-icons slug'ı. Varsayılan STOCK_SYMBOLS listesi + yerel
- * tohum + makul bir büyük şirket üst kümesi. simple-icons'ta olmayan markalar (ör. Microsoft, Amazon)
- * listede YOKTUR: AssetAvatar onlar için baş harf (monogram) gösterir.
+ * tohum + makul bir büyük şirket üst kümesi. simple-icons'ta olmayan Microsoft ve Amazon için PortfoyGo'nun
+ * çizdiği işaretler stock-marks.mjs'dedir; diğer kapsanmayanlar baş harf (monogram) gösterir.
  * `license` alanı taşıyan (CC0 dışı) simgeler betik tarafından otomatik dışlanır.
  */
 export const STOCK_BRANDS = {
@@ -107,6 +131,3 @@ export const STOCK_ALIASES = {
   GOOG: 'GOOGL',
   ZG: 'Z',
 };
-
-/** Uygulamada izlenen ama simple-icons'ta bulunmayan (bilinçli olarak monogram) hisseler — raporda gösterilir. */
-export const STOCKS_WITHOUT_BRAND = ['MSFT', 'AMZN'];

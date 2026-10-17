@@ -8,6 +8,8 @@ import Button from '@portfoygo/shared/ui/Button';
 import Modal from '@portfoygo/shared/ui/Modal';
 import { Alert, Badge, EmptyState } from '@portfoygo/shared/ui/Feedback';
 import { cn, formatNumber } from '@portfoygo/shared/format';
+import { assetRefWithLogo } from '@portfoygo/shared/assetLogos';
+import AssetAvatar from '@portfoygo/shared/ui/AssetAvatar';
 import { TableCardHeader, TableSkeleton, table } from '@/components/ui';
 import { ConfirmModal, LoadError, SearchInput, SelectField } from '@/components/controls';
 import { downloadCsv } from '@/lib/csv';
@@ -119,6 +121,7 @@ export default function CatalogAdmin({ onChanged }: { onChanged?: () => void }) 
                 <tr key={i.id} className="align-top transition-colors hover:bg-surface-2">
                   <td className={table.td}>
                     <p className="flex flex-wrap items-center gap-1.5">
+                      <CatalogLogo providerSymbol={i.provider_symbol} />
                       <span className="num font-semibold text-fg">{i.symbol}</span>
                       <Badge>{VEHICLE_LABELS[i.vehicle] ?? i.vehicle}</Badge>
                       {!i.active && <Badge tone="gold">Pasif</Badge>}
@@ -186,6 +189,12 @@ export default function CatalogAdmin({ onChanged }: { onChanged?: () => void }) 
       <CsvImportModal kind="instruments" open={importing} onClose={() => setImporting(false)} onDone={refresh} />
     </Card>
   );
+}
+
+/** Uygulamadaki bir varlığa bağlı araçlar (provider_symbol, ör. commodity:GOLD) o varlığın logosunu gösterir. */
+function CatalogLogo({ providerSymbol }: { providerSymbol: string | null | undefined }) {
+  const logo = assetRefWithLogo(providerSymbol);
+  return logo ? <AssetAvatar symbol={logo.symbol} type={logo.type} size={20} /> : null;
 }
 
 type FormState = Record<keyof InstrumentInput, string>;

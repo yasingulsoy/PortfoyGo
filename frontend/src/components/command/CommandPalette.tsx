@@ -11,6 +11,7 @@ import {
   ChartPieIcon,
   ClockIcon,
   CommandLineIcon,
+  CurrencyDollarIcon,
   EnvelopeIcon,
   GlobeAltIcon,
   KeyIcon,
@@ -35,7 +36,8 @@ import { assetHref } from '@/components/market/MarketTable';
 import AssetAvatar from '@portfoygo/shared/ui/AssetAvatar';
 import { Delta } from '@portfoygo/shared/ui/Delta';
 import Spinner from '@portfoygo/shared/ui/Spinner';
-import { cn, formatTRY } from '@portfoygo/shared/format';
+import { cn } from '@portfoygo/shared/format';
+import { useDisplayCurrency } from '@/hooks/useDisplayCurrency';
 import { ASSET_TYPE_LABELS, type AssetType, type MarketAsset } from '@/types';
 import { ADMIN_URL } from '@/lib/site';
 import { COMMAND_PALETTE_EVENT, anotherDialogOpen, isTypingTarget, openCommandPalette, openShortcutsHelp } from './events';
@@ -56,7 +58,7 @@ interface RecentAsset {
 }
 
 type Item =
-  | { kind: 'asset'; id: string; asset: RecentAsset & { priceTRY?: number | null; changePercent?: number }; recent?: boolean }
+  | { kind: 'asset'; id: string; asset: RecentAsset & { priceTRY?: number | null; priceUSD?: number | null; changePercent?: number }; recent?: boolean }
   | { kind: 'command'; id: string; label: string; hint?: string; icon: Icon; keywords: string; run: () => void };
 
 interface Section {
@@ -176,6 +178,7 @@ function PaletteBody({ onClose }: { onClose: () => void }) {
   const { openTrade } = useTrade();
   const { resolvedTheme, setTheme } = useTheme();
   const market = useMarket();
+  const dc = useDisplayCurrency();
   const [rawRecent, setRawRecent] = useLocalStorage(RECENT_KEY);
   const recent = useMemo(() => parseRecent(rawRecent), [rawRecent]);
 
@@ -233,8 +236,21 @@ function PaletteBody({ onClose }: { onClose: () => void }) {
       list.push(nav('nav-register', 'Hesap oluştur', '/register', UserPlusIcon, 'kayit hesap olustur register ucretsiz'));
     }
     const isDark = resolvedTheme === 'dark';
+    const toUsd = dc.preference !== 'USD';
     return [
       ...list,
+      {
+        kind: 'command' as const,
+        id: 'display-currency',
+        label: toUsd ? 'Fiyatları USD göster' : 'Fiyatları TL göster',
+        hint: toUsd ? 'USD' : 'TL',
+        icon: CurrencyDollarIcon,
+        keywords: 'para birimi doviz kur dolar usd tl lira turk lirasi fiyat goster gosterim currency',
+        run: () => {
+          dc.setCurrency(toUsd ? 'USD' : 'TRY');
+          onClose();
+        },
+      },
       {
         kind: 'command' as const,
         id: 'theme',
@@ -260,7 +276,7 @@ function PaletteBody({ onClose }: { onClose: () => void }) {
         },
       },
     ];
-  }, [user, resolvedTheme, setTheme, router, onClose]);
+  }, [user, resolvedTheme, setTheme, router, onClose, dc]);
 
   const sections = useMemo<Section[]>(() => {
     if (!q) {
@@ -274,7 +290,7 @@ function PaletteBody({ onClose }: { onClose: () => void }) {
               kind: 'asset',
               id: `recent:${r.type}:${r.symbol}`,
               recent: true,
-              asset: { ...r, image: live?.image ?? r.image, priceTRY: live?.priceTRY, changePercent: live?.changePercent },
+              asset: { ...r, image: live?.image ?? r.image, priceTRY: live?.priceTRY, priceUSD: live?.priceUSD, changePercent: live?.changePercent },
             };
           }),
         });
@@ -420,7 +436,16 @@ function PaletteBody({ onClose }: { onClose: () => void }) {
                   )}
                 >
                   {item.kind === 'asset' ? (
-                    <AssetRow item={item} selected={selected} onTrade={() => tradeAsset(item.asset)} />
+                    <AssetRow
+                      item={item}
+                      selected={selected}
+                      price={
+                        item.asset.priceTRY != null
+                          ? dc.assetPrice({ type: item.asset.type, symbol: item.asset.symbol, priceTRY: item.asset.priceTRY, priceUSD: item.asset.priceUSD ?? null })
+                          : null
+                      }
+                      onTrade={() => tradeAsset(item.asset)}
+                    />
                   ) : (
                     <>
                       <span className={cn('flex h-8 w-8 shrink-0 items-center justify-center rounded-lg', selected ? 'bg-brand-soft text-brand' : 'bg-surface-2 text-subtle')}>
@@ -461,7 +486,7 @@ function PaletteBody({ onClose }: { onClose: () => void }) {
   );
 }
 
-function AssetRow({ item, selected, onTrade }: { item: Extract<Item, { kind: 'asset' }>; selected: boolean; onTrade: () => void }) {
+function AssetRow({ item, selected, price, onTrade }: { item: Extract<Item, { kind: 'asset' }>; selected: boolean; price: string | null; onTrade: () => void }) {
   const a = item.asset;
   return (
     <>
@@ -479,9 +504,9 @@ function AssetRow({ item, selected, onTrade }: { item: Extract<Item, { kind: 'as
         </span>
         <span className="block truncate text-xs text-muted">{a.name}</span>
       </span>
-      {a.priceTRY != null && (
+      {price != null && (
         <span className="hidden text-right sm:block">
-          <span className="num block text-[13px] font-medium text-fg">{formatTRY(a.priceTRY, { precise: true })}</span>
+          <span className="num block text-[13px] font-medium text-fg">{price}</span>
           {a.changePercent != null && <Delta value={a.changePercent} variant="text" className="text-[11px]" />}
         </span>
       )}

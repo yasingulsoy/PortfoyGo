@@ -9,8 +9,9 @@ import { Alert, Skeleton } from '@portfoygo/shared/ui/Feedback';
 import { useLivePortfolio } from '@/context/PortfolioContext';
 import { leaderboardApi } from '@/lib/api';
 import { STARTING_BALANCE } from '@/lib/constants';
-import { formatPercent, formatTRY } from '@portfoygo/shared/format';
+import { formatPercent } from '@portfoygo/shared/format';
 import { normalizeMyRank, type Board, type Leader } from './model';
+import { useDisplayCurrency } from '@/hooks/useDisplayCurrency';
 
 export const MY_RANK_KEY = 'leaderboard:my-rank';
 
@@ -23,6 +24,7 @@ interface Props {
 
 /** Oturumdaki kullanıcının sırası ve ilk 50'deki konumu. */
 export default function MyRankCard({ board, verified, leaders, username }: Props) {
+  const dc = useDisplayCurrency();
   const { data, error, isLoading } = useSWR(verified ? MY_RANK_KEY : null, () => leaderboardApi.myRank(), { refreshInterval: 60_000 });
   const { totals, loaded } = useLivePortfolio();
 
@@ -76,7 +78,7 @@ export default function MyRankCard({ board, verified, leaders, username }: Props
         <dl className="grid grid-cols-2 gap-3 text-sm">
           <div className="min-w-0 rounded-xl border border-line bg-surface-2 p-3.5">
             <dt className="text-xs text-muted">Toplam varlık</dt>
-            <dd className="num mt-1 truncate font-semibold">{loaded ? formatTRY(me?.totalValue ?? totals.netWorth) : '—'}</dd>
+            <dd className="num mt-1 truncate font-semibold">{loaded ? dc.money(me?.totalValue ?? totals.netWorth) : '—'}</dd>
           </div>
           <div className="min-w-0 rounded-xl border border-line bg-surface-2 p-3.5">
             <dt className="text-xs text-muted">{board === 'week' ? 'Hafta getirisi' : 'Getiri'}</dt>

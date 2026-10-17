@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import { ThemeProvider } from 'next-themes';
 import { AuthProvider } from '@/context/AuthContext';
 import { PortfolioProvider } from '@/context/PortfolioContext';
+import { DisplayCurrencyProvider } from '@/context/DisplayCurrencyContext';
 import { TradeProvider } from '@/components/trade/TradeProvider';
 import { ToastProvider } from '@portfoygo/shared/ui/Toast';
 import CommandPalette from '@/components/command/CommandPalette';
@@ -15,15 +16,17 @@ export default function Providers({ children, nonce }: { children: ReactNode; /*
     <ThemeProvider attribute="data-theme" defaultTheme="light" enableSystem disableTransitionOnChange nonce={nonce}>
       <ToastProvider>
         <AuthProvider>
-          <NotificationsProvider>
-            <PortfolioProvider>
-              <TradeProvider>
-                {children}
-                <CommandPalette />
-                <Shortcuts />
-              </TradeProvider>
-            </PortfolioProvider>
-          </NotificationsProvider>
+          <DisplayCurrencyProvider>
+            <NotificationsProvider>
+              <PortfolioProvider>
+                <TradeProvider>
+                  {children}
+                  <CommandPalette />
+                  <Shortcuts />
+                </TradeProvider>
+              </PortfolioProvider>
+            </NotificationsProvider>
+          </DisplayCurrencyProvider>
         </AuthProvider>
       </ToastProvider>
     </ThemeProvider>

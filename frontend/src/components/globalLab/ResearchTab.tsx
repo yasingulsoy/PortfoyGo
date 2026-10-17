@@ -6,6 +6,8 @@ import { useSWRConfig } from 'swr';
 import { ArrowsRightLeftIcon, BookmarkIcon as BookmarkSolid, XMarkIcon } from '@heroicons/react/20/solid';
 import { BookmarkIcon, GlobeAltIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import { cn } from '@portfoygo/shared/format';
+import { assetRefWithLogo } from '@portfoygo/shared/assetLogos';
+import AssetAvatar from '@portfoygo/shared/ui/AssetAvatar';
 import { Card, CardHeader } from '@portfoygo/shared/ui/Card';
 import Button from '@portfoygo/shared/ui/Button';
 import { Alert, EmptyState, Skeleton } from '@portfoygo/shared/ui/Feedback';
@@ -197,11 +199,14 @@ function CatalogTable({
             {items.map((i) => {
               const inList = listed.has(i.id);
               const inCompare = compare.ids.includes(i.id);
+              // Uygulamadaki bir varlığa bağlı araçlar (ör. commodity:GOLD) o varlığın logosunu gösterir
+              const logo = assetRefWithLogo(i.provider_symbol);
               return (
                 <Tr key={i.id}>
                   <Td className="max-w-[16rem] sm:max-w-none">
                     <Link href={`/global-lab/${encodeURIComponent(i.symbol)}`} className="group block min-w-0">
                       <span className="flex items-center gap-2">
+                        {logo && <AssetAvatar symbol={logo.symbol} type={logo.type} size={20} />}
                         <span className="num font-semibold text-fg group-hover:text-brand">{i.symbol}</span>
                         <Chip>{vehicleLabel(i.vehicle)}</Chip>
                       </span>

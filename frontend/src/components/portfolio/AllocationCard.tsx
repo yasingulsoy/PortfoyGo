@@ -2,10 +2,11 @@
 
 import { useMemo } from 'react';
 import type { LiveHolding } from '@/context/PortfolioContext';
-import { cn, formatTRY } from '@portfoygo/shared/format';
+import { cn } from '@portfoygo/shared/format';
 import { ASSET_TYPE_LABELS, type AssetType } from '@/types';
 import { Card, CardHeader } from '@portfoygo/shared/ui/Card';
 import { Skeleton } from '@portfoygo/shared/ui/Feedback';
+import { useDisplayCurrency } from '@/hooks/useDisplayCurrency';
 
 type Bucket = AssetType | 'cash';
 
@@ -27,6 +28,7 @@ const pctText = (p: number) => `%${p.toLocaleString('tr-TR', { maximumFractionDi
 
 /** Nakit + varlık türlerine göre dağılım: düz SVG halka grafik ve açıklama listesi. */
 export default function AllocationCard({ holdings, balance, loaded, className }: { holdings: LiveHolding[]; balance: number; loaded: boolean; className?: string }) {
+  const dc = useDisplayCurrency();
   const { slices, total } = useMemo(() => {
     const buckets: Partial<Record<Bucket, number>> = { cash: Math.max(0, balance) };
     for (const h of holdings) buckets[h.assetType] = (buckets[h.assetType] ?? 0) + Math.max(0, h.liveValue);
@@ -83,7 +85,7 @@ export default function AllocationCard({ holdings, balance, loaded, className }:
               <li key={s.key} className="flex items-center gap-3 py-2.5 first:pt-0 last:pb-0">
                 <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: ALLOCATION_COLORS[s.key] }} aria-hidden="true" />
                 <span className="min-w-0 flex-1 truncate text-muted">{LABELS[s.key]}</span>
-                <span className="num font-medium text-fg">{formatTRY(s.value)}</span>
+                <span className="num font-medium text-fg">{dc.money(s.value)}</span>
                 <span className="num w-14 shrink-0 text-right text-xs text-muted">{pctText(s.pct)}</span>
               </li>
             ))}

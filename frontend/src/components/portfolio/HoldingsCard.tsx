@@ -15,6 +15,7 @@ import type { LiveHolding } from '@/context/PortfolioContext';
 import { useTrade } from '@/components/trade/TradeProvider';
 import { assetHref } from '@/components/market/MarketTable';
 import { cn, formatQuantity, formatTRY, trend } from '@portfoygo/shared/format';
+import { useDisplayCurrency } from '@/hooks/useDisplayCurrency';
 import { ASSET_TYPE_LABELS, type AssetType } from '@/types';
 import { Card } from '@portfoygo/shared/ui/Card';
 import Button from '@portfoygo/shared/ui/Button';
@@ -41,7 +42,7 @@ const FILTERS: { value: Filter; label: string }[] = [
 
 const SORTS: { value: SortKey; label: string }[] = [
   { value: 'value', label: 'Değer (yüksekten düşüğe)' },
-  { value: 'pl', label: 'K/Z ₺ (yüksekten düşüğe)' },
+  { value: 'pl', label: 'K/Z tutarı (yüksekten düşüğe)' },
   { value: 'plPercent', label: 'K/Z % (yüksekten düşüğe)' },
   { value: 'day', label: 'Günlük değişim' },
   { value: 'symbol', label: 'Sembol (A–Z)' },
@@ -219,6 +220,7 @@ function nearestOrders(orders: OrderRow[] | undefined) {
   };
 }
 
+// Emir tetik seviyeleri TL bazlıdır (TL girilir, TL fiyatla tetiklenir): görüntüleme biriminden bağımsız TL gösterilir
 function AssetCell({ h, orders }: { h: LiveHolding; orders?: OrderRow[] }) {
   const { stop, upper } = nearestOrders(orders);
   return (
@@ -290,6 +292,7 @@ function plTone(v: number) {
 }
 
 function TableRow({ h, orders, onOrders }: { h: LiveHolding; orders?: OrderRow[]; onOrders: (h: LiveHolding) => void }) {
+  const dc = useDisplayCurrency();
   const act = useHoldingActions(h, orders, onOrders);
   return (
     <Tr className="hover:bg-surface-2">
@@ -300,17 +303,17 @@ function TableRow({ h, orders, onOrders }: { h: LiveHolding; orders?: OrderRow[]
         {formatQuantity(h.quantity)}
       </Td>
       <Td align="right" className="num hidden text-muted xl:table-cell">
-        {formatTRY(h.averagePrice, { precise: true })}
+        {dc.money(h.averagePrice, { precise: true })}
       </Td>
       <Td align="right" className="num whitespace-nowrap text-fg">
-        {formatTRY(h.livePrice, { precise: true })}
+        {dc.money(h.livePrice, { precise: true, nativeUSD: h.livePriceUSD })}
         <div className="mt-0.5 text-xs text-muted lg:hidden">{formatQuantity(h.quantity)} adet</div>
       </Td>
       <Td align="right" className="num whitespace-nowrap font-semibold text-fg">
-        {formatTRY(h.liveValue)}
+        {dc.money(h.liveValue)}
       </Td>
       <Td align="right" className="whitespace-nowrap">
-        <Money value={h.livePL} signed className="block font-medium" />
+        <Money value={dc.convert(h.livePL)} currency={dc.currency} signed className="block font-medium" />
         <Delta value={h.livePLPercent} variant="text" className="text-xs" />
       </Td>
       <Td align="right" className="hidden lg:table-cell">
@@ -341,21 +344,22 @@ function TableRow({ h, orders, onOrders }: { h: LiveHolding; orders?: OrderRow[]
 }
 
 function MobileRow({ h, orders, onOrders }: { h: LiveHolding; orders?: OrderRow[]; onOrders: (h: LiveHolding) => void }) {
+  const dc = useDisplayCurrency();
   const act = useHoldingActions(h, orders, onOrders);
   return (
     <li className="px-5 py-4">
       <div className="flex items-start justify-between gap-3">
         <AssetCell h={h} orders={orders} />
         <div className="shrink-0 text-right">
-          <p className="num text-sm font-semibold">{formatTRY(h.liveValue)}</p>
-          <p className={cn('num mt-0.5 text-xs font-medium', plTone(h.livePL))}>{formatTRY(h.livePL, { sign: true })}</p>
+          <p className="num text-sm font-semibold">{dc.money(h.liveValue)}</p>
+          <p className={cn('num mt-0.5 text-xs font-medium', plTone(h.livePL))}>{dc.money(h.livePL, { sign: true })}</p>
           <Delta value={h.livePLPercent} variant="text" className="text-xs" />
         </div>
       </div>
       <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2.5 rounded-xl border border-line bg-surface-2 px-3.5 py-3">
         <MiniStat label="Miktar" value={formatQuantity(h.quantity)} />
-        <MiniStat label="Ort. maliyet" value={formatTRY(h.averagePrice, { precise: true })} />
-        <MiniStat label="Güncel fiyat" value={formatTRY(h.livePrice, { precise: true })} />
+        <MiniStat label="Ort. maliyet" value={dc.money(h.averagePrice, { precise: true })} />
+        <MiniStat label="Güncel fiyat" value={dc.money(h.livePrice, { precise: true, nativeUSD: h.livePriceUSD })} />
         <MiniStat label="Günlük" value={h.dayChangePercent != null ? <Delta value={h.dayChangePercent} variant="text" /> : '—'} />
       </dl>
       <div className="mt-3 flex items-center justify-between gap-3">

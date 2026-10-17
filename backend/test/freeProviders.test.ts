@@ -415,8 +415,8 @@ describe('localEnv: LOCAL_LIVE_PRICES', () => {
     process.env = { ...saved };
   });
 
-  it('varsayılan: dış yenileme kapalı, anahtarlar boş, emtia son bilinen fiyattan', () => {
-    delete process.env.LOCAL_LIVE_PRICES;
+  it('LOCAL_LIVE_PRICES=0: dış yenileme kapalı, anahtarlar boş, emtia son bilinen fiyattan', () => {
+    process.env.LOCAL_LIVE_PRICES = '0';
     process.env.FINNHUB_API_KEY = 'gercek-anahtar-env';
     process.env.DOVIZ = 'gercek-doviz';
     const env = localDevEnv(db);
@@ -425,11 +425,14 @@ describe('localEnv: LOCAL_LIVE_PRICES', () => {
     expect(env.DOVIZ).toBe('');
     expect(env.FX_PROVIDER).toBe('nosyapi');
     expect(env.COMMODITY_PROVIDER).toBe('pricehistory');
-    expect(localLivePrices({}).enabled).toBe(false);
+    expect(localLivePrices({ LOCAL_LIVE_PRICES: 'off' }).enabled).toBe(false);
+    expect(localLivePrices({ LOCAL_LIVE_PRICES: '0' }).liveCommodityCodes).toEqual([]);
   });
 
-  it('LOCAL_LIVE_PRICES=1: yalnızca anahtarsız kaynaklar; Finnhub yalnızca LOCAL_FINNHUB_API_KEY ile', () => {
-    process.env.LOCAL_LIVE_PRICES = '1';
+  it('varsayılan (ve LOCAL_LIVE_PRICES=1): yalnızca anahtarsız kaynaklar; Finnhub yalnızca LOCAL_FINNHUB_API_KEY ile', () => {
+    delete process.env.LOCAL_LIVE_PRICES;
+    expect(localLivePrices({}).enabled).toBe(true);
+    expect(localLivePrices({ LOCAL_LIVE_PRICES: '1' }).enabled).toBe(true);
     process.env.FINNHUB_API_KEY = 'gercek-anahtar-env';
     delete process.env.LOCAL_FINNHUB_API_KEY;
     let env = localDevEnv(db);
@@ -451,7 +454,8 @@ describe('localEnv: LOCAL_LIVE_PRICES', () => {
     const live = localLivePrices(process.env);
     expect(live).toMatchObject({ enabled: true, crypto: true, fx: true, metals: true, stocks: true });
     expect(live.liveCommodityCodes).toEqual(GOLD_API_LIVE_CODES);
-    expect(localLivePrices({ LOCAL_FINNHUB_API_KEY: 'x' }).stocks).toBe(false);
+    expect(localLivePrices({ LOCAL_FINNHUB_API_KEY: 'x' }).stocks).toBe(true);
+    expect(localLivePrices({ LOCAL_LIVE_PRICES: '0', LOCAL_FINNHUB_API_KEY: 'x' }).stocks).toBe(false);
   });
 });
 

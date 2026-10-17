@@ -2,8 +2,9 @@
 
 import { ClockIcon, MegaphoneIcon } from '@heroicons/react/20/solid';
 import { cn } from '@portfoygo/shared/format';
+import AssetAvatar from '@portfoygo/shared/ui/AssetAvatar';
 import { useNow } from '@/hooks/useNow';
-import { formatClock, formatPrice, type FeedItem } from '@/components/arena/model';
+import { arenaInstrumentAsset, formatClock, formatPrice, type FeedItem } from '@/components/arena/model';
 import { Avatar } from '@/components/game/ui';
 import { BOT_LABEL } from '@/components/game/ui/VsScreen';
 import { PCT_TONE_CLASS, pctTone, signedPct, tugOfWar } from '@/components/game/model';
@@ -159,6 +160,7 @@ export function InstrumentChips({
         const q = quotes[ins.code];
         const ch = q?.change_pct_since_start ?? 0;
         const active = ins.code === selected;
+        const asset = arenaInstrumentAsset(ins.code);
         return (
           <button
             key={ins.code}
@@ -166,12 +168,15 @@ export function InstrumentChips({
             role="tab"
             aria-selected={active}
             onClick={() => onSelect(ins.code)}
-            className="g-chip shrink-0 flex-col !items-start gap-0 px-3 py-1.5 text-left"
+            className="g-chip shrink-0 !justify-start gap-2 px-3 py-1.5 text-left"
             title={`Kısayol ${i + 1}`}
           >
-            <span className="text-sm font-extrabold leading-tight">{ins.label}</span>
-            <span className={cn('g-num text-[11px] font-extrabold leading-tight', !active && (ch >= 0 ? 'text-(--g-up)' : 'text-(--g-down)'))}>
-              {formatPrice(q?.mid, ins.decimals)} · {signedPct(ch)}
+            {asset && <AssetAvatar symbol={asset.symbol} type={asset.type} size={24} />}
+            <span className="flex flex-col items-start">
+              <span className="text-sm font-extrabold leading-tight">{ins.label}</span>
+              <span className={cn('g-num text-[11px] font-extrabold leading-tight', !active && (ch >= 0 ? 'text-(--g-up)' : 'text-(--g-down)'))}>
+                {formatPrice(q?.mid, ins.decimals)} · {signedPct(ch)}
+              </span>
             </span>
           </button>
         );

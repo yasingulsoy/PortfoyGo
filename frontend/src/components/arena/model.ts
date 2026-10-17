@@ -23,7 +23,9 @@ import type {
   ArenaHostMessage,
   ArenaRoundDuel,
   ArenaRoundScenario,
+  AssetType,
 } from '@/types';
+import { hasAssetLogo } from '@portfoygo/shared/assetLogos';
 import { toRoundDuel, toRoundScenario } from '@/components/game/model';
 
 /** Arena başlangıç sermayesi (USD, sanal). */
@@ -73,6 +75,24 @@ export function toArenaInstrument(raw: any): ArenaInstrument {
     spread_display: str(raw?.spread_display),
     available: raw?.available !== false,
   };
+}
+
+/**
+ * Arena enstrümanının logosu için temsil ettiği varlık (backend services/arena/instruments.ts ile aynı eşleme;
+ * EUR/USD paritesi için Euro bayrağı). Logosu olmayan / bilinmeyen kodlarda (ör. sentetik senaryo serileri) null.
+ */
+const ARENA_INSTRUMENT_ASSETS: Readonly<Record<string, { type: AssetType; symbol: string }>> = {
+  EURUSD: { type: 'currency', symbol: 'EUR' },
+  XAUUSD: { type: 'commodity', symbol: 'XAUUSD' },
+  XAGUSD: { type: 'commodity', symbol: 'XAGUSD' },
+  BRENT: { type: 'commodity', symbol: 'BRENT' },
+  BTCUSD: { type: 'crypto', symbol: 'BTC' },
+};
+
+export function arenaInstrumentAsset(code: string): { type: AssetType; symbol: string } | null {
+  const key = code.trim().toUpperCase();
+  const asset = Object.prototype.hasOwnProperty.call(ARENA_INSTRUMENT_ASSETS, key) ? ARENA_INSTRUMENT_ASSETS[key] : null;
+  return asset && hasAssetLogo(asset.type, asset.symbol) ? asset : null;
 }
 
 export function toArenaInstruments(raw: any): ArenaInstrument[] {
