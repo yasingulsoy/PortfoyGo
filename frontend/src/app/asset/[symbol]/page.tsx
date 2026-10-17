@@ -7,6 +7,8 @@ import { MagnifyingGlassIcon } from '@heroicons/react/20/solid';
 import { useRequireAuth } from '@/hooks/useRequireAuth';
 import { useLivePortfolio } from '@/context/PortfolioContext';
 import { useTrade } from '@/components/trade/TradeProvider';
+import { useDisplayCurrency } from '@/hooks/useDisplayCurrency';
+import { DISPLAY_CURRENCY_NAMES, fxSourceLabel } from '@/lib/displayCurrency';
 import { COMMISSION_RATE } from '@/lib/constants';
 import { formatPercent } from '@portfoygo/shared/format';
 import { ASSET_TYPE_LABELS, type AssetType, type MarketAsset } from '@/types';
@@ -57,6 +59,7 @@ function AssetDetail({ params }: { params: Promise<{ symbol: string }> }) {
   const { user, ready } = useRequireAuth();
   const { holdings, loaded, market } = useLivePortfolio();
   const { openTrade } = useTrade();
+  const dc = useDisplayCurrency();
   const [tab, setTab] = useState<DetailTab>('overview');
 
   if (!ready || !user) return <PageLoader />;
@@ -125,7 +128,14 @@ function AssetDetail({ params }: { params: Promise<{ symbol: string }> }) {
 
       <div className="grid grid-cols-1 gap-4 md:gap-6 xl:grid-cols-[minmax(0,1fr)_360px] xl:items-start">
         <div className="min-w-0 space-y-4 md:space-y-6">
-          <AssetChart type={type} symbol={symbol} coinId={coinId} usdTry={usdTry} title={`${symbol} · ${asset.name}`} />
+          <AssetChart
+            type={type}
+            symbol={symbol}
+            coinId={coinId}
+            usdTry={usdTry}
+            displayCurrency={type === 'currency' && symbol === 'USD' ? 'TRY' : dc.currency}
+            title={`${symbol} · ${asset.name}`}
+          />
 
           <Card className="min-w-0">
             <div className="px-5 pt-2 sm:px-6">
@@ -146,12 +156,13 @@ function AssetDetail({ params }: { params: Promise<{ symbol: string }> }) {
                 <>
                   <h2 className="text-lg font-semibold text-fg">Önemli veriler</h2>
                   <p className="mt-1 text-sm text-muted">{type === 'stock' ? 'Son işlem günü' : 'Son 24 saat'}</p>
-                  <KeyStats asset={asset} usdTry={usdTry} className="mt-4" />
+                  <KeyStats asset={asset} usdTry={usdTry} currency={dc.currency} fxNote={fxSourceLabel(market.fxSource)} className="mt-4" />
                   <div className="mt-5 flex items-start gap-2.5 rounded-xl bg-surface-2 p-4 text-sm">
                     <InformationCircleIcon className="mt-0.5 h-4 w-4 shrink-0 text-muted" aria-hidden="true" />
                     <p className="text-muted">
                       Her alım ve satımda <span className="num font-medium text-fg">{formatPercent(COMMISSION_RATE * 100, { sign: false })}</span> komisyon
-                      uygulanır. Fiyatlar TL bazında hesaplanır; veriler gecikmeli olabilir ve yatırım tavsiyesi değildir.
+                      uygulanır. İşlemler TL bazında hesaplanır{dc.currency === 'USD' ? `; tutarlar ${DISPLAY_CURRENCY_NAMES.USD} olarak gösteriliyor` : ''}; veriler gecikmeli
+                      olabilir ve yatırım tavsiyesi değildir.
                     </p>
                   </div>
                 </>

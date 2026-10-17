@@ -1,6 +1,7 @@
 'use client';
 
-import { formatTRY } from '@portfoygo/shared/format';
+import { formatMoney } from '@portfoygo/shared/format';
+import { isTryPair, useDisplayCurrency } from '@/hooks/useDisplayCurrency';
 import { Card } from '@portfoygo/shared/ui/Card';
 import { Delta } from '@portfoygo/shared/ui/Delta';
 import AssetAvatar from '@portfoygo/shared/ui/AssetAvatar';
@@ -18,11 +19,14 @@ export function rangePosition(low: number | undefined, high: number | undefined,
 /** Sağ sütun: seçili varlığın özeti — fiyat, gün içi aralık ve dönemsel performans karoları. */
 export default function AssetSummaryCard({ asset, usdTry }: { asset: MarketAsset; usdTry: number | null }) {
   const status = getMarketStatus(asset.type);
-  // Gün içi aralık USD kotasyonlu varlıklarda (hisse) TL'ye çevrilir
-  const k = asset.priceUSD != null && usdTry ? usdTry : null;
+  const dc = useDisplayCurrency();
+  // Gün içi aralık USD kotasyonlu varlıklarda (hisse): USD görünümde kendi USD değerleri, TL görünümde kurla TL
+  const usdView = dc.currency === 'USD' && !isTryPair(asset);
+  const k = asset.priceUSD != null ? (usdView ? 1 : usdTry) : null;
   const low = asset.low != null && k ? asset.low * k : undefined;
   const high = asset.high != null && k ? asset.high * k : undefined;
-  const pos = rangePosition(low, high, asset.priceTRY);
+  const pos = rangePosition(low, high, usdView ? asset.priceUSD : asset.priceTRY);
+  const rangeCurrency = usdView ? 'USD' : 'TRY';
 
   return (
     <Card className="p-5 sm:p-6">
@@ -34,7 +38,7 @@ export default function AssetSummaryCard({ asset, usdTry }: { asset: MarketAsset
         </div>
         <div className="shrink-0 text-right">
           <PriceTick value={asset.priceTRY} className="block text-sm font-semibold text-fg">
-            {asset.priceTRY != null ? formatTRY(asset.priceTRY, { precise: true }) : '—'}
+            {dc.assetPrice(asset)}
           </PriceTick>
           <Delta value={asset.changePercent} variant="text" className="text-xs" />
         </div>
@@ -51,8 +55,8 @@ export default function AssetSummaryCard({ asset, usdTry }: { asset: MarketAsset
             <span className="absolute top-1/2 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-surface bg-brand shadow-card" style={{ left: `${pos}%` }} />
           </div>
           <div className="num mt-2 flex items-center justify-between text-xs font-medium text-fg">
-            <span>{formatTRY(low, { precise: true })}</span>
-            <span>{formatTRY(high, { precise: true })}</span>
+            <span>{formatMoney(low, rangeCurrency, { precise: true })}</span>
+            <span>{formatMoney(high, rangeCurrency, { precise: true })}</span>
           </div>
         </div>
       )}

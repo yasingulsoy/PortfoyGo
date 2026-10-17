@@ -7,7 +7,8 @@ import { StarIcon } from '@heroicons/react/24/outline';
 import { useWatchlist } from '@/hooks/useWatchlist';
 import { useMarket } from '@/hooks/useMarketData';
 import { openCommandPalette } from '@/components/command/events';
-import { cn, formatTRY } from '@portfoygo/shared/format';
+import { cn } from '@portfoygo/shared/format';
+import { useDisplayCurrency } from '@/hooks/useDisplayCurrency';
 import { Card, CardHeader } from '@portfoygo/shared/ui/Card';
 import { Delta } from '@portfoygo/shared/ui/Delta';
 import { EmptyState, Skeleton } from '@portfoygo/shared/ui/Feedback';
@@ -50,6 +51,7 @@ export function useWatchlistAssets() {
 /** TailAdmin "My Watchlist" kartı: izlenen varlıklar, fiyat ve günlük değişim. */
 export default function WatchlistPanel({ highlight, compact = false, className }: Props) {
   const { assets, watch, market } = useWatchlistAssets();
+  const dc = useDisplayCurrency();
   const highlightKey = highlight ? `${highlight.type}:${highlight.symbol.toUpperCase()}` : null;
   const loading = watch.isLoading || (market.isLoading && assets.length > 0 && assets.every((a) => a.priceTRY == null));
 
@@ -123,7 +125,7 @@ export default function WatchlistPanel({ highlight, compact = false, className }
                   </span>
                   <span className="shrink-0 text-right">
                     <PriceTick value={a.priceTRY} className="block text-sm font-semibold text-fg">
-                      {a.priceTRY != null ? formatTRY(a.priceTRY, { precise: true }) : '—'}
+                      {dc.assetPrice(a)}
                     </PriceTick>
                     {a.priceTRY != null && <Delta value={a.changePercent} variant="text" className="text-xs" />}
                   </span>

@@ -1,6 +1,6 @@
 'use client';
 
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { MagnifyingGlassIcon } from '@heroicons/react/20/solid';
 import AssetAvatar from '@portfoygo/shared/ui/AssetAvatar';
@@ -10,7 +10,8 @@ import { EmptyState, Skeleton } from '@portfoygo/shared/ui/Feedback';
 import { useTrade } from '@/components/trade/TradeProvider';
 import Sparkline from '@/components/asset/Sparkline';
 import { useSparklines } from '@/hooks/useMarketHistory';
-import { cn, formatCompact, formatTRY, formatUSD } from '@portfoygo/shared/format';
+import { useDisplayCurrency } from '@/hooks/useDisplayCurrency';
+import { cn, formatNumber } from '@portfoygo/shared/format';
 import type { MarketAsset } from '@/types';
 import PriceTick from './PriceTick';
 import WatchStar from './WatchStar';
@@ -41,6 +42,8 @@ interface Props {
   showSparkline?: boolean;
   /** Liste boşken (arama yokken) gösterilecek özel boş durum */
   empty?: ReactNode;
+  /** Uzun listelerde ilk N satır + "Daha fazla göster" (varsayılan: hepsi) */
+  pageSize?: number;
   className?: string;
 }
 
@@ -51,11 +54,15 @@ const th = 'py-3 text-xs font-medium text-muted whitespace-nowrap';
  * 7 günlük mini grafik, piyasa değeri ve Sat / Al düğmeleri. Satırın tamamı varlık sayfasına gider
  * (varlık hücresindeki bağlantı satırı kaplar; düğmeler üstte kalır).
  */
-export default function MarketTable({ assets, loading, error, query = '', showMarketCap, showVolume, showSparkline = true, empty, className }: Props) {
+export default function MarketTable({ assets, loading, error, query = '', showMarketCap, showVolume, showSparkline = true, empty, pageSize, className }: Props) {
   const { openTrade } = useTrade();
+  const dc = useDisplayCurrency();
   const rows = filterAssets(assets, query);
   const sparks = useSparklines(showSparkline ? rows : []);
   const withCap = showMarketCap ?? showVolume ?? false;
+  const [limit, setLimit] = useState(pageSize ?? Infinity);
+  const visible = Number.isFinite(limit) ? rows.slice(0, limit) : rows;
+  const hidden = rows.length - visible.length;
 
   if (loading && assets.length === 0) {
     return (
@@ -104,8 +111,9 @@ export default function MarketTable({ assets, loading, error, query = '', showMa
           </tr>
         </thead>
         <tbody>
-          {rows.map((a) => {
+          {visible.map((a) => {
             const tradable = a.priceTRY != null;
+            const secondary = dc.assetSecondary(a);
             return (
               <tr key={a.key} className="group relative border-b border-line transition-colors last:border-b-0 hover:bg-surface-2">
                 <td className="py-3.5 pl-2 pr-3 sm:pl-4">
@@ -123,10 +131,10 @@ export default function MarketTable({ assets, loading, error, query = '', showMa
                 </td>
                 <td className="px-3 py-3.5 text-right align-middle">
                   <PriceTick value={a.priceTRY} className="whitespace-nowrap font-medium text-fg">
-                    {a.priceTRY != null ? formatTRY(a.priceTRY, { precise: true }) : '—'}
+                    {dc.assetPrice(a)}
                   </PriceTick>
                   <div className="num mt-0.5 whitespace-nowrap text-xs text-subtle">
-                    {a.priceUSD != null && <span className="hidden sm:inline">{formatUSD(a.priceUSD, { precise: true })}</span>}
+                    {secondary && <span className="hidden sm:inline">{secondary}</span>}
                     <Delta value={a.changePercent} variant="text" className="text-xs sm:hidden" />
                   </div>
                 </td>
@@ -147,7 +155,7 @@ export default function MarketTable({ assets, loading, error, query = '', showMa
                 )}
                 {withCap && (
                   <td className="num hidden px-3 py-3.5 text-right text-muted lg:table-cell">
-                    {a.marketCap ? `$${formatCompact(a.marketCap)}` : '—'}
+                    {dc.compactUSD(a.marketCap)}
                   </td>
                 )}
                 <td className="py-3.5 pl-3 pr-4 text-right sm:pr-6">
@@ -172,6 +180,16 @@ export default function MarketTable({ assets, loading, error, query = '', showMa
           })}
         </tbody>
       </table>
+      {hidden > 0 && (
+        <div className="flex flex-col items-center gap-1 border-t border-line px-4 py-4">
+          <Button size="sm" variant="secondary" onClick={() => setLimit((n) => n + (pageSize ?? rows.length))}>
+            Daha fazla göster
+          </Button>
+          <span className="num text-xs text-subtle">
+            {formatNumber(visible.length, 0)} / {formatNumber(rows.length, 0)} varlık
+          </span>
+        </div>
+      )}
     </div>
   );
 }

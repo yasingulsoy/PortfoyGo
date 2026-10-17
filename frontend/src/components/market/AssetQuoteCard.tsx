@@ -1,11 +1,12 @@
 'use client';
 
 import Link from 'next/link';
-import { cn, formatTRY, formatUSD } from '@portfoygo/shared/format';
+import { cn } from '@portfoygo/shared/format';
 import { Delta } from '@portfoygo/shared/ui/Delta';
 import { Skeleton } from '@portfoygo/shared/ui/Feedback';
 import AssetAvatar from '@portfoygo/shared/ui/AssetAvatar';
 import Sparkline from '@/components/asset/Sparkline';
+import { useDisplayCurrency } from '@/hooks/useDisplayCurrency';
 import type { AssetType, MarketAsset } from '@/types';
 import { assetHref } from './MarketTable';
 import PriceTick from './PriceTick';
@@ -19,7 +20,7 @@ interface Props {
   label?: string;
   /** 7 günlük seri (verilirse sağ altta mini grafik çizilir) */
   sparkline?: readonly number[] | null;
-  /** USD fiyatını küçük satırda göster */
+  /** Diğer birimdeki fiyatı (TL görünümde USD, USD görünümde TL) küçük satırda göster */
   showUSD?: boolean;
   className?: string;
 }
@@ -29,6 +30,10 @@ export default function AssetQuoteCard({ asset, fallback, loading, label, sparkl
   const type = asset?.type ?? fallback.type;
   const symbol = asset?.symbol ?? fallback.symbol;
   const name = asset?.name ?? fallback.name ?? symbol;
+  const dc = useDisplayCurrency();
+  // "USD/TRY", "EUR/TRY" gibi kur çifti kartları her zaman TL kurunu gösterir
+  const pairTRY = type === 'currency' && /\/TRY$/i.test(label ?? '');
+  const secondary = showUSD && asset ? dc.assetSecondary(asset, { pairTRY }) : null;
 
   if (loading && !asset) {
     return (
@@ -63,9 +68,9 @@ export default function AssetQuoteCard({ asset, fallback, loading, label, sparkl
       <div className="mt-4 flex flex-wrap items-end justify-between gap-x-3 gap-y-1.5 sm:mt-5">
         <div className="min-w-0">
           <PriceTick value={asset?.priceTRY ?? null} className="block truncate text-base font-semibold text-fg sm:text-lg">
-            {asset?.priceTRY != null ? formatTRY(asset.priceTRY, { precise: true }) : '—'}
+            {asset ? dc.assetPrice(asset, { pairTRY }) : '—'}
           </PriceTick>
-          {showUSD && asset?.priceUSD != null && <p className="num truncate text-xs text-subtle">{formatUSD(asset.priceUSD, { precise: true })}</p>}
+          {secondary && <p className="num truncate text-xs text-subtle">{secondary}</p>}
         </div>
         <div className="flex items-center gap-2">
           {sparkline !== undefined && asset && <Sparkline values={sparkline} width={56} height={22} className="max-sm:hidden" />}

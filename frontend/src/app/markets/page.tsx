@@ -16,6 +16,8 @@ import MarketTable from '@/components/market/MarketTable';
 import MarketStatus from '@/components/asset/MarketStatus';
 import TopAssetCards, { type AssetRef } from '@/components/market/TopAssetCards';
 import { useWatchlistAssets } from '@/components/market/WatchlistPanel';
+import { useDisplayCurrency } from '@/hooks/useDisplayCurrency';
+import { DISPLAY_CURRENCY_NAMES, fxSourceLabel } from '@/lib/displayCurrency';
 import type { AssetType, MarketAsset } from '@/types';
 
 type MarketTab = AssetType | 'watchlist';
@@ -47,13 +49,14 @@ export default function MarketsPage() {
 
 function Markets() {
   const { user, ready } = useRequireAuth();
+  const dc = useDisplayCurrency();
   if (!ready || !user) return <PageLoader />;
 
   return (
     <div className="space-y-4 md:space-y-6">
       <PageTitle
         title="Piyasalar"
-        description="Hisse, kripto, döviz ve emtia fiyatları — tümü Türk lirası bazında"
+        description={`Hisse, kripto, döviz ve emtia fiyatları — tümü ${DISPLAY_CURRENCY_NAMES[dc.currency]} bazında`}
         crumbs={[{ label: 'Panel', href: '/' }, { label: 'Piyasalar' }]}
       />
       <section aria-label="Piyasa özeti">
@@ -67,6 +70,8 @@ function Markets() {
 function MarketsCard() {
   const search = useSearchParams();
   const market = useMarket();
+  const dc = useDisplayCurrency();
+  const fxNote = fxSourceLabel(market.fxSource);
   const watch = useWatchlist();
   const { assets: watchAssets } = useWatchlistAssets();
   const tabParam = search.get('tab') as MarketTab | null;
@@ -102,8 +107,11 @@ function MarketsCard() {
           <p className="mt-1 text-sm text-muted">
             {market.usdTry ? (
               <>
-                USD/TRY <span className="num font-medium text-fg">{market.usdTry.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 4 })}</span> ile
-                TL’ye çevrilir
+                USD/TRY <span className="num font-medium text-fg">{market.usdTry.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 4 })}</span>
+                {dc.currency === 'USD'
+                  ? ' · hisse ve kripto kendi USD fiyatıyla, döviz ve TL kotasyonlu emtia bu kurla USD’ye çevrilir'
+                  : ' ile TL’ye çevrilir'}
+                {fxNote && <span className="text-subtle"> · {fxNote}</span>}
               </>
             ) : (
               'Canlı fiyatlar, 15 saniyede bir yenilenir'
@@ -128,6 +136,8 @@ function MarketsCard() {
       </div>
 
       <MarketTable
+        key={tab}
+        pageSize={25}
         assets={assets}
         loading={tab === 'watchlist' ? watch.isLoading || market.isLoading : market.isLoading}
         error={tab === 'watchlist' ? watch.error : market.errors[tab]}

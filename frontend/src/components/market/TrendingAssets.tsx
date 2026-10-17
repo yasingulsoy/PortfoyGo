@@ -6,7 +6,8 @@ import { ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/20/solid';
 import { FireIcon } from '@heroicons/react/24/outline';
 import { useMarket } from '@/hooks/useMarketData';
 import { useTrade } from '@/components/trade/TradeProvider';
-import { cn, formatTRY } from '@portfoygo/shared/format';
+import { cn } from '@portfoygo/shared/format';
+import { useDisplayCurrency } from '@/hooks/useDisplayCurrency';
 import { Card, CardHeader } from '@portfoygo/shared/ui/Card';
 import { Delta } from '@portfoygo/shared/ui/Delta';
 import Button from '@portfoygo/shared/ui/Button';
@@ -35,6 +36,7 @@ const roundBtn =
 /** TailAdmin "Trending Stocks": yatay kaydırılabilir varlık karoları, Sat / Al düğmeleriyle. */
 export default function TrendingAssets({ className }: { className?: string }) {
   const market = useMarket();
+  const dc = useDisplayCurrency();
   const { openTrade } = useTrade();
   const scroller = useRef<HTMLUListElement>(null);
   const movers = useMemo(() => topMovers(market.byType), [market.byType]);
@@ -90,7 +92,7 @@ export default function TrendingAssets({ className }: { className?: string }) {
                 </Link>
                 <div className="shrink-0 text-right">
                   <PriceTick value={a.priceTRY} className="block text-sm font-semibold text-fg">
-                    {formatTRY(a.priceTRY, { precise: true })}
+                    {dc.assetPrice(a)}
                   </PriceTick>
                   <Delta value={a.changePercent} variant="text" className="text-xs" />
                 </div>

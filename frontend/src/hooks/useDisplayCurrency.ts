@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useMemo, useSyncExternalStore } from 'react';
+import { formatMoney, formatMoneyCompact } from '@portfoygo/shared/format';
 import { useCurrencies } from '@/hooks/useMarketData';
 import {
   DISPLAY_CURRENCY_STORAGE_KEY,
@@ -80,7 +81,32 @@ export interface DisplayCurrencyApi {
   alt: (valueTRY: number | null | undefined, opts?: DisplayMoneyOptions) => string | null;
   /** Kısa tutar ("$3,4 B") */
   compact: (valueTRY: number | null | undefined, nativeUSD?: number | null) => string;
+  /** USD tutarın (piyasa değeri, hacim) kısa gösterimi görüntüleme biriminde; bilinmiyorsa "—" */
+  compactUSD: (valueUSD: number | null | undefined) => string;
+  /**
+   * Fiyatın diğer birimdeki karşılığı (tablo ikincil satırı): TL görünümde yalnızca USD kotasyonlu varlıklar için
+   * kendi USD fiyatı, USD görünümde TL fiyatı; yoksa null.
+   */
+  secondaryPrice: (priceTRY: number | null | undefined, priceUSD: number | null | undefined) => string | null;
+  /**
+   * Varlığın birim fiyatı: hisse/kripto USD görünümde kendi USD kotasyonu; döviz çapraz kurla (EUR → $1,13).
+   * USD'nin kendisi (ve `pairTRY` ile "EUR/TRY" gibi kur çifti kartları) her zaman TL kurudur — "$1,00" anlamsız.
+   */
+  assetPrice: (a: PricedAsset, opts?: { pairTRY?: boolean }) => string;
+  /** Tablo/kart ikincil satırı (diğer birim); kur çiftlerinde null */
+  assetSecondary: (a: PricedAsset, opts?: { pairTRY?: boolean }) => string | null;
 }
+
+export interface PricedAsset {
+  type: string;
+  symbol: string;
+  priceTRY: number | null;
+  priceUSD: number | null;
+}
+
+/** TL kuru olarak gösterilmesi gereken varlık mı (USD/TRY, ya da açıkça "X/TRY" kur çifti) */
+export const isTryPair = (a: Pick<PricedAsset, 'type' | 'symbol'>, pairTRY?: boolean) =>
+  a.type === 'currency' && (pairTRY === true || a.symbol.toUpperCase() === 'USD');
 
 /**
  * Site geneli TL / USD görüntüleme tercihi + kur. Para gösteren her bileşen bunu kullanır; tercih değişince
@@ -92,6 +118,13 @@ export function useDisplayCurrency(): DisplayCurrencyApi {
   const ctx = useMemo<MoneyContext>(() => ({ currency: preference, usdTry }), [preference, usdTry]);
   const currency = resolveCurrency(ctx);
   const toggle = useCallback(() => setCurrency(preference === 'USD' ? 'TRY' : 'USD'), [preference, setCurrency]);
+  const secondaryPrice = useCallback(
+    (priceTRY: number | null | undefined, priceUSD: number | null | undefined): string | null => {
+      if (currency === 'USD') return priceTRY != null && Number.isFinite(priceTRY) ? formatMoney(priceTRY, 'TRY', { precise: true }) : null;
+      return priceUSD != null && Number.isFinite(priceUSD) ? formatMoney(priceUSD, 'USD', { precise: true }) : null;
+    },
+    [currency],
+  );
 
   return useMemo<DisplayCurrencyApi>(
     () => ({
@@ -107,7 +140,18 @@ export function useDisplayCurrency(): DisplayCurrencyApi {
       money: (v, opts) => formatDisplayMoney(v, ctx, opts),
       alt: (v, opts) => formatAlternateMoney(v, ctx, opts),
       compact: (v, nativeUSD) => formatDisplayCompact(v, ctx, nativeUSD),
+      compactUSD: (v) => {
+        const c = convertFromUSD(v, ctx);
+        return c == null || c === 0 ? '—' : formatMoneyCompact(c, currency);
+      },
+      secondaryPrice,
+      assetPrice: (a, opts) => {
+        if (isTryPair(a, opts?.pairTRY)) return a.priceTRY != null ? formatMoney(a.priceTRY, 'TRY', { precise: true }) : '—';
+        if (a.priceTRY == null && !(currency === 'USD' && a.priceUSD != null)) return '—';
+        return formatDisplayMoney(a.priceTRY, ctx, { precise: true, nativeUSD: a.priceUSD });
+      },
+      assetSecondary: (a, opts) => (isTryPair(a, opts?.pairTRY) ? null : secondaryPrice(a.priceTRY, a.priceUSD)),
     }),
-    [preference, currency, usdTry, ctx, setCurrency, toggle],
+    [preference, currency, usdTry, ctx, setCurrency, toggle, secondaryPrice],
   );
 }

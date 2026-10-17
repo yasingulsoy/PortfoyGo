@@ -2,7 +2,8 @@
 
 import { useNow } from '@/hooks/useNow';
 import { formatTrClock } from '@/lib/marketHours';
-import { cn, formatTRY, formatUSD, trend } from '@portfoygo/shared/format';
+import { cn, formatMoney, trend } from '@portfoygo/shared/format';
+import { isTryPair, useDisplayCurrency } from '@/hooks/useDisplayCurrency';
 import { Card } from '@portfoygo/shared/ui/Card';
 import { Delta } from '@portfoygo/shared/ui/Delta';
 import Button from '@portfoygo/shared/ui/Button';
@@ -30,8 +31,14 @@ interface Props {
 /** Varlık sayfası başlık kartı: büyük simge, isim, sembol/tür etiketi, piyasa durumu, fiyat ve Al / Sat. */
 export default function AssetHeaderCard({ asset, stale, canSell, onBuy, onSell }: Props) {
   const now = useNow(30_000);
+  const dc = useDisplayCurrency();
   const price = asset.priceTRY;
-  const abs = absoluteChange(price, asset.changePercent);
+  // Görüntüleme biriminde fiyat (hisse/kripto USD görünümde kendi USD kotasyonu; USD/TRY her zaman TL kuru)
+  const pair = isTryPair(asset);
+  const shownCurrency = pair ? 'TRY' : dc.currency;
+  const shownPrice = pair ? price : dc.convert(price, asset.priceUSD);
+  const abs = absoluteChange(shownPrice, asset.changePercent);
+  const secondary = price != null ? dc.assetSecondary(asset) : null;
   const t = trend(asset.changePercent);
 
   return (
@@ -74,13 +81,13 @@ export default function AssetHeaderCard({ asset, stale, canSell, onBuy, onSell }
 
       <div className="mt-6 flex flex-wrap items-baseline gap-x-3 gap-y-1">
         <p className="min-w-0 truncate text-4xl font-semibold tracking-tight text-fg sm:text-5xl">
-          <PriceTick value={price}>{price != null ? formatTRY(price, { precise: true }) : '—'}</PriceTick>
+          <PriceTick value={price}>{dc.assetPrice(asset)}</PriceTick>
         </p>
-        {asset.priceUSD != null && price != null && <span className="num text-base font-medium text-muted">{formatUSD(asset.priceUSD, { precise: true })}</span>}
+        {secondary && <span className="num text-base font-medium text-muted">{secondary}</span>}
       </div>
       <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
         {abs != null && (
-          <span className={cn('num font-medium', t === 'up' ? 'text-up' : t === 'down' ? 'text-down' : 'text-muted')}>{formatTRY(abs, { precise: true, sign: true })}</span>
+          <span className={cn('num font-medium', t === 'up' ? 'text-up' : t === 'down' ? 'text-down' : 'text-muted')}>{formatMoney(abs, shownCurrency, { precise: true, sign: true })}</span>
         )}
         <Delta value={asset.changePercent} />
         <span className="text-muted">{asset.type === 'stock' ? 'günlük' : 'son 24 saat'}</span>
