@@ -12,7 +12,7 @@ import AllocationDonutCard from '@/components/dashboard/AllocationDonutCard';
 import LeadersCard from '@/components/dashboard/LeadersCard';
 import RecentTransactionsCard from '@/components/dashboard/RecentTransactionsCard';
 import LatestNewsCard from '@/components/dashboard/LatestNewsCard';
-import TopAssetCards from '@/components/market/TopAssetCards';
+import MarketTicker from '@/components/market/MarketTicker';
 import TrendingAssets from '@/components/market/TrendingAssets';
 import WatchlistPanel from '@/components/market/WatchlistPanel';
 
@@ -39,10 +39,8 @@ export default function DashboardPage() {
 
       <OnboardingGuide />
 
-      {/* 1. satır: izleme listesi / popüler varlık kartları */}
-      <section aria-label="Öne çıkan varlıklar">
-        <TopAssetCards />
-      </section>
+      {/* 1. satır: kayan piyasa şeridi (ABD hisseleri / kripto / döviz / emtia / izleme listesi) */}
+      <MarketTicker />
 
       {/* 2. satır: performans grafiği + dağılım ve izleme listesi */}
       <div className="grid grid-cols-1 gap-4 md:gap-6 xl:grid-cols-12">

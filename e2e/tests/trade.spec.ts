@@ -37,12 +37,14 @@ async function pickStock(page: Page): Promise<string> {
   return symbol!;
 }
 
-async function openMarketsTab(page: Page, tab: RegExp) {
+async function openMarketsTab(page: Page, tab: RegExp, symbol?: string) {
   await page.goto('/markets');
   // İzleme listesi doluysa varsayılan sekme o olabilir: açıkça istenen sekmeye geç
   const t = page.getByRole('tablist', { name: 'Piyasa türü' }).getByRole('tab', { name: tab });
   await t.click();
   await expect(t).toHaveAttribute('aria-selected', 'true');
+  // Uzun listeler sayfalıdır (ilk 25 satır + "Daha fazla göster"): varlığı aramayla bul
+  if (symbol) await page.getByRole('searchbox', { name: 'Varlık ara' }).fill(symbol);
   return page.getByRole('table');
 }
 
@@ -62,7 +64,7 @@ async function sellExactly(page: Page, symbol: string, quantity: number) {
 test('(d) piyasalardan 1000 TL kripto al, portföyde gör, kısmi kapatma kısayolu, sonra aynı miktarı geri sat', async ({ page }) => {
   const symbol = await pickCrypto(page);
   const before = await heldQuantity(page, symbol, 'crypto');
-  const table = await openMarketsTab(page, /Kripto/);
+  const table = await openMarketsTab(page, /Kripto/, symbol);
 
   // --- Alış ---
   await table.getByRole('button', { name: `${symbol} al` }).click();
@@ -108,7 +110,7 @@ test('(e) hisse: borsa açıksa al/sat; kapalıysa "Açılışta gerçekleştir"
   const symbol = await pickStock(page);
   const before = await heldQuantity(page, symbol, 'stock');
   const reservedBefore = await reservedCash(page);
-  const table = await openMarketsTab(page, /Hisse/);
+  const table = await openMarketsTab(page, /Hisse/, symbol);
 
   await expect(page.getByText(session.open ? 'Piyasa açık' : 'Piyasa kapalı').first()).toBeVisible();
   await table.getByRole('button', { name: `${symbol} al` }).click();

@@ -112,6 +112,9 @@ export async function startLocalDb(opts: StartLocalDbOptions = {}): Promise<Loca
     if (ph.seeded.length > 0) {
       log(`Fiyat geçmişi örnek verisi: ${ph.seeded.length} varlık, ${ph.rows} satır (${ph.skipped} varlık zaten hazırdı)`);
     }
+    if (ph.rebased.length > 0) {
+      log(`Eski düzeyde kalmış sentetik geçmiş güncel fiyata yeniden çapalandı: ${ph.rebased.join(', ')}`);
+    }
 
     const arena = await seedArena(pool);
     if (arena.commodities.length > 0 || arena.upcomingCreated || arena.finishedCreated) {

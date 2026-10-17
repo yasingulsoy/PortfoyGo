@@ -58,10 +58,11 @@ const toChartTime = (t: number) => t - new Date(t * 1000).getTimezoneOffset() * 
 
 type ChartHandle = { chart: IChartApi; series: ISeriesApi<'Area'> };
 
-function paint(handle: ChartHandle, points: HistoryPoint[], up: boolean) {
+/** factor: TL seriyi görüntüleme birimine çevirir (USD görünümde 1 / USD-TRY); ipucu/değerler TL noktalarından okunur */
+function paint(handle: ChartHandle, points: HistoryPoint[], up: boolean, factor = 1) {
   const color = cssVar(up ? '--up' : '--down');
   handle.series.applyOptions({ lineColor: color, topColor: color + '33', bottomColor: color + '00' });
-  handle.series.setData(points.map((p) => ({ time: toChartTime(p.t) as never, value: p.value })));
+  handle.series.setData(points.map((p) => ({ time: toChartTime(p.t) as never, value: p.value * factor })));
   handle.chart.timeScale().fitContent();
 }
 
@@ -93,7 +94,8 @@ export default function PerformanceChart({ compact = false, className }: Props) 
 
   const containerRef = useRef<HTMLDivElement>(null);
   const handleRef = useRef<ChartHandle | null>(null);
-  const latest = useRef({ points, up });
+  const factor = dc.currency === 'USD' && dc.usdTry ? 1 / dc.usdTry : 1;
+  const latest = useRef({ points, up, factor });
 
   // Grafik örneği: veri varken bir kez oluşturulur; tema / yoğunluk değişince yeniden kurulur
   useEffect(() => {
@@ -123,7 +125,7 @@ export default function PerformanceChart({ compact = false, className }: Props) 
       const series = chart.addSeries(lc.AreaSeries, { lineWidth: 2, priceLineVisible: false, lastValueVisible: !compact });
       const handle = { chart, series };
       handleRef.current = handle;
-      paint(handle, latest.current.points, latest.current.up);
+      paint(handle, latest.current.points, latest.current.up, latest.current.factor);
 
       chart.subscribeCrosshairMove((param) => {
         if (param.time === undefined || !param.point) {
@@ -144,9 +146,9 @@ export default function PerformanceChart({ compact = false, className }: Props) 
 
   // Yeni veri (aralık değişimi / periyodik yenileme): grafiği yeniden kurmadan güncelle
   useEffect(() => {
-    latest.current = { points, up };
-    if (handleRef.current && points.length >= 2) paint(handleRef.current, points, up);
-  }, [points, up]);
+    latest.current = { points, up, factor };
+    if (handleRef.current && points.length >= 2) paint(handleRef.current, points, up, factor);
+  }, [points, up, factor]);
 
   const caption = hover ? (range === '1W' ? formatDateTime(hover.t * 1000) : formatDate(hover.t * 1000)) : RANGE_CAPTION[range];
   const shownValue = hover?.value ?? data?.endValue ?? 0;

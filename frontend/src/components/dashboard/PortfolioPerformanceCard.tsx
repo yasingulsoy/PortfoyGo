@@ -10,7 +10,7 @@ import { useLivePortfolio } from '@/context/PortfolioContext';
 import type { PortfolioHistory } from '@/components/portfolio/PerformanceChart';
 import { chartFont, cssVar, useDocumentTheme, withAlpha } from '@/components/asset/chartTheme';
 import { STARTING_BALANCE } from '@/lib/constants';
-import { cn } from '@portfoygo/shared/format';
+import { cn, formatMoney } from '@portfoygo/shared/format';
 import { useDisplayCurrency } from '@/hooks/useDisplayCurrency';
 import { Card, CardHeader } from '@portfoygo/shared/ui/Card';
 import { Delta, Money } from '@portfoygo/shared/ui/Delta';
@@ -53,9 +53,9 @@ export default function PortfolioPerformanceCard({ className }: { className?: st
   const { totals, loaded } = useLivePortfolio();
   const dc = useDisplayCurrency();
   // Grafik bir kez kurulur; ipucu biçimlendiricisi güncel görüntüleme birimini ref'ten okur
-  const moneyRef = useRef(dc.money);
+  const moneyRef = useRef((v: number) => formatMoney(v, dc.currency));
   useEffect(() => {
-    moneyRef.current = dc.money;
+    moneyRef.current = (v: number) => formatMoney(v, dc.currency);
   });
   const docTheme = useDocumentTheme();
   const [range, setRange] = useState<Range>('1M');
@@ -67,11 +67,14 @@ export default function PortfolioPerformanceCard({ className }: { className?: st
     refreshInterval: 5 * 60_000,
   });
 
+  // Seri TL'dir; USD görünümde güncel kurla çevrilir (eksen ve ipucu aynı birimde). İpucu zaten çevrilmiş değeri
+  // görüntüleme biriminde biçimler (TL değeri değil), bu yüzden ref'teki biçimlendirici yalnızca birimi ekler.
+  const factor = dc.currency === 'USD' && dc.usdTry ? 1 / dc.usdTry : 1;
   const series = useMemo(() => {
     const seen = new Map<number, number>();
-    for (const p of data?.points ?? []) if (Number.isFinite(p.t) && Number.isFinite(p.value)) seen.set(Math.floor(p.t), p.value);
+    for (const p of data?.points ?? []) if (Number.isFinite(p.t) && Number.isFinite(p.value)) seen.set(Math.floor(p.t), p.value * factor);
     return [...seen.entries()].sort((a, b) => a[0] - b[0]).map(([t, value]) => ({ time: t as UTCTimestamp, value }));
-  }, [data]);
+  }, [data, factor]);
   const hasData = series.length >= 2;
 
   const containerRef = useRef<HTMLDivElement>(null);

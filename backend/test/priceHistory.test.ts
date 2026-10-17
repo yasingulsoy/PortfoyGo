@@ -444,6 +444,50 @@ describe('PriceHistoryService (PGlite)', () => {
   });
 });
 
+describe('seedMarketData (PGlite, yerel tohum)', () => {
+  it('yeni sembolleri ekler; simülasyon değerini korur, eski düzeyi güncel tohuma çeker', async () => {
+    const { PGlite } = await import('@electric-sql/pglite');
+    const db = new PGlite();
+    try {
+      for (const f of MIGRATIONS) {
+        await db.exec(fs.readFileSync(path.resolve(__dirname, '../migrations', f), 'utf8'));
+      }
+      const fakePool: any = {
+        query: async (text: string, params?: unknown[]) => {
+          const r = await db.query(text, params ?? []);
+          return { rows: r.rows, rowCount: r.affectedRows ?? r.rows.length };
+        },
+      };
+      const { seedMarketData, MARKET_SEED, CURRENCY_SEED } = await import('../src/dev/seed');
+      await seedMarketData(fakePool);
+      const n = await db.query<{ n: number }>(`SELECT count(*)::int AS n FROM market_data_cache`);
+      expect(n.rows[0].n).toBe(MARKET_SEED.length);
+      expect(MARKET_SEED.filter((m) => m.asset_type === 'stock').length).toBeGreaterThanOrEqual(30);
+      expect(MARKET_SEED.filter((m) => m.asset_type === 'crypto').length).toBe(50);
+
+      const btc = MARKET_SEED.find((m) => m.symbol === 'BTC')!.price;
+      const usd = CURRENCY_SEED.find((c) => c.code === 'USD')!.selling;
+      // ETH simülasyonla biraz oynamış (korunur), BTC ve USD eski tohum düzeyinde (yeniden çapalanır)
+      await db.query(`UPDATE market_data_cache SET price = price * 1.03 WHERE symbol = 'ETH'`);
+      await db.query(`UPDATE market_data_cache SET price = $1 WHERE symbol = 'BTC'`, [btc * 1.45]);
+      await db.query(`UPDATE currency_rates SET selling = $1, buying = $1 WHERE code = 'USD'`, [usd * 0.85]);
+      await db.query(`UPDATE currency_rates SET selling = selling * 1.02 WHERE code = 'EUR'`);
+      await seedMarketData(fakePool);
+
+      const price = async (sym: string) =>
+        (await db.query<{ p: number }>(`SELECT price::float AS p FROM market_data_cache WHERE symbol = $1`, [sym])).rows[0].p;
+      const rate = async (code: string) =>
+        (await db.query<{ s: number }>(`SELECT selling::float AS s FROM currency_rates WHERE code = $1`, [code])).rows[0].s;
+      expect(await price('BTC')).toBe(btc);
+      expect(await price('ETH')).toBeCloseTo(MARKET_SEED.find((m) => m.symbol === 'ETH')!.price * 1.03, 6);
+      expect(await rate('USD')).toBe(usd);
+      expect(await rate('EUR')).toBeCloseTo(CURRENCY_SEED.find((c) => c.code === 'EUR')!.selling * 1.02, 6);
+    } finally {
+      await db.close();
+    }
+  }, 60_000);
+});
+
 describe('seedPriceHistory (PGlite, idempotent)', () => {
   it('önbellekteki varlıklar için geçmiş üretir, ikinci çalıştırmada atlar', async () => {
     const { PGlite } = await import('@electric-sql/pglite');
@@ -475,8 +519,22 @@ describe('seedPriceHistory (PGlite, idempotent)', () => {
 
       const second = await seedPriceHistory(fakePool, now);
       expect(second.seeded).toEqual([]);
+      expect(second.rebased).toEqual([]);
       expect(second.skipped).toBe(2);
       expect(second.rows).toBe(0);
+
+      // Güncel fiyat eski sentetik düzeyden %25'ten fazla saptı (ör. canlı fiyat geldi): geçmiş yeniden çapalanır
+      await db.query(`UPDATE market_data_cache SET price = 400 WHERE symbol = 'AAPL'`);
+      const third = await seedPriceHistory(fakePool, now);
+      expect(third.rebased).toEqual(['stock:AAPL']);
+      expect(third.seeded).toEqual(['stock:AAPL']);
+      const rebased = await db.query<{ price: number }>(
+        `SELECT price::float AS price FROM price_history WHERE symbol = 'AAPL' AND granularity = 'day' ORDER BY bucket_start DESC LIMIT 1`
+      );
+      expect(rebased.rows[0].price).toBe(400);
+      // Döviz daha sıkı eşikle (%10): 43,96 → 49,45
+      await db.query(`UPDATE currency_rates SET selling = 49.45 WHERE code = 'USD'`);
+      expect((await seedPriceHistory(fakePool, now)).rebased).toEqual(['currency:USD']);
     } finally {
       await db.close();
     }

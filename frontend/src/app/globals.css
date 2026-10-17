@@ -3,3 +3,20 @@
 
 /* Ortak paketteki bileşenlerin sınıflarını da tara */
 @source "../../../packages/shared/src";
+
+/* Piyasa şeridi (components/market/MarketTicker.tsx): şerit iki özdeş yarıdan oluşur; -%50 kaydırma dikişsiz döngü verir.
+   Fareyle üzerine gelince, klavye odağında ve "Durdur" ile durur. Hareket azaltma tercihinde kaymaz, kaydırılabilir. */
+@keyframes ticker-scroll {
+  from { transform: translate3d(0, 0, 0); }
+  to { transform: translate3d(-50%, 0, 0); }
+}
+.ticker-viewport { overflow: hidden; }
+.ticker-track { animation: ticker-scroll var(--ticker-duration, 60s) linear infinite; will-change: transform; }
+.ticker-viewport:hover .ticker-track,
+.ticker-viewport:focus-within .ticker-track,
+.ticker-viewport[data-paused] .ticker-track { animation-play-state: paused; }
+@media (prefers-reduced-motion: reduce) {
+  .ticker-viewport { overflow-x: auto; }
+  .ticker-track { animation: none !important; transform: none; }
+  .ticker-dup { display: none; }
+}
