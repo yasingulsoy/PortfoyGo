@@ -1,6 +1,6 @@
 // Piyasa şeridi (MarketTicker) — saf yardımcılar: sekmeler, öğe biçimleme, kesintisiz kayan şerit için çoğaltma ve süre.
 
-import { formatMoney, formatPercent, trend } from '@portfoygo/shared/format';
+import { changeDigits, formatMoney, formatPercent, trend } from '@portfoygo/shared/format';
 import { absoluteChange } from '@/components/asset/AssetHeaderCard';
 import { convertFromTRY, resolveCurrency, validRate, type DisplayCurrency, type MoneyContext } from '@/lib/displayCurrency';
 import type { MarketAsset } from '@/types';
@@ -67,7 +67,7 @@ export function tickerItem(a: MarketAsset, ctx: MoneyContext): TickerItem | null
     name: a.name,
     image: a.image,
     price,
-    change: abs == null ? null : formatMoney(abs, cur, { precise: true, sign: true }),
+    change: abs == null ? null : formatMoney(abs, cur, { digits: changeDigits(value), sign: true }),
     percent: formatPercent(a.changePercent),
     trend: trend(a.changePercent),
   };

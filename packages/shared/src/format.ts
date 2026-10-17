@@ -20,6 +20,14 @@ function precisionFor(value: number): number {
 export interface MoneyFormatOptions {
   precise?: boolean;
   sign?: boolean;
+  /** Ondalık hane sayısını zorla (precise'tan önceliklidir) */
+  digits?: number;
+}
+
+/** Fiyat değişimi için ondalık: değişim fiyatın büyüklüğüne göre yazılır ("+$0,0042" kur, "+₺12,30" hisse) */
+export function changeDigits(price: number | null | undefined): number {
+  const p = Math.abs(safe(price));
+  return p >= 10 ? 2 : p >= 1 ? 4 : p >= 0.01 ? 6 : 8;
 }
 
 /** Arayüzde gösterilebilen para birimleri (TL / ABD doları) */
@@ -29,7 +37,7 @@ const trMoneyFmt: Record<MoneyCurrency, Intl.NumberFormat> = { TRY: tryFmt, USD:
 
 function formatTrMoney(value: number | null | undefined, currency: MoneyCurrency, opts: MoneyFormatOptions): string {
   const raw = safe(value);
-  const digits = opts.precise ? precisionFor(raw) : 2;
+  const digits = opts.digits != null && opts.digits >= 0 && opts.digits <= 10 ? Math.round(opts.digits) : opts.precise ? precisionFor(raw) : 2;
   // Kuruş/sent altı değerleri yuvarla; "-₺0,00" görünmesin
   // Kayan nokta hatasını telafi ederek yarımları sıfırdan uzağa yuvarla (12,345 → 12,35)
   const v = digits === 2 ? (Math.sign(raw) * Math.round(Math.abs(raw) * 100 + 1e-7)) / 100 || 0 : raw;

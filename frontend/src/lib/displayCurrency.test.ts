@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatMoney, formatMoneyCompact } from '@portfoygo/shared/format';
+import { changeDigits, formatMoney, formatMoneyCompact } from '@portfoygo/shared/format';
 import {
   convertFromTRY,
   convertFromUSD,
@@ -28,6 +28,13 @@ describe('formatMoney (shared, tr-TR)', () => {
     expect(norm(formatMoney(-0.001, 'USD'))).toBe('$0,00');
     expect(norm(formatMoney(0.00001234, 'USD', { precise: true }))).toBe('$0,00001234');
     expect(norm(formatMoney(null, 'USD'))).toBe('$0,00');
+  });
+
+  it('değişim hanesi fiyatın büyüklüğüne göre; digits önceliklidir', () => {
+    expect(norm(formatMoney(0.0041867, 'USD', { digits: changeDigits(1.12), sign: true }))).toBe('+$0,0042');
+    expect(norm(formatMoney(3.73, 'USD', { digits: changeDigits(240.19), sign: true }))).toBe('+$3,73');
+    expect(changeDigits(0.5)).toBe(6);
+    expect(changeDigits(0.000005)).toBe(8);
   });
 
   it('kısa tutar', () => {

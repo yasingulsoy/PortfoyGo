@@ -2,7 +2,7 @@
 
 import { useNow } from '@/hooks/useNow';
 import { formatTrClock } from '@/lib/marketHours';
-import { cn, formatMoney, trend } from '@portfoygo/shared/format';
+import { changeDigits, cn, formatMoney, trend } from '@portfoygo/shared/format';
 import { isTryPair, useDisplayCurrency } from '@/hooks/useDisplayCurrency';
 import { Card } from '@portfoygo/shared/ui/Card';
 import { Delta } from '@portfoygo/shared/ui/Delta';
@@ -87,7 +87,7 @@ export default function AssetHeaderCard({ asset, stale, canSell, onBuy, onSell }
       </div>
       <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
         {abs != null && (
-          <span className={cn('num font-medium', t === 'up' ? 'text-up' : t === 'down' ? 'text-down' : 'text-muted')}>{formatMoney(abs, shownCurrency, { precise: true, sign: true })}</span>
+          <span className={cn('num font-medium', t === 'up' ? 'text-up' : t === 'down' ? 'text-down' : 'text-muted')}>{formatMoney(abs, shownCurrency, { digits: changeDigits(shownPrice), sign: true })}</span>
         )}
         <Delta value={asset.changePercent} />
         <span className="text-muted">{asset.type === 'stock' ? 'günlük' : 'son 24 saat'}</span>

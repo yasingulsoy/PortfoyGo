@@ -202,7 +202,7 @@ function Header({ headerActions, onSearch, searchPlaceholder = 'Ara veya komut y
   return (
     <header className="sticky top-0 z-30 flex w-full border-b border-line bg-surface">
       <div className="flex w-full items-center justify-between gap-3 px-3 py-3 lg:px-6 lg:py-4">
-        <div className="flex min-w-0 items-center gap-2 sm:gap-4">
+        <div className="flex min-w-0 items-center gap-1.5 sm:gap-4">
           <button
             type="button"
             onClick={toggle}
@@ -233,7 +233,7 @@ function Header({ headerActions, onSearch, searchPlaceholder = 'Ara veya komut y
             </button>
           )}
         </div>
-        <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+        <div className="flex shrink-0 items-center gap-1.5 sm:gap-3">
           {onSearch && (
             <button
               type="button"

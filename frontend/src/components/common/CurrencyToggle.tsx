@@ -30,7 +30,9 @@ export default function CurrencyToggle({ size = 'header', className }: { size?: 
             title={`Fiyatları ${DISPLAY_CURRENCY_NAMES[c]} olarak göster`}
             onClick={() => setCurrency(c)}
             className={cn(
-              'num flex h-full min-w-9 items-center justify-center rounded-full px-2 text-xs font-semibold transition-colors sm:min-w-11 sm:px-3 sm:text-sm',
+              'num flex h-full items-center justify-center rounded-full font-semibold transition-colors',
+              // Dar ekranda üst çubuktaki düğmelere yer kalsın diye sıkı; sm+ rahat
+              size === 'header' ? 'min-w-7 px-1.5 text-[11px] sm:min-w-11 sm:px-3 sm:text-sm' : 'min-w-12 px-3 text-sm',
               active ? 'bg-brand text-brand-fg shadow-card' : 'text-muted hover:text-fg',
             )}
           >
