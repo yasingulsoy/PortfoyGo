@@ -38,6 +38,10 @@ export interface RateQuote {
   price?: number;
   change_rate: number;
   datetime?: string;
+  /** Döviz: sunucunun etkin kur kaynağı (ör. 'tcmb', 'frankfurter', 'nosyapi') */
+  source?: string;
+  /** Emtia: 'TRY' (GAU, *TRY) ya da 'USD' */
+  quote_currency?: 'TRY' | 'USD';
 }
 
 /* ---------- UI'nin kullandığı normalize edilmiş varlık modeli ---------- */

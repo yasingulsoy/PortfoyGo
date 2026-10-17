@@ -24,10 +24,11 @@ import SidebarLayout, { type SidebarSection } from '@portfoygo/shared/ui/Sidebar
 import ThemeToggle from '@portfoygo/shared/ui/ThemeToggle';
 import AnimatedNumber from '@portfoygo/shared/ui/AnimatedNumber';
 import { Delta } from '@portfoygo/shared/ui/Delta';
-import { formatTRY } from '@portfoygo/shared/format';
 import { useAuth } from '@/context/AuthContext';
 import { useLivePortfolio } from '@/context/PortfolioContext';
 import { openCommandPalette } from '@/components/command/events';
+import CurrencyToggle from '@/components/common/CurrencyToggle';
+import { useDisplayCurrency } from '@/hooks/useDisplayCurrency';
 import { STARTING_BALANCE } from '@/lib/constants';
 import { ADMIN_URL } from '@/lib/site';
 import TopBar from './TopBar';
@@ -110,6 +111,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
       footer={<NetWorthWidget />}
       headerActions={
         <>
+          <CurrencyToggle />
           <ThemeToggle />
           <NotificationBell />
           <UserMenu />
@@ -124,17 +126,18 @@ export default function AppShell({ children }: { children: ReactNode }) {
 /** Menünün altındaki özet kart (TailAdmin'deki alt kutu). */
 function NetWorthWidget() {
   const { balance, totals, loaded } = useLivePortfolio();
+  const dc = useDisplayCurrency();
   if (!loaded) return null;
   const change = ((totals.netWorth - STARTING_BALANCE) / STARTING_BALANCE) * 100;
   return (
     <Link href="/portfolio" className="block rounded-2xl bg-surface-2 px-4 py-5 text-center transition-colors hover:bg-surface-3">
       <p className="text-xs font-medium uppercase tracking-wide text-subtle">Toplam varlık</p>
       <p className="mt-1.5 text-xl font-semibold text-fg">
-        <AnimatedNumber value={totals.netWorth} format={formatTRY} />
+        <AnimatedNumber value={totals.netWorth} format={(n) => dc.money(n)} />
       </p>
       <div className="mt-2 flex items-center justify-center gap-2 text-xs">
         <Delta value={change} />
-        <span className="text-muted">Nakit {formatTRY(balance)}</span>
+        <span className="text-muted">Nakit {dc.money(balance)}</span>
       </div>
     </Link>
   );

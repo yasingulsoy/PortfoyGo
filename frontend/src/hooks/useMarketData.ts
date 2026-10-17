@@ -19,7 +19,8 @@ export function useStocks() {
 }
 
 export function useCryptos() {
-  const { data, error, isLoading, mutate } = useSWR<CryptoCoin[]>('/cryptos?limit=25', swrFetcher, { ...swrOptions, refreshInterval: 15_000 });
+  // Sunucu piyasa değerine göre ilk 50 kriptoyu önbellekler (CRYPTO_TOP_N); 100 üst sınırdır
+  const { data, error, isLoading, mutate } = useSWR<CryptoCoin[]>('/cryptos?limit=100', swrFetcher, { ...swrOptions, refreshInterval: 15_000 });
   return { cryptos: data ?? EMPTY_CRYPTOS, error, isLoading, refresh: mutate };
 }
 
@@ -31,7 +32,9 @@ export function useCurrencies() {
     const rate = usd ? usd.selling || usd.buying : 0;
     return rate > 0 ? rate : null;
   }, [currencies]);
-  return { currencies, usdTry, error, isLoading, refresh: mutate };
+  /** Etkin kur kaynağı (sunucunun FX_PROVIDER'ı; ör. 'tcmb' → "TCMB günlük kur") */
+  const fxSource = currencies.find((c) => c.code === 'USD')?.source ?? null;
+  return { currencies, usdTry, fxSource, error, isLoading, refresh: mutate };
 }
 
 export function useCommodities() {
@@ -60,7 +63,7 @@ export const FEATURED_CURRENCIES = ['USD', 'EUR', 'GBP', 'CHF', 'JPY', 'SAR', 'C
 export function useMarket() {
   const { stocks, isLoading: l1, error: e1 } = useStocks();
   const { cryptos, isLoading: l2, error: e2 } = useCryptos();
-  const { currencies, usdTry, isLoading: l3, error: e3 } = useCurrencies();
+  const { currencies, usdTry, fxSource, isLoading: l3, error: e3 } = useCurrencies();
   const { commodities, isLoading: l4, error: e4 } = useCommodities();
 
   const stockAssets = useMemo<MarketAsset[]>(
@@ -157,6 +160,7 @@ export function useMarket() {
     byType,
     find,
     usdTry,
+    fxSource,
     isLoading: l1 || l2 || l3 || l4,
     errors: { stock: e1, crypto: e2, currency: e3, commodity: e4 } as Record<AssetType, unknown>,
   };
