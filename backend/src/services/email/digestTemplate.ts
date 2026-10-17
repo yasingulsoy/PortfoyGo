@@ -55,8 +55,8 @@ const COLORS = {
   line: '#eaecf0',
   text: '#101828',
   muted: '#667085',
-  brand: '#5b3df5',
-  brandSoft: '#efebff',
+  brand: '#465FFF',
+  brandSoft: '#ECF3FF',
   up: '#079455',
   down: '#d92d20',
 };

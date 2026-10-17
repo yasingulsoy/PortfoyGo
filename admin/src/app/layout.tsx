@@ -14,7 +14,7 @@ const outfit = Outfit({ variable: '--font-outfit', subsets: ['latin', 'latin-ext
 export const metadata: Metadata = {
   title: { default: 'Yönetim paneli · PortfoyGo', template: '%s · PortfoyGo Yönetim' },
   robots: { index: false, follow: false },
-  icons: { icon: '/fav.ico' },
+  icons: { icon: [{ url: '/icon.svg', type: 'image/svg+xml' }], apple: '/apple-touch-icon.png' },
 };
 
 export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

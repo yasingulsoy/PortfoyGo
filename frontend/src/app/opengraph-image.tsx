@@ -1,4 +1,5 @@
 import { ImageResponse } from 'next/og';
+import { OG_BRAND, OgLogoMark } from '@/lib/ogBrand';
 
 // Paylaşım görseli. CSS değişkenleri burada kullanılamadığından renkler
 // globals.css'teki koyu tema token'larıyla birebir aynı tutulur.
@@ -8,8 +9,8 @@ const C = {
   line: '#222939',
   fg: '#e9ebf2',
   muted: '#9aa2b6',
-  brand: '#8466ff',
-  brandSolid: '#5b3df5',
+  brand: OG_BRAND.accent,
+  brandSolid: OG_BRAND.solid,
   up: '#2fd389',
 };
 
@@ -31,7 +32,7 @@ export default function OpengraphImage() {
           justifyContent: 'space-between',
           padding: '64px 72px',
           background: C.canvas,
-          backgroundImage: `radial-gradient(circle at 0% 0%, rgba(132,102,255,0.32), transparent 55%), radial-gradient(circle at 100% 100%, rgba(132,102,255,0.22), transparent 50%)`,
+          backgroundImage: `radial-gradient(circle at 0% 0%, rgba(70,95,255,0.32), transparent 55%), radial-gradient(circle at 100% 100%, rgba(70,95,255,0.22), transparent 50%)`,
           color: C.fg,
           fontFamily: 'Geist',
           position: 'relative',
@@ -51,12 +52,7 @@ export default function OpengraphImage() {
         </svg>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
-          <svg width="72" height="72" viewBox="0 0 32 32">
-            <rect width="32" height="32" rx="9" fill={C.brandSolid} />
-            <path d="M8 23v-3.5M12.5 23v-6M17 23v-4.5M21.5 23v-8" stroke="#fff" strokeOpacity="0.55" strokeWidth="2.6" strokeLinecap="round" />
-            <path d="M7.5 16.5 13 12l4 3 7.5-6.5" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
-            <path d="M20.5 8.5h4v4" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
+          <OgLogoMark size={72} />
           {/* Satori, yan yana iki metin parçası arasına boşluk koyduğundan ad tek parça çizilir */}
           <div style={{ display: 'flex', fontSize: 44 }}>PortfoyGo</div>
         </div>

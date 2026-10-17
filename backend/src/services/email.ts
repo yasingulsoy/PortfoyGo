@@ -332,64 +332,60 @@ ${String(mail.data.text ?? String(mail.data.html ?? '').replace(/<[^>]+>/g, ' ')
   }
 }
 
-function verificationTemplate(code: string): string {
+/** Marka renkleri (frontend tokens: --brand #465FFF) — e-posta istemcileri CSS değişkeni desteklemez */
+const MAIL = { brand: '#465FFF', brandSoft: '#ECF3FF', text: '#101828', muted: '#475467', line: '#EAECF0', bg: '#F2F4F7' };
+
+/** Ortak e-posta düzeni: üstte logo (site adresi biliniyorsa görsel) + başlık, beyaz kart, alt bilgi. */
+function brandedEmail({ kicker, title, body }: { kicker: string; title: string; body: string }): string {
+  const site = (process.env.PUBLIC_SITE_URL || process.env.NEXT_PUBLIC_SITE_URL || '').trim().replace(/\/+$/, '');
+  const mark = site
+    ? `<img src="${escapeHtml(site)}/brand/icon-192.png" width="32" height="32" alt="" style="display:block;border:0;border-radius:8px;">`
+    : '';
   return `
-    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-      <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center;">
-        <h1 style="color: white; margin: 0; font-size: 28px;">PortfoyGo</h1>
-        <p style="color: white; margin: 10px 0 0 0; opacity: 0.9;">Email Doğrulama</p>
-      </div>
-      <div style="padding: 40px 30px; background: #f8f9fa;">
-        <h2 style="color: #333; margin: 0 0 20px 0;">Hesabınızı Doğrulayın</h2>
-        <p style="color: #666; line-height: 1.6; margin: 0 0 20px 0;">
-          Merhaba!<br><br>
-          PortfoyGo'ya hoş geldiniz. Hesabınızı aktifleştirmek için aşağıdaki doğrulama kodunu kullanın:
-        </p>
-        <div style="background: white; border: 2px dashed #667eea; border-radius: 10px; padding: 30px; text-align: center; margin: 30px 0;">
-          <div style="font-size: 32px; font-weight: bold; color: #667eea; letter-spacing: 5px; font-family: monospace;">${escapeHtml(code)}</div>
+    <div style="background:${MAIL.bg};padding:24px 12px;font-family:Arial,Helvetica,sans-serif;">
+      <div style="max-width:560px;margin:0 auto;">
+        <table role="presentation" cellspacing="0" cellpadding="0" style="margin:0 0 16px 4px;"><tr>
+          ${mark ? `<td style="padding-right:10px;">${mark}</td>` : ''}
+          <td style="font-size:20px;font-weight:700;color:${MAIL.text};letter-spacing:-0.3px;">Portfoy<span style="color:${MAIL.brand};">Go</span></td>
+        </tr></table>
+        <div style="background:#ffffff;border:1px solid ${MAIL.line};border-radius:16px;padding:28px 24px;">
+          <div style="font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:${MAIL.brand};margin:0 0 6px;">${escapeHtml(kicker)}</div>
+          <h1 style="font-size:22px;line-height:28px;color:${MAIL.text};margin:0 0 16px;">${escapeHtml(title)}</h1>
+          ${body}
         </div>
-        <p style="color: #666; line-height: 1.6; margin: 20px 0;">
-          Bu kod <strong>15 dakika</strong> geçerlidir. Eğer bu işlemi siz yapmadıysanız, bu emaili görmezden gelebilirsiniz.
+        <p style="color:${MAIL.muted};font-size:12px;line-height:18px;text-align:center;margin:16px 0 0;">
+          Bu e-posta otomatik olarak gönderilmiştir, lütfen yanıtlamayın. PortfoyGo bir sanal yatırım simülasyonudur.
         </p>
-        <div style="background: #e3f2fd; border-left: 4px solid #2196f3; padding: 15px; margin: 20px 0;">
-          <p style="margin: 0; color: #1976d2; font-size: 14px;">
-            <strong>Güvenlik Uyarısı:</strong> Bu kodu kimseyle paylaşmayın. Ekibimiz asla sizden şifrenizi veya doğrulama kodunuzu istemez.
-          </p>
-        </div>
-      </div>
-      <div style="background: #f1f3f4; padding: 20px; text-align: center; color: #666; font-size: 12px;">
-        <p style="margin: 0;">Bu email otomatik olarak gönderilmiştir, lütfen yanıtlamayın.</p>
       </div>
     </div>`;
 }
 
+function codeBox(code: string): string {
+  return `<div style="background:${MAIL.brandSoft};border-radius:12px;padding:22px;text-align:center;margin:22px 0;">
+    <div style="font-size:32px;font-weight:700;color:${MAIL.brand};letter-spacing:6px;font-family:'Courier New',monospace;">${escapeHtml(code)}</div>
+  </div>`;
+}
+
+function verificationTemplate(code: string): string {
+  return brandedEmail({
+    kicker: 'E-posta doğrulama',
+    title: 'Hesabını doğrula',
+    body: `
+      <p style="color:${MAIL.muted};line-height:1.6;margin:0;">Merhaba! PortfoyGo'ya hoş geldin. Hesabını etkinleştirmek için aşağıdaki doğrulama kodunu kullan:</p>
+      ${codeBox(code)}
+      <p style="color:${MAIL.muted};line-height:1.6;margin:0 0 16px;">Bu kod <strong style="color:${MAIL.text};">15 dakika</strong> geçerlidir. Bu işlemi sen yapmadıysan bu e-postayı görmezden gelebilirsin.</p>
+      <p style="color:${MAIL.muted};font-size:13px;line-height:1.5;margin:0;border-top:1px solid ${MAIL.line};padding-top:14px;"><strong style="color:${MAIL.text};">Güvenlik:</strong> Bu kodu kimseyle paylaşma. Ekibimiz senden asla şifreni veya doğrulama kodunu istemez.</p>`,
+  });
+}
+
 function resetTemplate(code: string, username: string): string {
-  return `
-    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-      <div style="background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%); padding: 30px; text-align: center;">
-        <h1 style="color: white; margin: 0; font-size: 28px;">PortfoyGo</h1>
-        <p style="color: white; margin: 10px 0 0 0; opacity: 0.9;">Şifre Sıfırlama</p>
-      </div>
-      <div style="padding: 40px 30px; background: #f8f9fa;">
-        <h2 style="color: #333; margin: 0 0 20px 0;">Şifrenizi Sıfırlayın</h2>
-        <p style="color: #666; line-height: 1.6; margin: 0 0 20px 0;">
-          Merhaba ${escapeHtml(username)}!<br><br>
-          Hesabınız için şifre sıfırlama talebinde bulunuldu. Aşağıdaki kodu kullanarak şifrenizi sıfırlayabilirsiniz:
-        </p>
-        <div style="background: white; border: 2px dashed #ff6b6b; border-radius: 10px; padding: 30px; text-align: center; margin: 30px 0;">
-          <div style="font-size: 32px; font-weight: bold; color: #ff6b6b; letter-spacing: 5px; font-family: monospace;">${escapeHtml(code)}</div>
-        </div>
-        <p style="color: #666; line-height: 1.6; margin: 20px 0;">
-          Bu kod <strong>30 dakika</strong> geçerlidir. Eğer bu işlemi siz yapmadıysanız, bu emaili görmezden gelebilirsiniz; şifreniz değişmez.
-        </p>
-        <div style="background: #ffebee; border-left: 4px solid #f44336; padding: 15px; margin: 20px 0;">
-          <p style="margin: 0; color: #c62828; font-size: 14px;">
-            <strong>Güvenlik Uyarısı:</strong> Bu kodu kimseyle paylaşmayın.
-          </p>
-        </div>
-      </div>
-      <div style="background: #f1f3f4; padding: 20px; text-align: center; color: #666; font-size: 12px;">
-        <p style="margin: 0;">Bu email otomatik olarak gönderilmiştir, lütfen yanıtlamayın.</p>
-      </div>
-    </div>`;
+  return brandedEmail({
+    kicker: 'Şifre sıfırlama',
+    title: 'Şifreni sıfırla',
+    body: `
+      <p style="color:${MAIL.muted};line-height:1.6;margin:0;">Merhaba ${escapeHtml(username)}! Hesabın için şifre sıfırlama talebinde bulunuldu. Aşağıdaki kodla şifreni sıfırlayabilirsin:</p>
+      ${codeBox(code)}
+      <p style="color:${MAIL.muted};line-height:1.6;margin:0 0 16px;">Bu kod <strong style="color:${MAIL.text};">30 dakika</strong> geçerlidir. Bu işlemi sen yapmadıysan bu e-postayı görmezden gelebilirsin; şifren değişmez.</p>
+      <p style="color:${MAIL.muted};font-size:13px;line-height:1.5;margin:0;border-top:1px solid ${MAIL.line};padding-top:14px;"><strong style="color:${MAIL.text};">Güvenlik:</strong> Bu kodu kimseyle paylaşma.</p>`,
+  });
 }

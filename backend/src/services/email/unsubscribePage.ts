@@ -43,8 +43,8 @@ export function renderUnsubscribePage(opts: { state: UnsubscribePageState; token
 <meta name="robots" content="noindex">
 <title>${escapeHtml(c.title)} · PortfoyGo</title>
 <style>
-  :root { color-scheme: light dark; --bg:#f2f4f7; --card:#fff; --text:#101828; --muted:#667085; --line:#eaecf0; --brand:#5b3df5; }
-  @media (prefers-color-scheme: dark) { :root { --bg:#0b0f19; --card:#111827; --text:#f2f4f7; --muted:#98a2b3; --line:#1f2937; --brand:#8466ff; } }
+  :root { color-scheme: light dark; --bg:#f2f4f7; --card:#fff; --text:#101828; --muted:#667085; --line:#eaecf0; --brand:#465FFF; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#0b0f19; --card:#111827; --text:#f2f4f7; --muted:#98a2b3; --line:#1f2937; --brand:#7592FF; } }
   * { box-sizing: border-box; }
   body { margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center; padding:16px; background:var(--bg); color:var(--text); font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif; }
   main { width:100%; max-width:480px; background:var(--card); border:1px solid var(--line); border-radius:18px; padding:28px 24px; }

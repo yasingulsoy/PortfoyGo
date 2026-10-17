@@ -19,11 +19,11 @@ export const metadata: Metadata = {
   },
   description: 'Gerçek piyasa verileriyle risksiz yatırım yapın: hisse, kripto, döviz ve emtia alıp satın, portföyünüzü büyütün, liderlik tablosunda yarışın.',
   applicationName: 'PortfoyGo',
-  icons: { icon: '/fav.ico' },
+  // favicon.ico: app/favicon.ico (dosya kuralı). Marka dosyaları: public/brand (scripts/brand/build-brand-assets.mjs)
+  icons: { icon: [{ url: '/icon.svg', type: 'image/svg+xml' }], apple: '/brand/apple-touch-icon.png' },
   openGraph: {
     title: 'PortfoyGo — Sanal Yatırım Simülasyonu',
     description: 'Gerçek piyasa verileriyle sanal portföy oluşturun ve yarışın.',
-    images: ['/PortfoyGo.png'],
     locale: 'tr_TR',
     type: 'website',
   },
