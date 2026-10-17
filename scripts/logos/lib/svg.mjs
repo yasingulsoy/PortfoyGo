@@ -10,11 +10,15 @@ const SVG_NS = 'http://www.w3.org/2000/svg';
 /** Çocuklarıyla birlikte korunur. Listede olmayan öğeler içerikleriyle birlikte atılır. */
 const ALLOWED_ELEMENTS = new Set([
   'svg', 'g', 'defs', 'path', 'circle', 'ellipse', 'rect', 'line', 'polyline', 'polygon',
-  'linearGradient', 'radialGradient', 'stop', 'clipPath', 'mask', 'use', 'symbol', 'pattern',
+  'linearGradient', 'radialGradient', 'stop', 'clipPath', 'mask', 'use', 'symbol', 'pattern', 'marker',
+  // Pasif filtre ilkelleri (gölge, renk matrisi). feImage (dış görsel yükleyebilir) bilinçli olarak YOK.
+  'filter', 'feColorMatrix', 'feOffset', 'feGaussianBlur', 'feComposite', 'feMerge', 'feMergeNode', 'feFlood', 'feBlend',
 ]);
 
 /** Sessizce atılan (beklenen) öğeler; diğer atılanlar raporlanır. */
-const SILENT_DROP = new Set(['title', 'desc', 'metadata', 'filter']);
+const SILENT_DROP = new Set(['title', 'desc', 'metadata']);
+/** Yalnızca metin düzenini etkileyen, sessizce atılan öznitelikler. */
+const SILENT_DROP_ATTRS = new Set(['xml:space', 'version', 'class', 'data-name']);
 
 const ALLOWED_ATTRS = new Set([
   'id', 'd', 'points', 'x', 'y', 'x1', 'y1', 'x2', 'y2', 'cx', 'cy', 'r', 'rx', 'ry', 'fx', 'fy', 'fr',
@@ -25,6 +29,9 @@ const ALLOWED_ATTRS = new Set([
   'clip-path', 'clip-rule', 'mask', 'maskUnits', 'maskContentUnits', 'clipPathUnits',
   'stop-color', 'stop-opacity', 'color', 'href', 'style', 'display', 'visibility', 'overflow',
   'shape-rendering', 'vector-effect', 'paint-order',
+  'marker-start', 'marker-mid', 'marker-end', 'markerWidth', 'markerHeight', 'markerUnits', 'refX', 'refY', 'orient',
+  'filter', 'filterUnits', 'primitiveUnits', 'color-interpolation-filters', 'in', 'in2', 'result', 'values', 'type',
+  'stdDeviation', 'dx', 'dy', 'operator', 'k1', 'k2', 'k3', 'k4', 'mode', 'flood-color', 'flood-opacity',
 ]);
 
 /** style="" içinde izin verilen CSS özellikleri (sunum öznitelikleriyle aynı küme). */
@@ -123,23 +130,89 @@ export function parseSvg(text) {
 // Temizleme
 // ---------------------------------------------------------------------------
 
-/** Yol verisindeki sayıları `decimals` basamağa yuvarlar (ayırıcılar korunur). */
-export function roundPathNumbers(value, decimals) {
-  const re = /[-+]?(?:\d*\.\d+|\d+\.?)(?:[eE][-+]?\d+)?/g;
-  return value.replace(re, (num, offset, whole) => {
-    let n = Number(num);
-    if (!Number.isFinite(n)) return num;
-    n = Number(n.toFixed(decimals));
-    let out = String(n === 0 ? 0 : n);
-    if (out.includes('e')) out = n.toFixed(decimals);
-    out = out.replace(/^(-?)0\./, '$1.');
-    // İşaret ayırıcı görevi görüyordu ("2.1-0.00001" → "2.1 0"): işaret kaybolduysa boşluk koy
-    if (/^[-+]/.test(num) && !out.startsWith('-')) out = ` ${out}`;
-    // "1.04.5" → "1 .5": yuvarlanan sayı tam sayıya dönüştüyse ve hemen ardından '.' geliyorsa ayırıcı ekle
-    const next = whole[offset + num.length];
-    if (next === '.' && !out.includes('.')) out += ' ';
-    return out;
-  });
+const NUMBER_RE = /[-+]?(?:\d*\.\d+|\d+\.?)(?:[eE][-+]?\d+)?/y;
+const COMMANDS = 'MmZzLlHhVvCcSsQqTtAa';
+
+function formatNumber(raw, decimals) {
+  const n = Number(Number(raw).toFixed(decimals));
+  if (!Number.isFinite(n)) throw new Error(`Geçersiz sayı: ${raw}`);
+  let out = Object.is(n, -0) ? '0' : String(n);
+  if (out.includes('e')) out = n.toFixed(decimals).replace(/\.?0+$/, '');
+  return out.replace(/^(-?)0\./, '$1.');
+}
+
+/**
+ * Yol verisini (`d`) komut/argüman olarak ayrıştırır ve sayıları `decimals` basamağa yuvarlar.
+ * Yay (A/a) komutlarının bayrakları (4. ve 5. argüman) tek karakterdir ve "01.5" gibi bitişik
+ * yazılabilir; bunlar sayı olarak OKUNMAZ (aksi halde şekil bozulur). Ayrıştırılamayan veri olduğu gibi kalır.
+ */
+export function roundPathData(d, decimals) {
+  const tokens = [];
+  let cmd = null;
+  let arg = 0;
+  let i = 0;
+  while (i < d.length) {
+    const ch = d[i];
+    if (ch === ' ' || ch === ',' || ch === '\n' || ch === '\t' || ch === '\r') {
+      i++;
+      continue;
+    }
+    if (COMMANDS.includes(ch)) {
+      cmd = ch;
+      arg = 0;
+      tokens.push({ kind: 'cmd', text: ch });
+      i++;
+      continue;
+    }
+    if (!cmd) return d;
+    if ((cmd === 'A' || cmd === 'a') && (arg % 7 === 3 || arg % 7 === 4)) {
+      if (ch !== '0' && ch !== '1') return d;
+      tokens.push({ kind: 'flag', text: ch });
+      arg++;
+      i++;
+      continue;
+    }
+    NUMBER_RE.lastIndex = i;
+    const m = NUMBER_RE.exec(d);
+    if (!m) return d;
+    tokens.push({ kind: 'num', text: formatNumber(m[0], decimals) });
+    arg++;
+    i = NUMBER_RE.lastIndex;
+  }
+  return joinTokens(tokens);
+}
+
+/** points="" (polyline / polygon) için aynı yuvarlama */
+export function roundPoints(value, decimals) {
+  const tokens = [];
+  let i = 0;
+  while (i < value.length) {
+    if (/[\s,]/.test(value[i])) {
+      i++;
+      continue;
+    }
+    NUMBER_RE.lastIndex = i;
+    const m = NUMBER_RE.exec(value);
+    if (!m) return value;
+    tokens.push({ kind: 'num', text: formatNumber(m[0], decimals) });
+    i = NUMBER_RE.lastIndex;
+  }
+  return joinTokens(tokens);
+}
+
+/** Belirteçleri en kısa GÜVENLİ biçimde birleştirir: yalnızca '-' ve "x.y.z" ayırıcısız yazılır. */
+function joinTokens(tokens) {
+  let out = '';
+  let prev = null;
+  for (const t of tokens) {
+    if (prev && prev.kind !== 'cmd' && t.kind !== 'cmd') {
+      const glued = t.kind === 'num' && (t.text.startsWith('-') || (t.text.startsWith('.') && prev.kind === 'num' && prev.text.includes('.')));
+      if (!glued) out += ' ';
+    }
+    out += t.text;
+    prev = t;
+  }
+  return out;
 }
 
 function cleanStyle(value, report) {
@@ -165,7 +238,7 @@ function cleanNode(node, ctx) {
     if (name === 'xlink:href') name = 'href';
     if (name === 'xmlns' || name.startsWith('xmlns:')) continue; // yeniden yazılır
     if (!ALLOWED_ATTRS.has(name)) {
-      report.droppedAttrs.add(name);
+      if (!SILENT_DROP_ATTRS.has(name)) report.droppedAttrs.add(name);
       continue;
     }
     value = value.trim();
@@ -181,19 +254,14 @@ function cleanNode(node, ctx) {
       value = cleanStyle(value, report);
       if (!value) continue;
     }
-    if ((name === 'd' || name === 'points') && ctx.decimals != null) {
-      value = roundPathNumbers(value, ctx.decimals);
+    if (ctx.decimals != null) {
+      if (name === 'd') value = roundPathData(value, ctx.decimals);
+      else if (name === 'points') value = roundPoints(value, ctx.decimals);
     }
-    if (name === 'id') ctx.ids.add(value);
     attrs.push([name, value.replace(/\s+/g, ' ')]);
   }
   const children = [];
   for (const child of node.children) {
-    // filter="url(#…)" taşıyan öğeler yalnızca gölge katmanıdır; <filter> tutulmadığı için öğe de atılır
-    if (child.attrs.some(([k]) => k === 'filter')) {
-      report.droppedElements.add('(filtreli gölge katmanı)');
-      continue;
-    }
     if (!ALLOWED_ELEMENTS.has(child.name)) {
       if (!SILENT_DROP.has(child.name)) report.droppedElements.add(child.name);
       continue;
@@ -236,7 +304,7 @@ export function sanitizeSvg(text, { round = true } = {}) {
     if (!(w > 0 && h > 0)) throw new Error('viewBox yok ve width/height\'tan türetilemiyor');
     viewBox = `0 0 ${w} ${h}`;
   }
-  const ctx = { report, ids: new Set(), decimals: round ? decimalsFor(viewBox) : null };
+  const ctx = { report, decimals: round ? decimalsFor(viewBox) : null };
   const cleaned = cleanNode(parsed, ctx);
   // Kök: xmlns + viewBox + sunum öznitelikleri; boyutu <img> belirler (width/height/x/y/id atılır)
   const ROOT_DROP = new Set(['viewBox', 'width', 'height', 'x', 'y', 'id']);
@@ -255,7 +323,7 @@ export function sanitizeSvg(text, { round = true } = {}) {
 export function assertSafeSvg(svg) {
   const problems = [];
   if (!/^<svg xmlns="http:\/\/www\.w3\.org\/2000\/svg" viewBox="[^"]+"/.test(svg)) problems.push('kök/viewBox');
-  if (/<script|<foreignObject|<style|<iframe|<image|<a[\s>]/i.test(svg)) problems.push('yasak öğe');
+  if (/<script|<foreignObject|<style|<iframe|<image|<feImage|<a[\s>]/i.test(svg)) problems.push('yasak öğe');
   if (/\son[a-z]+\s*=/i.test(svg)) problems.push('olay işleyici');
   if (/javascript:|data:|https?:\/\/(?!www\.w3\.org\/2000\/svg")/i.test(svg)) problems.push('dış bağlantı');
   if (/href="(?!#)/i.test(svg)) problems.push('dış href');

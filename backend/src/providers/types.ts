@@ -114,6 +114,11 @@ export interface CommodityQuote {
   quoteCurrency: 'TRY' | 'USD';
   /** Fiyatın sağlayıcıdan çekildiği an (ms) */
   fetchedAt: number;
+  /**
+   * true: fiyat dış kaynaktan değil `price_history`'deki son kayıttan okundu (bkz. adapters/priceHistoryCommodity.ts).
+   * Fiyat geçmişi işi bu fiyatları tabloya geri yazmaz; aksi halde bayat fiyat her turda "taze" damgalanırdı.
+   */
+  fromHistory?: boolean;
 }
 
 export interface CommodityProvider {

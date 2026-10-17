@@ -15,13 +15,23 @@ import { coingeckoCryptoProvider } from './adapters/coingecko';
 import { nosyFxProvider } from './adapters/nosyCurrency';
 import { nosyCommodityProvider } from './adapters/nosyCommodity';
 import { rssNewsProvider } from './adapters/rssNews';
+import { tcmbFxProvider } from './adapters/tcmbCurrency';
+import { frankfurterFxProvider } from './adapters/frankfurterCurrency';
+import { priceHistoryCommodityProvider } from './adapters/priceHistoryCommodity';
+import { goldApiCommodityProvider } from './adapters/goldApiCommodity';
 import { instrumentProvider } from '../observability/providerMetrics';
 
 const registry = {
   stocks: { finnhub: finnhubStockProvider } as Record<string, StockProvider>,
   crypto: { coingecko: coingeckoCryptoProvider } as Record<string, CryptoProvider>,
-  fx: { nosyapi: nosyFxProvider } as Record<string, FxProvider>,
-  commodities: { nosyapi: nosyCommodityProvider } as Record<string, CommodityProvider>,
+  // tcmb / frankfurter: anahtarsız, ücretsiz, GÜNLÜK resmi kurlar (bkz. README.md "Ücretsiz kaynaklar")
+  fx: { nosyapi: nosyFxProvider, tcmb: tcmbFxProvider, frankfurter: frankfurterFxProvider } as Record<string, FxProvider>,
+  // pricehistory: son bilinen fiyatlar (dış API yok); goldapi: değerli metaller canlı (anahtarsız) + diğerleri son bilinen
+  commodities: {
+    nosyapi: nosyCommodityProvider,
+    pricehistory: priceHistoryCommodityProvider,
+    goldapi: goldApiCommodityProvider,
+  } as Record<string, CommodityProvider>,
   news: { rss: rssNewsProvider } as Record<string, NewsProvider>,
 };
 

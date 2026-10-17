@@ -16,16 +16,49 @@ function precisionFor(value: number): number {
   return 8;
 }
 
-export function formatTRY(value: number | null | undefined, opts: { precise?: boolean; sign?: boolean } = {}): string {
+/** Para biçimi seçenekleri: precise → küçük birim fiyatlarda fazla ondalık; sign → pozitiflerde "+" */
+export interface MoneyFormatOptions {
+  precise?: boolean;
+  sign?: boolean;
+}
+
+/** Arayüzde gösterilebilen para birimleri (TL / ABD doları) */
+export type MoneyCurrency = 'TRY' | 'USD';
+
+const trMoneyFmt: Record<MoneyCurrency, Intl.NumberFormat> = { TRY: tryFmt, USD: new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 }) };
+
+function formatTrMoney(value: number | null | undefined, currency: MoneyCurrency, opts: MoneyFormatOptions): string {
   const raw = safe(value);
   const digits = opts.precise ? precisionFor(raw) : 2;
-  // Kuruş altı değerleri yuvarla; "-₺0,00" görünmesin
+  // Kuruş/sent altı değerleri yuvarla; "-₺0,00" görünmesin
   // Kayan nokta hatasını telafi ederek yarımları sıfırdan uzağa yuvarla (12,345 → 12,35)
   const v = digits === 2 ? (Math.sign(raw) * Math.round(Math.abs(raw) * 100 + 1e-7)) / 100 || 0 : raw;
   const text = digits === 2
-    ? tryFmt.format(v)
-    : new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', minimumFractionDigits: digits, maximumFractionDigits: digits }).format(v);
+    ? trMoneyFmt[currency].format(v)
+    : new Intl.NumberFormat('tr-TR', { style: 'currency', currency, minimumFractionDigits: digits, maximumFractionDigits: digits }).format(v);
   return opts.sign && v > 0 ? `+${text}` : text;
+}
+
+export function formatTRY(value: number | null | undefined, opts: MoneyFormatOptions = {}): string {
+  return formatTrMoney(value, 'TRY', opts);
+}
+
+/**
+ * Para birimi seçilebilen, tr-TR biçimli tutar: "₺1.234,56" / "$1.234,56" (formatTRY ile aynı yuvarlama ve işaret
+ * kuralları). Sitenin TL/USD görüntüleme tercihi bunu kullanır. Not: formatUSD ("$1,234.56", en-US) USD bazlı
+ * sanal portföylerin (Model Portföy, Portföy Ligi, Arena) kendi biçimidir.
+ */
+export function formatMoney(value: number | null | undefined, currency: MoneyCurrency = 'TRY', opts: MoneyFormatOptions = {}): string {
+  return formatTrMoney(value, currency === 'USD' ? 'USD' : 'TRY', opts);
+}
+
+export const MONEY_SYMBOLS: Record<MoneyCurrency, string> = { TRY: '₺', USD: '$' };
+
+/** Kısa tutar: "₺1,2 Mn" / "$3,4 B" (piyasa değeri, hacim) */
+export function formatMoneyCompact(value: number | null | undefined, currency: MoneyCurrency = 'TRY'): string {
+  const v = safe(value);
+  const sym = MONEY_SYMBOLS[currency === 'USD' ? 'USD' : 'TRY'];
+  return v < 0 ? `-${sym}${compactFmt.format(-v)}` : `${sym}${compactFmt.format(v)}`;
 }
 
 export function formatUSD(value: number | null | undefined, opts: { precise?: boolean } = {}): string {

@@ -305,6 +305,8 @@ export class PriceHistoryService {
         const price = positive(q?.selling);
         if (!sym || sym.length > 20 || !price) continue;
         if (Number.isFinite(q.fetchedAt) && now.getTime() - q.fetchedAt > SOURCE_MAX_AGE_MS) continue;
+        // Tablonun kendisinden okunmuş fiyat (pricehistory / goldapi adaptörleri): geri yazılmaz (bayat fiyat tazelenmesin)
+        if (q.fromHistory) continue;
         const currency: QuoteCurrency =
           q.quoteCurrency === 'TRY' || q.quoteCurrency === 'USD' ? q.quoteCurrency : defaultCurrency('commodity', sym);
         bySymbol.set(sym, { price, currency });

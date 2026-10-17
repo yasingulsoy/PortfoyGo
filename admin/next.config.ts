@@ -23,6 +23,14 @@ function securityHeaders() {
   return headers;
 }
 
+/**
+ * public/logos (varlık logoları, scripts/logos/fetch-logos.mjs): uygulama adresleri içerik özetli (?v=…) kullanır,
+ * bu yüzden SVG'ler uzun süre önbelleklenebilir. Doğrudan açılan bir SVG'de betik / dış kaynak / form çalışamaz
+ * (dosyalar zaten temizlenmiş; bu ek savunma hattıdır).
+ */
+const logoCacheHeaders = [{ key: "Cache-Control", value: "public, max-age=31536000, immutable" }];
+const logoSandboxHeaders = [{ key: "Content-Security-Policy", value: "default-src 'none'; style-src 'unsafe-inline'; sandbox" }];
+
 const nextConfig: NextConfig = {
   agentRules: false,
   // Docker imajı için: .next/standalone (yalnızca gereken node_modules + server.js)
@@ -32,7 +40,11 @@ const nextConfig: NextConfig = {
   // Ortak paket (packages/shared) TypeScript kaynağı olarak derlenir
   transpilePackages: ["@portfoygo/shared"],
   async headers() {
-    return [{ source: "/:path*", headers: securityHeaders() }];
+    return [
+      { source: "/:path*", headers: securityHeaders() },
+      { source: "/logos/:path*", headers: logoSandboxHeaders },
+      { source: "/logos/:type(stock|crypto|currency|commodity)/:file", headers: logoCacheHeaders },
+    ];
   },
 };
 

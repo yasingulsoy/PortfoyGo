@@ -4,7 +4,9 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { Badge } from '@portfoygo/shared/ui/Feedback';
 import Button from '@portfoygo/shared/ui/Button';
+import AssetAvatar from '@portfoygo/shared/ui/AssetAvatar';
 import { useToast } from '@portfoygo/shared/ui/Toast';
+import { isAssetType } from '@portfoygo/shared/types';
 import { cn, formatDateTime, formatQuantity, formatRelative, formatTRY } from '@portfoygo/shared/format';
 import { adminApi } from '@/lib/api';
 import { assetTypeLabel, orderStatus, orderTypeLabel, sideLabel, sideTone } from '@/lib/labels';
@@ -25,14 +27,18 @@ function UserCell({ id, username }: { id: string; username: string }) {
   );
 }
 
-function AssetCell({ symbol, name, assetType }: { symbol: string; name?: string | null; assetType: string }) {
+/** Varlık hücresi: logo + sembol + ad · tip (işlem / emir tabloları ve kullanıcı detayındaki pozisyonlar). */
+export function AssetCell({ symbol, name, assetType }: { symbol: string; name?: string | null; assetType: string }) {
   return (
-    <div className="min-w-0">
-      <p className="font-medium text-fg">{symbol}</p>
-      <p className="max-w-[12rem] truncate text-xs text-subtle" title={name ?? undefined}>
-        {name ? `${name} · ` : ''}
-        {assetTypeLabel(assetType)}
-      </p>
+    <div className="flex min-w-0 items-center gap-2.5">
+      {isAssetType(assetType) && <AssetAvatar symbol={symbol} type={assetType} size={28} />}
+      <div className="min-w-0">
+        <p className="font-medium text-fg">{symbol}</p>
+        <p className="max-w-[12rem] truncate text-xs text-subtle" title={name ?? undefined}>
+          {name ? `${name} · ` : ''}
+          {assetTypeLabel(assetType)}
+        </p>
+      </div>
     </div>
   );
 }

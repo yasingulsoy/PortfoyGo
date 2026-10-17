@@ -1,5 +1,5 @@
 import { ArrowDownRightIcon, ArrowUpRightIcon } from '@heroicons/react/20/solid';
-import { cn, formatPercent, formatTRY, trend } from '../format';
+import { cn, formatMoney, formatPercent, trend, type MoneyCurrency } from '../format';
 
 const tone = {
   up: 'text-up',
@@ -31,8 +31,21 @@ export function Delta({ value, variant = 'pill', className }: { value: number | 
   );
 }
 
-/** Kâr/zarar tutarı; işaretli ve renkli. */
-export function Money({ value, signed = false, className }: { value: number | null | undefined; signed?: boolean; className?: string }) {
+/**
+ * Kâr/zarar tutarı; işaretli ve renkli. `value` verilen `currency` cinsindendir (varsayılan TL); TL/USD görüntüleme
+ * tercihinde çağıran tutarı önce çevirir (frontend: useDisplayCurrency().convert).
+ */
+export function Money({
+  value,
+  signed = false,
+  currency = 'TRY',
+  className,
+}: {
+  value: number | null | undefined;
+  signed?: boolean;
+  currency?: MoneyCurrency;
+  className?: string;
+}) {
   const t = signed ? trend(value) : 'flat';
-  return <span className={cn('num', signed && tone[t], !signed && 'text-fg', className)}>{formatTRY(value, { sign: signed })}</span>;
+  return <span className={cn('num', signed && tone[t], !signed && 'text-fg', className)}>{formatMoney(value, currency, { sign: signed })}</span>;
 }

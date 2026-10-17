@@ -256,6 +256,17 @@ describe('PriceHistoryService (PGlite)', () => {
     ]);
   });
 
+  it("price_history'den okunmuş emtia fiyatları (fromHistory) tabloya geri yazılmaz — bayat fiyat tazelenmez", async () => {
+    vi.spyOn(providers.commodities, 'getPopularPrices').mockResolvedValue([
+      { code: 'HISTX', name: 'Tablo', buying: 10, selling: 10, changeRate: 0, datetime: '', quoteCurrency: 'USD', fetchedAt: Date.now(), fromHistory: true },
+      { code: 'LIVEX', name: 'Canlı', buying: 20, selling: 20, changeRate: 0, datetime: '', quoteCurrency: 'USD', fetchedAt: Date.now() },
+    ]);
+    const res = await PriceHistoryService.snapshotAll(new Date());
+    expect(res.commodity).toBe(3);
+    expect(await countRows(`symbol = 'HISTX'`)).toBe(0);
+    expect(await countRows(`symbol = 'LIVEX'`)).toBe(3);
+  });
+
   it('emtia kaynağı hata verirse diğer kaynaklar yine yazılır', async () => {
     vi.spyOn(providers.commodities, 'getPopularPrices').mockRejectedValue(new Error('kota'));
     vi.spyOn(console, 'error').mockImplementation(() => undefined);

@@ -25,14 +25,14 @@ import { Delta, Money } from '@portfoygo/shared/ui/Delta';
 import { useToast } from '@portfoygo/shared/ui/Toast';
 import { cn, formatDate, formatDateTime, formatNumber, formatQuantity, formatRelative, formatTRY } from '@portfoygo/shared/format';
 import { adminApi, adminKeys, swrFetcher } from '@/lib/api';
-import { activityLabel, assetTypeLabel, errorStatus, isEndpointMissing, leagueRoleLabel } from '@/lib/labels';
+import { activityLabel, errorStatus, isEndpointMissing, leagueRoleLabel } from '@/lib/labels';
 import type { UserDetail as Detail } from '@/lib/types';
 import { useAdminAuth } from '@/lib/auth';
 import { num } from './model';
 import { ADMIN_STATS_KEY } from './AdminStats';
 import { MetricCard, PageBreadcrumb, table } from './ui';
 import { ConfirmModal, LoadError } from './controls';
-import { OrdersTableView, TransactionsTableView, useCancelOrder } from './RecordTables';
+import { AssetCell, OrdersTableView, TransactionsTableView, useCancelOrder } from './RecordTables';
 import PremiumBadge from '@/app/subscriptions/_components/PremiumBadge';
 
 type ActionKey = 'role' | 'verify' | 'revoke' | 'ban';
@@ -365,11 +365,7 @@ function HoldingsPanel({ items }: { items: Detail['holdings'] }) {
           {items.map((h) => (
             <tr key={h.id} className="transition-colors hover:bg-surface-2">
               <td className={table.td}>
-                <p className="font-medium text-fg">{h.symbol}</p>
-                <p className="max-w-[12rem] truncate text-xs text-subtle">
-                  {h.name ? `${h.name} · ` : ''}
-                  {assetTypeLabel(h.asset_type)}
-                </p>
+                <AssetCell symbol={h.symbol} name={h.name} assetType={h.asset_type} />
               </td>
               <td className={cn(table.td, 'num whitespace-nowrap text-right')}>{formatQuantity(num(h.quantity))}</td>
               <td className={cn(table.td, 'num hidden whitespace-nowrap text-right sm:table-cell')}>{formatTRY(num(h.average_price), { precise: true })}</td>

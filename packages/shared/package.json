@@ -9,6 +9,7 @@
   ],
   "exports": {
     "./api": "./src/api/client.ts",
+    "./assetLogos": "./src/assetLogos.ts",
     "./csp": "./src/csp.ts",
     "./devAutoLogin": "./src/devAutoLogin.ts",
     "./errors": "./src/errors.ts",

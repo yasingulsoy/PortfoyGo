@@ -8,7 +8,10 @@ import { AuditService } from '../services/audit';
 
 const router = express.Router();
 
-/** Döviz fiyatları TL / birim cinsindendir; `price` = satış kuru */
+/**
+ * Döviz fiyatları TL / birim cinsindendir; `price` = satış kuru. `source`: etkin kur sağlayıcısı (FX_PROVIDER;
+ * ör. 'tcmb' → arayüzde "TCMB günlük kur" tazelik notu).
+ */
 const toCurrencyDto = (p: CurrencyRate) => ({
   code: p.code,
   name: p.name,
@@ -17,6 +20,7 @@ const toCurrencyDto = (p: CurrencyRate) => ({
   price: p.selling,
   change_rate: p.changeRate,
   datetime: p.datetime,
+  source: providers.fx.id,
 });
 
 /** Tüm döviz kurları (DB'den) */

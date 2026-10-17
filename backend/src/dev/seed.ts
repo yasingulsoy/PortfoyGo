@@ -158,39 +158,62 @@ export async function seedMarketData(pool: Pool): Promise<void> {
   }
 }
 
+/** tickMarket seçenekleri: LOCAL_LIVE_PRICES=1 iken canlı kaynaktan beslenen veri simülasyonla bozulmasın */
+export interface TickMarketOptions {
+  /** Hisse satırlarına dokunma (Finnhub canlı) */
+  skipStocks?: boolean;
+  /** Kripto satırlarına dokunma (CoinGecko canlı) */
+  skipCrypto?: boolean;
+  /** Döviz kurlarına dokunma (TCMB / Frankfurter) */
+  skipCurrencies?: boolean;
+  /** Bu emtia kodlarına dokunma (ör. gold-api.com'dan canlı gelen metaller) */
+  skipCommodityCodes?: readonly string[];
+}
+
 /**
  * Fiyatları ±%0,4'lük rastgele adımlarla günceller ve tazelik zaman damgalarını yeniler.
- * (Gerçek piyasa verisi değildir; sadece çevrimdışı geliştirme içindir.)
+ * (Gerçek piyasa verisi değildir; sadece çevrimdışı geliştirme içindir.) Gram altın (GAU) türetilmiş olduğundan
+ * (ons × USD/TRY, bkz. providers/adapters/priceHistoryCommodity.ts) hiçbir zaman simüle edilmez.
  */
-export async function tickMarket(pool: Pool): Promise<void> {
-  await pool.query(
-    `UPDATE market_data_cache
-        SET price = GREATEST(price * (1 + (random() - 0.5) * 0.008), 0.0001),
-            cached_at = CURRENT_TIMESTAMP,
-            expires_at = CURRENT_TIMESTAMP + INTERVAL '1 hour'`
-  );
-  await pool.query(
-    `UPDATE market_data_cache
-        SET change = price - previous_close,
-            change_percent = CASE WHEN previous_close > 0 THEN (price - previous_close) / previous_close * 100 ELSE 0 END,
-            high_price = GREATEST(COALESCE(high_price, price), price),
-            low_price = LEAST(COALESCE(low_price, price), price)
-      WHERE previous_close IS NOT NULL`
-  );
-  await pool.query(
-    `UPDATE currency_rates
-        SET buying = buying * f, selling = selling * f, updated_at = CURRENT_TIMESTAMP
-       FROM (SELECT 1 + (random() - 0.5) * 0.001 AS f) r`
-  );
-  // Emtia: yerelde sağlayıcı yok; fiyat geçmişindeki son fiyattan güncel saatlik kova yazılır (Sanal portföy / Haftalık
-  // Seçim / Arena emtiayı price_history'deki taze kayıttan okur — yoksa altın vb. "bayat" görünür).
+export async function tickMarket(pool: Pool, opts: TickMarketOptions = {}): Promise<void> {
+  const types = [...(opts.skipStocks ? [] : ['stock']), ...(opts.skipCrypto ? [] : ['crypto'])];
+  if (types.length > 0) {
+    await pool.query(
+      `UPDATE market_data_cache
+          SET price = GREATEST(price * (1 + (random() - 0.5) * 0.008), 0.0001),
+              cached_at = CURRENT_TIMESTAMP,
+              expires_at = CURRENT_TIMESTAMP + INTERVAL '1 hour'
+        WHERE asset_type = ANY($1::text[])`,
+      [types]
+    );
+    await pool.query(
+      `UPDATE market_data_cache
+          SET change = price - previous_close,
+              change_percent = CASE WHEN previous_close > 0 THEN (price - previous_close) / previous_close * 100 ELSE 0 END,
+              high_price = GREATEST(COALESCE(high_price, price), price),
+              low_price = LEAST(COALESCE(low_price, price), price)
+        WHERE previous_close IS NOT NULL AND asset_type = ANY($1::text[])`,
+      [types]
+    );
+  }
+  if (!opts.skipCurrencies) {
+    await pool.query(
+      `UPDATE currency_rates
+          SET buying = buying * f, selling = selling * f, updated_at = CURRENT_TIMESTAMP
+         FROM (SELECT 1 + (random() - 0.5) * 0.001 AS f) r`
+    );
+  }
+  // Emtia: yerelde sağlayıcı yok; fiyat geçmişindeki son fiyattan güncel saatlik kova yazılır (Piyasalar > Emtia,
+  // Sanal portföy / Haftalık Seçim / Arena emtiayı price_history'deki taze kayıttan okur — yoksa altın vb. "bayat" görünür).
+  const skipCodes = ['GAU', ...(opts.skipCommodityCodes ?? [])].map((c) => c.toUpperCase());
   await pool.query(
     `INSERT INTO price_history (asset_type, symbol, granularity, bucket_start, price, currency, updated_at)
      SELECT 'commodity', l.symbol, 'hour', date_trunc('hour', CURRENT_TIMESTAMP), l.price * (1 + (random() - 0.5) * 0.004), l.currency, CURRENT_TIMESTAMP
        FROM (SELECT DISTINCT ON (symbol) symbol, currency, price
-               FROM price_history WHERE asset_type = 'commodity' AND price > 0
+               FROM price_history WHERE asset_type = 'commodity' AND price > 0 AND NOT (symbol = ANY($1::text[]))
               ORDER BY symbol, bucket_start DESC) l
-     ON CONFLICT (asset_type, symbol, granularity, bucket_start) DO UPDATE SET price = EXCLUDED.price, updated_at = EXCLUDED.updated_at`
+     ON CONFLICT (asset_type, symbol, granularity, bucket_start) DO UPDATE SET price = EXCLUDED.price, updated_at = EXCLUDED.updated_at`,
+    [skipCodes]
   );
 }
 

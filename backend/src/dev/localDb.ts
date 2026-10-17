@@ -6,6 +6,7 @@ import { startPgliteServer } from './pgliteServer';
 import { runMigrations } from '../db/migrator';
 import { DEMO_EMAIL, DEMO_USERNAME, seedArena, seedCompetitions, seedMarketData, seedPriceHistory, seedUsers, tickMarket } from './seed';
 import { seedScenarios } from './seed';
+import { localLivePrices } from './localEnv';
 
 /**
  * Yerel geliştirme veritabanı: gömülü PostgreSQL (PGlite, WASM) + wire protokol soketi.
@@ -133,13 +134,21 @@ export async function startLocalDb(opts: StartLocalDbOptions = {}): Promise<Loca
   }
 
   const tickMs = opts.tickMs ?? parseInt(process.env.LOCAL_DB_TICK_MS || '60000', 10);
+  // LOCAL_LIVE_PRICES=1: canlı kaynaktan beslenen satırlar (kripto, döviz, metaller; anahtar varsa hisse) simüle edilmez
+  const live = localLivePrices(process.env);
+  const tickOpts = {
+    skipStocks: live.stocks,
+    skipCrypto: live.crypto,
+    skipCurrencies: live.fx,
+    skipCommodityCodes: live.liveCommodityCodes,
+  };
   let ticking = false;
   const timer =
     tickMs > 0
       ? setInterval(() => {
           if (ticking) return;
           ticking = true;
-          tickMarket(pool)
+          tickMarket(pool, tickOpts)
             .catch((err) => log(`Fiyat simülasyonu hatası: ${err?.message || err}`))
             .finally(() => {
               ticking = false;
@@ -147,6 +156,12 @@ export async function startLocalDb(opts: StartLocalDbOptions = {}): Promise<Loca
         }, tickMs)
       : null;
   if (timer) log(`Çevrimdışı fiyat simülasyonu açık (${Math.round(tickMs / 1000)} sn'de bir; LOCAL_DB_TICK_MS=0 ile kapatın)`);
+  if (live.enabled) {
+    log(
+      `LOCAL_LIVE_PRICES açık: kripto (CoinGecko), döviz (${live.fxProvider === 'tcmb' ? 'TCMB günlük' : 'Frankfurter/ECB günlük'}), ` +
+        `değerli metaller (gold-api.com) canlı${live.stocks ? ', hisse (Finnhub, LOCAL_FINNHUB_API_KEY)' : '; hisseler simülasyonda (LOCAL_FINNHUB_API_KEY yok)'}`
+    );
+  }
 
   let stopped = false;
   return {
