@@ -84,17 +84,18 @@ export function MetricCard({
   hint?: ReactNode;
 }) {
   return (
-    <Card className="h-full p-5 md:p-6">
-      <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-surface-3 text-fg">
-        <Icon className="h-6 w-6" aria-hidden="true" />
+    // Dar ekranda yatay ve kısa satır (ikon solda); sm+ TailAdmin dikey kartı
+    <Card className="flex h-full items-center gap-4 p-4 sm:block sm:p-5 md:p-6">
+      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-surface-3 text-fg sm:h-12 sm:w-12">
+        <Icon className="h-5 w-5 sm:h-6 sm:w-6" aria-hidden="true" />
       </div>
-      <div className="mt-5 flex items-end justify-between gap-3">
+      <div className="flex min-w-0 flex-1 items-end justify-between gap-3 sm:mt-5">
         <div className="min-w-0">
           <span className="text-sm text-muted">{label}</span>
           {loading ? (
-            <Skeleton className="mt-2 h-8 w-24" />
+            <Skeleton className="mt-1 h-7 w-24 sm:mt-2 sm:h-8" />
           ) : (
-            <p className="num mt-2 truncate text-2xl font-bold text-fg" title={typeof value === 'string' ? value : undefined}>
+            <p className="num mt-0.5 truncate text-xl font-bold text-fg sm:mt-2 sm:text-2xl" title={typeof value === 'string' ? value : undefined}>
               {value}
             </p>
           )}
@@ -106,18 +107,38 @@ export function MetricCard({
   );
 }
 
-/** TailAdmin tablo sınıfları */
+/**
+ * TailAdmin tablo sınıfları.
+ * Kaydırma kabı bir CSS kapsayıcısıdır (@container): sütunlar ekran yerine kartın genişliğine göre
+ * `hidden @xl:table-cell` gibi kapsayıcı sorgularıyla açılır. (1024px'te açık kenar menüsü içeriği
+ * 768px'tekinden dar bıraktığı için `lg:` gibi ekran kırılımları tabloyu taşırır.)
+ * Kenar sütunları kart başlığıyla hizalı (pl-5/pr-5 → sm:6); ara boşluklar dar ekranda sıkı.
+ */
 export const table = {
   // relative: sr-only (absolute) başlık metinleri kaydırma kabının dışına taşıp sayfayı genişletmesin
-  wrap: 'relative max-w-full overflow-x-auto',
+  wrap: 'relative max-w-full overflow-x-auto @container',
   table: 'min-w-full text-sm',
   headRow: 'border-y border-line',
-  th: 'px-5 py-3 text-left text-xs font-medium whitespace-nowrap text-muted sm:px-6',
+  th: 'px-3 py-3 text-left text-xs font-medium whitespace-nowrap text-muted first:pl-5 last:pr-5 sm:px-4 sm:first:pl-6 sm:last:pr-6',
   body: 'divide-y divide-line',
-  td: 'px-5 py-3.5 text-sm text-muted sm:px-6',
+  td: 'px-3 py-3.5 text-sm text-muted first:pl-5 last:pr-5 sm:px-4 sm:first:pl-6 sm:last:pr-6',
+  /** Son görünen sütun DOM'da son değilse (sonraki sütunlar gizliyken) sağ kenar boşluğu */
+  edgeEnd: 'pr-5 sm:pr-6',
   /** Tıklanabilir satır */
   rowLink: 'cursor-pointer transition-colors hover:bg-surface-2',
 };
+
+/**
+ * Küçük (size="sm") düğmeleri dar ekranlarda (<640px) en az 44px dokunma hedefine büyütür;
+ * masaüstündeki sıkı yerleşim değişmez.
+ */
+export const tapSm = 'max-sm:h-11 max-sm:min-w-11 max-sm:px-3.5 max-sm:text-sm';
+
+/** Segment sekmeleri (Tabs variant="segment") dar ekranlarda 44px yüksekliğe çıkar */
+export const tapTabs = 'max-sm:[&>button]:h-11';
+
+/** Mobil liste satırı (tabloların dar kapsayıcıdaki karşılığı) */
+export const stackRow = 'px-5 py-4 sm:px-6';
 
 /** Kart başlığı (TailAdmin: büyük başlık + sağda eylemler), CardHeader'ın tablo kartlarına uygun sürümü. */
 export function TableCardHeader({ title, description, actions, className }: { title: string; description?: ReactNode; actions?: ReactNode; className?: string }) {

@@ -66,7 +66,7 @@ export default function PicksHistoryScreen() {
         </GameNotice>
       ) : (
         <>
-          <ul className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:gap-4 2xl:grid-cols-3" aria-label="Haftalar">
+          <ul className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:gap-4 xl:grid-cols-3" aria-label="Haftalar">
             {items.map((w) => (
               <WeekRow key={w.week_id} week={w} />
             ))}

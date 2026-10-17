@@ -186,7 +186,11 @@ function shuffled<T>(rand: () => number, list: readonly T[]): T[] {
   return a;
 }
 
-/** Haber rollerini dağıtır: söylenti→yalanlama çiftleri (ardışık), ~%22 gürültü, en az bir etkili haber. */
+/**
+ * Haber rollerini dağıtır: söylenti→yalanlama çiftleri (ardışık), ~%22 gürültü, en az bir etkili haber.
+ * İlk başlık her zaman etkili bir haberdir (oyuncu ilk dakikada haber–fiyat ilişkisini görsün); gürültü
+ * haberler mümkünse art arda gelmez.
+ */
 export function assignRoles(n: number, durationS: number, rand: () => number): NewsRole[] {
   const roles: NewsRole[] = new Array(n).fill('news');
   if (n === 0) return roles;
@@ -199,16 +203,24 @@ export function assignRoles(n: number, durationS: number, rand: () => number): N
   pairs = Math.min(pairs, Math.floor((n - 1) / 2));
   for (let p = 0; p < pairs; p++) {
     const candidates: number[] = [];
-    for (let i = 0; i + 1 < n; i++) if (roles[i] === 'news' && roles[i + 1] === 'news') candidates.push(i);
+    for (let i = 1; i + 1 < n; i++) if (roles[i] === 'news' && roles[i + 1] === 'news') candidates.push(i);
     if (candidates.length === 0) break;
     const i = pick(rand, candidates);
     roles[i] = 'rumour';
     roles[i + 1] = 'denial';
   }
-  const newsIdx = roles.map((r, i) => (r === 'news' ? i : -1)).filter((i) => i >= 0);
   const target = Math.max(n >= 3 ? 1 : 0, Math.round(n * 0.22));
-  const noise = Math.min(target, newsIdx.length - 1);
-  for (const i of shuffled(rand, newsIdx).slice(0, Math.max(0, noise))) roles[i] = 'noise';
+  let placed = 0;
+  for (const allowAdjacent of [false, true]) {
+    const newsIdx = roles.map((r, i) => (r === 'news' && i > 0 ? i : -1)).filter((i) => i >= 0);
+    for (const i of shuffled(rand, newsIdx)) {
+      const left = roles.filter((r) => r === 'news').length;
+      if (placed >= target || left <= 1) break;
+      if (!allowAdjacent && (roles[i - 1] === 'noise' || roles[i + 1] === 'noise')) continue;
+      roles[i] = 'noise';
+      placed++;
+    }
+  }
   return roles;
 }
 

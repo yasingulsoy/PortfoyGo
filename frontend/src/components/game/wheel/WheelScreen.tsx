@@ -4,6 +4,7 @@ import { useRef, useState } from 'react';
 import Link from 'next/link';
 import { cn } from '@portfoygo/shared/format';
 import GameButton from '@/components/game/ui/GameButton';
+import GameColumns from '@/components/game/ui/GameColumns';
 import GamePanel from '@/components/game/ui/GamePanel';
 import GameScreen from '@/components/game/ui/GameScreen';
 import RewardPopup, { type RewardItem } from '@/components/game/ui/RewardPopup';
@@ -121,7 +122,7 @@ export default function WheelScreen() {
   const nextFree = wheel?.next_free_at ? Date.parse(wheel.next_free_at) : fallbackReset;
 
   return (
-    <GameScreen topBar back="/oyun" backLabel="Oyun Merkezi’ne dön" title="Günlük Çark">
+    <GameScreen topBar back="/oyun" backLabel="Oyun Merkezi’ne dön" title="Günlük Çark" layout="wide">
       <div className="space-y-5">
         <p className="g-title-sm -mt-2 text-base">Her gün 1 ücretsiz çevirme. Şansını dene!</p>
 
@@ -129,133 +130,137 @@ export default function WheelScreen() {
           {announce}
         </p>
 
-        <div className="space-y-5">
-          {/* Çark + düğme */}
-          <section aria-labelledby="wheel-heading" className="flex flex-col items-center gap-5">
-            <h2 id="wheel-heading" className="sr-only">
-              Şans çarkı
-            </h2>
-            <div className="w-full max-w-[22rem] px-2 pt-4">
-              {error && !wheel ? (
-                <div className="g-panel p-4">
-                  <ErrorPanel error={error} onRetry={() => void mutate()} />
-                </div>
-              ) : isLoading && !wheel ? (
-                <div
-                  className="mx-auto aspect-square w-full animate-pulse rounded-full border-8 border-(--g-gold) bg-(--g-glass) motion-reduce:animate-none"
-                  role="status"
-                  aria-label="Çark yükleniyor"
-                />
-              ) : (
-                <SpinWheel
-                  segments={segments}
-                  rotation={rotation}
-                  durationMs={durationMs}
-                  spinning={phase === 'spinning'}
-                  highlight={phase === 'done' && result ? result.segment_index : null}
-                  onSpinEnd={() => finish(result)}
-                />
-              )}
-            </div>
-
-            {wheel && (
-              <div className="flex w-full max-w-sm flex-col items-center gap-3">
-                <div className="flex flex-wrap items-center justify-center gap-2" aria-label="Çevirme hakların">
-                  <span className={cn('g-hud h-9 px-3 text-sm', !free && 'opacity-70')}>Ücretsiz: {free ? 1 : 0}</span>
-                  <span className={cn('g-hud h-9 px-3 text-sm', extra === 0 && 'opacity-70')}>Ekstra: {extra}</span>
-                </div>
-
-                {hasSpin || busy ? (
-                  <GameButton
-                    variant="green"
-                    size="xl"
-                    block
-                    loading={phase === 'requesting'}
-                    disabled={busy || !hasSpin}
-                    onClick={spin}
-                    sound="tap"
-                    aria-describedby="wheel-odds-note"
-                    className={cn(!busy && 'g-anim-bounce')}
-                  >
-                    {phase === 'spinning' ? 'DÖNÜYOR…' : 'ÇEVİR!'}
-                  </GameButton>
-                ) : (
-                  <div className="g-panel w-full px-4 py-3 text-center">
-                    <p className="font-extrabold">Bugünkü hakkını kullandın</p>
-                    <p className="g-font text-xl font-extrabold">
-                      Yarın tekrar gel —{' '}
-                      <Countdown
-                        target={nextFree}
-                        onDone={() => {
-                          setFallbackReset(nextIstanbulMidnight());
-                          void mutate();
-                          void mutateProfile();
-                        }}
-                      />
-                    </p>
+        {/* Telefonda tek sütun; masaüstünde solda çark (kaydırırken sabit), sağda olasılıklar ve bilgiler */}
+        <GameColumns
+          split="6/6"
+          stickyMain
+          main={
+            <section aria-labelledby="wheel-heading" className="flex flex-col items-center gap-5">
+              <h2 id="wheel-heading" className="sr-only">
+                Şans çarkı
+              </h2>
+              <div className="w-full max-w-[22rem] px-2 pt-4 lg:max-w-[26rem] xl:max-w-[28rem]">
+                {error && !wheel ? (
+                  <div className="g-panel p-4">
+                    <ErrorPanel error={error} onRetry={() => void mutate()} />
                   </div>
-                )}
-                <p className="g-title-sm text-center text-sm">
-                  {free ? 'Bugünkü ücretsiz hakkın hazır!' : extra > 0 ? `${extra} ekstra hakkın var.` : 'Ekstra hakları oynayarak kazanabilirsin.'}
-                </p>
-                {message && (
-                  <p role="alert" className="w-full rounded-2xl bg-(--g-down-soft) px-3 py-2 text-center text-sm font-bold text-(--g-down)">
-                    {message}
-                  </p>
+                ) : isLoading && !wheel ? (
+                  <div
+                    className="mx-auto aspect-square w-full animate-pulse rounded-full border-8 border-(--g-gold) bg-(--g-glass) motion-reduce:animate-none"
+                    role="status"
+                    aria-label="Çark yükleniyor"
+                  />
+                ) : (
+                  <SpinWheel
+                    segments={segments}
+                    rotation={rotation}
+                    durationMs={durationMs}
+                    spinning={phase === 'spinning'}
+                    highlight={phase === 'done' && result ? result.segment_index : null}
+                    onSpinEnd={() => finish(result)}
+                  />
                 )}
               </div>
-            )}
-          </section>
 
-          {/* Olasılıklar ve bilgiler */}
-          <div className="space-y-5">
-            <GamePanel title="Olasılıklar" accent="purple">
-              <OddsTable segments={segments} loading={isLoading && !wheel} />
-              <p id="wheel-odds-note" className="mt-3 flex items-start gap-2 text-sm font-semibold">
-                <ShieldIcon size={22} className="mt-0.5" />
-                <span>{WHEEL_DISCLAIMER}</span>
-              </p>
-              {wheel?.disclaimer && wheel.disclaimer !== WHEEL_DISCLAIMER && <p className="mt-2 text-xs text-(--g-ink-soft)">{wheel.disclaimer}</p>}
-            </GamePanel>
+              {wheel && (
+                <div className="flex w-full max-w-sm flex-col items-center gap-3">
+                  <div className="flex flex-wrap items-center justify-center gap-2" aria-label="Çevirme hakların">
+                    <span className={cn('g-hud h-9 px-3 text-sm', !free && 'opacity-70')}>Ücretsiz: {free ? 1 : 0}</span>
+                    <span className={cn('g-hud h-9 px-3 text-sm', extra === 0 && 'opacity-70')}>Ekstra: {extra}</span>
+                  </div>
 
-            <GamePanel title="Ekstra hak nasıl kazanılır?" accent="orange">
-              <ul className="space-y-2.5 text-sm">
-                <li className="flex items-start gap-3">
-                  <FlameIcon size={28} />
-                  <span>
-                    <strong>7 günlük seri:</strong> her gün bir Arena turu bitir ya da portföyünde işlem yap; 7. günde <strong>+1 çevirme</strong> ve 100 jeton.
-                  </span>
-                </li>
-                <li className="flex items-start gap-3">
-                  <span
-                    aria-hidden="true"
-                    className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-(--g-teal) text-xs font-black text-(--g-on-color)"
-                  >
-                    +1
-                  </span>
-                  <span>
-                    Çarktaki <strong>+1 Çevirme</strong> dilimi sana hemen bir hak daha verir (en fazla 10 hak birikir).
-                  </span>
-                </li>
-                <li className="flex items-start gap-3">
-                  <span
-                    aria-hidden="true"
-                    className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-(--g-green) text-xs font-black text-(--g-on-color)"
-                  >
-                    ✓
-                  </span>
-                  <span>
-                    <Link href="/oyun/gorevler" className="font-extrabold text-(--g-ink) underline decoration-(--g-blue) decoration-2 underline-offset-2">
-                      Günlük görevler
-                    </Link>{' '}
-                    jeton ve XP kazandırır, serini sürdürmene yardım eder.
-                  </span>
-                </li>
-              </ul>
-              <p className="mt-3 text-xs font-semibold text-(--g-ink-soft)">Çevirme hakkı hiçbir zaman parayla satılmaz.</p>
-            </GamePanel>
-          </div>
-        </div>
+                  {hasSpin || busy ? (
+                    <GameButton
+                      variant="green"
+                      size="xl"
+                      block
+                      loading={phase === 'requesting'}
+                      disabled={busy || !hasSpin}
+                      onClick={spin}
+                      sound="tap"
+                      aria-describedby="wheel-odds-note"
+                      className={cn(!busy && 'g-anim-bounce')}
+                    >
+                      {phase === 'spinning' ? 'DÖNÜYOR…' : 'ÇEVİR!'}
+                    </GameButton>
+                  ) : (
+                    <div className="g-panel w-full px-4 py-3 text-center">
+                      <p className="font-extrabold">Bugünkü hakkını kullandın</p>
+                      <p className="g-font text-xl font-extrabold">
+                        Yarın tekrar gel —{' '}
+                        <Countdown
+                          target={nextFree}
+                          onDone={() => {
+                            setFallbackReset(nextIstanbulMidnight());
+                            void mutate();
+                            void mutateProfile();
+                          }}
+                        />
+                      </p>
+                    </div>
+                  )}
+                  <p className="g-title-sm text-center text-sm">
+                    {free ? 'Bugünkü ücretsiz hakkın hazır!' : extra > 0 ? `${extra} ekstra hakkın var.` : 'Ekstra hakları oynayarak kazanabilirsin.'}
+                  </p>
+                  {message && (
+                    <p role="alert" className="w-full rounded-2xl bg-(--g-down-soft) px-3 py-2 text-center text-sm font-bold text-(--g-down)">
+                      {message}
+                    </p>
+                  )}
+                </div>
+              )}
+            </section>
+          }
+          side={
+            <>
+              <GamePanel title="Olasılıklar" accent="purple">
+                <OddsTable segments={segments} loading={isLoading && !wheel} />
+                <p id="wheel-odds-note" className="mt-3 flex items-start gap-2 text-sm font-semibold">
+                  <ShieldIcon size={22} className="mt-0.5" />
+                  <span>{WHEEL_DISCLAIMER}</span>
+                </p>
+                {wheel?.disclaimer && wheel.disclaimer !== WHEEL_DISCLAIMER && <p className="mt-2 text-xs text-(--g-ink-soft)">{wheel.disclaimer}</p>}
+              </GamePanel>
+
+              <GamePanel title="Ekstra hak nasıl kazanılır?" accent="orange">
+                <ul className="space-y-2.5 text-sm">
+                  <li className="flex items-start gap-3">
+                    <FlameIcon size={28} />
+                    <span>
+                      <strong>7 günlük seri:</strong> her gün bir Arena turu bitir ya da portföyünde işlem yap; 7. günde <strong>+1 çevirme</strong> ve 100 jeton.
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <span
+                      aria-hidden="true"
+                      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-(--g-teal) text-xs font-black text-(--g-on-color)"
+                    >
+                      +1
+                    </span>
+                    <span>
+                      Çarktaki <strong>+1 Çevirme</strong> dilimi sana hemen bir hak daha verir (en fazla 10 hak birikir).
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <span
+                      aria-hidden="true"
+                      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-(--g-green) text-xs font-black text-(--g-on-color)"
+                    >
+                      ✓
+                    </span>
+                    <span>
+                      <Link href="/oyun/gorevler" className="font-extrabold text-(--g-ink) underline decoration-(--g-blue) decoration-2 underline-offset-2">
+                        Günlük görevler
+                      </Link>{' '}
+                      jeton ve XP kazandırır, serini sürdürmene yardım eder.
+                    </span>
+                  </li>
+                </ul>
+                <p className="mt-3 text-xs font-semibold text-(--g-ink-soft)">Çevirme hakkı hiçbir zaman parayla satılmaz.</p>
+              </GamePanel>
+            </>
+          }
+        />
 
         {result && (
           <RewardPopup
