@@ -14,6 +14,9 @@ import {
 import { createGoldApiCommodityProvider } from '../src/providers/adapters/goldApiCommodity';
 import { GOLD_API_LIVE_CODES, TROY_OUNCE_GRAMS } from '../src/providers/adapters/goldApiSymbols';
 import { localDevEnv, localLivePrices } from '../src/dev/localEnv';
+import { createFinnhubCachedProvider } from '../src/providers/adapters/finnhubCached';
+import { MAX_TRACKED_STOCKS, STOCK_UNIVERSE, trackedStockSymbols } from '../src/providers/stockUniverse';
+import { cryptoTopN } from '../src/services/marketCache';
 
 // Ücretsiz / anahtarsız veri kaynağı adaptörleri. Ağ YOK: HTTP istemcisi sahte; veritabanı testleri test PGlite'ında
 // geri alınan (ROLLBACK) bir işlem içinde çalışır, böylece diğer test dosyalarının kurlarını/fiyatlarını etkilemez.
@@ -268,6 +271,18 @@ describe('emtia adaptörleri (pricehistory, goldapi)', () => {
     expect(await p.getPrice('GAU')).toBeNull();
   });
 
+  it('işlem fiyatı (PricingService): taze emtia kabul, bayat emtia 503 PRICE_UNAVAILABLE', async () => {
+    const { PricingService } = await import('../src/services/pricing');
+    const { providers } = await import('../src/providers');
+    const ph = createPriceHistoryCommodityProvider({ db, cacheMs: () => 0 });
+    vi.spyOn(providers.commodities, 'getPrice').mockImplementation((code, a, b) => ph.getPrice(code, a, b));
+    await addHistory('PLATINUM', 1600);
+    await addHistory('PALLADIUM', 1100, { updatedHoursAgo: 25 });
+    const ok = await PricingService.getExecutionPriceTRY('PLATINUM', 'commodity');
+    expect(ok.priceTRY).toBeCloseTo(1600 * 40, 6); // USD kotasyonlu × USD/TRY (test kuru 40)
+    await expect(PricingService.getExecutionPriceTRY('PALLADIUM', 'commodity')).rejects.toMatchObject({ status: 503, code: 'PRICE_UNAVAILABLE' });
+  });
+
   it('gram altın: kur yoksa ya da ons USD değilse türetilmez', async () => {
     const gold = { code: 'GOLD', name: 'Altın', buying: 2000, selling: 2000, changeRate: 0, datetime: '', quoteCurrency: 'USD' as const, fetchedAt: Date.now() };
     expect(await deriveGramGold({ ...gold, quoteCurrency: 'TRY' }, db)).toBeNull();
@@ -325,6 +340,70 @@ describe('emtia adaptörleri (pricehistory, goldapi)', () => {
 });
 
 // ---------------------------------------------------------------------------
+// Hisse evreni + kota dostu Finnhub (anahtar gerekir; burada sahte quote/profil)
+// ---------------------------------------------------------------------------
+
+describe('hisse evreni ve finnhub-cached', () => {
+  it('varsayılan evren 30–50 sembol, tekrarsız; STOCK_SYMBOLS ile değişir (en fazla 50)', () => {
+    const def = trackedStockSymbols({});
+    expect(def.length).toBeGreaterThanOrEqual(30);
+    expect(def.length).toBeLessThanOrEqual(MAX_TRACKED_STOCKS);
+    expect(new Set(def).size).toBe(def.length);
+    expect(STOCK_UNIVERSE.every((u) => u.name && u.industry)).toBe(true);
+    expect(trackedStockSymbols({ STOCK_SYMBOLS: ' aapl, msft,AAPL, bad sym ' })).toEqual(['AAPL', 'MSFT']);
+    const many = Array.from({ length: 70 }, (_, i) => `S${i}`).join(',');
+    expect(trackedStockSymbols({ STOCK_SYMBOLS: many })).toHaveLength(50);
+  });
+
+  it('her turda hisse başına 1 quote çağrısı; profiller tur başına sınırlı ve 24 sa önbellekli', async () => {
+    const quotes: string[] = [];
+    const profiles: string[] = [];
+    let t = 0;
+    const p = createFinnhubCachedProvider({
+      isConfigured: () => true,
+      symbols: () => ['AAPL', 'MSFT', 'XOM', 'NEW1'],
+      getQuote: async (sym) => {
+        quotes.push(sym);
+        if (sym === 'NEW1') return { c: 0, d: 0, dp: 0, h: 0, l: 0, o: 0, pc: 0 }; // bilinmeyen sembol
+        return { c: 100, d: 1, dp: 1, h: 101, l: 99, o: 99.5, pc: 99 };
+      },
+      getProfile: async (sym) => {
+        profiles.push(sym);
+        if (sym === 'MSFT') throw new Error('429');
+        return { name: `${sym} Profil`, marketCapitalization: 2_000, logo: 'l.png', finnhubIndustry: 'Tech' };
+      },
+      profileBatch: 2,
+      now: () => t,
+    });
+
+    const first = await p.getPopularStocks();
+    expect(quotes).toHaveLength(4);
+    expect(profiles).toEqual(['AAPL', 'MSFT']);
+    expect(first.map((q) => q.symbol)).toEqual(['AAPL', 'MSFT', 'XOM']);
+    expect(first[0]).toMatchObject({ name: 'AAPL Profil', marketCap: 2_000_000_000, industry: 'Tech', price: 100 });
+    // Profil yoksa ad/sektör evrenden
+    expect(first[2]).toMatchObject({ name: 'Exxon Mobil Corp', industry: 'Energy', marketCap: 0 });
+
+    await p.getPopularStocks();
+    expect(quotes).toHaveLength(8);
+    expect(profiles).toEqual(['AAPL', 'MSFT', 'MSFT', 'XOM']);
+    t += 25 * 3_600_000;
+    await p.getPopularStocks();
+    expect(profiles.slice(4)).toEqual(['AAPL', 'MSFT']);
+
+    const off = createFinnhubCachedProvider({ isConfigured: () => false, getQuote: async () => { throw new Error('çağrılmamalı'); } });
+    expect(await off.getPopularStocks()).toEqual([]);
+  });
+
+  it('kripto: tek istekte ilk 50 (CRYPTO_TOP_N ile 1..100)', () => {
+    expect(cryptoTopN({})).toBe(50);
+    expect(cryptoTopN({ CRYPTO_TOP_N: '25' })).toBe(25);
+    expect(cryptoTopN({ CRYPTO_TOP_N: '500' })).toBe(100);
+    expect(cryptoTopN({ CRYPTO_TOP_N: 'x' })).toBe(50);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Yerel ortam: LOCAL_LIVE_PRICES (varsayılan kapalı; .env anahtarları asla kullanılmaz)
 // ---------------------------------------------------------------------------
 
@@ -366,6 +445,7 @@ describe('localEnv: LOCAL_LIVE_PRICES', () => {
     process.env.LOCAL_FX_PROVIDER = 'Frankfurter';
     env = localDevEnv(db);
     expect(env.FINNHUB_API_KEY).toBe('yerel-test-anahtari');
+    expect(env.STOCK_PROVIDER).toBe('finnhub-cached');
     expect(env.FX_PROVIDER).toBe('frankfurter');
 
     const live = localLivePrices(process.env);

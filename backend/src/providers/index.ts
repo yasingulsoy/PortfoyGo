@@ -11,6 +11,7 @@
  */
 import type { CommodityProvider, CryptoProvider, FxProvider, NewsProvider, StockProvider } from './types';
 import { finnhubStockProvider } from './adapters/finnhub';
+import { finnhubCachedStockProvider } from './adapters/finnhubCached';
 import { coingeckoCryptoProvider } from './adapters/coingecko';
 import { nosyFxProvider } from './adapters/nosyCurrency';
 import { nosyCommodityProvider } from './adapters/nosyCommodity';
@@ -22,7 +23,8 @@ import { goldApiCommodityProvider } from './adapters/goldApiCommodity';
 import { instrumentProvider } from '../observability/providerMetrics';
 
 const registry = {
-  stocks: { finnhub: finnhubStockProvider } as Record<string, StockProvider>,
+  // finnhub-cached: aynı Finnhub servisi, hisse başına 1 çağrı + 24 sa profil önbelleği (ücretsiz katman dostu)
+  stocks: { finnhub: finnhubStockProvider, 'finnhub-cached': finnhubCachedStockProvider } as Record<string, StockProvider>,
   crypto: { coingecko: coingeckoCryptoProvider } as Record<string, CryptoProvider>,
   // tcmb / frankfurter: anahtarsız, ücretsiz, GÜNLÜK resmi kurlar (bkz. README.md "Ücretsiz kaynaklar")
   fx: { nosyapi: nosyFxProvider, tcmb: tcmbFxProvider, frankfurter: frankfurterFxProvider } as Record<string, FxProvider>,

@@ -26,6 +26,12 @@ type CacheInput = Omit<CachedMarketData, 'id' | 'cached_at' | 'expires_at'>;
 
 const CACHE_DURATION_HOURS = 1;
 
+/** Piyasa değerine göre ilk N kripto (tek istek); CRYPTO_TOP_N (1..100), varsayılan 50 */
+export function cryptoTopN(env: NodeJS.ProcessEnv = process.env): number {
+  const n = parseInt(env.CRYPTO_TOP_N || '', 10);
+  return Number.isFinite(n) && n >= 1 ? Math.min(n, 100) : 50;
+}
+
 const toStockCacheData = (stocks: StockQuote[]): CacheInput[] =>
   stocks.map((stock) => ({
     asset_type: 'stock' as const,
@@ -189,7 +195,7 @@ export class MarketCacheService {
 
     // Kriptolar
     try {
-      const cryptos = await providers.crypto.getTopCoins(25);
+      const cryptos = await providers.crypto.getTopCoins(cryptoTopN());
       const cryptoCacheData: CacheInput[] = cryptos
         .filter((c) => c && typeof c.symbol === 'string' && Number(c.current_price) > 0)
         .map((crypto) => ({

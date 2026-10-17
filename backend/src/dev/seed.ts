@@ -9,6 +9,7 @@ import {
   seasonNameFor,
   seasonSlugFor,
 } from '../utils/competition';
+import { STOCK_UNIVERSE } from '../providers/stockUniverse';
 import { DAY_MS, GRANULARITY_MS, bucketStart, istanbulDayStart } from '../utils/priceBuckets';
 import { completedHoursEnd, loadHourlySeries, type ArenaInstrumentCode } from '../services/arena/instruments';
 import { pickWindows, randomSeed } from '../services/arena/paths';
@@ -48,13 +49,30 @@ const BCRYPT_ROUNDS = 10;
 const COMMISSION_RATE = 0.0025;
 const INITIAL_BALANCE = 100_000;
 
-/** TL / birim (alış, satış) — 2026 sonbaharı için makul değerler */
+/**
+ * Döviz kurları (TL / birim): TCMB 16.10.2026 gösterge niteliğindeki döviz alış/satış kurları; değişim 15.10.2026
+ * bültenine göre. Yalnızca YENİ satırlar eklenir (mevcut yerel veritabanındaki kurların üzerine yazılmaz); güncel kur
+ * için LOCAL_LIVE_PRICES=1 (TCMB) ya da `npm run dev:local -- --reset`.
+ */
 export const CURRENCY_SEED: { code: string; name: string; buying: number; selling: number; change: number }[] = [
-  { code: 'USD', name: 'Amerikan Doları', buying: 43.82, selling: 43.96, change: 0.12 },
-  { code: 'EUR', name: 'Euro', buying: 51.05, selling: 51.24, change: -0.08 },
-  { code: 'GBP', name: 'İngiliz Sterlini', buying: 58.71, selling: 58.95, change: 0.21 },
-  { code: 'CHF', name: 'İsviçre Frangı', buying: 54.62, selling: 54.86, change: 0.05 },
-  { code: 'JPY', name: 'Japon Yeni', buying: 0.2918, selling: 0.2931, change: -0.14 },
+  { code: 'USD', name: 'Amerikan Doları', buying: 49.3573, selling: 49.4463, change: 0.05 },
+  { code: 'EUR', name: 'Euro', buying: 55.5179, selling: 55.618, change: 0.37 },
+  { code: 'GBP', name: 'İngiliz Sterlini', buying: 65.6633, selling: 66.0056, change: 0.63 },
+  { code: 'CHF', name: 'İsviçre Frangı', buying: 59.7521, selling: 60.1358, change: 0.77 },
+  { code: 'JPY', name: 'Japon Yeni', buying: 0.311708, selling: 0.313773, change: -0.02 },
+  { code: 'AUD', name: 'Avustralya Doları', buying: 34.2637, selling: 34.4871, change: 0.53 },
+  { code: 'CAD', name: 'Kanada Doları', buying: 34.8079, selling: 34.9649, change: 0.38 },
+  { code: 'SAR', name: 'Suudi Arabistan Riyali', buying: 13.1524, selling: 13.1761, change: 0.06 },
+  { code: 'DKK', name: 'Danimarka Kronu', buying: 7.4155, selling: 7.4519, change: 0.37 },
+  { code: 'SEK', name: 'İsveç Kronu', buying: 4.9631, selling: 5.0145, change: 0.79 },
+  { code: 'NOK', name: 'Norveç Kronu', buying: 5.2129, selling: 5.248, change: 0.8 },
+  { code: 'KWD', name: 'Kuveyt Dinarı', buying: 159.275, selling: 161.359, change: 0.05 },
+  { code: 'CNY', name: 'Çin Yuanı', buying: 7.34, selling: 7.436, change: 0.12 },
+  { code: 'AED', name: 'BAE Dirhemi', buying: 13.3633, selling: 13.5382, change: 0.05 },
+  { code: 'QAR', name: 'Katar Riyali', buying: 13.4645, selling: 13.6407, change: 0.05 },
+  { code: 'AZN', name: 'Azerbaycan Manatı', buying: 28.871, selling: 29.2488, change: 0.05 },
+  { code: 'RUB', name: 'Rus Rublesi', buying: 0.58651, selling: 0.59419, change: 0.1 },
+  { code: 'RON', name: 'Rumen Leyi', buying: 10.3462, selling: 10.4816, change: 0.37 },
 ];
 
 type MarketSeed = {
@@ -91,27 +109,118 @@ const coin = (symbol: string, id: string, name: string, price: number, chg: numb
   metadata: { id, image: '' },
 });
 
+/**
+ * Piyasa cache'i (USD). Yalnızca YENİ semboller eklenir; mevcut satırların fiyatı korunur (simülasyon sürer).
+ * - Hisseler: varsayılan evren (providers/stockUniverse.ts, 48 büyük ABD şirketi); fiyat / piyasa değeri YAKLAŞIK
+ *   örnek değerlerdir (anahtarsız ücretsiz ABD hisse kaynağı yok; gerçek fiyat için LOCAL_FINNHUB_API_KEY).
+ * - Kriptolar: CoinGecko piyasa değerine göre ilk 50, 17.10.2026 fiyatları (LOCAL_LIVE_PRICES=1 ile canlı).
+ */
+const STOCK_SEED_VALUES: Record<string, [price: number, changePct: number, capB: number]> = {
+  AAPL: [238.4, 0.82, 3580],
+  MSFT: [512.1, -0.35, 3810],
+  NVDA: [182.6, 1.94, 4450],
+  GOOGL: [241.3, 0.41, 2930],
+  AMZN: [226.8, -0.62, 2420],
+  META: [731.5, 1.12, 1840],
+  TSLA: [418.2, -2.31, 1350],
+  AVGO: [345.2, 1.05, 1630],
+  ORCL: [292.4, -0.84, 820],
+  AMD: [164.9, 2.48, 267],
+  NFLX: [1204.7, 0.27, 512],
+  CRM: [247.6, -0.42, 237],
+  ADBE: [352.8, 0.31, 150],
+  INTC: [36.9, 1.67, 161],
+  CSCO: [69.4, 0.22, 275],
+  QCOM: [168.3, -0.71, 182],
+  IBM: [282.5, 0.38, 263],
+  PLTR: [182.1, 3.12, 431],
+  UBER: [96.7, -1.08, 201],
+  JPM: [301.2, -0.18, 828],
+  V: [345.6, 0.24, 668],
+  MA: [571.3, 0.35, 518],
+  BAC: [50.9, -0.27, 377],
+  GS: [778.4, 0.92, 238],
+  MS: [157.2, 0.61, 251],
+  PYPL: [69.8, -1.35, 67],
+  XOM: [114.6, 0.47, 488],
+  CVX: [155.3, 0.29, 311],
+  WMT: [102.4, 0.15, 817],
+  COST: [921.5, -0.38, 409],
+  HD: [392.7, 0.56, 391],
+  KO: [69.1, 0.12, 297],
+  PEP: [148.2, -0.21, 203],
+  MCD: [302.6, 0.08, 216],
+  SBUX: [84.3, -0.93, 96],
+  NKE: [68.9, -1.44, 102],
+  DIS: [112.4, 0.66, 203],
+  LLY: [812.3, 1.21, 728],
+  UNH: [352.1, -0.57, 319],
+  JNJ: [189.7, 0.19, 457],
+  ABBV: [228.4, 0.44, 403],
+  MRK: [84.6, -0.33, 212],
+  PFE: [24.9, -0.48, 141],
+  BA: [216.8, 1.36, 164],
+  CAT: [498.3, 0.87, 233],
+  GE: [301.5, 0.72, 320],
+  T: [27.4, -0.15, 196],
+  VZ: [41.2, 0.09, 174],
+};
+
 export const MARKET_SEED: MarketSeed[] = [
-  stock('AAPL', 'Apple Inc', 238.4, 0.82, 3580, 'Technology'),
-  stock('MSFT', 'Microsoft Corp', 512.1, -0.35, 3810, 'Technology'),
-  stock('NVDA', 'NVIDIA Corp', 182.6, 1.94, 4450, 'Semiconductors'),
-  stock('GOOGL', 'Alphabet Inc', 241.3, 0.41, 2930, 'Media'),
-  stock('AMZN', 'Amazon.com Inc', 226.8, -0.62, 2420, 'Retail'),
-  stock('META', 'Meta Platforms Inc', 731.5, 1.12, 1840, 'Media'),
-  stock('TSLA', 'Tesla Inc', 418.2, -2.31, 1350, 'Automobiles'),
-  stock('NFLX', 'Netflix Inc', 1204.7, 0.27, 512, 'Media'),
-  stock('AMD', 'Advanced Micro Devices', 164.9, 2.48, 267, 'Semiconductors'),
-  stock('JPM', 'JPMorgan Chase & Co', 301.2, -0.18, 828, 'Banking'),
-  coin('BTC', 'bitcoin', 'Bitcoin', 118250, 1.36, 2350, 48),
-  coin('ETH', 'ethereum', 'Ethereum', 4385, 2.04, 529, 31),
-  coin('USDT', 'tether', 'Tether', 1.0, 0.01, 176, 92),
-  coin('XRP', 'ripple', 'XRP', 2.94, -1.12, 176, 5.1),
-  coin('BNB', 'binancecoin', 'BNB', 1012, 0.74, 141, 2.3),
-  coin('SOL', 'solana', 'Solana', 221.4, 3.18, 120, 6.4),
-  coin('DOGE', 'dogecoin', 'Dogecoin', 0.2471, -2.05, 37, 2.9),
-  coin('ADA', 'cardano', 'Cardano', 0.8562, -0.93, 31, 1.1),
-  coin('AVAX', 'avalanche-2', 'Avalanche', 31.27, 1.57, 13, 0.9),
-  coin('LINK', 'chainlink', 'Chainlink', 22.83, 0.66, 15, 0.8),
+  ...STOCK_UNIVERSE.filter((u) => STOCK_SEED_VALUES[u.symbol]).map((u) => {
+    const [price, chg, capB] = STOCK_SEED_VALUES[u.symbol];
+    return stock(u.symbol, u.name, price, chg, capB, u.industry);
+  }),
+  coin('BTC', 'bitcoin', 'Bitcoin', 81447, -0.96, 1637, 22.2),
+  coin('ETH', 'ethereum', 'Ethereum', 2427.92, -1.74, 296.6, 8.8),
+  coin('USDT', 'tether', 'Tether', 0.9988, -0.03, 183.5, 41.5),
+  coin('BNB', 'binancecoin', 'BNB', 719.49, -1.34, 95.8, 0.5),
+  coin('XRP', 'ripple', 'XRP', 1.3, -2.91, 82.1, 1.1),
+  coin('USDC', 'usd-coin', 'USDC', 0.9996, -0.02, 72.5, 13.5),
+  coin('SOL', 'solana', 'Solana', 104.29, -1.77, 61.5, 2.3),
+  coin('TRX', 'tron', 'TRON', 0.3365, 0.38, 32, 0.3),
+  coin('FIGR_HELOC', 'figure-heloc', 'Figure Heloc', 1.034, 0.29, 24.8, 0.1),
+  coin('ZEC', 'zcash', 'Zcash', 1165.69, -5.1, 19.8, 0.7),
+  coin('HYPE', 'hyperliquid', 'Hyperliquid', 78.79, -3.53, 17.5, 0.6),
+  coin('DOGE', 'dogecoin', 'Dogecoin', 0.07997, -2.66, 12.5, 0.6),
+  coin('XMR', 'monero', 'Monero', 554.62, -0.7, 10.4, 0.1),
+  coin('USDS', 'usds', 'USDS', 0.9996, -0.03, 10.2, 0.1),
+  coin('WBT', 'whitebit', 'WhiteBIT Coin', 79.88, -1.29, 9.5, 0.1),
+  coin('LINK', 'chainlink', 'Chainlink', 12.1, -4.23, 9.3, 0.2),
+  coin('ADA', 'cardano', 'Cardano', 0.2222, -3.54, 8.3, 0.2),
+  coin('LEO', 'leo-token', 'LEO Token', 9.05, 0.06, 8.3, 0.01),
+  coin('NEAR', 'near', 'NEAR Protocol', 5.08, -3.91, 6.7, 0.8),
+  coin('XLM', 'stellar', 'Stellar', 0.1787, -2.78, 6.3, 0.1),
+  coin('RAIN', 'rain', 'Rain', 0.008825, -4.02, 6.3, 0.01),
+  coin('BCH', 'bitcoin-cash', 'Bitcoin Cash', 272.97, -3.16, 5.5, 0.1),
+  coin('USDE', 'ethena-usde', 'Ethena USDe', 0.9992, -0.03, 4.7, 0.05),
+  coin('LTC', 'litecoin', 'Litecoin', 59.51, -2.8, 4.6, 0.2),
+  coin('DAI', 'dai', 'Dai', 1, -0.03, 4.5, 0.2),
+  coin('UNI', 'uniswap', 'Uniswap', 7.21, -3.54, 4.5, 0.3),
+  coin('AVAX', 'avalanche-2', 'Avalanche', 9.95, -3.37, 4.4, 0.3),
+  coin('SUI', 'sui', 'Sui', 0.9993, -4.79, 4.1, 0.8),
+  coin('CC', 'canton-network', 'Canton', 0.1031, -0.69, 4.1, 0.02),
+  coin('USD1', 'usd1-wlfi', 'USD1', 0.9989, -0.03, 4, 0.8),
+  coin('GRAM', 'the-open-network', 'Gram (prev. Toncoin)', 1.35, -3.11, 3.8, 0.05),
+  coin('HBAR', 'hedera-hashgraph', 'Hedera', 0.08304, -4.43, 3.7, 0.1),
+  coin('XAUT', 'tether-gold', 'Tether Gold', 4156.96, -0.33, 3.4, 0.1),
+  coin('BTW', 'bitway', 'Bitway', 2.22, 32.09, 3.3, 0.02),
+  coin('USDG', 'global-dollar', 'Global Dollar', 1, -0.03, 3.1, 0.5),
+  coin('TAO', 'bittensor', 'Bittensor', 271.78, -5.32, 3.1, 0.1),
+  coin('SHIB', 'shiba-inu', 'Shiba Inu', 0.00000504, -2.37, 3, 0.04),
+  coin('QNT', 'quant-network', 'Quant', 203.69, -2.71, 3, 0.1),
+  coin('CRO', 'crypto-com-chain', 'Cronos', 0.05772, -3.08, 2.9, 0.02),
+  coin('PYUSD', 'paypal-usd', 'PayPal USD', 0.9995, -0.03, 2.8, 0.1),
+  coin('ENA', 'ethena', 'Ethena', 0.1951, -5.27, 2.6, 0.2),
+  coin('OKB', 'okb', 'OKB', 116.68, -2.15, 2.5, 0.02),
+  coin('RLUSD', 'ripple-usd', 'Ripple USD', 0.9999, -0.03, 2.4, 0.1),
+  coin('AAVE', 'aave', 'Aave', 154.65, -5.2, 2.4, 0.2),
+  coin('USYC', 'hashnote-usyc', 'Circle USYC', 1.14, 0.03, 2.4, 0.01),
+  coin('USDY', 'ondo-us-dollar-yield', 'Ondo US Dollar Yield', 1.15, -0.03, 2.4, 0.01),
+  coin('BUIDL', 'blackrock-usd-institutional-digital-liquidity-fund', 'BlackRock USD Institutional Digital Liquidity Fund', 1, 0, 2.2, 0.01),
+  coin('ONDO', 'ondo-finance', 'Ondo', 0.4488, -4.48, 2.2, 0.1),
+  coin('PUMP', 'pump-fun', 'Pump.fun', 0.004529, 1.82, 2.1, 0.1),
+  coin('WLD', 'worldcoin-wld', 'Worldcoin', 0.5111, -5.94, 2, 0.3),
 ];
 
 const ceil2 = (n: number) => Math.ceil(n * 100 - 1e-7) / 100;
@@ -924,10 +1033,18 @@ export async function seedPriceHistory(pool: Pool, now: Date = new Date()): Prom
 // ---------------------------------------------------------------------------
 
 /** Arena emtiaları (USD): yerelde emtia sağlayıcısı kapalı olduğundan sentetik saatlik/günlük geçmiş */
+/**
+ * Emtia fiyat geçmişi tohumu (USD). Değerler 17.10.2026: değerli metaller gold-api.com, Brent EIA günlük spot
+ * (14.10.2026). Yalnızca geçmişi olmayan kodlar için üretilir; yerelde fiyatı tickMarket taze tutar
+ * (LOCAL_LIVE_PRICES=1 iken metaller gold-api.com'dan canlı gelir). Gram altın (GAU) onstan türetilir.
+ */
 const ARENA_COMMODITY_SEED: { symbol: string; price: number }[] = [
-  { symbol: 'GOLD', price: 2650 },
-  { symbol: 'BRENT_OIL', price: 78 },
-  { symbol: 'SILVER', price: 31 },
+  { symbol: 'GOLD', price: 4166.1 },
+  { symbol: 'BRENT_OIL', price: 126.55 },
+  { symbol: 'SILVER', price: 57.12 },
+  { symbol: 'PLATINUM', price: 1636 },
+  { symbol: 'PALLADIUM', price: 1136 },
+  { symbol: 'COPPER', price: 6.6167 },
 ];
 
 const ARENA_CORE_CODES: ArenaInstrumentCode[] = ['EURUSD', 'XAUUSD', 'BRENT', 'BTCUSD'];

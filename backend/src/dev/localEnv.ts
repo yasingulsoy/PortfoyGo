@@ -86,7 +86,8 @@ export function localDevEnv(db: { url: string; port: number }, extra: NodeJS.Pro
     EMTIA: '',
     DEFAULT_USD_TRY: '',
     // --- Veri sağlayıcı seçicileri (backend/.env'deki seçimler de ezilir) ---
-    STOCK_PROVIDER: 'finnhub',
+    // Hisse: anahtar varsa kota dostu Finnhub (hisse başına 1 çağrı + profil önbelleği; varsayılan 48 hisselik evren)
+    STOCK_PROVIDER: live.stocks ? 'finnhub-cached' : 'finnhub',
     // CoinGecko anahtarsız genel uç (COINGECKO_API_KEY boş); yalnızca piyasa cache işi açıkken çağrılır
     CRYPTO_PROVIDER: 'coingecko',
     // Kapalıyken nosyapi (anahtar boş → yalnızca veritabanındaki tohum kurlar); açıkken TCMB / Frankfurter

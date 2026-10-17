@@ -2,7 +2,7 @@
 
 Yol haritasından ([GELISTIRME_YOL_HARITASI.md](GELISTIRME_YOL_HARITASI.md)) çıkarılan, tamamlanmış işlerin arşivi. Yeni tamamlanan işler buraya eklenir; yol haritasında yalnızca açık işler tutulur.
 
-**Son güncelleme:** 16 Ekim 2026
+**Son güncelleme:** 17 Ekim 2026
 
 ---
 
@@ -163,3 +163,9 @@ Oyun alanı TailAdmin panelinden ayrıldı: kendi "oyun derisi" (gökyüzü / ge
 - [x] **Yerelde otomatik giriş:** `next dev` + yerel veritabanında oturum yoksa site ve yönetim paneli demo hesabıyla kendiliğinden giriş yapar (`packages/shared/src/devAutoLogin.ts`). Çıkış yapınca o sekmede durur; `?manuel` ile ya da `NEXT_PUBLIC_DEV_AUTO_LOGIN=0` ile kapatılır; E2E / otomasyon tarayıcılarında ve production derlemesinde çalışmaz (backend hızlı giriş ucu zaten yalnızca yerel DB'de açık).
 - [x] **Sunum rehberi:** `docs/SUNUM.md` (ekran ekran konuşma metni, demo hazırlığı, olası sorular).
 
+## Varlık logoları ✅
+
+- [x] **Piyasadaki varlıkların logoları** (hisse, kripto, döviz, emtia) depoda: `frontend/public/logos/{stock,crypto,currency,commodity}/<SEMBOL>.svg` (+ yönetim paneli için birebir kopya `admin/public/logos/`). Çalışma anında dış adrese logo isteği yok. `AssetAvatar` (sitede ~26 yer + yönetim panelinde işlem / emir tabloları ve kullanıcı pozisyonları) önce yerel logoyu, yoksa sağlayıcı görselini, o da yoksa baş harfleri gösterir; tipli manifest (`packages/shared/src/assetLogos.generated.ts`, yardımcılar `assetLogos.ts` → `assetLogoSrc`) sayesinde olmayan dosyaya istek atılmaz (404 yok). Yuvarlak çerçeve + ince `fg/10` iç halka: açık ve koyu temada okunur.
+  - Kaynaklar (sabit sürüm + npm sha512 doğrulaması): kripto `cryptocurrency-icons@0.18.1` (CC0, 98 coin), döviz bayrakları `flag-icons@7.5.0` (MIT, 68 para birimi), hisse markaları `simple-icons@16.33.0` (CC0 simge verisi; marka rengi dairede glif, 114 hisse). Emtialar için **kendi çizimimiz** 19 simge (ons altın / gümüş külçe yığını, gram altın kartı, platin / paladyum / alüminyum külçe, bakır bobini, Brent varili, WTI damlası, doğal gaz alevi, ısıtma yağı, benzin pompası, buğday, mısır, pamuk, şeker, soya, kahve, kakao) + Arena / Global Lab kodları için takma adlar (XAUUSD, XAGUSD, BRENT, GOLDTRY …).
+  - Üretici: `node scripts/logos/fetch-logos.mjs` (`--check` ile CI doğrulaması; bkz. `scripts/logos/README.md`). İzin listesi tabanlı SVG temizleyici (betik, olay işleyici, dış bağlantı, `foreignObject` yok; her dosyada `viewBox`), `/logos/*` için `sandbox` CSP ve içerik özetli (`?v=`) 1 yıllık önbellek. Toplam ~370 KB (uygulama başına).
+  - Kapsanmayanlar baş harf gösterir: Microsoft, Amazon (simple-icons'ta yok), Broadcom (CC0 dışı lisans), cryptocurrency-icons'ta olmayan yeni coinler (HYPE, SUI, TON, SHIB, PEPE …), boyutu büyük bayraklar (MXN, RSD, TMT). Atıf ve marka notu: `frontend/public/logos/ATTRIBUTION.md`; hukuk incelemesi kontrol listesinde.

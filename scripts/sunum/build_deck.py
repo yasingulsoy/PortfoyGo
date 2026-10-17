@@ -1,13 +1,18 @@
-# PortfoyGo tanıtım sunumu — tek dosyalık HTML üretir (görseller gömülü).
+# PortfoyGo — kullanıcı tanıtım sunumu (tek dosyalık HTML, görseller ve grafikler gömülü).
 # Kullanım: python build_deck.py <shots_klasörü> <çıktı.html>
-import base64, io, sys
+# Grafikler gerçek hesaplamadır (çeşitlendirme formülü, Monte Carlo, bileşik getiri, beklenen değer);
+# varsayımlar slaytlardaki notlarda yazılıdır.
+import base64, io, math, sys
 from pathlib import Path
+import numpy as np
 from PIL import Image
 
 SHOTS = Path(sys.argv[1])
 OUT = Path(sys.argv[2])
+DATE = "Ekim 2026"
 
-def img(name, max_w=1800, q=82):
+# ---------------------------------------------------------------- yardımcılar
+def img(name, max_w=1800, q=84):
     im = Image.open(SHOTS / f"{name}.png").convert("RGB")
     if im.width > max_w:
         im = im.resize((max_w, round(im.height * max_w / im.width)), Image.LANCZOS)
@@ -15,460 +20,520 @@ def img(name, max_w=1800, q=82):
     im.save(buf, "JPEG", quality=q, optimize=True, progressive=True)
     return "data:image/jpeg;base64," + base64.b64encode(buf.getvalue()).decode()
 
+def tr(x, d=0):
+    s = f"{x:,.{d}f}"
+    return s.replace(",", "X").replace(".", ",").replace("X", ".")
+
 P = "M13 13.2A2.2 2.2 0 0 1 15.2 11H25.5A9.5 9.5 0 0 1 25.5 30H20.5V34.8A2.2 2.2 0 0 1 18.3 37H15.2A2.2 2.2 0 0 1 13 34.8Z"
 ARROW = "M20.4 24.6 28.4 16.6M22.2 16.2H28.8V22.8"
 _uid = [0]
 
-def mark(size, inverse=False):
+def mark(size):
     _uid[0] += 1
     u = _uid[0]
-    bg = "#FFFFFF" if inverse else f"url(#g{u})"
-    glyph = "#465FFF" if inverse else "#FFFFFF"
     return (f'<svg class="mark" width="{size}" height="{size}" viewBox="0 0 48 48" aria-hidden="true"><defs>'
-            f'<linearGradient id="g{u}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#465FFF"/><stop offset="1" stop-color="#3641F5"/></linearGradient>'
-            f'<mask id="m{u}" maskUnits="userSpaceOnUse" x="0" y="0" width="48" height="48"><path fill="#fff" d="{P}"/>'
+            f'<linearGradient id="lg{u}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#465FFF"/><stop offset="1" stop-color="#3641F5"/></linearGradient>'
+            f'<mask id="lm{u}" maskUnits="userSpaceOnUse" x="0" y="0" width="48" height="48"><path fill="#fff" d="{P}"/>'
             f'<path d="{ARROW}" fill="none" stroke="#000" stroke-width="2.9" stroke-linecap="round" stroke-linejoin="round"/></mask></defs>'
-            f'<rect width="48" height="48" rx="12" fill="{bg}"/><rect width="48" height="48" fill="{glyph}" mask="url(#m{u})"/></svg>')
+            f'<rect width="48" height="48" rx="12" fill="url(#lg{u})"/><rect width="48" height="48" fill="#fff" mask="url(#lm{u})"/></svg>')
 
-def wordmark(size=40, dark=False):
-    return f'<span class="wm{" wm-dark" if dark else ""}" style="font-size:{size}px">Portfoy<b>Go</b></span>'
+def wordmark(size, light=False):
+    return f'<span class="wm{" wm-l" if light else ""}" style="font-size:{size}px">Portfoy<b>Go</b></span>'
 
 def shot(name, cls="shot"):
-    return f'<div class="{cls}"><div class="bar"><i></i><i></i><i></i></div><img src="{img(name)}" alt=""></div>'
+    return f'<figure class="{cls}"><img src="{img(name)}" alt=""></figure>'
 
 def bullets(items):
-    return "<ul class='bl'>" + "".join(f"<li>{t}</li>" for t in items) + "</ul>"
+    return '<ul class="bl">' + "".join(f"<li>{t}</li>" for t in items) + "</ul>"
 
+def head(eyebrow, title, sub=None):
+    s = f'<header class="hd"><p class="eyebrow"><i></i>{eyebrow}</p><h2 class="title">{title}</h2>'
+    if sub:
+        s += f'<p class="dek">{sub}</p>'
+    return s + "</header>"
+
+def note(text):
+    return f'<p class="note">{text}</p>'
+
+# ---------------------------------------------------------------- grafikler (SVG)
+INK, MUTED, RULE, BRAND, ORANGE, GREEN, RED = "#111827", "#5B6474", "#DAD6CC", "#465FFF", "#E8890C", "#0E9F6E", "#D92D20"
+
+def axis_svg(w, h, pad, xs, ys, xlab, ylab, xfmt, yfmt):
+    l, r, t, b = pad
+    x0, x1 = xs; y0, y1 = ys
+    X = lambda v: l + (v - x0) / (x1 - x0) * (w - l - r)
+    Y = lambda v: h - b - (v - y0) / (y1 - y0) * (h - t - b)
+    return X, Y
+
+def diversification_chart():
+    w, h = 980, 560
+    pad = (96, 40, 30, 80)
+    sigma, rho = 30.0, 0.3
+    ns = np.arange(1, 31)
+    sp = np.sqrt(sigma**2 / ns + (1 - 1 / ns) * rho * sigma**2)
+    floor = math.sqrt(rho) * sigma
+    X, Y = axis_svg(w, h, pad, (1, 30), (0, 32), "", "", None, None)
+    g = [f'<svg viewBox="0 0 {w} {h}" class="chart" role="img" aria-label="Varlık sayısı arttıkça portföy oynaklığı azalır">']
+    for v in range(0, 33, 8):
+        g.append(f'<line x1="{X(1)}" y1="{Y(v)}" x2="{X(30)}" y2="{Y(v)}" stroke="{RULE}" stroke-width="1.5"/>')
+        g.append(f'<text x="{X(1)-16}" y="{Y(v)+9}" text-anchor="end" class="tk">%{v}</text>')
+    for v in (1, 5, 10, 15, 20, 25, 30):
+        g.append(f'<text x="{X(v)}" y="{h-pad[3]+44}" text-anchor="middle" class="tk">{v}</text>')
+    g.append(f'<line x1="{X(1)}" y1="{Y(floor)}" x2="{X(30)}" y2="{Y(floor)}" stroke="{ORANGE}" stroke-width="3" stroke-dasharray="10 8"/>')
+    g.append(f'<text x="{X(30)}" y="{Y(floor)+40}" text-anchor="end" class="lbl" fill="{ORANGE}">Çeşitlendirilemeyen (piyasa) riski ≈ %{tr(floor,1)}</text>')
+    pts = " ".join(f"{X(n):.1f},{Y(s):.1f}" for n, s in zip(ns, sp))
+    area = f"{X(1):.1f},{Y(floor):.1f} " + pts + f" {X(30):.1f},{Y(floor):.1f}"
+    g.append(f'<polygon points="{area}" fill="{BRAND}" fill-opacity=".10"/>')
+    g.append(f'<polyline points="{pts}" fill="none" stroke="{BRAND}" stroke-width="5" stroke-linejoin="round"/>')
+    for n in (1, 5, 10):
+        s = float(sp[n - 1])
+        g.append(f'<circle cx="{X(n)}" cy="{Y(s)}" r="9" fill="#fff" stroke="{BRAND}" stroke-width="4"/>')
+        g.append(f'<text x="{X(n)+16}" y="{Y(s)-14}" class="val">%{tr(s,1)}</text>')
+    g.append(f'<text x="{(X(1)+X(30))/2}" y="{h-8}" text-anchor="middle" class="ax">Portföydeki varlık sayısı</text>')
+    g.append(f'<text transform="translate(22 {(Y(0)+Y(32))/2}) rotate(-90)" text-anchor="middle" class="ax">Portföy oynaklığı (yıllık)</text>')
+    g.append("</svg>")
+    return "".join(g), sp
+
+def fan_chart():
+    rng = np.random.default_rng(20261017)
+    mu, sig, years, steps, n = 0.08, 0.15, 10, 12, 2000
+    dt = 1 / steps
+    shocks = rng.standard_normal((n, years * steps))
+    logret = (mu - 0.5 * sig**2) * dt + sig * math.sqrt(dt) * shocks
+    paths = 100_000 * np.exp(np.cumsum(logret, axis=1))
+    paths = np.hstack([np.full((n, 1), 100_000.0), paths])
+    t = np.arange(0, years * steps + 1) / steps
+    pct = {p: np.percentile(paths, p, axis=0) for p in (5, 25, 50, 75, 95)}
+    w, h = 980, 560
+    pad = (130, 40, 30, 80)
+    ymax = 500_000
+    X, Y = axis_svg(w, h, pad, (0, 10), (0, ymax), "", "", None, None)
+    g = [f'<svg viewBox="0 0 {w} {h}" class="chart" role="img" aria-label="10 yıllık örnek Monte Carlo simülasyonu">']
+    for v in range(0, ymax + 1, 100_000):
+        g.append(f'<line x1="{X(0)}" y1="{Y(v)}" x2="{X(10)}" y2="{Y(v)}" stroke="{RULE}" stroke-width="1.5"/>')
+        g.append(f'<text x="{X(0)-16}" y="{Y(v)+9}" text-anchor="end" class="tk">{tr(v/1000)} bin</text>')
+    for yv in range(0, 11, 2):
+        g.append(f'<text x="{X(yv)}" y="{h-pad[3]+44}" text-anchor="middle" class="tk">{yv}. yıl</text>')
+    idx = range(0, len(t), 3)
+    def band(lo, hi, op):
+        up = " ".join(f"{X(t[i]):.1f},{Y(min(hi[i], ymax)):.1f}" for i in idx)
+        dn = " ".join(f"{X(t[i]):.1f},{Y(min(lo[i], ymax)):.1f}" for i in reversed(list(idx)))
+        return f'<polygon points="{up} {dn}" fill="{BRAND}" fill-opacity="{op}"/>'
+    g.append(band(pct[5], pct[95], ".12"))
+    g.append(band(pct[25], pct[75], ".22"))
+    med = " ".join(f"{X(t[i]):.1f},{Y(pct[50][i]):.1f}" for i in idx)
+    g.append(f'<polyline points="{med}" fill="none" stroke="{BRAND}" stroke-width="5"/>')
+    g.append(f'<line x1="{X(0)}" y1="{Y(100_000)}" x2="{X(10)}" y2="{Y(100_000)}" stroke="{MUTED}" stroke-width="2" stroke-dasharray="6 8"/>')
+    end = {p: float(pct[p][-1]) for p in pct}
+    g.append(f'<text x="{X(10)-10}" y="{Y(min(end[95], ymax))-14}" text-anchor="end" class="lbl" fill="{BRAND}">%95: {tr(end[95]/1000)} bin</text>')
+    g.append(f'<text x="{X(10)-10}" y="{Y(end[50])-18}" text-anchor="end" class="val">Medyan: {tr(end[50]/1000)} bin TL</text>')
+    g.append(f'<text x="{X(10)-10}" y="{Y(end[5])+40}" text-anchor="end" class="lbl" fill="{MUTED}">%5: {tr(end[5]/1000)} bin</text>')
+    g.append(f'<text x="{(X(0)+X(10))/2}" y="{h-8}" text-anchor="middle" class="ax">Yıl</text>')
+    g.append("</svg>")
+    loss_prob = float((paths[:, -1] < 100_000).mean() * 100)
+    return "".join(g), end, loss_prob
+
+def compounding_chart():
+    r, n0, periods = 0.10, 100.0, 20
+    comp = [n0 * (1 + r) ** k for k in range(periods + 1)]
+    simp = [n0 * (1 + r * k) for k in range(periods + 1)]
+    w, h = 900, 500
+    pad = (90, 40, 30, 76)
+    X, Y = axis_svg(w, h, pad, (0, periods), (0, 700), "", "", None, None)
+    g = [f'<svg viewBox="0 0 {w} {h}" class="chart" role="img" aria-label="Bileşik ve basit getiri karşılaştırması">']
+    for v in range(0, 701, 200):
+        g.append(f'<line x1="{X(0)}" y1="{Y(v)}" x2="{X(periods)}" y2="{Y(v)}" stroke="{RULE}" stroke-width="1.5"/>')
+        g.append(f'<text x="{X(0)-14}" y="{Y(v)+9}" text-anchor="end" class="tk">{v}</text>')
+    for k in range(0, periods + 1, 5):
+        g.append(f'<text x="{X(k)}" y="{h-pad[3]+42}" text-anchor="middle" class="tk">{k}</text>')
+    pc = " ".join(f"{X(k):.1f},{Y(v):.1f}" for k, v in enumerate(comp))
+    ps = " ".join(f"{X(k):.1f},{Y(v):.1f}" for k, v in enumerate(simp))
+    g.append(f'<polyline points="{ps}" fill="none" stroke="{MUTED}" stroke-width="4" stroke-dasharray="10 8"/>')
+    g.append(f'<polyline points="{pc}" fill="none" stroke="{GREEN}" stroke-width="5"/>')
+    g.append(f'<text x="{X(periods-1)}" y="{Y(comp[-1])+6}" text-anchor="end" class="val" fill="{GREEN}">Bileşik: {tr(comp[-1])}</text>')
+    g.append(f'<text x="{X(periods)-8}" y="{Y(simp[-1])+42}" text-anchor="end" class="lbl" fill="{MUTED}">Basit: {tr(simp[-1])}</text>')
+    g.append(f'<text x="{(X(0)+X(periods))/2}" y="{h-6}" text-anchor="middle" class="ax">Dönem</text>')
+    g.append("</svg>")
+    return "".join(g), comp[-1], simp[-1]
+
+def ev_chart():
+    w, h = 900, 500
+    g = [f'<svg viewBox="0 0 {w} {h}" class="chart" role="img" aria-label="100 jetonluk bahiste beklenen dağılım">']
+    bx, bw, by, bh = 110, 680, 150, 120
+    g.append(f'<rect x="{bx}" y="{by}" width="{bw*0.95}" height="{bh}" rx="10" fill="{BRAND}"/>')
+    g.append(f'<rect x="{bx+bw*0.95+6}" y="{by}" width="{bw*0.05-6}" height="{bh}" rx="6" fill="{RED}"/>')
+    g.append(f'<text x="{bx+28}" y="{by+76}" class="bigv" fill="#fff">95 jeton geri döner</text>')
+    g.append(f'<text x="{bx+bw+18}" y="{by+56}" class="val" fill="{RED}">5</text>')
+    g.append(f'<text x="{bx+bw+18}" y="{by+92}" class="lbl" fill="{RED}">kasa</text>')
+    g.append(f'<text x="{bx}" y="{by-34}" class="ax">Her 100 jetonluk bahiste, uzun vadede ortalama</text>')
+    g.append(f'<text x="{bx}" y="{by+bh+90}" class="lbl" fill="{INK}">Beklenen değer = Σ (olasılık × ödeme) = 0,95 × bahis</text>')
+    g.append(f'<text x="{bx}" y="{by+bh+140}" class="lbl" fill="{MUTED}">Kısa vadede şans büyük görünür;</text>')
+    g.append(f'<text x="{bx}" y="{by+bh+176}" class="lbl" fill="{MUTED}">çok çevirmede sonuç beklenen değere yaklaşır.</text>')
+    g.append("</svg>")
+    return "".join(g)
+
+def risk_return_chart():
+    w, h = 980, 560
+    pad = (96, 40, 30, 80)
+    pts = [("Nakit / mevduat", 0.08, 0.14, MUTED), ("Tahvil", 0.22, 0.27, MUTED), ("Altın", 0.42, 0.40, ORANGE),
+           ("Hisse senedi", 0.62, 0.60, BRAND), ("Kripto para", 0.90, 0.80, RED)]
+    X = lambda v: pad[0] + v * (w - pad[0] - pad[1])
+    Y = lambda v: h - pad[3] - v * (h - pad[2] - pad[3])
+    g = [f'<svg viewBox="0 0 {w} {h}" class="chart" role="img" aria-label="Kavramsal risk ve getiri ilişkisi">']
+    g.append(f'<line x1="{X(0)}" y1="{Y(0)}" x2="{X(1)}" y2="{Y(0)}" stroke="{INK}" stroke-width="2.5"/>')
+    g.append(f'<line x1="{X(0)}" y1="{Y(0)}" x2="{X(0)}" y2="{Y(1)}" stroke="{INK}" stroke-width="2.5"/>')
+    g.append(f'<path d="M{X(0.04)} {Y(0.08)} Q {X(0.45)} {Y(0.32)} {X(0.95)} {Y(0.86)}" fill="none" stroke="{RULE}" stroke-width="22" stroke-linecap="round"/>')
+    for name, x, y, c in pts:
+        g.append(f'<circle cx="{X(x)}" cy="{Y(y)}" r="14" fill="{c}"/>')
+        anchor = "end" if x > 0.8 else "start"
+        dx = -26 if x > 0.8 else 26
+        g.append(f'<text x="{X(x)+dx}" y="{Y(y)+10}" text-anchor="{anchor}" class="lbl" fill="{INK}">{name}</text>')
+    g.append(f'<text x="{X(1)}" y="{h-30}" text-anchor="end" class="ax">Risk (oynaklık) →</text>')
+    g.append(f'<text transform="translate(40 {Y(1)}) rotate(-90)" text-anchor="end" class="ax">Beklenen getiri →</text>')
+    g.append("</svg>")
+    return "".join(g)
+
+DIV_SVG, DIV_SP = diversification_chart()
+FAN_SVG, FAN_END, FAN_LOSS = fan_chart()
+COMP_SVG, COMP_END, SIMP_END = compounding_chart()
+EV_SVG = ev_chart()
+RR_SVG = risk_return_chart()
+ROUND_TRIP = 0.0025 * 2
+YEAR_COST = (1 - (1 - ROUND_TRIP) ** 48) * 100
+
+# ---------------------------------------------------------------- slaytlar
 slides = []
-def add(html, theme="light", sec=None):
-    slides.append((html, theme, sec))
-
-# ---------------------------------------------------------------- 1 Kapak
-add(f"""
-<div class="cover">
-  <div class="cover-logo">{mark(132)}{wordmark(112, dark=True)}</div>
-  <h1 class="cover-tag">Gerçek piyasa. <span class="hl">Sanal para.</span> Gerçek rekabet.</h1>
-  <p class="cover-sub">Sanal yatırım simülasyonu · yatırım eğitimi · rekabet platformu</p>
-  <p class="cover-date">Tanıtım · Ekim 2026</p>
-</div>""", "dark")
-
-# ---------------------------------------------------------------- 2 Problem
-add("""
-<p class="eyebrow">Problem</p>
-<h2 class="statement">Yatırımı öğrenmenin bugünkü yolu:<br><span class="hl">gerçek parayı kaybederek.</span></h2>
-<div class="cards3">
-  <div class="card"><h3>İlgi çok yüksek</h3><p>Borsa, kripto, döviz ve altına ilgi hiç olmadığı kadar fazla.</p></div>
-  <div class="card"><h3>Deneyim pahalı</h3><p>İlk adımlar genellikle gerçek parayla, rehbersiz ve yalnız atılıyor.</p></div>
-  <div class="card"><h3>Güvenli ortam yok</h3><p>Risksiz, eğlenceli ve ölçülebilir bir öğrenme ve yarışma alanı eksik.</p></div>
-</div>""")
-
-# ---------------------------------------------------------------- 3 Çözüm
-add(f"""
-<p class="eyebrow">Çözüm</p>
-<h2 class="title">{wordmark(72)}: gerçek veriyle, sıfır riskle yatırım</h2>
-<div class="cards3 tall">
-  <div class="card c-blue"><div class="ic">📈</div><h3>Simülasyon</h3><p>Gerçek piyasa verisi, 100.000 TL sanal bakiye. Hisse, kripto, döviz ve emtia alıp sat.</p></div>
-  <div class="card c-orange"><div class="ic">🎮</div><h3>Oyun ve rekabet</h3><p>Hızlı turlar, düellolar, ligler, haftalık yarışmalar ve sezonlar.</p></div>
-  <div class="card c-green"><div class="ic">🎓</div><h3>Eğitim ve portföy</h3><p>Risk profili, portföy önerisi, senaryo analizi ve her turdan sonra koç geri bildirimi.</p></div>
-</div>""")
-
-# ---------------------------------------------------------------- 4 İki hedef
-add("""
-<p class="eyebrow">Ürün stratejisi</p>
-<h2 class="title">İki hedef, tek platform</h2>
-<div class="two">
-  <div class="panel p-orange"><p class="num">01</p><h3>Oyuncu odaklı hızlı al-sat</h3>
-    <ul class="bl"><li>Az sayıda enstrüman, tek dokunuşla işlem</li><li>Kısa süreli turlar, düellolar ve canlı meydan okumalar</li><li>Ligler, sezonlar, haftalık yarışmalar</li></ul></div>
-  <div class="panel p-blue"><p class="num">02</p><h3>Yatırımcı eğitimi ve portföy</h3>
-    <ul class="bl"><li>Risk profili anketi → önerilen dağılım</li><li>Modern portföy teorisi ve Monte Carlo</li><li>Model portföy, senaryo ve stres testleri</li></ul></div>
-</div>""")
+def add(html, theme="paper"):
+    slides.append((html, theme))
 
 def section(n, title, sub):
-    add(f"""<div class="sect"><p class="sect-n">{n}</p><h2>{title}</h2><p>{sub}</p></div>""", "brand", title)
+    add(f'<div class="sect"><p class="sect-n">{n}</p><h2>{title}</h2><p>{sub}</p></div>', "navy")
 
-def feature(eyebrow, title, items, shot_name, flip=False):
-    left = f'<div class="ftext"><p class="eyebrow">{eyebrow}</p><h2 class="title sm">{title}</h2>{bullets(items)}</div>'
-    right = shot(shot_name)
-    inner = right + left if flip else left + right
-    add(f'<div class="feature{" flip" if flip else ""}">{inner}</div>')
+def feature(eyebrow, title, items, shot_name, flip=False, foot=None):
+    text = f'<div class="ftext">{head(eyebrow, title)}{bullets(items)}</div>'
+    pic = shot(shot_name)
+    body = (pic + text) if flip else (text + pic)
+    add(f'<div class="feature{" flip" if flip else ""}">{body}</div>' + (note(foot) if foot else ""))
 
-# ---------------------------------------------------------------- Temel deneyim
-section("1", "Temel deneyim", "Piyasa → işlem → portföy")
-feature("Panel", "Her şey tek ekranda", [
-    "Herkes <b>100.000 TL sanal bakiye</b> ile başlar",
-    "Portföy performans grafiği ve varlık dağılımı",
-    "İzleme listesi, trend varlıklar, son işlemler",
-    "Açık ve koyu tema, mobil uyumlu",
+# 1 — Kapak
+add(f"""
+<div class="cover">
+  <div class="cover-logo">{mark(104)}{wordmark(88, light=True)}</div>
+  <h1>Gerçek piyasa verisiyle,<br><em>risksiz</em> yatırım deneyimi</h1>
+  <p class="cover-sub">Yatırım kararlarınızı sanal parayla sınayın, ölçün ve geliştirin.</p>
+  <p class="cover-meta">Kullanıcı tanıtımı · {DATE}</p>
+</div>""", "navy")
+
+# 2 — Neden
+add(head("Neden PortfoyGo?", "Yatırımda öğrenmenin bedeli çoğu zaman gerçek paradır") + """
+<div class="cols3">
+  <div class="col"><p class="kicker">01</p><h3>Risk ve getiri ayrılmaz</h3><p>Daha yüksek beklenen getiri, daha yüksek oynaklığı kabul etmeyi gerektirir. Bu dengeyi yaşayarak öğrenmek en kalıcı yoldur.</p></div>
+  <div class="col"><p class="kicker">02</p><h3>Deneyim pahalıdır</h3><p>İlk kararlar genellikle gerçek parayla, ölçmeden ve geri bildirim almadan verilir; hataların maliyeti yüksektir.</p></div>
+  <div class="col"><p class="kicker">03</p><h3>Simülasyon maliyetsizdir</h3><p>Aynı kararları gerçek piyasa verisiyle ama sanal parayla vermek; sonucu ölçmek ve tekrar denemek mümkündür.</p></div>
+</div>""")
+
+# 3 — Nedir
+add(head("PortfoyGo nedir?", "Simülasyon, eğitim ve rekabet tek platformda") + """
+<div class="cols3 cards">
+  <div class="card"><h3>Simülasyon</h3><p>Gerçek piyasa verisi ile <b>100.000 TL sanal bakiye</b>. ABD hisseleri, kripto paralar, döviz ve emtia.</p></div>
+  <div class="card"><h3>Eğitim</h3><p>Risk profili, portföy önerisi, senaryo analizi ve her işlem turundan sonra kişisel geri bildirim.</p></div>
+  <div class="card"><h3>Rekabet</h3><p>Kısa süreli turlar, düellolar ve haftalık yarışmalarla kararlarınızı başkalarınınkiyle kıyaslayın.</p></div>
+</div>""" + note("PortfoyGo bir eğitim ve simülasyon platformudur; gerçek para yatırılmaz ve yatırım tavsiyesi verilmez."))
+
+# 4 — Nasıl çalışır
+add(head("Nasıl çalışır?", "Dört adımda başlayın") + """
+<div class="steps">
+  <div class="st"><p class="sn">1</p><h3>Hesap açın</h3><p>Ücretsiz kayıt; e-posta doğrulaması.</p></div>
+  <div class="st"><p class="sn">2</p><h3>Sanal bakiye</h3><p>100.000 TL ile portföyünüzü kurun.</p></div>
+  <div class="st"><p class="sn">3</p><h3>Karar verin</h3><p>Piyasaları inceleyin, işlem yapın, emir girin.</p></div>
+  <div class="st"><p class="sn">4</p><h3>Ölçün ve öğrenin</h3><p>Getiri, risk ve maliyeti izleyin; stratejinizi geliştirin.</p></div>
+</div>""")
+
+# § 1
+section("1", "Piyasalar ve işlem", "Gerçek veri, gerçekçi kurallar")
+feature("Panel", "Portföyünüz tek bakışta", [
+    "Toplam varlık, nakit ve günlük değişim",
+    "Portföy performans grafiği: 1H, 1A, 3A, 1Y, Tümü",
+    "Varlık sınıfı dağılımı ve izleme listesi",
+    "Masaüstü ve mobilde, açık ve koyu temada",
 ], "panel")
-feature("Piyasalar", "Hisse, kripto, döviz ve emtia", [
+feature("Piyasalar", "Dört varlık sınıfı, TL ve USD", [
     "ABD hisseleri, kripto paralar, döviz ve emtia",
-    "<b>TL ve USD</b> fiyatlar, 7 günlük mini grafikler",
-    "Gerçek varlık logoları ve bayraklar",
-    "Fiyatı her zaman <b>sunucu belirler</b> — hile yapılamaz",
+    "Fiyatları <b>TL veya USD</b> olarak görüntüleme",
+    "7 günlük mini grafikler, arama ve izleme listesi",
+    "Fiyatlar sunucu tarafında belirlenir; herkes için aynıdır",
 ], "markets", flip=True)
-feature("Varlık sayfası", "Detaylı grafik ve performans", [
-    "Aralık seçimli fiyat grafiği (1G → Tümü)",
-    "Performans kutucukları: 1H, 1A, 3A, 6A, YB, 1Y",
-    "ABD borsası saatleri: <b>Piyasa açık / kapalı</b> rozeti",
-    "Tek tıkla al-sat ve izleme listesi",
+feature("Varlık sayfası", "Karar vermeden önce inceleyin", [
+    "Aralık seçimli fiyat grafiği",
+    "Haftalık, aylık, yıllık performans",
+    "ABD borsası seans saatleri: piyasa açık / kapalı",
+    "Tek tıkla alım, satım ve izleme listesi",
 ], "asset")
 
-add("""
-<p class="eyebrow">İşlem</p>
-<h2 class="title">Gerçek borsa gibi emir tipleri</h2>
+add(head("İşlem", "Emir tipleri ve maliyetin etkisi") + f"""
 <div class="orders">
   <table>
-    <tr><th>Emir</th><th>Ne yapar?</th></tr>
-    <tr><td>Piyasa</td><td>Anında güncel fiyattan alır / satar</td></tr>
-    <tr><td>Limit</td><td>Belirlenen fiyata gelince işler; alışta nakit bloke edilir</td></tr>
+    <tr><th>Emir</th><th>Ne işe yarar?</th></tr>
+    <tr><td>Piyasa</td><td>Güncel fiyattan hemen alım / satım</td></tr>
+    <tr><td>Limit</td><td>Belirlediğiniz fiyata gelince işlem</td></tr>
     <tr><td>Zarar durdur</td><td>Fiyat düşerse pozisyonu otomatik kapatır</td></tr>
-    <tr><td>Kâr al</td><td>Hedef fiyatta kârı otomatik realize eder</td></tr>
-    <tr><td>Takip eden stop</td><td>Zirveyi takip eder, % veya TL mesafeyle korur</td></tr>
-    <tr><td>Açılışta gerçekleştir</td><td>Borsa kapalıyken sıraya alınır, açılışta işlenir</td></tr>
+    <tr><td>Kâr al</td><td>Hedef fiyatta kârı realize eder</td></tr>
+    <tr><td>Takip eden stop</td><td>Yükselişi izler, belirlenen mesafeyle korur</td></tr>
+    <tr><td>Açılışta gerçekleştir</td><td>Borsa kapalıyken verilen emir açılışta işlenir</td></tr>
   </table>
-  <div class="facts">
-    <div class="fact"><p class="big">%0,25</p><p>işlem komisyonu — maliyet farkındalığı</p></div>
-    <div class="fact"><p class="big">%25 · %50 · %100</p><p>tek tıkla kısmi kapatma</p></div>
-    <div class="fact"><p class="big">Alış ≠ Satış</p><p>dövizde gerçekçi kur makası</p></div>
+  <div class="calc">
+    <p class="kicker">Maliyet örneği</p>
+    <div class="cl"><span>İşlem tutarı</span><b>10.000 TL</b></div>
+    <div class="cl"><span>Alış komisyonu (%0,25)</span><b>25 TL</b></div>
+    <div class="cl"><span>Satış komisyonu (%0,25)</span><b>25 TL</b></div>
+    <div class="cl tot"><span>Bir tam al-sat maliyeti</span><b>%0,50</b></div>
+    <p class="calc-n">Ayda 4 tam al-sat, sermayenin tamamıyla yapılırsa yılda yaklaşık <b>%{tr(YEAR_COST,1)}</b> maliyet demektir. Sık işlem, getiriyi sessizce aşındırır.</p>
   </div>
-</div>""")
-feature("Portföy", "Pozisyonlar, kâr / zarar ve dağılım", [
+</div>""" + note("Dövizde alış ve satış kuru ayrıdır (kur makası); %25 / %50 / %100 kısayollarıyla pozisyon kısmen kapatılabilir."))
+
+feature("Portföy", "Pozisyon, maliyet ve kâr / zarar", [
     "Ortalama maliyet ve anlık kâr / zarar",
-    "Varlık sınıfı dağılımı ve performans geçmişi",
-    "Bekleyen emirler: limit, stop, takip eden stop",
-    "Tüm işlem geçmişi",
+    "Varlık sınıfı dağılımı ve değer geçmişi",
+    "Bekleyen emirler: limit, zarar durdur, takip eden stop",
+    "Tüm işlem geçmişi ve rozetler",
 ], "portfolio", flip=True)
 
-# ---------------------------------------------------------------- Eğitim ve portföy
-section("2", "Eğitim ve portföy", "Doğru risk, doğru dağılım")
-feature("Portföy Sihirbazı", "Risk profiline göre portföy önerisi", [
+# § 2
+section("2", "Risk, getiri ve portföy", "Ekonominin temel dengesi")
+add(head("Temel kavramlar", "Getiriye bakmadan önce riske bakın") + f"""
+<div class="concepts">
+  <div class="rr">{RR_SVG}<p class="cap">Kavramsal gösterim, ölçeksizdir.</p></div>
+  <div class="defs">
+    <div class="df"><h3>Getiri</h3><p>Bir dönemde değerdeki yüzde değişim.</p></div>
+    <div class="df"><h3>Oynaklık (volatilite)</h3><p>Getirilerin ortalamadan ne kadar saptığı; riskin en yaygın ölçüsü.</p></div>
+    <div class="df"><h3>Maksimum düşüş</h3><p>Zirveden en dip noktaya kadar yaşanan en büyük kayıp.</p></div>
+    <div class="df"><h3>Korelasyon</h3><p>İki varlığın birlikte hareket etme eğilimi; düşük korelasyon çeşitlendirmenin anahtarıdır.</p></div>
+  </div>
+</div>""")
+add(head("Çeşitlendirme", "Varlık sayısı arttıkça risk azalır — ama sıfırlanmaz") + f"""
+<div class="chartrow">
+  <div class="chartbox">{DIV_SVG}</div>
+  <div class="side">
+    <p class="big">%{tr(DIV_SP[0],1)} → %{tr(DIV_SP[9],1)}</p>
+    <p>Tek varlıktan on varlığa geçmek, bu örnekte portföy oynaklığını yaklaşık <b>%{tr((1-DIV_SP[9]/DIV_SP[0])*100)}</b> azaltır.</p>
+    <p>Kalan kısım tüm piyasayı etkileyen ortak risktir; çeşitlendirmeyle giderilemez.</p>
+  </div>
+</div>""" + note("Varsayım: her varlığın yıllık oynaklığı %30, varlık çiftleri arası korelasyon 0,3, eşit ağırlık. σₚ = √(σ²/n + (1 − 1/n)·ρ·σ²)."))
+add(head("Belirsizlik", "Gelecek tek bir sayı değil, bir olasılık aralığıdır") + f"""
+<div class="chartrow">
+  <div class="chartbox">{FAN_SVG}</div>
+  <div class="side">
+    <p class="big">{tr(FAN_END[50]/1000)} bin TL</p>
+    <p>10 yıl sonra <b>medyan</b> sonuç. Senaryoların yarısı bunun altında, yarısı üstünde.</p>
+    <p>Senaryoların <b>%90’ı</b> {tr(FAN_END[5]/1000)} bin – {tr(FAN_END[95]/1000)} bin TL arasında.</p>
+    <p>Başlangıç değerinin altında kalma olasılığı: <b>%{tr(FAN_LOSS,1)}</b></p>
+  </div>
+</div>""" + note("Örnek Monte Carlo simülasyonu: 100.000 TL başlangıç, yıllık beklenen getiri %8, oynaklık %15, 2.000 senaryo (geometrik Brown hareketi). Portföy Sihirbazı aynı yöntemi kişisel dağılımınıza uygular."))
+feature("Portföy Sihirbazı", "Risk profilinize uygun dağılım", [
     "8 soruluk risk anketi → 5 risk profili",
     "<b>Modern portföy teorisi</b> ile kısıtlı optimizasyon",
-    "<b>Monte Carlo</b>: beklenen getiri aralığı, zarar olasılığı, en kötü düşüş",
-    "Tek tıkla sanal portföye uygula · yatırım tavsiyesi değildir",
-], "advisor")
-add(f"""
-<p class="eyebrow">100.000 USD Model Portföy</p>
-<h2 class="title sm">Dağıt, sına, karşılaştır</h2>
-<div class="pair">
-  <div>{shot("model", "shot small")}<p class="cap">Dağılım, nakdin yeri, her varlığın toplam getiriye katkısı ve <b>“Ya … olursa?”</b> simülatörü</p></div>
-  <div>{shot("model-compare", "shot small")}<p class="cap">Alternatif dağılımların karşılaştırılması: getiri, oynaklık, en büyük düşüş, çeşitlendirme</p></div>
+    "<b>Monte Carlo</b>: beklenen getiri aralığı, zarar olasılığı, maksimum düşüş",
+    "Önerilen dağılımı tek tıkla sanal portföyünüze uygulayın",
+], "advisor", foot="Sihirbazın önerileri eğitim amaçlıdır; yatırım tavsiyesi değildir.")
+add(head("100.000 USD Model Portföy", "Dağıtın, sınayın, karşılaştırın") + f"""
+<div class="model">
+  <div>{shot("model", "shot small")}<p class="cap">Dağılım, nakdin yeri ve her varlığın toplam getiriye katkısı</p></div>
+  <div class="calc whatif">
+    <p class="kicker">“Ya … olursa?”</p>
+    <p class="wf">Bir varlığın portföye etkisi = <b>ağırlık × değişim</b></p>
+    <div class="cl"><span>Kripto ağırlığı</span><b>%20</b></div>
+    <div class="cl"><span>Kripto fiyatı</span><b class="neg">−%30</b></div>
+    <div class="cl tot"><span>Portföye etkisi</span><b class="neg">−%6</b></div>
+    <p class="calc-n">Modeller yan yana karşılaştırılır: getiri, oynaklık, maksimum düşüş ve çeşitlendirme.</p>
+  </div>
 </div>""")
-feature("Global Portföy Lab", "Küresel varlık sınıflarını araştır", [
-    "48 küresel araç: bölge, varlık sınıfı, para birimi, risk seviyesi",
-    "Alternatifleri sınıflandır ve yan yana karşılaştır",
-    "Senaryo ve <b>stres testi</b>: 2008, 2020, 2022, TL şoku",
-    "<b>Premium</b> modül — abonelik altyapısı hazır",
-], "globallab", flip=True)
+feature("Global Portföy Lab", "Yerel piyasanın ötesine bakın", [
+    "48 küresel yatırım aracı: bölge, varlık sınıfı, para birimi, risk seviyesi",
+    "Alternatifleri sınıflandırın ve yan yana karşılaştırın",
+    "Senaryo ve <b>stres testi</b>: 2008, 2020, 2022 ve TL şoku",
+    "Coğrafi ve para birimi çeşitlendirmesini ölçün",
+], "globallab", flip=True, foot="Senaryo varsayımları örnek değerlerdir ve kaynaklarıyla birlikte güncellenir.")
 
-# ---------------------------------------------------------------- Oyun Merkezi
-section("3", "Oyun Merkezi", "Mobil oyun hissi, gerçek piyasa mantığı")
-add(f"""
-<div class="feature">
-  <div class="ftext"><p class="eyebrow">Oyun Merkezi</p><h2 class="title sm">Oyna, yarış, öğren</h2>
-  {bullets(["EUR/USD, altın, petrol ve Bitcoin ile 1–10 dakikalık turlar",
-            "Fiyatlar gerçek bir geçmiş dönemin <b>hızlandırılmış tekrarı</b>",
-            "Jeton, XP, seviye, kademeler (Bronz → Elmas)",
-            "Masaüstünde tam ekran lobi, telefonda mobil oyun"])}</div>
-  {shot("oyun")}
-</div>""")
-add("""
-<p class="eyebrow">Oyun modları</p>
-<h2 class="title">Her oyuncu için bir mod</h2>
+# § 3
+section("3", "Oyunlaştırılmış öğrenme", "Kısa turlarda karar verme pratiği")
+feature("Oyun Merkezi", "Oynayarak pratik yapın", [
+    "Euro/dolar, altın, petrol ve Bitcoin ile 1–10 dakikalık turlar",
+    "Fiyatlar gerçek bir geçmiş dönemin <b>hızlandırılmış tekrarıdır</b>; tarih tur sonunda açıklanır",
+    "Her turdan sonra kişisel karne: risk, disiplin, işlem kalitesi, sonuç",
+    "Jetonlar ve ödüller yalnızca oyun içidir",
+], "oyun")
+add(head("Oyun modları", "Farklı beceriler için farklı formatlar") + """
 <div class="modes">
-  <div class="mode m1"><h3>⚡ Hızlı Maç & Düello</h3><p>1’e 1 eşleşme, davet linki, rövanş, halat çekme çubuğu</p></div>
-  <div class="mode m2"><h3>🎯 Solo Tur + Koç Kemal</h3><p>Tur sonu A–E karne: risk, disiplin, kalite, sonuç</p></div>
-  <div class="mode m3"><h3>🏆 Meydan Okumalar</h3><p>Sponsorlu canlı etkinlikler, OBS yayın ekranı</p></div>
-  <div class="mode m4"><h3>📜 Senaryolar</h3><p>Tarihi anları yeniden oyna: brifing → tur → “Ne oldu?”</p></div>
-  <div class="mode m5"><h3>🏙️ Yatırım İmparatorluğu</h3><p>Gelirleri gerçek piyasa hareketine bağlı idle oyun</p></div>
-  <div class="mode m6"><h3>🎡 Çark · Görevler · Mağaza</h3><p>Ücretsiz günlük çark, günlük görevler, kozmetikler</p></div>
-  <div class="mode m7"><h3>✉️ Haftalık Seçim</h3><p>Kitlelerin bilgeliği: gizli seçim, sonra paylaşım</p></div>
-  <div class="mode m8"><h3>🎰 Slot Makinesi</h3><p>Olasılık dersi: kasa her zaman kazanır, oranlar açık</p></div>
+  <div class="md"><h3>Hızlı Maç ve Düello</h3><p>Bire bir, aynı fiyat akışında kim daha iyi karar verir?</p></div>
+  <div class="md"><h3>Solo Tur</h3><p>1–10 dakika; tur sonunda A–E arası karne ve öneriler.</p></div>
+  <div class="md"><h3>Meydan Okumalar</h3><p>Planlanmış, herkesin aynı anda katıldığı canlı etkinlikler.</p></div>
+  <div class="md"><h3>Senaryolar</h3><p>Tarihi piyasa olaylarını yeniden oynayın: brifing → tur → “Ne oldu?”</p></div>
+  <div class="md"><h3>Yatırım İmparatorluğu</h3><p>Geliri gerçek piyasa hareketlerine bağlı, bileşik büyüme oyunu.</p></div>
+  <div class="md"><h3>Haftalık Seçim</h3><p>Bağımsız tahmin, ardından kitlenin ortak seçimiyle kıyas.</p></div>
+  <div class="md"><h3>Çark ve görevler</h3><p>Günlük görevler, seri ve ücretsiz günlük çark.</p></div>
+  <div class="md"><h3>Slot Makinesi</h3><p>Beklenen değer dersi: oranlar ve kasa payı her zaman açık.</p></div>
 </div>""")
-add(f"""
-<p class="eyebrow">Haftalık Seçim — Kitlelerin Bilgeliği</p>
-<h2 class="title sm">Önce bağımsız karar, sonra paylaşım</h2>
+add(head("Haftalık Seçim — Kitlelerin bilgeliği", "Önce bağımsız karar, sonra ortak akıl") + """
 <div class="tl">
-  <div class="step"><p class="when">Cumartesi 00:00</p><h3>Gizli seçim</h3><p>Herkes tek başına bir varlık ve yön seçer</p></div>
-  <div class="step"><p class="when">Pazar 15:00</p><h3>Açılış</h3><p>Tüm seçimler açılır, kitlenin seçimi görünür</p></div>
-  <div class="step"><p class="when">Pazartesi → Cuma</p><h3>Yarış</h3><p>Canlı sıralama ve tartışma</p></div>
-  <div class="step"><p class="when">Cumartesi</p><h3>Sonuç</h3><p>Kitle portföyü katılımcılarla kıyaslanır, ödüller</p></div>
-</div>
-<p class="src">Dr. Alexander Elder’ın anlattığı SpikeTrade yarışmasından uyarlandı. Seçimler açılana kadar sunucuda gizlidir.</p>""")
-add(f"""
-<p class="eyebrow">Oyunla öğrenmek</p>
-<h2 class="title sm">Eğlenceli ama dürüst</h2>
-<div class="pair">
-  <div>{shot("idle", "shot small")}<p class="cap"><b>Yatırım İmparatorluğu:</b> binaların geliri bugünkü gerçek piyasa hareketiyle değişir; bileşik getiri ve çeşitlendirme ipuçları</p></div>
-  <div>{shot("slot", "shot small")}<p class="cap"><b>Slot Makinesi:</b> geri ödeme %95, kasa payı %5 — olasılıklar her zaman görünür, beklenen değer canlı çizilir</p></div>
-</div>""")
-add("""
-<div class="resp">
-  <p class="eyebrow light">Sorumlu oyun</p>
-  <h2 class="statement light">Para yatırılamaz, çekilemez.<br>Jetonlar yalnızca oyun içidir.</h2>
-  <div class="chips">
-    <span>18+ onayı</span><span>Kişisel günlük limit</span><span>Oturum hatırlatıcısı</span><span>Kısaltılamayan mola</span>
-    <span>Art arda zarar uyarısı</span><span>Olasılıklar her zaman açık</span><span>Hile yok, otomatik çevirme yok</span><span>Yönetimden tek tıkla kapatma</span>
-  </div>
-</div>""", "accent")
-
-# ---------------------------------------------------------------- Rekabet ve topluluk
-section("4", "Rekabet ve topluluk", "Adil yarış, ortak akıl")
-feature("Ligler ve Portföy Ligi", "Arkadaşlar, okullar, şirketler için", [
-    "Özel ve herkese açık ligler, davet kodu, aylık sezonlar",
-    "<b>Portföy Ligi:</b> aynı başlangıç sermayesi, ölçüm dönemi ve işlem maliyeti",
-    "Bireysel veya <b>takım</b> portföyleri",
-    "Sonunda stratejiler ve sonuçlar yan yana: “Al-tut”, “Yoğun işlem”…",
-], "leagues")
-feature("Ortak Akıl Öneri Havuzu", "Fikirden gerekçeli, izlenen öneriye", [
-    "Varlık, gerekçe, beklenen senaryo, riskler, izleme kriterleri",
-    "Yayından beri performans otomatik takip edilir",
-    "“Katılıyorum / Katılmıyorum” — gerekçesiyle",
-    "Kapanışta zorunlu değerlendirme · tavsiye değildir",
-], "idea", flip=True)
-feature("Profil ve bildirimler", "Paylaşılabilir oyuncu profili", [
-    "Herkese açık profil: yalnızca yüzde ve sıralar, tutar yok",
-    "Unvanlar, rozetler, Arena kademesi, Haftalık Seçim geçmişi",
-    "Canlı bildirim merkezi ve haftalık özet e-postası",
-    "Profil gizlenebilir",
-], "profile")
-
-# ---------------------------------------------------------------- Platform
-section("5", "Platform", "Yönetim, mimari, güvenlik ve kalite")
-feature("Yönetim paneli", "Operasyon tek yerde", [
-    "Kullanıcılar, işlemler, emirler, ligler, meydan okumalar",
-    "Moderasyon: yorumlar, öneriler, notlar",
-    "Sistem durumu: zamanlanmış işler, veri tazeliği",
-    "Tüm yönetici işlemleri denetim kaydında · 2FA zorunlu",
-], "admin", flip=True)
-add("""
-<p class="eyebrow">Mimari</p>
-<h2 class="title">Ölçeklenebilir, modüler yapı</h2>
-<div class="arch">
-  <div class="row">
-    <div class="box b-blue"><h3>Site</h3><p>Next.js · React</p></div>
-    <div class="box b-blue"><h3>Yönetim paneli</h3><p>Next.js · React</p></div>
-  </div>
-  <div class="arrow">↓ httpOnly çerez oturumu · CSRF koruması</div>
-  <div class="row">
-    <div class="box b-dark wide"><h3>API</h3><p>Node.js · Express · zod doğrulama · fiyatı sunucu belirler</p></div>
-    <div class="box b-dark"><h3>Worker</h3><p>Zamanlanmış işler · iş kilitleri</p></div>
-  </div>
-  <div class="arrow">↓</div>
-  <div class="row">
-    <div class="box b-light"><h3>PostgreSQL</h3><p>Sıralı migration'lar · yedekli</p></div>
-    <div class="box b-light"><h3>Redis</h3><p>Çok sunucu · canlı akış</p></div>
-    <div class="box b-light wide"><h3>Veri sağlayıcı katmanı</h3><p>Hisse · kripto · döviz · emtia · haber — değiştirilebilir adaptörler</p></div>
-  </div>
-</div>""")
-add("""
-<p class="eyebrow">Güvenlik ve KVKK</p>
-<h2 class="title">Güven, ürünün temeli</h2>
-<div class="grid4">
-  <div class="card"><h3>Adil oyun</h3><p>Fiyat ve tur sonucu sunucuda; işlemler satır kilitli tek transaction</p></div>
-  <div class="card"><h3>Oturum</h3><p>httpOnly çerez, CSRF koruması, tüm cihazlardan çıkış</p></div>
-  <div class="card"><h3>İki adımlı doğrulama</h3><p>TOTP + kurtarma kodları; yöneticilere zorunlu</p></div>
-  <div class="card"><h3>İçerik güvenliği</h3><p>Nonce tabanlı CSP ve güvenlik başlıkları</p></div>
-  <div class="card"><h3>KVKK</h3><p>Verilerimi indir, hesabımı sil (anonimleştirme), yalnızca zorunlu çerezler</p></div>
-  <div class="card"><h3>Denetim</h3><p>Tüm yönetici işlemleri kayıt altında</p></div>
-  <div class="card"><h3>Hız sınırları</h3><p>Giriş, kayıt, e-posta ve API uçlarında</p></div>
-  <div class="card"><h3>Gözlemlenebilirlik</h3><p>Hata takibi, metrikler, sağlık uçları</p></div>
-</div>""")
-add("""
-<p class="eyebrow">Kalite ve ölçek</p>
-<h2 class="title">Test edilmiş, yük altında denenmiş</h2>
-<div class="stats">
-  <div class="stat"><p class="big">700+</p><p>sunucu testi</p></div>
-  <div class="stat"><p class="big">370+</p><p>arayüz testi</p></div>
-  <div class="stat"><p class="big">19</p><p>uçtan uca tarayıcı testi</p></div>
-  <div class="stat"><p class="big">~1.400</p><p>istek / saniye<br><span class="muted">1.000 kullanıcılık veri<br>p99&nbsp;141&nbsp;ms</span></p></div>
-</div>
-<p class="src">Her kod gönderiminde otomatik test (GitHub Actions). Birden çok sunucuya yatay ölçeklenebilir.</p>""")
-
-# ---------------------------------------------------------------- İş modeli ve yol haritası
-add("""
-<p class="eyebrow">İş modeli</p>
-<h2 class="title">Gelir kalemleri</h2>
-<div class="grid4 biz">
-  <div class="card c-orange"><h3>Sponsorlu yarışmalar</h3><p>Aracı kurum ve fintech sponsorlu, ödüllü meydan okumalar</p></div>
-  <div class="card c-blue"><h3>Premium</h3><p>Global Portföy Lab senaryoları ve gelişmiş analizler</p></div>
-  <div class="card c-green"><h3>Kurumsal ve eğitim</h3><p>Okullar, kulüpler ve şirketler için özel ligler ve paneller</p></div>
-  <div class="card c-purple"><h3>Veri ve analiz</h3><p>Anonim, toplu içgörüler ve raporlar</p></div>
-</div>
-<p class="src">Kapsam dışı: gerçek para yatırma ve gerçek yatırım yönlendirmesi (SPK düzenlemeleri).</p>""")
-add("""
-<p class="eyebrow">Yol haritası</p>
-<h2 class="title">Sırada ne var?</h2>
-<div class="tl road">
-  <div class="step now"><p class="when">Şimdi</p><h3>MVP testi</h3><p>~1.000 kişilik test grubu · demo lig · gecikmeli veri</p></div>
-  <div class="step"><p class="when">Sıradaki</p><h3>Yayına hazırlık</h3><p>Lisanslı veri sağlayıcı · staging · hukuk onayları</p></div>
-  <div class="step"><p class="when">Sonra</p><h3>Kapsam</h3><p>BIST hisseleri · gerçek zamanlı fiyat akışı · fon / ETF</p></div>
-  <div class="step"><p class="when">Büyüme</p><h3>Yaygınlaşma</h3><p>Kurumsal paket · mobil uygulama · takip etme · İngilizce</p></div>
-</div>""")
-add("""
-<p class="eyebrow">Ekip</p>
-<h2 class="title">Kim ne yapıyor?</h2>
-<div class="grid4 team">
-  <div class="card"><div class="av">Y</div><h3>Yasin</h3><p>Geliştirme, ürün ve canlı veri gereksinimleri</p></div>
-  <div class="card"><div class="av">A</div><h3>Art</h3><p>Oyun akışı, lig ve etkinlik formatı</p></div>
-  <div class="card"><div class="av">K</div><h3>Koray</h3><p>Veri sağlayıcıları ve maliyet</p></div>
-  <div class="card"><div class="av">H</div><h3>H. Burak</h3><p>Portföy, risk anketi ve senaryolar</p></div>
+  <div class="tst"><p class="when">Cumartesi 00:00</p><h3>Gizli seçim</h3><p>Herkes tek başına bir varlık ve yön seçer; diğer seçimler görünmez.</p></div>
+  <div class="tst"><p class="when">Pazar 15:00</p><h3>Açılış</h3><p>Tüm seçimler ve kitlenin tercihi aynı anda açıklanır.</p></div>
+  <div class="tst"><p class="when">Pazartesi → Cuma</p><h3>Ölçüm</h3><p>Getiriler varlıkların kendi para biriminde izlenir.</p></div>
+  <div class="tst"><p class="when">Cumartesi</p><h3>Sonuç</h3><p>Eşit ağırlıklı kitle portföyü bireylerle karşılaştırılır.</p></div>
+</div>""" + note("Bağımsız tahminlerin ortalaması, çoğu zaman tek tek tahminlerin büyük kısmından daha isabetlidir — yeter ki kararlar birbirinden etkilenmeden verilsin (Dr. Alexander Elder’ın anlattığı SpikeTrade yarışmasından uyarlanmıştır)."))
+add(head("İki temel ders", "Bileşik getiri ve beklenen değer") + f"""
+<div class="lessons">
+  <div class="ls"><h3>Bileşik getiri <span>— Yatırım İmparatorluğu</span></h3><div class="chartbox sm">{COMP_SVG}</div>
+    <p class="cap">Dönem başına %10: 20 dönemde basit getiri {tr(SIMP_END)}’e, bileşik getiri {tr(COMP_END)}’e ulaşır. Kazancı yeniden yatırmak büyümeyi hızlandırır.</p></div>
+  <div class="ls"><h3>Beklenen değer <span>— Slot Makinesi</span></h3><div class="chartbox sm">{EV_SVG}</div>
+    <p class="cap">Geri ödeme oranı %95, kasa payı %5. Negatif beklenen değerli bir oyunda, oynadıkça sonuç kayba yaklaşır.</p></div>
 </div>""")
 
-# ---------------------------------------------------------------- Kapanış
+# Kapanış
 add(f"""
 <div class="cover end">
-  <div class="cover-logo">{mark(110)}{wordmark(92, dark=True)}</div>
-  <h1 class="cover-tag">Teşekkürler</h1>
-  <p class="cover-sub">Gerçek piyasa. Sanal para. Gerçek rekabet.</p>
-  <p class="cover-date">Sorular?</p>
-</div>""", "dark")
+  <div class="cover-logo">{mark(96)}{wordmark(80, light=True)}</div>
+  <h1>Kararlarınızı gerçek piyasada,<br><em>sanal parayla</em> sınayın.</h1>
+  <p class="cover-sub">Ücretsiz · Gerçek piyasa verisi · TL ve USD</p>
+  <p class="disc">PortfoyGo bir eğitim ve simülasyon platformudur. Gerçek para yatırılamaz ve çekilemez; içerikler yatırım tavsiyesi değildir.</p>
+</div>""", "navy")
 
-# ------------------------------------------------------------------ HTML
+# ---------------------------------------------------------------- HTML
 N = len(slides)
 def footer(i, theme):
-    if i == 0 or i == N - 1 or theme in ("brand",):
+    if theme == "navy":
         return ""
-    dark = theme in ("dark", "accent")
-    return f'<div class="foot{" foot-dark" if dark else ""}">{mark(30)}<span>PortfoyGo</span><span class="pg">{i + 1} / {N}</span></div>'
+    return f'<footer class="ft">{mark(26)}<span>PortfoyGo</span><span class="sep">·</span><span>Kullanıcı tanıtımı</span><span class="pg">{i + 1}</span></footer>'
 
-sections_html = "\n".join(
-    f'<section class="slide t-{theme}" aria-roledescription="slide" aria-label="{i + 1} / {N}" data-i="{i}"><div class="inner">{html}</div>{footer(i, theme)}</section>'
-    for i, (html, theme, sec) in enumerate(slides)
+body = "\n".join(
+    f'<section class="slide t-{theme}" aria-roledescription="slide" aria-label="{i + 1} / {N}"><div class="inner">{html}</div>{footer(i, theme)}</section>'
+    for i, (html, theme) in enumerate(slides)
 )
 
 CSS = r"""
-:root{--brand:#465FFF;--brand2:#3641F5;--brand-l:#7592FF;--ink:#101828;--ink2:#344054;--muted:#667085;--line:#E4E7EC;--bg:#F7F8FC;--card:#FFFFFF;--navy:#0B1120;--navy2:#111a33;--green:#12B76A;--orange:#F79009;--purple:#7A5AF8;--pink:#EE46BC}
+:root{--paper:#F6F5F1;--paper2:#EFEDE6;--ink:#111827;--ink2:#2B3442;--muted:#5B6474;--rule:#DAD6CC;--brand:#465FFF;--brand-d:#2B3BB8;--brand-l:#8FA2FF;--navy:#0C1730;--green:#0E9F6E;--red:#D92D20;--orange:#E8890C;
+  --serif:"Source Serif 4",Georgia,"Times New Roman",serif;--sans:Inter,"Segoe UI",system-ui,-apple-system,sans-serif}
 *{box-sizing:border-box;margin:0;padding:0}
-html,body{height:100%;background:#05070d;overflow:hidden;font-family:Outfit,"Segoe UI",system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}
+html,body{height:100%;background:#03060c;overflow:hidden;font-family:var(--sans);-webkit-font-smoothing:antialiased;color:var(--ink)}
 #stage{position:absolute;left:50%;top:50%;width:1920px;height:1080px;transform-origin:center center}
-.slide{position:absolute;inset:0;background:var(--bg);color:var(--ink);opacity:0;visibility:hidden;transition:opacity .45s ease,transform .45s ease;transform:translateY(14px);overflow:hidden}
-.slide.on{opacity:1;visibility:visible;transform:none}
-.inner{position:absolute;inset:0;padding:110px 128px 140px;display:flex;flex-direction:column;justify-content:center}
-.t-dark{background:radial-gradient(1200px 700px at 85% 10%,rgba(70,95,255,.35),transparent 60%),radial-gradient(900px 600px at 0% 100%,rgba(117,146,255,.18),transparent 60%),var(--navy);color:#F2F4F7}
-.t-brand{background:linear-gradient(135deg,#465FFF 0%,#3641F5 100%);color:#fff}
-.t-accent{background:radial-gradient(1000px 600px at 100% 0%,rgba(247,144,9,.25),transparent 60%),var(--navy2);color:#F2F4F7}
-.eyebrow{font-size:26px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--brand);margin-bottom:18px}
-.eyebrow.light{color:#FDB022}
-.title{font-size:72px;font-weight:700;line-height:1.08;letter-spacing:-.025em;margin-bottom:56px}
-.title.sm{font-size:60px;margin-bottom:40px}
-.statement{font-size:84px;font-weight:700;line-height:1.08;letter-spacing:-.03em;margin-bottom:70px}
-.statement.light{color:#fff}
-.hl{color:var(--brand)}
-.t-dark .hl{color:var(--brand-l)}
-.wm{font-weight:700;letter-spacing:-.03em;color:var(--ink)}
-.wm b{color:var(--brand);font-weight:700}
-.wm-dark{color:#fff}.wm-dark b{color:var(--brand-l)}
-.cover{display:flex;flex-direction:column;align-items:flex-start;justify-content:center;height:100%}
-.cover-logo{display:flex;align-items:center;gap:36px;margin-bottom:70px}
-.cover-tag{font-size:92px;font-weight:700;line-height:1.05;letter-spacing:-.03em;max-width:1500px}
-.cover-sub{font-size:38px;color:#C1C9DC;margin-top:30px}
-.cover-date{font-size:28px;color:#8C97B2;margin-top:90px;letter-spacing:.06em}
-.end .cover-tag{font-size:120px}
-.cards3{display:grid;grid-template-columns:repeat(3,1fr);gap:36px}
-.card{background:var(--card);border:1px solid var(--line);border-radius:24px;padding:40px 40px 44px;box-shadow:0 12px 32px rgba(16,24,40,.06)}
-.card h3{font-size:38px;font-weight:700;margin-bottom:14px;letter-spacing:-.01em}
-.card p{font-size:28px;line-height:1.45;color:var(--muted)}
-.cards3.tall .card{padding:48px}
-.ic{font-size:64px;margin-bottom:22px}
-.c-blue{border-top:8px solid var(--brand)}.c-orange{border-top:8px solid var(--orange)}.c-green{border-top:8px solid var(--green)}.c-purple{border-top:8px solid var(--purple)}
-.two{display:grid;grid-template-columns:1fr 1fr;gap:44px}
-.panel{border-radius:28px;padding:52px 56px;color:#fff}
-.p-orange{background:linear-gradient(140deg,#F79009,#DC6803)}.p-blue{background:linear-gradient(140deg,#465FFF,#3641F5)}
-.panel .num{font-size:30px;font-weight:700;opacity:.75;margin-bottom:14px}
-.panel h3{font-size:46px;font-weight:700;margin-bottom:26px;line-height:1.15}
-.panel .bl li{color:#fff}.panel .bl li::before{background:#fff}
-.bl{list-style:none;display:flex;flex-direction:column;gap:20px}
-.bl li{font-size:32px;line-height:1.4;color:var(--ink2);padding-left:38px;position:relative}
-.bl li::before{content:"";position:absolute;left:0;top:16px;width:14px;height:14px;border-radius:4px;background:var(--brand)}
-.bl b{color:var(--ink);font-weight:700}
-.sect{display:flex;flex-direction:column;justify-content:center;height:100%}
-.sect-n{font-size:200px;font-weight:800;line-height:1;opacity:.25;margin-bottom:10px}
-.sect h2{font-size:120px;font-weight:700;letter-spacing:-.03em;line-height:1.02}
-.sect p{font-size:44px;margin-top:26px;opacity:.85}
-.feature{display:grid;grid-template-columns:640px 1fr;gap:70px;align-items:center;height:100%}
-.feature.flip{grid-template-columns:1fr 640px}
-.ftext .bl li{font-size:30px}
-.shot{background:#fff;border-radius:22px;overflow:hidden;box-shadow:0 30px 70px rgba(16,24,40,.18),0 0 0 1px rgba(16,24,40,.06)}
-.t-dark .shot{box-shadow:0 30px 80px rgba(0,0,0,.5)}
-.shot .bar{height:34px;background:#EEF1F6;display:flex;align-items:center;gap:9px;padding:0 16px}
-.shot .bar i{width:12px;height:12px;border-radius:50%;background:#D0D5DD;display:block}
-.shot .bar i:first-child{background:#F97066}.shot .bar i:nth-child(2){background:#FDB022}.shot .bar i:nth-child(3){background:#32D583}
+.slide{position:absolute;inset:0;background:var(--paper);opacity:0;visibility:hidden;transition:opacity .5s ease;overflow:hidden}
+.slide.on{opacity:1;visibility:visible}
+.inner{position:absolute;inset:0;padding:96px 128px 150px;display:flex;flex-direction:column}
+.t-navy{background:radial-gradient(1400px 800px at 100% 0%,rgba(70,95,255,.28),transparent 60%),var(--navy);color:#EEF1F7}
+.t-navy .inner{justify-content:center}
+/* başlık bloğu */
+.hd{margin-bottom:48px}
+.eyebrow{display:flex;align-items:center;gap:14px;font-size:24px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--brand-d)}
+.eyebrow i{display:block;width:28px;height:14px;background:var(--brand)}
+.title{font-family:var(--serif);font-size:64px;font-weight:600;line-height:1.1;letter-spacing:-.01em;margin-top:18px;max-width:1500px}
+.dek{font-size:30px;color:var(--muted);margin-top:14px}
+.hd::after{content:"";display:block;height:2px;background:var(--ink);margin-top:30px;width:120px}
+/* metin */
+.bl{list-style:none;display:flex;flex-direction:column;gap:22px}
+.bl li{font-size:30px;line-height:1.42;color:var(--ink2);padding-left:34px;position:relative}
+.bl li::before{content:"";position:absolute;left:0;top:18px;width:16px;height:2px;background:var(--brand)}
+.bl b{color:var(--ink)}
+.note{position:absolute;left:128px;right:128px;bottom:96px;font-size:22px;line-height:1.45;color:var(--muted);border-top:1px solid var(--rule);padding-top:14px}
+.cap{font-size:24px;color:var(--muted);margin-top:16px;line-height:1.45}
+.kicker{font-size:22px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--brand-d);margin-bottom:12px}
+/* kapak */
+.cover h1{font-family:var(--serif);font-size:96px;font-weight:500;line-height:1.06;letter-spacing:-.015em;color:#fff;max-width:1500px}
+.cover h1 em{font-style:italic;color:var(--brand-l)}
+.cover-logo{display:flex;align-items:center;gap:30px;margin-bottom:84px}
+.cover-sub{font-size:36px;color:#C3CBDD;margin-top:34px;max-width:1300px;line-height:1.4}
+.cover-meta{font-size:26px;color:#8D98B3;margin-top:110px;letter-spacing:.1em;text-transform:uppercase}
+.end h1{font-size:84px}
+.disc{font-size:24px;color:#8D98B3;margin-top:110px;max-width:1300px;line-height:1.5;border-top:1px solid rgba(255,255,255,.15);padding-top:22px}
+.wm{font-family:Outfit,var(--sans);font-weight:700;letter-spacing:-.03em;color:var(--ink)}
+.wm b{color:var(--brand)}
+.wm-l{color:#fff}.wm-l b{color:var(--brand-l)}
+/* bölüm */
+.sect-n{font-family:var(--serif);font-size:220px;font-weight:400;line-height:1;color:var(--brand-l);opacity:.9}
+.sect h2{font-family:var(--serif);font-size:110px;font-weight:500;letter-spacing:-.015em;margin-top:20px;color:#fff}
+.sect p{font-size:40px;color:#C3CBDD;margin-top:24px}
+/* düzenler */
+.cols3{display:grid;grid-template-columns:repeat(3,1fr);gap:56px;margin-top:10px}
+.col{border-top:2px solid var(--ink);padding-top:28px}
+.col h3,.card h3{font-family:var(--serif);font-size:40px;font-weight:600;margin-bottom:16px}
+.col p,.card p{font-size:28px;line-height:1.5;color:var(--ink2)}
+.cards .card{background:#fff;border:1px solid var(--rule);padding:44px 44px 48px;border-top:6px solid var(--brand)}
+.steps{display:grid;grid-template-columns:repeat(4,1fr);gap:0;margin-top:30px;border-top:2px solid var(--ink)}
+.st{padding:36px 36px 0 0}
+.sn{font-family:var(--serif);font-size:96px;color:var(--brand);line-height:1;margin-bottom:22px}
+.st h3{font-family:var(--serif);font-size:38px;font-weight:600;margin-bottom:12px}
+.st p{font-size:27px;color:var(--ink2);line-height:1.45}
+.feature{display:grid;grid-template-columns:600px 1fr;gap:72px;align-items:center;flex:1}
+.feature.flip{grid-template-columns:1fr 600px}
+.feature .hd{margin-bottom:36px}
+.feature .title{font-size:56px}
+.shot{background:#fff;border:1px solid var(--rule);border-radius:10px;overflow:hidden;box-shadow:0 24px 50px rgba(17,24,39,.10)}
 .shot img{display:block;width:100%;height:auto}
-.pair{display:grid;grid-template-columns:1fr 1fr;gap:48px}
-.cap{font-size:27px;line-height:1.45;color:var(--muted);margin-top:26px}
-.cap b{color:var(--ink)}
-.orders{display:grid;grid-template-columns:1.35fr 1fr;gap:56px;align-items:start}
-table{width:100%;border-collapse:separate;border-spacing:0;background:#fff;border:1px solid var(--line);border-radius:22px;overflow:hidden}
-th,td{text-align:left;padding:20px 28px;font-size:28px;border-bottom:1px solid var(--line)}
-th{background:#F2F4F7;color:var(--muted);font-weight:600;font-size:24px;text-transform:uppercase;letter-spacing:.08em}
-tr:last-child td{border-bottom:none}
-td:first-child{font-weight:700;color:var(--ink);white-space:nowrap}
+.orders{display:grid;grid-template-columns:1.25fr 1fr;gap:64px;align-items:start}
+table{width:100%;border-collapse:collapse}
+th,td{text-align:left;padding:18px 18px;font-size:27px;border-bottom:1px solid var(--rule)}
+th{font-size:21px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);border-bottom:2px solid var(--ink)}
+td:first-child{font-weight:700;white-space:nowrap;color:var(--ink)}
 td{color:var(--ink2)}
-.facts{display:flex;flex-direction:column;gap:26px}
-.fact{background:#fff;border:1px solid var(--line);border-radius:22px;padding:30px 36px;border-left:8px solid var(--brand)}
-.fact .big{font-size:52px;font-weight:800;color:var(--brand);letter-spacing:-.02em}
-.fact p{font-size:27px;color:var(--muted)}
-.modes{display:grid;grid-template-columns:repeat(4,1fr);gap:28px}
-.mode{border-radius:24px;padding:34px 32px;color:#fff;min-height:250px;box-shadow:0 10px 0 rgba(0,0,0,.12)}
-.mode h3{font-size:31px;font-weight:700;margin-bottom:14px;line-height:1.2}
-.mode p{font-size:25px;line-height:1.4;opacity:.95}
-.m1{background:linear-gradient(160deg,#22C55E,#16A34A)}.m2{background:linear-gradient(160deg,#465FFF,#3641F5)}
-.m3{background:linear-gradient(160deg,#FB923C,#EA580C)}.m4{background:linear-gradient(160deg,#14B8A6,#0D9488)}
-.m5{background:linear-gradient(160deg,#FACC15,#CA8A04)}.m6{background:linear-gradient(160deg,#F472B6,#DB2777)}
-.m7{background:linear-gradient(160deg,#0EA5E9,#0369A1)}.m8{background:linear-gradient(160deg,#A855F7,#7E22CE)}
-.tl{display:grid;grid-template-columns:repeat(4,1fr);gap:0;position:relative;margin-top:20px}
-.tl::before{content:"";position:absolute;left:40px;right:40px;top:42px;height:6px;background:linear-gradient(90deg,var(--brand),var(--brand-l));border-radius:3px}
-.step{position:relative;padding:90px 30px 0 0}
-.step::before{content:"";position:absolute;left:0;top:26px;width:38px;height:38px;border-radius:50%;background:#fff;border:8px solid var(--brand)}
-.step.now::before{background:var(--brand)}
-.when{font-size:24px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--brand);margin-bottom:12px}
-.step h3{font-size:40px;font-weight:700;margin-bottom:12px}
-.step p{font-size:27px;line-height:1.45;color:var(--muted)}
-.src{font-size:24px;color:var(--muted);margin-top:56px}
-.resp{display:flex;flex-direction:column;justify-content:center;height:100%}
-.chips{display:flex;flex-wrap:wrap;gap:18px;max-width:1600px}
-.chips span{font-size:30px;font-weight:600;padding:16px 30px;border-radius:999px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.18);color:#fff}
-.arch{display:flex;flex-direction:column;gap:18px}
-.arch .row{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:28px}
-.box{border-radius:22px;padding:28px 34px}
-.box.wide{grid-column:span 2}
-.box h3{font-size:36px;font-weight:700;margin-bottom:6px}
-.box p{font-size:25px;line-height:1.4}
-.b-blue{background:var(--brand);color:#fff}.b-blue p{color:#DCE3FF}
-.b-dark{background:var(--navy);color:#fff}.b-dark p{color:#AEB8D0}
-.b-light{background:#fff;border:1px solid var(--line)}.b-light p{color:var(--muted)}
-.arrow{font-size:26px;color:var(--muted);text-align:center;font-weight:600}
-.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:28px}
-.grid4 .card{padding:32px 32px 36px}
-.grid4 .card h3{font-size:32px}.grid4 .card p{font-size:25px}
-.biz .card{padding:40px 36px 44px}.biz .card h3{font-size:36px}.biz .card p{font-size:27px}
-.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:32px}
-.stat{background:#fff;border:1px solid var(--line);border-radius:26px;padding:46px 40px}
-.stat .big{font-size:96px;font-weight:800;color:var(--brand);letter-spacing:-.03em;line-height:1}
-.stat p{font-size:30px;color:var(--ink2);margin-top:16px;line-height:1.35}
-.muted{color:var(--muted);font-size:24px}
-.team .card{text-align:left}
-.av{width:96px;height:96px;border-radius:50%;background:linear-gradient(140deg,#465FFF,#7592FF);color:#fff;font-size:44px;font-weight:800;display:flex;align-items:center;justify-content:center;margin-bottom:24px}
-.foot{position:absolute;left:128px;right:128px;bottom:48px;display:flex;align-items:center;gap:14px;font-size:24px;font-weight:700;color:var(--muted)}
-.foot .pg{margin-left:auto;font-weight:600}
-.foot-dark{color:#8C97B2}
-#ui{position:fixed;left:0;right:0;bottom:0;height:4px;background:rgba(255,255,255,.08);z-index:5}
-#bar{height:100%;width:0;background:linear-gradient(90deg,#465FFF,#7592FF);transition:width .35s ease}
-#hint{position:fixed;right:18px;bottom:14px;font:500 13px/1 system-ui,sans-serif;color:rgba(255,255,255,.55);z-index:5;transition:opacity .6s}
+.calc{background:#fff;border:1px solid var(--rule);padding:36px 40px}
+.cl{display:flex;justify-content:space-between;align-items:baseline;font-size:28px;padding:14px 0;border-bottom:1px solid var(--rule)}
+.cl span{color:var(--ink2)}.cl b{font-variant-numeric:tabular-nums}
+.cl.tot{border-bottom:none;border-top:2px solid var(--ink);margin-top:6px;font-size:32px}
+.cl.tot b{color:var(--brand-d)}
+.neg{color:var(--red)!important}
+.calc-n{font-size:24px;color:var(--muted);line-height:1.5;margin-top:18px}
+.calc-n b{color:var(--ink)}
+.concepts{display:grid;grid-template-columns:1.1fr 1fr;gap:64px;align-items:center}
+.rr .chart{width:100%;height:auto}
+.defs{display:grid;grid-template-columns:1fr 1fr;gap:36px 40px}
+.df{border-top:2px solid var(--ink);padding-top:18px}
+.df h3{font-family:var(--serif);font-size:34px;font-weight:600;margin-bottom:10px}
+.df p{font-size:25px;line-height:1.45;color:var(--ink2)}
+.chartrow{display:grid;grid-template-columns:1.45fr 1fr;gap:64px;align-items:center}
+.chartbox .chart{width:100%;height:auto;display:block}
+.chart text{font-family:var(--sans)}
+.chart .tk{font-size:22px;fill:var(--muted)}
+.chart .ax{font-size:23px;fill:var(--ink2);font-weight:600}
+.chart .lbl{font-size:24px;font-weight:600}
+.chart .val{font-size:26px;font-weight:700;fill:var(--ink)}
+.chart .bigv{font-size:40px;font-weight:700}
+.side .big{font-family:var(--serif);font-size:70px;font-weight:600;color:var(--brand-d);line-height:1.05;margin-bottom:24px}
+.side p{font-size:28px;line-height:1.5;color:var(--ink2);margin-bottom:18px}
+.model{display:grid;grid-template-columns:1.45fr 1fr;gap:64px;align-items:start}
+.wf{font-size:30px;margin-bottom:14px}
+.modes{display:grid;grid-template-columns:repeat(4,1fr);gap:0;border-top:2px solid var(--ink)}
+.md{padding:32px 32px 36px 0;border-bottom:1px solid var(--rule)}
+.md h3{font-family:var(--serif);font-size:34px;font-weight:600;margin-bottom:10px}
+.md p{font-size:25px;line-height:1.45;color:var(--ink2)}
+.tl{display:grid;grid-template-columns:repeat(4,1fr);gap:0;position:relative;margin-top:16px}
+.tl::before{content:"";position:absolute;left:0;right:0;top:30px;height:2px;background:var(--ink)}
+.tst{position:relative;padding:72px 40px 0 0}
+.tst::before{content:"";position:absolute;left:0;top:20px;width:22px;height:22px;background:var(--brand)}
+.when{font-size:22px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--brand-d);margin-bottom:12px}
+.tst h3{font-family:var(--serif);font-size:38px;font-weight:600;margin-bottom:12px}
+.tst p{font-size:26px;line-height:1.45;color:var(--ink2)}
+.lessons{display:grid;grid-template-columns:1fr 1fr;gap:64px}
+.ls h3{font-family:var(--serif);font-size:38px;font-weight:600;margin-bottom:18px}
+.ls h3 span{font-family:var(--sans);font-size:24px;font-weight:500;color:var(--muted)}
+.chartbox.sm{background:#fff;border:1px solid var(--rule);padding:18px}
+/* alt bilgi */
+.ft{position:absolute;left:128px;right:128px;bottom:44px;display:flex;align-items:center;gap:12px;font-size:21px;color:var(--muted);font-weight:500}
+.ft span:first-of-type{font-weight:700;color:var(--ink)}
+.ft .sep{opacity:.5}
+.ft .pg{margin-left:auto;font-family:var(--serif);font-size:26px;color:var(--ink)}
+#ui{position:fixed;left:0;right:0;bottom:0;height:3px;background:rgba(255,255,255,.06);z-index:5}
+#bar{height:100%;width:0;background:#465FFF;transition:width .35s ease}
 @media print{
   @page{size:1920px 1080px;margin:0}
   html,body{overflow:visible;background:#fff}
   #stage{position:static;transform:none!important;width:1920px;height:auto}
-  .slide{position:relative;opacity:1;visibility:visible;transform:none;width:1920px;height:1080px;page-break-after:always;break-after:page}
-  #ui,#hint{display:none}
+  .slide{position:relative;opacity:1;visibility:visible;width:1920px;height:1080px;break-after:page}
+  #ui{display:none}
 }
 @media (prefers-reduced-motion:reduce){.slide{transition:none}}
 """
 
 JS = r"""
 (function(){
-  var stage=document.getElementById('stage'),slides=[].slice.call(document.querySelectorAll('.slide')),bar=document.getElementById('bar'),hint=document.getElementById('hint');
+  var stage=document.getElementById('stage'),slides=[].slice.call(document.querySelectorAll('.slide')),bar=document.getElementById('bar');
   var i=0,n=slides.length;
   function fit(){var s=Math.min(window.innerWidth/1920,window.innerHeight/1080);stage.style.transform='translate(-50%,-50%) scale('+s+')';}
   function go(k){k=Math.max(0,Math.min(n-1,k));if(slides[i])slides[i].classList.remove('on');i=k;slides[i].classList.add('on');bar.style.width=((i+1)/n*100)+'%';if(location.hash!=='#'+(i+1))history.replaceState(null,'','#'+(i+1));}
@@ -486,7 +551,6 @@ JS = r"""
   window.addEventListener('resize',fit);
   window.addEventListener('hashchange',function(){var h=parseInt(location.hash.slice(1),10);if(h&&h-1!==i)go(h-1);});
   fit();var h=parseInt(location.hash.slice(1),10);go(h?h-1:0);
-  setTimeout(function(){hint.style.opacity=0;},4500);
 })();
 """
 
@@ -495,17 +559,16 @@ html = f"""<!doctype html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>PortfoyGo — Tanıtım Sunumu</title>
+<title>PortfoyGo — Kullanıcı Tanıtımı</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400..700;1,8..60,400..600&display=swap" rel="stylesheet">
 <style>{CSS}</style>
 </head>
 <body>
 <div id="stage">
-{sections_html}
+{body}
 </div>
 <div id="ui"><div id="bar"></div></div>
-<div id="hint">← → ile geç · F: tam ekran</div>
 <script>{JS}</script>
 </body>
 </html>
@@ -513,3 +576,4 @@ html = f"""<!doctype html>
 OUT.parent.mkdir(parents=True, exist_ok=True)
 OUT.write_text(html, encoding="utf-8")
 print(f"{N} slayt → {OUT} ({OUT.stat().st_size/1024/1024:.1f} MB)")
+print(f"çeşitlendirme 1/10: {DIV_SP[0]:.1f} / {DIV_SP[9]:.1f} · MC medyan {FAN_END[50]:.0f} p5 {FAN_END[5]:.0f} p95 {FAN_END[95]:.0f} kayıp% {FAN_LOSS:.1f} · yıllık maliyet {YEAR_COST:.1f}")
