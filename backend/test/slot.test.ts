@@ -350,6 +350,8 @@ describe('slot: sorumlu oyun ve yönetici anahtarı', () => {
       const get = await api().get('/api/game/slot').set(u.auth);
       expect(get.status).toBe(410);
       expect(get.body).toMatchObject({ success: false, code: 'SLOT_DISABLED', enabled: false });
+      // 410 varsayılan olarak önbelleklenebilir: yeniden açılınca tarayıcı eski yanıtı göstermesin
+      expect(get.headers['cache-control']).toBe('no-store');
       const spin = await api().post('/api/game/slot/spin').set(u.auth).send({ bet: 5, request_id: uuid() });
       expect(spin.status).toBe(410);
       expect(spin.body.code).toBe('SLOT_DISABLED');

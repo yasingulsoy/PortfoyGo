@@ -262,7 +262,8 @@ export type AuditAction =
   | 'global_lab.assumptions_update'
   | 'global_lab.correlations_update'
   | 'global_lab.stress_upsert'
-  | 'global_lab.stress_delete';
+  | 'global_lab.stress_delete'
+  | 'settings.slot_toggle';
 
 export interface AuditEntry {
   id: string;

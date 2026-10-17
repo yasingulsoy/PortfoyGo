@@ -233,7 +233,7 @@ function CorrelationEditor({ view, onSaved }: { view: AssumptionsView; onSaved: 
                     inputMode="decimal"
                     value={draft[k] ?? fmtNum(rho(row, k), 3)}
                     onChange={(e) => setDraft((d) => ({ ...d, [k]: e.target.value }))}
-                    className={cn(cellInput, 'num w-20 text-right', draft[k] !== undefined && 'border-gold')}
+                    className={cn('h-9 w-20 shrink-0 rounded-md border bg-surface px-2 text-right text-sm text-fg focus:border-brand/50 focus:outline-none focus:ring-[3px] focus:ring-brand/10', 'num', draft[k] !== undefined ? 'border-gold' : 'border-line')}
                   />
                 </li>
               ))}

@@ -69,14 +69,15 @@ export default function SlotScreen() {
   const [announce, setAnnounce] = useState('');
   const [reality, setReality] = useState<SlotRealityCheck | null>(null);
   const [ackNext, setAckNext] = useState(false);
-  const [cooling, setCooling] = useState<{ until: number; ms: number } | null>(null);
+  const [cooling, setCooling] = useState<{ id: number; ms: number } | null>(null);
   const [celebrate, setCelebrate] = useState(0);
 
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const frames = useRef<number[]>([]);
   const spinSeq = useRef(0);
-  /** Yanıtı alınamayan isteğin kimliği: yeniden denemede aynısı gönderilir (sunucu idempotent; jeton iki kez düşmez) */
-  const pendingId = useRef<string | null>(null);
+  const coolSeq = useRef(0);
+  /** Yanıtı alınamayan / işlenmemiş istek: yeniden denemede AYNI kimlik ve bahis gönderilir (sunucu idempotent; jeton iki kez düşmez) */
+  const pending = useRef<{ id: string; bet: number } | null>(null);
 
   useEffect(
     () => () => {
@@ -113,8 +114,9 @@ export default function SlotScreen() {
 
   const startCooldown = (ms: number) => {
     const total = Math.max(0, ms) + COOLDOWN_MARGIN_MS;
-    setCooling({ until: Date.now() + total, ms: total });
-    later(() => setCooling(null), total);
+    const id = (coolSeq.current += 1);
+    setCooling({ id, ms: total });
+    later(() => setCooling((c) => (c && c.id === id ? null : c)), total);
   };
 
   const applyResult = (res: SlotSpinResult) => {
@@ -192,13 +194,13 @@ export default function SlotScreen() {
       setReality({ ...info.session });
       return;
     }
-    const requestId = pendingId.current ?? newRequestId();
-    pendingId.current = requestId;
+    const req = pending.current ?? { id: newRequestId(), bet: currentBet };
+    pending.current = req;
     setPhase('requesting');
     setMessage(null);
     try {
-      const res = await slotApi.spin({ bet: currentBet, request_id: requestId, ...(ackNext ? { reality_check_ack: true } : {}) });
-      pendingId.current = null;
+      const res = await slotApi.spin({ bet: req.bet, request_id: req.id, ...(ackNext ? { reality_check_ack: true } : {}) });
+      pending.current = null;
       setAckNext(false);
       startCooldown(info.limits.min_interval_ms);
       run(res);
@@ -220,21 +222,22 @@ export default function SlotScreen() {
           startCooldown(Number(data.retry_after_ms) || info.limits.min_interval_ms);
           return;
         case 'SLOT_DISABLED':
-          pendingId.current = null;
+          pending.current = null;
           void mutate();
           return;
         case 'ADULT_CONFIRM_REQUIRED':
         case 'ARENA_BREAK':
-          pendingId.current = null;
+          pending.current = null;
           setMessage(err.message);
           void mutateProfile();
           return;
         default:
-          if (err.status === 0) {
-            setMessage('Bağlantı kurulamadı. Tekrar denediğinde aynı çevirme gönderilir; jeton iki kez düşmez.');
+          // Ağ / sunucu hatası: çevirme işlenmiş olabilir → aynı istek yeniden gönderilir (idempotent)
+          if (err.status === 0 || err.status >= 500) {
+            setMessage('Bağlantı sorunu oldu. Tekrar denediğinde aynı çevirme gönderilir; jeton iki kez düşmez.');
             return;
           }
-          pendingId.current = null;
+          pending.current = null;
           setMessage(err.message);
           void mutate();
       }
@@ -364,7 +367,7 @@ export default function SlotScreen() {
                         {phase === 'spinning' ? 'DÖNÜYOR…' : `ÇEVİR · ${currentBet} JETON`}
                       </GameButton>
                       <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-(--g-glass)" aria-hidden="true">
-                        {cooling && <div key={cooling.until} className={cn(s.cooldown, 'h-full w-full rounded-full bg-(--g-glass-strong)')} style={{ animationDuration: `${cooling.ms}ms` }} />}
+                        {cooling && <div key={cooling.id} className={cn(s.cooldown, 'h-full w-full rounded-full bg-(--g-glass-strong)')} style={{ animationDuration: `${cooling.ms}ms` }} />}
                       </div>
                       <p id="slot-spin-note" className="sr-only">
                         Her çevirme seçili bahsi düşer. İki çevirme arasında en az 1,5 saniye beklenir; otomatik çevirme yoktur.
@@ -399,17 +402,17 @@ function TodayStats({ info }: { info: SlotInfo }) {
   const { today, limits } = info;
   return (
     <dl className="grid grid-cols-3 gap-2 text-center text-(--g-on-color)">
-      <div className="g-glass rounded-2xl px-1 py-2">
+      <div className="rounded-2xl border-2 border-(--g-hud-edge) bg-(--g-hud) px-1 py-2">
         <dt className="text-[10px] font-extrabold uppercase tracking-wide opacity-85">Bugün</dt>
         <dd className="g-num font-extrabold">
           {today.spins}/{limits.max_spins_per_day} çevirme
         </dd>
       </div>
-      <div className="g-glass rounded-2xl px-1 py-2">
+      <div className="rounded-2xl border-2 border-(--g-hud-edge) bg-(--g-hud) px-1 py-2">
         <dt className="text-[10px] font-extrabold uppercase tracking-wide opacity-85">Bugünkü net</dt>
         <dd className="g-num font-extrabold">{formatSignedCoins(today.net)} jeton</dd>
       </div>
-      <div className="g-glass rounded-2xl px-1 py-2">
+      <div className="rounded-2xl border-2 border-(--g-hud-edge) bg-(--g-hud) px-1 py-2">
         <dt className="text-[10px] font-extrabold uppercase tracking-wide opacity-85">Kalan kayıp hakkı</dt>
         <dd className="g-num font-extrabold">{limits.loss_remaining_today} jeton</dd>
       </div>

@@ -21,8 +21,7 @@
 
 ## 1. Şu an yapılıyor 🚧
 
-- [ ] 🚧 **Portföy Ligi** (Ligler içinde yeni tür): aynı başlangıç sermayesi, ölçüm dönemi ve işlem maliyeti; bireysel veya takım portföyleri; dönemsel performans; strateji ve sonuç değerlendirmesi.
-- [ ] 🚧 **Global Portföy Lab** (`/global-lab`) ve abonelik altyapısı: küresel araç kataloğu ve sınıflandırma, senaryo ve stres testi (premium), 14 günlük deneme; ödeme sağlayıcısı kararı açık.
+_Şu an yürüyen iş yok; tamamlananlar [YAPILANLAR.md](YAPILANLAR.md) içinde._
 
 ---
 
@@ -60,10 +59,12 @@ Eylemler: Yasin canlı veri gereksinimleri · Art oyun akışı ve lig/etkinlik 
 - [ ] Lig sohbeti ve duyuruları, kurumsal (okul/şirket) lig paneli
 - [ ] **Turnuvalar:** kısıtlı varlık evreni (ör. "Sadece BIST 30"), giriş koşulları
 - [ ] Liderlik tablosunda risk ayarlı getiri (Sharpe) ve maksimum düşüş; yalnızca "en çok kazanan" değil, "en istikrarlı" da ödüllendirilsin
+- [ ] 🔜 **Portföy Ligi devamı:** takım sohbeti; kaptanın üye çıkarması ve takım kodunu yenilemesi; lig bitince katılımcıların pozisyon dağılımlarını yan yana gösterme; stil etiketi eşiklerinin gerçek lig verisiyle ayarı; (isteğe bağlı) varlık evreni kısıtı ve kısa ligler için seans dışı hisse işlemlerine kural
 
 ### 3.2 Oyun Merkezi
 - [ ] Ekonomi dengesinin gerçek kullanıcı verisiyle ayarı (`backend/src/services/game/config.ts`, `backend/src/services/idle/config.ts`); haftalık düello ligi ve sezonluk kademe ödülleri; Art ile oyun akışı ve etkinlik formatı gözden geçirmesi
 - [ ] Gerçek zamanlı kotasyon sağlayıcısı geldiğinde Arena'ya "canlı" mod
+- [ ] 🔜 **Slot Makinesi devamı:** hukuk onayı sonrası production'da açma (yönetici anahtarı; bkz. `YAYIN_KONTROL_LISTESI.md` §5); sorumlu oyun ekranına kişisel slot sınırları (günlük çevirme / kayıp, yalnızca daraltılabilir); yönetici özetine günlük RTP grafiği
 - [ ] 🔜 **Arena tur ekranında kurgusal haber akışı** (`/oyun/tur/[id]`) — toplantı kararı "sürekli haber akışı". *(Yasin sonra yapacak.)*
   - Haberler **gerçek değil, oyunun ürettiği kurgu**: her haberin yönü (olumlu/olumsuz), etkilediği enstrüman(lar), etki büyüklüğü ve sönümlenme süresi var; fiyat bu habere göre yükselir/düşer (ör. "Merkez bankası beklenmedik faiz artışı" → EUR/USD ↓, altın ↓).
   - Sunucu belirler: haber zamanlaması ve fiyat etkisi turun sunucu tarafındaki fiyat üretimine eklenir (gerçek geçmiş tekrarı yerine/üstüne sentetik yol; senaryo modundaki sentetik veri altyapısı kullanılabilir); aynı turdaki herkes haberi aynı anda görür.
@@ -77,7 +78,7 @@ Eylemler: Yasin canlı veri gereksinimleri · Art oyun akışı ve lig/etkinlik 
 ### 3.4 Piyasa kapsamı
 - [ ] **BIST hisseleri:** gecikmeli veri lisansı ve sağlayıcı (ör. Matriks, Foreks veya ücretli API)
 - [ ] Daha geniş ABD hisse listesi (şu an 10 sabit sembol; `STOCK_SYMBOLS` ile genişletilebilir ama kota planı gerekir)
-- [ ] Fonlar ve ETF'ler
+- [ ] Fonlar ve ETF'ler (Global Portföy Lab kataloğundaki ETF / endeks / TL tahvil araçları şu an fiyatsız; sağlayıcı kararından sonra `provider_symbol` ile bağlanabilir)
 - [ ] NYSE tatil takviminin her yıl güncellenmesi (şu an 2027 sonuna kadar)
 
 ### 3.5 Öğrenme
@@ -141,7 +142,11 @@ Eylemler: Yasin canlı veri gereksinimleri · Art oyun akışı ve lig/etkinlik 
 
 - 💡 **Kurumsal ve eğitim lisansı:** Okullar, üniversite kulüpleri ve aracı kurumların eğitim programları için özel lig, öğretmen paneli ve raporlama. *En gerçekçi gelir kalemi.*
 - 💡 **Sponsorlu turnuvalar:** Aracı kurum ve fintech sponsorluğu, ödüllü yarışmalar (yasal çerçeve kontrol edilmeli).
-- 💡 **Premium üyelik:** Gelişmiş analizler, sınırsız izleme listesi, ek emir türleri, reklamsız deneyim.
+- 💡 **Premium üyelik:** Gelişmiş analizler, sınırsız izleme listesi, ek emir türleri, reklamsız deneyim. Altyapı hazır (migration 025): planlar, 14 günlük tek seferlik deneme, sunucu tarafı yetki kapısı (`402 SUBSCRIPTION_REQUIRED`), yönetici tanımı; ilk Premium içerik Global Portföy Lab senaryo laboratuvarı.
+  - [ ] 🔜 Ödeme sağlayıcısı kararı (iyzico / Stripe / mağaza içi satın alma) ve `source = 'payment'` entegrasyonu (webhook → `user_subscriptions`, `external_ref`); fatura / KDV, mesafeli satış sözleşmesi ve cayma hakkı (bkz. YAYIN_KONTROL_LISTESI §5)
+  - [ ] Fiyatlandırma ve Premium kapsamı (hangi analizler; deneme süresi; okul / kurum paketiyle ilişkisi)
+  - [ ] Global Portföy Lab varsayımlarının gerçek kaynak ve tarihle güncellenmesi, katalog gider oranlarının doğrulanması (yönetim paneli → Global Portföy Lab)
+  - [ ] 💡 Global Portföy Lab: varsayımların fiyat geçmişinden (price_history) kalibrasyonu, senaryoyu Model Portföy olarak kurma kısayolu
 - ❌ Gerçek para yatırma veya gerçek yatırım yönlendirmesi: SPK düzenlemeleri nedeniyle kapsam dışı.
 
 ---
@@ -161,9 +166,9 @@ Eylemler: Yasin canlı veri gereksinimleri · Art oyun akışı ve lig/etkinlik 
 
 ## 9. Önerilen sıra (özet)
 
-1. 🚧 Model Portföy, Portföy Ligi, Ortak Akıl, Global Portföy Lab (bu dalga)
-2. **Yayına alma:** staging + ilk Docker derlemesi, secret yenileme ve git geçmişi temizliği, yedekleme, hukuk onayları
-3. **Yeni veri sağlayıcıları** (ekip araştırıyor): kararlaştırılınca `backend/src/providers/adapters/` altına adaptör
-4. **Kapsam:** BIST, gerçek zamanlı fiyat akışı, daha geniş hisse listesi, fon/ETF
-5. **Büyüme:** kurumsal (okul/şirket) paket, takip etme, rozetler
+1. **Yayına alma:** staging + ilk Docker derlemesi, secret yenileme ve git geçmişi temizliği, yedekleme, hukuk onayları (KVKK, İYS, çark ve slot makinesi, abonelik/ödeme)
+2. **Yeni veri sağlayıcıları** (ekip araştırıyor): kararlaştırılınca `backend/src/providers/adapters/` altına adaptör
+3. **Kapsam:** BIST, gerçek zamanlı fiyat akışı, daha geniş hisse listesi, fon/ETF
+4. **Oyun:** Arena tur ekranında kurgusal haber akışı (Yasin), ekonomi dengesi
+5. **Büyüme:** kurumsal (okul/şirket) paket, takip etme, rozetler, ödeme sağlayıcısı (premium)
 6. **Kalite:** kayıt akışı E2E testi, bileşen kataloğu, erişilebilirlik denetimi, OpenAPI

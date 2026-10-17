@@ -2,6 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
+import { DEV_AUTO_LOGIN_USER, devAutoLoginEnabled, pauseDevAutoLogin } from '@portfoygo/shared/devAutoLogin';
 import { ApiError, authApi, session, twoFactorApi } from '@/lib/api';
 
 export interface AdminUser {
@@ -84,9 +85,25 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
       .then((res) => {
         if (cancelled) return;
         if (res?.user) void apply(res.user);
-        else setStatus('anonymous');
+        else void devAutoLoginOr(() => !cancelled && setStatus('anonymous'));
       })
-      .catch(() => !cancelled && setStatus('anonymous'));
+      .catch(() => void devAutoLoginOr(() => !cancelled && setStatus('anonymous')));
+
+    /** Yalnızca yerel geliştirme: oturum yoksa demo (yönetici) ile otomatik giriş; olmazsa normal giriş ekranı. */
+    async function devAutoLoginOr(fallback: () => unknown) {
+      if (devAutoLoginEnabled()) {
+        try {
+          const res = await authApi.devLogin(DEV_AUTO_LOGIN_USER);
+          if (!cancelled && res?.success && res.user) {
+            await apply(res.user);
+            return;
+          }
+        } catch {
+          // hızlı giriş kapalı (canlı / uzak DB)
+        }
+      }
+      fallback();
+    }
     return () => {
       cancelled = true;
     };
@@ -170,6 +187,7 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
     try {
       await authApi.logout();
     } catch {}
+    pauseDevAutoLogin();
     session.setActive(false);
     setUser(null);
     setStatus('anonymous');

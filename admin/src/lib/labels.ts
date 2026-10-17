@@ -84,6 +84,7 @@ export const AUDIT_ACTIONS: Record<AuditAction, { label: string; tone: Tone }> =
   'global_lab.correlations_update': { label: 'Lab korelasyonları güncellendi', tone: 'gold' },
   'global_lab.stress_upsert': { label: 'Stres senaryosu kaydedildi', tone: 'gold' },
   'global_lab.stress_delete': { label: 'Stres senaryosu silindi', tone: 'down' },
+  'settings.slot_toggle': { label: 'Slot Makinesi açıldı / kapatıldı', tone: 'gold' },
 };
 
 /** Listede olmayan senaryo eylemleri (ör. backend'e sonradan eklenen 'scenario.*') için okunur yedek etiket */

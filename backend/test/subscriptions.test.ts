@@ -77,6 +77,13 @@ describe('Yetki çözümlemesi (saf)', () => {
     expect(s.entitlements).not.toContain('global_lab_pro');
   });
 
+  it('veritabanı saati uygulamadan birkaç sn ileride olsa da yeni deneme hemen geçerli sayılır', () => {
+    const s = resolveEntitlements([row({ starts_at: new Date(now.getTime() + 5_000), ends_at: new Date(now.getTime() + 14 * DAY) })], PLANS, now);
+    expect(s.status).toBe('trial');
+    // ileri tarihli (ör. 1 gün sonra başlayacak) satır ise henüz yetki vermez
+    expect(resolveEntitlements([row({ starts_at: new Date(now.getTime() + DAY), ends_at: new Date(now.getTime() + 2 * DAY) })], PLANS, now).status).toBe('free');
+  });
+
   it('iptal edilmiş satır yetki vermez; süresiz yönetici tanımı verir', () => {
     expect(resolveEntitlements([row({ status: 'canceled', source: 'admin' })], PLANS, now).status).toBe('free');
     const s = resolveEntitlements([row({ status: 'active', source: 'admin', ends_at: null })], PLANS, now);

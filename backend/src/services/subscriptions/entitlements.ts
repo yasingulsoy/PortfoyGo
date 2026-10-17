@@ -60,9 +60,15 @@ export interface EntitlementState {
 
 const DAY_MS = 86_400_000;
 
+/**
+ * Başlangıç zamanı veritabanı saatiyle (now()) yazılır, kontrol uygulama saatiyle yapılır; iki saat arasındaki
+ * küçük kayma yeni başlayan aboneliği "henüz başlamadı" saymasın diye başlangıçta bu kadar pay bırakılır.
+ */
+export const CLOCK_SKEW_MS = 60_000;
+
 export function isCurrent(row: Pick<SubscriptionRow, 'status' | 'starts_at' | 'ends_at'>, now: Date): boolean {
   if (row.status !== 'trial' && row.status !== 'active') return false;
-  if (row.starts_at.getTime() > now.getTime()) return false;
+  if (row.starts_at.getTime() > now.getTime() + CLOCK_SKEW_MS) return false;
   return row.ends_at === null || row.ends_at.getTime() > now.getTime();
 }
 

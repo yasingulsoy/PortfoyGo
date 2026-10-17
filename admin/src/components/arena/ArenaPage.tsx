@@ -9,6 +9,7 @@ import { MetricCard } from '@/components/ui';
 import { SUMMARY_LIMIT, useArenaChallenges, useArenaSummary } from './data';
 import ChallengeForm from './ChallengeForm';
 import ChallengesTable from './ChallengesTable';
+import SlotSettingsCard from './SlotSettingsCard';
 
 export default function ArenaPage() {
   const [offset, setOffset] = useState(0);
@@ -58,6 +59,9 @@ export default function ArenaPage() {
       />
 
       <ChallengesTable list={list} offset={offset} setOffset={setOffset} onChanged={refresh} />
+
+      {/* Oyun Merkezi ayarı: Slot Makinesi (yönetici aç/kapat + toplu istatistik) */}
+      <SlotSettingsCard />
     </div>
   );
 }

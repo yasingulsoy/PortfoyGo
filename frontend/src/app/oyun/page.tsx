@@ -112,7 +112,7 @@ export default function OyunHubPage() {
             <ModeTile title="Görevler" subtitle={profile ? `${profile.quests.completed_today}/${profile.quests.total_today} tamam` : 'Günlük görevler'} art={<ChecklistArt />} color="green" href="/oyun/gorevler" badge={unclaimed || null} className={TILE} />
             <ModeTile title="Mağaza" subtitle="Avatar ve çerçeveler" art={<ShopArt />} color="purple" href="/oyun/magaza" className={TILE} />
             <ModeTile title="Sıralama" subtitle="Puan ve seviye listesi" art={<PodiumArt />} color="red" href="/oyun/siralama" className={TILE} />
-            {showSlot && <ModeTile title="Slot Makinesi" subtitle="Olasılık dersi" art={<SlotArt />} color="purple" href={SLOT_PATH} className={TILE} />}
+            {showSlot && <ModeTile title="Slot Makinesi" subtitle="Olasılık dersi" art={<SlotArt />} color="gold" href={SLOT_PATH} className={TILE} />}
             {/* Satırlar her kırılımda dolu: 9 kutu + geniş kutu (2 sütun: 1 hücre · 3 sütun: tam satır · 4 sütun: kalan 3 hücre); slot kapalıyken 8 kutu */}
             <ModeTile
               title="Haftalık Seçim"

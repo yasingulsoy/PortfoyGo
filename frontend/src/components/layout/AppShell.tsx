@@ -15,6 +15,10 @@ import {
   ChartBarSquareIcon,
   BoltIcon,
   SparklesIcon,
+  ChartPieIcon,
+  GlobeAltIcon,
+  LightBulbIcon,
+  StarIcon,
 } from '@heroicons/react/24/outline';
 import SidebarLayout, { type SidebarSection } from '@portfoygo/shared/ui/SidebarLayout';
 import ThemeToggle from '@portfoygo/shared/ui/ThemeToggle';
@@ -65,7 +69,14 @@ export default function AppShell({ children }: { children: ReactNode }) {
         { href: '/markets', label: 'Piyasalar', icon: ChartBarSquareIcon, match: (p) => p === '/markets' || p.startsWith('/asset/') },
         { href: '/portfolio', label: 'Portföy', icon: BriefcaseIcon },
         { href: '/transactions', label: 'İşlemler', icon: ArrowsRightLeftIcon },
+      ],
+    },
+    {
+      title: 'Analiz',
+      items: [
         { href: '/advisor', label: 'Portföy Sihirbazı', icon: SparklesIcon },
+        { href: '/model-portfoy', label: 'Model Portföy', icon: ChartPieIcon },
+        { href: '/global-lab', label: 'Global Portföy Lab', icon: GlobeAltIcon },
       ],
     },
     {
@@ -73,10 +84,11 @@ export default function AppShell({ children }: { children: ReactNode }) {
       items: [{ href: '/oyun', label: 'Oyun Merkezi', icon: BoltIcon, match: (p) => p === '/oyun' || p.startsWith('/oyun/') || p.startsWith('/arena') }],
     },
     {
-      title: 'Rekabet',
+      title: 'Rekabet ve topluluk',
       items: [
         { href: '/leaderboard', label: 'Liderlik', icon: TrophyIcon },
         { href: '/leagues', label: 'Ligler', icon: UserGroupIcon },
+        { href: '/ortak-akil', label: 'Ortak Akıl', icon: LightBulbIcon },
       ],
     },
     {
@@ -84,6 +96,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
       items: [
         { href: '/news', label: 'Haberler', icon: NewspaperIcon },
         { href: '/profile', label: 'Profil', icon: UserCircleIcon },
+        { href: '/abonelik', label: 'Abonelik', icon: StarIcon },
         ...(user?.is_admin ? [{ href: ADMIN_URL, label: 'Yönetim paneli', icon: ShieldCheckIcon, external: true }] : []),
       ],
     },

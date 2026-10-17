@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { LabInstrument } from '@/lib/globalLab';
 import { featureRows, statusSummary, type EntitlementState, type Plan } from '@/lib/subscriptions';
-import { buildMatrix, compareRows, compactMoney, emptyCells, equalWeights, isComplete, normalizeWeights, parseDecimal, pct, riskTone, weightTotal } from './model';
+import { buildMatrix, compareRows, compactMoney, emptyCells, equalWeights, isComplete, normalizeWeights, parseAmount, parseDecimal, pct, riskTone, weightTotal } from './model';
 
 const ins = (over: Partial<LabInstrument>): LabInstrument => ({
   id: over.symbol ?? 'x',
@@ -51,6 +51,9 @@ describe('ağırlıklar', () => {
     expect(parseDecimal('%40')).toBe(40);
     expect(parseDecimal('1.250,5')).toBe(1250.5);
     expect(parseDecimal('abc')).toBeNaN();
+    expect(parseAmount('100.000')).toBe(100000);
+    expect(parseAmount('₺ 12.500,5')).toBe(12500.5);
+    expect(parseAmount('')).toBeNaN();
   });
 });
 

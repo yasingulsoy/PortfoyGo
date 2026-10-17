@@ -9,14 +9,22 @@ import { API_URL } from '../env';
 const NAME = 'E2E Portföy Ligi';
 const CSRF = { 'X-Requested-With': 'PortfoyGo' };
 
+/** API yeniden başlarken (dosya değişikliği) kısa bağlantı hatalarını tolere eder */
+async function getLeagues(request: APIRequestContext) {
+  for (let i = 0; ; i++) {
+    const res = await request.get(`${API_URL}/leagues`).catch(() => null);
+    if (res?.ok()) return (await res.json()).data as { id: string; name: string; role: string; status: string }[];
+    if (i >= 10) throw new Error(`GET /leagues başarısız: ${res?.status() ?? 'bağlantı yok'}`);
+    await new Promise((r) => setTimeout(r, 2000));
+  }
+}
+
 async function cleanup(request: APIRequestContext): Promise<{ owned: number; total: number }> {
-  const res = await request.get(`${API_URL}/leagues`);
-  expect(res.ok()).toBeTruthy();
-  const { data } = await res.json();
+  const data = await getLeagues(request);
   for (const l of data as { id: string; name: string; role: string }[]) {
     if (l.name === NAME && l.role === 'owner') await request.delete(`${API_URL}/leagues/${l.id}`, { headers: CSRF });
   }
-  const after = (await (await request.get(`${API_URL}/leagues`)).json()).data as { role: string; status: string }[];
+  const after = await getLeagues(request);
   const open = after.filter((l) => l.status !== 'finished');
   return { owned: open.filter((l) => l.role === 'owner').length, total: open.length };
 }
@@ -28,10 +36,14 @@ test('(m) Portföy Ligi: formdan kur, kurallar + portföyüm + sıralama + strat
   await page.goto('/leagues');
   await page.getByRole('button', { name: 'Lig oluştur' }).first().click();
   const dialog = page.getByRole('dialog');
-  await dialog.getByLabel(/Portföy ligi:/).check({ force: true });
+  // Seçenekler görsel olarak kart / çip, anlam olarak radyo düğmesi: görünen etikete tıklanır
+  await dialog.getByText('Portföy ligi', { exact: true }).click();
+  await expect(dialog.getByLabel(/Portföy ligi:/)).toBeChecked();
   await dialog.getByLabel('Lig adı').fill(NAME);
-  await dialog.getByLabel('Hemen', { exact: true }).check({ force: true });
-  await dialog.getByLabel('1 gün', { exact: true }).check({ force: true });
+  await dialog.getByText('Hemen', { exact: true }).click();
+  await expect(dialog.getByLabel('Hemen', { exact: true })).toBeChecked();
+  await dialog.getByText('1 gün', { exact: true }).click();
+  await expect(dialog.getByLabel('1 gün', { exact: true })).toBeChecked();
   await dialog.getByRole('button', { name: 'Ligi oluştur' }).click();
 
   await expect(page).toHaveURL(/\/leagues\/[0-9a-f-]{36}$/);

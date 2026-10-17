@@ -165,7 +165,7 @@ function MatrixPanel({ items, selectedIds, onToggle }: { items: LabInstrument[];
   const gaps = emptyCells(matrix);
   return (
     <Card className="min-w-0 overflow-hidden">
-      <CardHeader title="Sınıflandırma matrisi" description="Bölge × varlık sınıfı: hangi hücreyi hangi araçlar dolduruyor?" icon={<Squares2X2Icon />} />
+      <CardHeader title="Sınıflandırma matrisi" description="Bölge × varlık sınıfı" icon={<Squares2X2Icon />} />
       <p className="px-5 pb-3 text-sm text-muted sm:px-6">
         {items.length} araç {REGIONS.length * ASSET_CLASSES.length - gaps} hücreye dağılıyor; {gaps} hücrede katalogda henüz alternatif yok. Bir sembole dokunarak
         karşılaştırmaya ekleyebilirsin.

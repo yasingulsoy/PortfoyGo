@@ -152,7 +152,7 @@ function CatalogTable({
     <Card className="min-w-0 overflow-hidden">
       <CardHeader
         title="Küresel araç kataloğu"
-        description="ETF, endeks, tahvil, emtia, gayrimenkul, kripto ve nakit alternatifleri"
+        description="Ülke, bölge ve sınıf alternatifleri"
         icon={<GlobeAltIcon />}
         action={
           compare.ids.length > 0 ? (
@@ -180,7 +180,7 @@ function CatalogTable({
       ) : items.length === 0 ? (
         <EmptyState icon={<MagnifyingGlassIcon />} title="Bu filtrelere uyan araç yok" description="Filtreleri gevşetmeyi ya da farklı bir arama yapmayı dene." />
       ) : (
-        <DataTable label="Küresel araç kataloğu" className="pb-3">
+        <DataTable label="Küresel araç kataloğu" className="relative pb-3">
           <THead>
             <Th>Araç</Th>
             <Th className="hidden md:table-cell">Sınıf · bölge</Th>

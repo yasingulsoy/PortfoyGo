@@ -154,6 +154,22 @@ describe('Sandbox engine', () => {
     expect(v.holdings[0]).toMatchObject({ price_usd: 120, stale: true });
   });
 
+  it('dondurulmuş portföy bitiş anındaki fiyatla değerlenir (lig bittikten sonra fiyat değişse de)', async () => {
+    const sym = uniqueSymbol('FZ');
+    await setMarketPrice(sym, 100);
+    const p = await newPortfolio();
+    await Sandbox.trade(p.id, userId, { side: 'buy', asset_type: 'stock', symbol: sym, quantity: 10 });
+    await Sandbox.freeze(p.id);
+    const before = await Sandbox.valuation(p.id);
+    await setMarketPrice(sym, 150); // bitişten sonra fiyat yükseldi
+    const after = await Sandbox.valuation(p.id);
+    expect(after.holdings[0].price_usd).toBe(100);
+    expect(after.equity_usd).toBe(before.equity_usd);
+    expect(after.stale).toBe(false);
+    const frozenAt = (await pool.query('SELECT frozen_at FROM sandbox_portfolios WHERE id = $1', [p.id])).rows[0].frozen_at;
+    expect(after.as_of).toBe(new Date(frozenAt).toISOString());
+  });
+
   it('dondurulmuş portföy: işlem ve yeniden dengeleme 409 SANDBOX_FROZEN', async () => {
     const p = await newPortfolio();
     const f = await Sandbox.freeze(p.id);

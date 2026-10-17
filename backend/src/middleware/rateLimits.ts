@@ -18,8 +18,15 @@ const make = (windowMs: number, limit: number, message: string, extra: Partial<O
     ...extra,
   });
 
-/** Tüm /api istekleri için genel sınır (IP başına dakikada 300). */
-export const globalApiLimiter = make(MINUTE, 300, 'Çok fazla istek gönderildi. Lütfen biraz sonra tekrar deneyin.');
+/**
+ * Tüm /api istekleri için genel sınır: IP başına dakikada 300 (API_RATE_LIMIT_PER_MIN ile değişir).
+ * Yerel geliştirmede (dev:local) çok sekme + canlı akış + E2E tek IP'den geldiği için daha yüksek verilir.
+ */
+const GLOBAL_LIMIT_PER_MIN = (() => {
+  const n = Number.parseInt(process.env.API_RATE_LIMIT_PER_MIN ?? '', 10);
+  return Number.isFinite(n) && n > 0 ? n : 300;
+})();
+export const globalApiLimiter = make(MINUTE, GLOBAL_LIMIT_PER_MIN, 'Çok fazla istek gönderildi. Lütfen biraz sonra tekrar deneyin.');
 
 /** Giriş: IP başına 15 dakikada 10 deneme. */
 export const loginLimiter = make(15 * MINUTE, 10, 'Çok fazla giriş denemesi. Lütfen 15 dakika sonra tekrar deneyin.');

@@ -66,7 +66,17 @@ export function slotErrorHandler(err: unknown, req: Request, res: Response, next
   gameErrorHandler(err, req, res, next);
 }
 
+/**
+ * Önbelleğe alınmasın: 410 varsayılan olarak "önbelleklenebilir" bir durumdur; tarayıcı yönetici slotu yeniden açtıktan
+ * sonra da eski 410'u gösterebilir. Yanıtlar ayrıca kişiye özeldir (bakiye, istatistik).
+ */
+const noStore = (_req: Request, res: Response, next: NextFunction) => {
+  res.setHeader('Cache-Control', 'no-store');
+  next();
+};
+
 const router = express.Router();
+router.use(noStore);
 
 router.get(
   '/',
@@ -95,7 +105,7 @@ export default router;
 // ---------------------------------------------------------------------------
 
 export const adminGameRouter = express.Router();
-adminGameRouter.use(authenticateToken, isAdmin);
+adminGameRouter.use(noStore, authenticateToken, isAdmin);
 
 adminGameRouter.get(
   '/slot',

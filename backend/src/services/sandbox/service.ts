@@ -3,6 +3,7 @@ import pool from '../../config/database';
 import { AppError } from '../../utils/errors';
 import { istanbulDay } from '../game/common';
 import {
+  ASSET_CLASS_OF,
   MIN_RETURNS_FOR_METRICS,
   MIN_TRADE_USD,
   PlanQuote,
@@ -259,6 +260,43 @@ async function withTx<T>(existing: PoolClient | undefined, fn: (client: PoolClie
 const notFound = () => new AppError(404, 'Portföy bulunamadı', 'SANDBOX_NOT_FOUND');
 const frozen = () => new AppError(409, 'Bu portföy donduruldu; işlem yapılamaz', 'SANDBOX_FROZEN');
 
+/** Donmuş portföyün bitiş anı fiyatı (027 öncesi donanlarda yok → güncel fiyata düşülür) */
+interface FrozenQuote {
+  price_usd: number;
+  name: string;
+}
+
+async function loadFrozenPrices(db: { query: PoolClient['query'] }, id: string): Promise<{ prices: Record<string, FrozenQuote>; at: Date } | null> {
+  const r = await db.query('SELECT frozen_prices, frozen_at FROM sandbox_portfolios WHERE id = $1', [id]);
+  const row = r.rows[0];
+  if (!row?.frozen_prices || !row.frozen_at) return null;
+  return { prices: row.frozen_prices as Record<string, FrozenQuote>, at: new Date(row.frozen_at) };
+}
+
+/** Bitiş fiyatlarını UsdQuote biçimine çevirir; fiyatı saklanmamış pozisyon haritada yer almaz (maliyetten değerlenir). */
+function frozenQuotes(holdings: HoldingRow[], prices: Record<string, FrozenQuote>, at: Date): Map<string, UsdQuote> {
+  const out = new Map<string, UsdQuote>();
+  for (const h of holdings) {
+    const key = assetKey(h.asset_type, h.symbol);
+    const f = prices[key];
+    if (!f || !(f.price_usd > 0)) continue;
+    out.set(key, {
+      asset_type: h.asset_type,
+      symbol: h.symbol,
+      name: f.name || h.name,
+      asset_class: ASSET_CLASS_OF[h.asset_type],
+      price_usd: f.price_usd,
+      sell_price_usd: f.price_usd,
+      quote_currency: 'USD',
+      as_of: at,
+      fresh: false,
+      valuation_fresh: true,
+      change_24h_pct: null,
+    });
+  }
+  return out;
+}
+
 async function lockPortfolio(client: PoolClient, id: string): Promise<SandboxPortfolio> {
   const r = await client.query('SELECT * FROM sandbox_portfolios WHERE id = $1 FOR UPDATE', [id]);
   if (!r.rows[0]) throw notFound();
@@ -357,9 +395,18 @@ export class Sandbox {
       const p = await lockPortfolio(c, portfolioId);
       if (p.status !== 'active') return p;
       await Sandbox.snapshotPortfolios([p.id], new Date(), c);
+      // Bitiş anındaki fiyatlar: donmuş portföy sonradan da bu fiyatlarla değerlenir (sıralamayla tutarlı)
+      const holdings = await loadHoldings(c, p.id);
+      const quotes = await SandboxPrices.getUsdPrices(holdings, c);
+      const frozenPrices: Record<string, FrozenQuote> = {};
+      for (const h of holdings) {
+        const q = quotes.get(assetKey(h.asset_type, h.symbol));
+        if (q) frozenPrices[assetKey(h.asset_type, h.symbol)] = { price_usd: q.price_usd, name: q.name };
+      }
       const r = await c.query(
-        `UPDATE sandbox_portfolios SET status = 'frozen', frozen_at = now(), updated_at = now() WHERE id = $1 RETURNING *`,
-        [portfolioId]
+        `UPDATE sandbox_portfolios SET status = 'frozen', frozen_at = now(), frozen_prices = $2::jsonb, updated_at = now()
+          WHERE id = $1 RETURNING *`,
+        [portfolioId, JSON.stringify(frozenPrices)]
       );
       return mapPortfolio(r.rows[0]);
     });
@@ -632,7 +679,8 @@ export class Sandbox {
         [p.id]
       ),
     ]);
-    const quotes = await SandboxPrices.getUsdPrices(holdings);
+    const frozenAt = p.status !== 'active' ? await loadFrozenPrices(db, p.id) : null;
+    const quotes = frozenAt ? frozenQuotes(holdings, frozenAt.prices, frozenAt.at) : await SandboxPrices.getUsdPrices(holdings);
     const aggregates: TradeAggregate[] = aggRes.rows.map((r: any) => ({
       asset_type: r.asset_type,
       symbol: r.symbol,
@@ -663,7 +711,7 @@ export class Sandbox {
     return {
       portfolio_id: p.id,
       ...result,
-      as_of: new Date(asOfs.length > 0 ? Math.min(...asOfs) : Date.now()).toISOString(),
+      as_of: frozenAt ? frozenAt.at.toISOString() : new Date(asOfs.length > 0 ? Math.min(...asOfs) : Date.now()).toISOString(),
     };
   }
 

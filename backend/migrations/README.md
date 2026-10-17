@@ -335,3 +335,98 @@ Performans fiyatları yalnızca saklanmış verilerden okunur (`market_data_cach
 yoktur. İş: `idea-reviews` (günlük 09:05 İstanbul). KVKK: tüm tablolar dışa aktarmada; hesap silinince kullanıcının önerileri,
 yanıtları, izleme listesi ve şikâyetleri silinir, başka önerilere yazdığı yorumların metni temizlenir.
 Yeni backend'i yayına almadan önce çalıştırın.
+
+## 023_portfolio_leagues.sql
+
+**Portföy Ligi.** Katılımcıların (bireysel ya da takım) aynı başlangıç sermayesi, ölçüm dönemi ve işlem maliyetiyle açılan
+USD sanal portföylerini (022 motoru, `kind = 'league'`) karşılaştırdığı lig modu. Mevcut ligler `mode = 'main'` kalır ve
+davranışları değişmez (ana TL portföyünün katılımdan bu yana getirisi). Kod: `backend/src/services/portfolioLeagues/`
+(`rules.ts` sabitler, `analytics.ts` saf hesaplar, `core.ts` yaşam döngüsü + sıralama, `service.ts` API), uçlar
+`/api/portfolio-leagues/*` ve `/api/admin/portfolio-leagues/:id(/finalize)`.
+
+- `leagues.mode` (`main` | `portfolio`, varsayılan `main`; CHECK) + kısmi indeks.
+- `portfolio_league_rules` (lig başına): `starting_capital_usd` ∈ {10.000, 100.000, 1.000.000}, `commission_bps` ∈ {0, 10, 25, 50},
+  `participation` (`solo` | `team`), takım liginde `team_size` 2–5 ve `max_teams` 2–10 (CHECK). **Lig başladıktan sonra
+  değiştirilemez:** servis 409 `RULES_LOCKED` döner, `trg_portfolio_league_rules_lock` tetikleyicisi de reddeder. Dönem
+  (`leagues.starts_at` / `ends_at`) en az 1 gün, en fazla 1 yıl (366 gün); başlangıç ≤ 30 gün sonra.
+- `portfolio_league_teams` (takım kodu = 8 karakter, lig içinde ad benzersiz, `captain_id`) ve `portfolio_league_team_members`
+  (kullanıcı ligde en fazla bir takımda; lig üyeliği silinince takım üyeliği de düşer — `(league_id, user_id)` → `league_members`).
+- `portfolio_league_entries`: yarışan birim (bireysel: `user_id`, takım: `team_id`; CHECK tam biri), `portfolio_id`,
+  `measured_from`, `late_join`, `withdrawn_at`, strateji beyanı ve değerlendirme notu (≤ 1000 karakter, son düzenleyen) ve
+  kapanışta dondurulan sonuçlar (`final_rank`, `final_equity_usd`, `final_return_pct`, `final_max_drawdown_pct`,
+  `final_volatility_ann`, `final_trades`, `final_turnover_pct`, `final_style_tags`, `finalized_at`).
+- 022'nin bıraktığı yabancı anahtarlar: `sandbox_portfolios.league_id → leagues` ve `team_id → portfolio_league_teams`
+  (ikisi de `ON DELETE CASCADE`; lig silinince lig portföyleri de silinir). Sahipsiz satır varsa önce temizlenir (normalde yoktur).
+
+Yaşam döngüsü mevcut `leagues-start` / `leagues-finalize` işlerinde (ve istek anındaki tembel geçişte) çalışır; yeni iş yoktur:
+
+- **Başlangıç:** portföyü olmayan her entry'ye aynı sermaye + komisyonla portföy açılır (takım portföyünün sahibi kaptan),
+  `league.portfolio_started` bildirimi ("Portföyün hazır: 100.000 USD"). Başlamadan işlem yok (`409 LEAGUE_NOT_STARTED`).
+- **Geç katılım:** dönemin ilk **%20**'si boyunca katılan üye / kurulan takım AYNI sermayeyle portföy alır, `late_join = true`
+  (sıralamada "Geç katıldı"). Sonrasında lige ve takımlara katılım kapanır (`409 LATE_JOIN_CLOSED`). Gerekçe: getiri yüzdesi
+  sermayeden bağımsızdır ama süresi kısalan katılımcı dezavantajlıdır; %20 makul bir pencere, bayrak şeffaflık sağlar.
+- **Ayrılma:** başlamamış ligde bireysel entry / boşalan takım silinir. Başlamış ligde entry "çekildi" olur (sıralamadan çıkar);
+  geri dönen aynı portföyle devam eder (sıfırlayıp yeniden başlama yok). Kaptan ayrılırsa en eski üye kaptan olur. Takım
+  değiştirmek lig başladıktan sonra yoktur (`409 TEAM_LOCKED`).
+- **İşlem:** yalnızca etkin dönemde (başladı, `ends_at` gelmedi); takım portföyünde takımın her üyesi işlem yapar
+  (`sandbox_trades.actor_user_id`). Motor yetki kontrolü yapmaz; kontrol `PortfolioLeagueService.tradeContext`'tedir.
+- **Kapanış:** önce portföyler dondurulur (`Sandbox.freeze`, son anlık görüntü), sonra sonuçlar ve sıra (getiri azalan; eşitlikte
+  önce ölçülen) yazılır, `league.portfolio_finished` (sıra + getiri) gönderilir. `finalized_at` aynı transaction'da → ikinci
+  çalıştırma hiçbir şey yapmaz.
+- **Ölçüler:** en büyük düşüş ve yıllık oynaklık ölçüm dönemindeki GERÇEKLEŞEN değer serisinden (≤ 34 gün saatlik, sonra
+  günlük); devir hızı = işlem hacmi / 2 / başlangıç sermayesi. Stil etiketleri (`analytics.ts` `styleTags`, birim testli):
+  Yoğun işlem (haftada ≥ 10 işlem veya devir ≥ %300), Al-tut (≥ 1 gün ölçüm, kuruluştan sonra 30 günde ≤ 2 işlem, nakit < %50),
+  Yoğunlaşmış (en büyük pozisyon ≥ %40 veya etkin pozisyon < 3), Çeşitlendirilmiş (etkin ≥ 5 ve en büyük < %25),
+  Nakit ağırlıklı (nakit ≥ %50).
+- **Strateji beyanı** lig başlayana kadar düzenlenir ve başlayınca herkese açılır (öncesinde yalnızca sahibi / takımı görür);
+  beyana fırsatı olmayanlar (geç katılan, hemen başlayan ligin kurucusu) geç katılım süresi içinde yazabilir. **Değerlendirme
+  notu** lig bitince yazılır.
+
+KVKK: takım üyelikleri ve entry'ler (notlar + sonuçlar) dışa aktarmada; hesap silinince kişinin yazdığı strateji / değerlendirme
+metinleri temizlenir, üyelik ve sonuçlar anonim kalır. Yönetim: lig listesinde mod + kurallar, detay penceresinde katılımcılar /
+takımlar ve devam eden ligi "Şimdi bitir" (denetim: `league.finalize`). Veri taşıma yok; **022'den sonra, yeni backend'i yayına
+almadan önce çalıştırın** (yönetim lig listesi ve lig yaşam döngüsü `leagues.mode` ile `portfolio_league_rules`'u okur).
+
+## 026_slot_machine.sql
+
+**Slot Makinesi — "Olasılık dersi"** (`/oyun/slot`). Yalnızca yeni tablolar ekler; mevcut tablolara dokunmaz, veri taşımaz.
+
+- `app_settings (key, value JSONB, updated_at, updated_by)`: küçük, kalıcı uygulama ayarları. İlk anahtar `slot_enabled`
+  (yönetim paneli → Arena → "Slot Makinesi" kartı, `PUT /api/admin/game/slot`; denetim `settings.slot_toggle`). **Tohum satırı
+  eklenmez:** kayıt yoksa geliştirme/testte açık, production'da kapalıdır (`SLOT_ENABLED_DEFAULT=1/0` varsayılanı ezer) — slot
+  hukuk onayından sonra panelden açılır. Kapalıyken `GET /api/game/slot` ve `POST /api/game/slot/spin` `410 SLOT_DISABLED` döner.
+- `slot_spins`: her çevirme (bahis, kazanç, makara sonuçları JSONB, uygulanan kural + çarpan, sonraki bakiye, durum özeti onayı).
+  `UNIQUE (user_id, request_id)` → istemcinin ürettiği `request_id` ile yeniden deneme aynı sonucu döndürür, jeton iki kez düşmez.
+  Jeton hareketleri ayrıca `game_ledger`'a yazılır (`slot_bet` −bahis, `slot_win` +kazanç; ref = (`slot`, `request_id`)).
+
+Kurallar ve olasılıklar `backend/src/services/game/config.ts` (`SLOT_*`; RTP %95 tam sayımla doğrulanır), servis
+`services/game/slot.ts`. KVKK: `slot_spins` dışa aktarmada; hesap silinince çevirmeler silinir. Yeni backend'i yayına almadan önce çalıştırın.
+
+## 025_global_lab_subscriptions.sql
+
+Global Portföy Lab ve abonelik altyapısı. Yalnızca yeni tablo / indeks / tohum satırı **ekler**; mevcut tablolara dokunmaz,
+veri taşımaz, tekrar çalıştırmak güvenlidir (`IF NOT EXISTS`, `ON CONFLICT DO NOTHING`).
+
+- **Abonelik (ödeme sağlayıcısı yok):** `subscription_plans` (`free` / `premium`; `features` JSONB = yetki anahtarları +
+  etiketler, `price_display` "Yakında") ve `user_subscriptions` (`status`: trial / active / canceled / expired, `source`:
+  trial / admin / payment, `starts_at`, `ends_at` — NULL = süresiz yönetici tanımı, `granted_by`, `note`, `external_ref`
+  ileride ödeme sağlayıcısı kimliği, `ending_notified_at`). Kısmi benzersiz indeksler: kullanıcı başına **tek deneme**
+  (`source = 'trial'`, süresi dolsa da) ve aynı anda **tek geçerli abonelik** (`status IN ('trial','active')`).
+  Yetki her istekte `ends_at`'e göre çözülür (`backend/src/services/subscriptions/entitlements.ts`); `subscriptions-expire`
+  işi (15 dk) durumu `expired` yapar, bildirir ve bitişe ≤ 3 gün kalanlara bir kez hatırlatma gönderir.
+- **Araştırma kataloğu (Excel'in yerine):** `global_instruments` (sembol, ad, araç türü, varlık sınıfı, alt sınıf, bölge,
+  ISO ülke, para birimi, 1–7 risk, gider oranı, kısa Türkçe açıklama, veri kaynağı, lisans notu, uygulamadaki fiyata bağlantı
+  `provider_symbol` = `asset_type:SEMBOL`, aktif) + ~48 araçlık tohum (yalnızca tanımlayıcı bilgi; gider oranları yaklaşık),
+  `global_research_notes` (yönetici notları; ücretsiz planda yalnızca başlık), `global_research_list` (kullanıcı listesi).
+- **Sermaye piyasası varsayımları (ÖRNEK):** `global_assumptions` — sınıf × bölge hücreleri + `fx|USDTRY` (USD bazında,
+  yıllık beklenen getiri % ve volatilite %, kaynak, tarih, not), `global_assumption_correlations` (çift başına bir satır;
+  faktör modelinden türetilmiş pozitif tanımlı örnek matris), `global_stress_scenarios` (2008, 2020, 2022, TL şoku; yaklaşık
+  USD bazlı şoklar JSONB). Hepsi yönetim panelinden düzenlenir; hesapta matris gerekirse en yakın PSD matrise düzeltilir.
+- **Kayıtlı Lab senaryoları:** `global_lab_scenarios` (kullanıcı başına ≤ 20; sonuç saklanmaz, güncel varsayımlarla yeniden hesaplanır).
+
+KVKK: abonelikler, araştırma listesi ve senaryolar "Verilerimi indir"e dahildir; hesap silmede silinir (ödeme kaynaklı
+abonelik satırları ileride yasal saklama için anonim kalır). **Yeni backend'i yayına almadan önce çalıştırın.**
+
+## 027_sandbox_frozen_prices.sql
+
+`sandbox_portfolios.frozen_prices`: lig bittiğinde (portföy dondurulurken) pozisyonların o anki USD fiyatları saklanır. Bitmiş ligde "Portföyüm" ekranı portföyü güncel fiyatla değil bitiş fiyatıyla gösterir, sıralamayla tutarlı olur. 027'den önce dondurulan portföylerde sütun boş kalır ve değerleme eskisi gibi güncel fiyata düşer.

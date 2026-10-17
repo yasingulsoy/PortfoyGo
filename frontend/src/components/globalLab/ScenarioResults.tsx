@@ -94,7 +94,7 @@ function ExposureCard({ analysis }: { analysis: Analysis }) {
   return (
     <Card className="min-w-0 overflow-hidden">
       <CardHeader title="Dağılım ve risk katkısı" description="Ağırlık riskin ne kadarını taşıyor?" icon={<ChartPieIcon />} />
-      <DataTable label="Dağılım ve risk katkısı" className="pb-3">
+      <DataTable label="Dağılım ve risk katkısı" className="relative pb-3">
         <THead>
           <Th>Hücre</Th>
           <Th align="right">Ağırlık</Th>
@@ -180,7 +180,7 @@ function DiversificationCard({ analysis }: { analysis: Analysis }) {
   const hb = d.home_bias;
   return (
     <Card className="min-w-0 overflow-hidden">
-      <CardHeader title="Çeşitlendirme" description="Risk kaynakları, bölge ve para birimi yoğunlaşması" icon={<GlobeEuropeAfricaIcon />} />
+      <CardHeader title="Çeşitlendirme" description="Risk kaynakları ve yoğunlaşma" icon={<GlobeEuropeAfricaIcon />} />
       <div className="space-y-5 px-5 pb-5 sm:px-6 sm:pb-6">
         <div className="grid grid-cols-1 gap-3 min-[420px]:grid-cols-2">
           <Stat label="Etkin bahis sayısı" value={`${d.effective_bets.toLocaleString('tr-TR', { maximumFractionDigits: 1 })} / ${d.cells}`} help={HELP.enb}>
@@ -224,7 +224,7 @@ function DiversificationCard({ analysis }: { analysis: Analysis }) {
 function StressCard({ analysis }: { analysis: Analysis }) {
   return (
     <Card className="min-w-0 overflow-hidden">
-      <CardHeader title="Stres testi" description="Geçmiş benzeri şoklarda yaklaşık etki" icon={<BoltIcon />} />
+      <CardHeader title="Stres testi" description="Yaklaşık şok etkileri" icon={<BoltIcon />} />
       {analysis.stress.length === 0 ? (
         <p className="px-5 pb-5 text-sm text-muted sm:px-6">Tanımlı stres senaryosu yok.</p>
       ) : (

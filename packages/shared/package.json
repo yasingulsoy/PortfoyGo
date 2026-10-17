@@ -10,6 +10,7 @@
   "exports": {
     "./api": "./src/api/client.ts",
     "./csp": "./src/csp.ts",
+    "./devAutoLogin": "./src/devAutoLogin.ts",
     "./errors": "./src/errors.ts",
     "./format": "./src/format.ts",
     "./types": "./src/types.ts",

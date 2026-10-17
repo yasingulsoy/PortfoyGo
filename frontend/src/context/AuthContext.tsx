@@ -2,6 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
+import { DEV_AUTO_LOGIN_USER, devAutoLoginEnabled, pauseDevAutoLogin } from '@portfoygo/shared/devAutoLogin';
 import { ApiError, authApi, session, twoFactorApi } from '@/lib/api';
 import type { LoginResult, User } from '@/types';
 
@@ -49,6 +50,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
 
   const endSession = useCallback(() => {
+    pauseDevAutoLogin();
     session.setActive(false);
     setUser(null);
     router.replace('/login');
@@ -76,6 +78,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     session.setActive(false);
     // Tam sayfa geçişi: bellekteki tüm istemci durumu (SWR önbellekleri, canlı akışlar) silinir. setUser(null)
     // yapılmaz — korumalı sayfanın "oturum yok" yönlendirmesi (/login?redirect=…) silme bildirimini ezmesin.
+    pauseDevAutoLogin();
     window.location.replace('/login?deleted=1');
   }, []);
 
@@ -100,9 +103,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (cancelled || !res?.user) return;
         session.setActive(true);
         setUser(normalizeUser(res.user));
+        return true;
       })
       .catch((err) => {
         if (!(err instanceof ApiError) || err.status !== 401) console.error('Oturum kontrol edilemedi', err);
+      })
+      .then(async (signedIn) => {
+        // Yalnızca yerel geliştirme: oturum yoksa giriş ekranını atla (backend yerel DB'de değilse 404 → sessizce geçer)
+        if (cancelled || signedIn || !devAutoLoginEnabled()) return;
+        try {
+          const data = await authApi.devLogin(DEV_AUTO_LOGIN_USER);
+          if (cancelled || !data?.success || !data.user) return;
+          session.setActive(true);
+          setUser(normalizeUser(data.user));
+        } catch {
+          // hızlı giriş kapalı (canlı / uzak DB): normal giriş akışı
+        }
       })
       .finally(() => {
         if (!cancelled) setLoading(false);

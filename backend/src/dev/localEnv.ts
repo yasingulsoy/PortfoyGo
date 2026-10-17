@@ -23,6 +23,8 @@ export function localDevEnv(db: { url: string; port: number }, extra: NodeJS.Pro
     COOKIE_SECURE: 'false',
     COOKIE_DOMAIN: '',
     // 3002: 3000 portu başka bir uygulamaca kullanılıyorsa site geçici olarak 3002'de çalıştırılabilir
+    // Çok sekme, canlı akışlar ve E2E aynı IP'den: genel sınır (canlıda 300/dk) yerelde yüksek
+    API_RATE_LIMIT_PER_MIN: process.env.API_RATE_LIMIT_PER_MIN || '5000',
     ALLOWED_ORIGINS: 'http://localhost:3000,http://127.0.0.1:3000,http://localhost:3001,http://127.0.0.1:3001,http://localhost:3002,http://127.0.0.1:3002',
     // --- Dış servisler kapalı: piyasa verisi tohumlanmış cache'ten gelir ---
     DISABLE_MARKET_REFRESH: '1',

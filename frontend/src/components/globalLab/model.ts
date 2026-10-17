@@ -109,6 +109,14 @@ export function parseDecimal(text: string): number {
   return Number.isFinite(n) ? n : NaN;
 }
 
+/** Tutar girişi: '100.000' / '₺ 12.500,50' → sayı (nokta binlik, virgül ondalık); geçersizse NaN */
+export function parseAmount(text: string): number {
+  const cleaned = text.replace(/[^\d,]/g, '').replace(',', '.');
+  if (!cleaned) return NaN;
+  const n = Number(cleaned);
+  return Number.isFinite(n) ? n : NaN;
+}
+
 /* ------------------------------------------------------------------ */
 /* Ağırlıklar                                                          */
 /* ------------------------------------------------------------------ */

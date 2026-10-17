@@ -9,7 +9,7 @@ import Button from '@portfoygo/shared/ui/Button';
 import { Alert } from '@portfoygo/shared/ui/Feedback';
 import { Segmented } from '@/components/advisor/bits';
 import type { BaseCurrency, LabInstrument, LabMeta, ScenarioInput, ScenarioMode } from '@/lib/globalLab';
-import { ASSET_CLASSES, CLASS_LABELS, HORIZON_OPTIONS, equalWeights, isComplete, normalizeWeights, parseDecimal, round1, weightTotal } from './model';
+import { ASSET_CLASSES, CLASS_LABELS, HORIZON_OPTIONS, equalWeights, isComplete, normalizeWeights, parseAmount, parseDecimal, round1, weightTotal } from './model';
 
 export interface BuilderRow {
   uid: string;
@@ -47,7 +47,7 @@ export function defaultState(): BuilderState {
 }
 
 export function toInput(s: BuilderState): { input: ScenarioInput | null; error: string | null } {
-  const amount = parseDecimal(s.amount);
+  const amount = parseAmount(s.amount);
   if (!Number.isFinite(amount) || amount < 1000) return { input: null, error: 'Tutar en az 1.000 olmalı' };
   const rows = s.rows.filter((r) => r.ref);
   if (rows.length === 0) return { input: null, error: 'En az bir satır seç' };
@@ -123,7 +123,7 @@ export default function ScenarioBuilder({
 
   return (
     <Card className="min-w-0 overflow-hidden">
-      <CardHeader title="Dağılımı kur" description="Bölge × varlık sınıfı ya da katalog araçlarıyla; ağırlıklar toplamı %100" icon={<AdjustmentsHorizontalIcon />} />
+      <CardHeader title="Dağılımı kur" description="Ağırlıkların toplamı %100 olmalı" icon={<AdjustmentsHorizontalIcon />} />
       <div className="space-y-4 px-5 pb-5 sm:px-6 sm:pb-6">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Segmented<ScenarioMode>

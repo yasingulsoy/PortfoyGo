@@ -216,7 +216,7 @@ function StressForm({ target, assumptions, onClose, onSaved }: { target: Stress 
                   value={shocks[a.key] ?? ''}
                   onChange={(e) => setShocks((s) => ({ ...s, [a.key]: e.target.value }))}
                   placeholder="—"
-                  className={cn(control, 'num h-8 w-20 text-right')}
+                  className="num h-8 w-20 shrink-0 rounded-lg border border-line bg-surface px-2 text-right text-sm text-fg shadow-card focus:border-brand/50 focus:outline-none focus:ring-[3px] focus:ring-brand/10"
                 />
               </label>
             ))}

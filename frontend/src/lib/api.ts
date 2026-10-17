@@ -975,6 +975,7 @@ import { toSlotInfo, toSlotSpinResult } from '@/components/game/slot/model';
  */
 export const slotApi = {
   key: '/game/slot',
-  info: async () => toSlotInfo(await gameRequest('/game/slot')),
+  // no-store: kapatıldıktan sonra açılan slotun eski 410 yanıtı tarayıcı önbelleğinden gelmesin
+  info: async () => toSlotInfo(await gameRequest('/game/slot', { cache: 'no-store' })),
   spin: async (body: { bet: number; request_id: string; reality_check_ack?: boolean }) => toSlotSpinResult(await gamePost('/game/slot/spin', body)),
 };
